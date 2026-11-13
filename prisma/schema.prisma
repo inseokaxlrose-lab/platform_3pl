@@ -55,6 +55,8 @@ model User {
   gridSettings        UserGridSetting[]
   // 사이드바 즐겨찾기 메뉴
   favoriteMenus       UserFavoriteMenu[]
+  // 운영사 정보를 마지막으로 고친 기록
+  companyUpdates      Company[]
 
   @@unique([email])
   @@unique([username])
@@ -252,4 +254,48 @@ model UserFavoriteMenu {
 
   @@id([userId, href])
   @@map("user_favorite_menu")
+}
+
+// 운영사 정보 (docs/decisions/0024)
+// MVP는 운영사 1곳 → 고정 id('default') 한 줄. 여러 운영사 SaaS로 바뀌면 회사 단위 기준이 된다
+model Company {
+  id             String           @id @default("default")
+  name           String
+  // 000-00-00000 모양으로 저장 (검증번호 확인 후)
+  businessNumber String
+  ceoName        String?
+  // 업태 / 종목 (거래명세서·세금계산서용)
+  businessType   String?
+  businessItem   String?
+  phone          String?
+  fax            String?
+  email          String?
+  // 주소: 카카오 우편번호 서비스로 검색해 채우고, 상세주소만 직접 입력
+  zipCode        String?
+  address        String?
+  addressDetail  String?
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
+  // 마지막으로 고친 사람
+  updatedById    String?
+  updatedBy      User?            @relation(fields: [updatedById], references: [id], onDelete: SetNull)
+  contacts       CompanyContact[]
+
+  @@map("company")
+}
+
+// 운영사 담당자 (최대 5명, 화면에서 정한 순서대로)
+model CompanyContact {
+  id        String  @id @default(cuid())
+  companyId String
+  sortOrder Int
+  // 담당 업무 (예: 입고 문의, 정산)
+  duty      String
+  name      String
+  phone     String?
+  email     String?
+  company   Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@index([companyId, sortOrder])
+  @@map("company_contact")
 }
