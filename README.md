@@ -40,3 +40,8 @@ npm run test       # 전체 테스트 한 번 실행 (DB 테스트는 platform_3
 npm run test:watch # 파일을 고칠 때마다 테스트 자동 실행
 npm run db:studio  # DB 내용을 브라우저에서 보기
 ```
+
+## 문제 해결
+
+- **CSS(색상 등)를 고쳤는데 화면에 반영되지 않을 때**: 개발 서버가 이전 빌드 결과(`.next` 폴더)를 재사용하는 경우가 있다. 개발 서버를 끄고 `rm -rf .next` 후 `npm run dev`로 다시 시작한다.
+- **개발 중 "Hydration failed" 오류에 `open-incognito-widget` 같은 낯선 요소가 보일 때**: 브라우저 확장 프로그램이 페이지에 요소를 끼워 넣은 것이다. 확장 프로그램을 끈 창(시크릿 모드 등)에서 확인한다.
