@@ -28,6 +28,7 @@ Next.js (App Router) · TypeScript · PostgreSQL · Prisma · Tailwind + shadcn/
 
 - **데이터 범위**: 모든 조회·수정에 사용자 데이터 범위를 적용한다. 화주사 사용자 → 자기 화주사만, 센터 운영자·작업자 → 소속 센터만, 운영사 관리자 → 전체. 목록은 `scopeFilter(scope, …)`, 한 건 수정·삭제는 `assertInScope(scope, …)`로 (`src/lib/scope/`, `docs/decisions/0016`).
 - **권한 검사는 화면 + 서버 둘 다**: 메뉴·버튼을 숨기는 것만으로 끝내지 않고, 서버 액션/API에서 같은 권한 코드로 다시 검사한다. 데이터를 바꾸는 서버 액션은 반드시 `createAction`(`src/lib/actions/create-action.ts`)으로 만든다 (`docs/decisions/0015`).
+- **기준정보 코드 3층**: 시스템 코드(`nextSystemCode`, 자동·불변, 라벨·이력용) + 사용자 코드(비우면 시스템 코드, 시스템 코드 모양 금지) + 외부 코드(`ExternalCode` 매핑, `saveExternalCodes`). 새 기준정보도 이 구조를 따른다 (`docs/decisions/0025`).
 - **재고는 직접 수정 금지**: 재고 수량은 반드시 재고 변경 공통 함수(이력 기록 포함)로만 바꾼다. 수량 변경과 이력 기록은 하나의 DB 트랜잭션으로 묶는다.
 - **재고는 기본단위로 저장**: 환산단위(BOX, CARTON, PLT)는 화면 표시·입력용이며, 환산은 공통 함수에서만 한다. 수량은 Decimal.
 - **로트번호·유통기한은 품목 설정에 따름**: 사용하는 품목은 필수 입력, 사용하지 않는 품목은 null.
