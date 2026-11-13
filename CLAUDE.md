@@ -40,6 +40,7 @@ Next.js (App Router) · TypeScript · PostgreSQL · Prisma · Tailwind + shadcn/
 - **목록 화면은 반드시 공통 `DataGrid`(`src/components/data-grid/`)를 사용**한다. `<table>`이나 TanStack Table을 화면에서 직접 쓰지 않는다.
 - 그리드에 필요한 기능이 없으면 화면에서 우회하지 말고 `DataGrid`에 기능을 추가하고, `/dev/grid` 쇼케이스에도 반영한다.
 - 자세한 설계: `docs/decisions/0002-ui-and-datagrid.md`
+- **화면 권한**: 각 화면(page.tsx) 맨 위에서 `hasPermission('메뉴.read')`로 확인하고 없으면 `<AccessDenied />`. 버튼은 `<Can permission="…">`으로 감싼다. 권한 코드는 `src/config/permissions.ts`에만 정의한다 (`docs/decisions/0011`, `0014`)
 
 ## 코드 스타일
 
