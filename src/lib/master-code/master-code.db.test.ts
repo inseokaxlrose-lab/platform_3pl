@@ -40,7 +40,7 @@ describe('시스템 코드', () => {
 
   it('번호 모양 만들기', () => {
     expect(formatSystemCode('CENTER', 1)).toBe('CT000001')
-    expect(formatSystemCode('CUSTOMER', 1234n)).toBe('CU00001234')
+    expect(formatSystemCode('CUSTOMER', BigInt(1234))).toBe('CU00001234')
   })
 })
 
