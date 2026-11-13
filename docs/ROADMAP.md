@@ -5,7 +5,7 @@
 > 끝난 작업은 `[x]`로 바꿉니다.
 > 데이터 구조는 `docs/decisions/0003-domain-model.md`를 따릅니다.
 
-## 현재 위치: M0 시작 전
+## 현재 위치: M0 진행 중 — 다음: 코드 스타일 설정
 
 ---
 
@@ -13,7 +13,7 @@
 
 목표: 빈 화면이라도 실행되고, DB에 연결되는 상태
 
-- [ ] Next.js + TypeScript 프로젝트 생성
+- [x] Next.js + TypeScript 프로젝트 생성
 - [ ] 코드 스타일 설정 (ESLint, Prettier: 2칸, 세미콜론 없음, 작은따옴표)
 - [ ] Tailwind + shadcn/ui 설정
 - [ ] 로컬 PostgreSQL 준비 + Prisma 연결
