@@ -34,6 +34,8 @@ export default defineConfig({
           name: 'db',
           environment: 'node',
           include: ['src/**/*.db.test.ts'],
+          // 시작 전 한 번: 테스트 DB에 마이그레이션 적용 / 파일마다: 테스트 DB로 주소 교체
+          globalSetup: ['./vitest.db-global-setup.ts'],
           setupFiles: ['./vitest.db-setup.ts'],
           // 같은 DB를 쓰므로 파일을 동시에 실행하지 않는다 (데이터 충돌 방지)
           fileParallelism: false,
