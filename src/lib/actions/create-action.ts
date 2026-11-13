@@ -21,7 +21,9 @@ export type ActionContext<TInput> = {
 
 type CreateActionOptions<TSchema extends z.ZodType, TData> = {
   // 이 액션에 필요한 권한 (화면 버튼과 같은 코드)
-  permission: PermissionCode
+  // 'signed-in': 메뉴 권한 없이 로그인만 필요 — 본인 것만 다루는 개인 설정용 (예: 그리드 설정)
+  //   이 경우 handler는 반드시 context.user.id의 데이터만 다뤄야 한다 (0015)
+  permission: PermissionCode | 'signed-in'
   // 입력 규칙
   input: TSchema
   // 실제 처리: 로그인·권한·입력 검사를 모두 통과해야 실행된다
@@ -48,7 +50,9 @@ export function createAction<TSchema extends z.ZodType, TData>({
     if (!user) return failure('UNAUTHENTICATED', MESSAGES.UNAUTHENTICATED)
 
     const permissions = await getCurrentPermissions()
-    if (!permissions.has(permission)) return failure('FORBIDDEN', MESSAGES.FORBIDDEN)
+    if (permission !== 'signed-in' && !permissions.has(permission)) {
+      return failure('FORBIDDEN', MESSAGES.FORBIDDEN)
+    }
 
     const parsed = input.safeParse(rawInput)
     if (!parsed.success) {

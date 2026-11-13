@@ -127,3 +127,24 @@ describe('unwrap', () => {
     ).toThrow('권한이 없습니다.')
   })
 })
+
+describe("permission: 'signed-in' (개인 설정용)", () => {
+  const saveMine = createAction({
+    permission: 'signed-in',
+    input: z.object({ value: z.string() }),
+    handler: async ({ user, input }) => ({ owner: user.id, value: input.value }),
+  })
+
+  it('메뉴 권한이 하나도 없어도 로그인했으면 처리한다', async () => {
+    signedIn([])
+    expect(await saveMine({ value: 'x' })).toEqual({ ok: true, data: { owner: 'u1', value: 'x' } })
+  })
+
+  it('로그인하지 않았으면 여전히 UNAUTHENTICATED', async () => {
+    vi.mocked(getCurrentUser).mockResolvedValue(null)
+    expect(await saveMine({ value: 'x' })).toMatchObject({
+      ok: false,
+      error: { code: 'UNAUTHENTICATED' },
+    })
+  })
+})
