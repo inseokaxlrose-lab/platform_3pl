@@ -1,11 +1,21 @@
 import { randomUUID } from 'node:crypto'
+import { nextSystemCode } from '@/lib/master-code/system-code'
 import { prisma } from '@/lib/prisma'
 
 // DB 테스트용 데이터 만들기 도우미 (테스트 DB에서만 사용)
 
-export function createTestCenter(code: string, data: { name?: string; isActive?: boolean } = {}) {
+// 센터 (시스템 코드는 실제처럼 시퀀스로 발급, 입고대기 창고는 만들지 않음 — 필요한 테스트에서 따로)
+export async function createTestCenter(
+  code: string,
+  data: { name?: string; isActive?: boolean } = {},
+) {
   return prisma.center.create({
-    data: { code, name: data.name ?? `${code} 센터`, isActive: data.isActive },
+    data: {
+      systemCode: await nextSystemCode('CENTER'),
+      code,
+      name: data.name ?? `${code} 센터`,
+      isActive: data.isActive,
+    },
   })
 }
 

@@ -187,18 +187,75 @@ model UserPermissionOverride {
 // ─────────────────────────────────────────────
 
 // 센터: 운영사의 물류센터
+// 센터: 운영사의 물류센터 (docs/decisions/0026)
+// 코드 3층 (0025): systemCode(자동·불변) / code(사용자 코드, 전체에서 중복 금지) / 외부 코드(ExternalCode)
 model Center {
-  id        String   @id @default(cuid())
-  code      String   @unique
-  name      String
+  id            String   @id @default(cuid())
+  // 시스템 코드: CT000001 (라벨·문서·이력에 쓰는 불변 코드)
+  systemCode    String   @unique
+  // 사용자 코드: 화면 검색·표시용 (바꿀 수 있음)
+  code          String   @unique
+  name          String
+  phone         String?
+  fax           String?
+  managerName   String?
+  managerPhone  String?
+  zipCode       String?
+  address       String?
+  addressDetail String?
   // false면 데이터 범위에서 빠진다 (소속 직원도 이 센터 데이터를 볼 수 없음)
-  isActive  Boolean  @default(true)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  isActive      Boolean  @default(true)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
 
-  users UserCenter[]
+  users      UserCenter[]
+  warehouses Warehouse[]
 
   @@map("center")
+}
+
+enum WarehouseType {
+  // 일반 보관 창고
+  GENERAL
+  // 입고대기 창고: 입고 확정 후 적치 전까지 재고가 머무는 곳 (센터마다 1개, 센터 등록 시 자동 생성)
+  INBOUND_STAGING
+}
+
+// 창고: 센터 안의 보관 구역 (관리 화면은 "센터별 창고 관리" 작업에서)
+model Warehouse {
+  id         String        @id @default(cuid())
+  centerId   String
+  // 시스템 코드: WH000001
+  systemCode String        @unique
+  // 사용자 코드: 같은 센터 안에서 중복 금지
+  code       String
+  name       String
+  type       WarehouseType @default(GENERAL)
+  isActive   Boolean       @default(true)
+  createdAt  DateTime      @default(now())
+  updatedAt  DateTime      @updatedAt
+  center     Center        @relation(fields: [centerId], references: [id], onDelete: Restrict)
+  locations  Location[]
+
+  // 센터마다 입고대기 창고 1개: 마이그레이션 SQL의 부분 고유 인덱스 warehouse_one_inbound_staging_per_center
+  @@unique([centerId, code])
+  @@index([centerId])
+  @@map("warehouse")
+}
+
+// 로케이션: 창고 안의 보관 위치. 코드 자체가 위치라 시스템 코드는 없다 (0025)
+model Location {
+  id          String    @id @default(cuid())
+  warehouseId String
+  // 같은 창고 안에서 중복 금지 (예: A-01-01, DEFAULT)
+  code        String
+  isActive    Boolean   @default(true)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  warehouse   Warehouse @relation(fields: [warehouseId], references: [id], onDelete: Restrict)
+
+  @@unique([warehouseId, code])
+  @@map("location")
 }
 
 // 화주사: 운영사에 물건 보관·배송을 맡기는 회사

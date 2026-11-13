@@ -1,11 +1,13 @@
 // 개발용 시드: npm run db:seed (여러 번 실행해도 안전)
 // - 역할별 권한그룹 4개: 실행할 때마다 prisma/seed-roles.ts 정의와 똑같이 맞춘다
-// - 예시 센터·화주사 (코드 기준으로 없을 때만 만든다. 센터·화주사 관리 화면은 M2·M3)
+// - 예시 센터·화주사 (코드 기준으로 없을 때만 만든다) + 센터마다 입고대기 창고·기본 로케이션
 // - 슈퍼 계정: .env의 SEED_ADMIN_USERNAME / SEED_ADMIN_PASSWORD (비밀번호는 코드에 두지 않는다)
 // - 예시 운영사 정보 (아직 없을 때만, 사업자번호는 검증번호 규칙으로 만든 가상 번호)
 // - 역할별 견본 계정 4개: .env의 SEED_SAMPLE_PASSWORD (비어 있거나 운영 환경이면 건너뛴다)
 // 이미 있는 계정은 비밀번호·소속을 덮어쓰지 않는다 (화면에서 바꾼 값을 지키기 위해)
 import 'dotenv/config'
+import { ensureCenterDefaults } from '../src/lib/centers/center-defaults'
+import { nextSystemCode } from '../src/lib/master-code/system-code'
 import { prisma } from '../src/lib/prisma'
 import { createUserAccount } from '../src/lib/users/create-user-account'
 import { SAMPLE_ACCOUNTS, SEED_GROUPS, SUPER_GROUP_NAME } from './seed-roles'
@@ -118,7 +120,14 @@ const SAMPLE_SHIPPERS = [
 // 예시 조직: 이미 있으면 건드리지 않는다 (화면에서 바꾼 이름을 덮어쓰지 않기 위해)
 async function seedSampleOrganizations() {
   for (const center of SAMPLE_CENTERS) {
-    await prisma.center.upsert({ where: { code: center.code }, create: center, update: {} })
+    // 없을 때만 만든다 (시스템 코드는 시퀀스로 발급)
+    const found =
+      (await prisma.center.findUnique({ where: { code: center.code } })) ??
+      (await prisma.center.create({
+        data: { ...center, systemCode: await nextSystemCode('CENTER') },
+      }))
+    // 입고대기 창고 + 기본 로케이션 (이미 있으면 그대로)
+    await ensureCenterDefaults(prisma, found.id)
   }
   for (const shipper of SAMPLE_SHIPPERS) {
     await prisma.shipper.upsert({ where: { code: shipper.code }, create: shipper, update: {} })
