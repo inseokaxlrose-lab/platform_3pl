@@ -9,7 +9,5 @@ export const USER_TYPE_STATUS: StatusFormat = {
   SHIPPER: { label: '화주사', tone: 'warning' },
 }
 
-export const ACTIVE_STATUS: StatusFormat = {
-  true: { label: '사용', tone: 'success' },
-  false: { label: '사용 중지', tone: 'danger' },
-}
+// 공통 상태 배지 (센터 등 다른 화면과 같은 모양)
+export { ACTIVE_STATUS } from '@/components/common/status-formats'

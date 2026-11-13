@@ -73,7 +73,7 @@ const adminNavigation: NavArea = {
           title: '센터',
           href: '/admin/master/centers',
           icon: WarehouseIcon,
-          ready: false,
+          ready: true,
           permission: 'master.centers.read',
         },
         {
