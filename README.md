@@ -28,6 +28,9 @@ openssl rand -base64 32
 npm install
 npx prisma migrate dev
 npm run db:check
+
+# 5. 개발용 슈퍼 계정 만들기 (.env의 SEED_ADMIN_PASSWORD를 먼저 채운다)
+npm run db:seed
 ```
 
 DB 구조가 바뀐 코드를 받았을 때(`git pull` 후)는 `npx prisma migrate dev`를 다시 실행한다. 테스트 DB는 `npm run test` 때 자동으로 맞춰진다.
@@ -44,6 +47,7 @@ npm run db:check   # DB 연결 확인
 npm run test       # 전체 테스트 한 번 실행 (DB 테스트는 platform_3pl_test 사용)
 npm run test:watch # 파일을 고칠 때마다 테스트 자동 실행
 npm run db:studio  # DB 내용을 브라우저에서 보기
+npm run db:seed    # 개발용 슈퍼 계정·권한그룹 (여러 번 실행해도 안전, 새 메뉴 권한도 반영)
 ```
 
 ## 문제 해결
