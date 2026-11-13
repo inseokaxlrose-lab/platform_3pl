@@ -51,6 +51,8 @@ model User {
   permissionOverrides UserPermissionOverride[]
   // 센터 직원의 소속 센터 (여러 개 가능)
   centers             UserCenter[]
+  // 목록 그리드 개인 설정 (숨긴 컬럼·순서·너비 등)
+  gridSettings        UserGridSetting[]
 
   @@unique([email])
   @@unique([username])
@@ -222,4 +224,17 @@ model UserCenter {
   @@id([userId, centerId])
   @@index([centerId])
   @@map("user_center")
+}
+
+// 사용자별 목록 그리드 설정: 사용자 + 그리드 이름(DataGrid id) 하나에 한 줄 (docs/decisions/0021)
+// settings 모양은 src/components/data-grid/settings.ts의 gridSettingsSchema (읽을 때 검사, 깨지면 기본값)
+model UserGridSetting {
+  userId    String
+  gridId    String
+  settings  Json
+  updatedAt DateTime @updatedAt
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([userId, gridId])
+  @@map("user_grid_setting")
 }
