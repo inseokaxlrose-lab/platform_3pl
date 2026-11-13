@@ -1,8 +1,8 @@
 import { cn } from '@/lib/utils'
 
 // 입력 화면 공통 배치 (docs/decisions/0002 "입력 화면")
-// 책을 펼친 모양: 정보가 적으면 왼쪽 단에만, 많으면 왼쪽을 채우고 오른쪽 단으로 이어서 쓴다
-// - 단 안에서는 칸을 위에서 아래로 한 줄에 하나씩 놓는다 (눈이 아래로만 움직이게)
+// 책을 펼친 모양: 왼쪽 단에 다 담을 수 있으면 왼쪽만, 넘칠 만큼 많을 때만 오른쪽 단으로 이어서 쓴다
+// - 단 안에서는 위에서 아래로 쌓는다. 관련 있는 짧은 칸은 FormRow로 한 줄에 2개까지
 // - 넓은 화면(lg 이상)에서만 2단, 그보다 좁으면 1단으로 위아래로 이어진다
 // - 표처럼 넓어야 하는 내용(권한 체크 표 등)은 FormColumns 밖에 전체 너비로 둔다
 export function FormColumns({
@@ -62,4 +62,16 @@ export function FormSection({
       <div className="grid gap-4">{children}</div>
     </section>
   )
+}
+
+// 한 줄에 칸 2개까지: 관련 있는 짧은 정보만 묶는다 (예: 업태 / 종목, 비밀번호 / 비밀번호 확인)
+// 좁은 화면에서는 한 줄에 하나로 바뀐다
+export function FormRow({
+  children,
+  className,
+}: {
+  children: React.ReactNode
+  className?: string
+}) {
+  return <div className={cn('grid items-start gap-4 sm:grid-cols-2', className)}>{children}</div>
 }
