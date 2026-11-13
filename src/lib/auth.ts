@@ -1,8 +1,12 @@
 import { betterAuth } from 'better-auth'
+import { APIError } from 'better-auth/api'
 import { prismaAdapter } from 'better-auth/adapters/prisma'
 import { nextCookies } from 'better-auth/next-js'
 import { username } from 'better-auth/plugins'
 import { prisma } from '@/lib/prisma'
+
+// 사용 중지 계정 로그인 시 오류 메시지 (로그인 화면에서 이 값으로 구분한다)
+export const ACCOUNT_DISABLED = 'ACCOUNT_DISABLED'
 
 // 인증 설정 (Better Auth) — docs/decisions/0010-auth-and-permission-model.md
 // - 로그인: 아이디 + 비밀번호 (현장 작업자는 이메일이 없을 수 있음)
@@ -20,6 +24,22 @@ export const auth = betterAuth({
       userType: { type: 'string', required: true, input: false },
       // false면 로그인·사용 불가 (퇴사자 등). 계정을 지우지 않고 막는다
       isActive: { type: 'boolean', required: true, defaultValue: true, input: false },
+    },
+  },
+  databaseHooks: {
+    session: {
+      create: {
+        // 로그인 직전 검사: 사용 중지된 계정(isActive = false)은 세션을 만들지 않는다
+        before: async (session) => {
+          const user = await prisma.user.findUnique({
+            where: { id: session.userId },
+            select: { isActive: true },
+          })
+          if (!user?.isActive) {
+            throw new APIError('FORBIDDEN', { message: ACCOUNT_DISABLED })
+          }
+        },
+      },
     },
   },
   plugins: [

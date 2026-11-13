@@ -6,7 +6,11 @@ import { configDefaults, defineConfig } from 'vitest/config'
 // - *.db.test.ts  → db        : 테스트 전용 DB에 연결
 export default defineConfig({
   // tsconfig.json의 경로 별칭(@/...)을 그대로 사용 (Vite 8 기본 기능)
-  resolve: { tsconfigPaths: true },
+  resolve: {
+    tsconfigPaths: true,
+    // 'server-only'는 브라우저 코드에 섞이는 것을 막는 표시. 테스트(Node)에서는 빈 모듈로 바꾼다
+    alias: { 'server-only': new URL('./src/test/empty-module.ts', import.meta.url).pathname },
+  },
   test: {
     passWithNoTests: true,
     projects: [
