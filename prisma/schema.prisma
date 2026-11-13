@@ -255,17 +255,23 @@ model Warehouse {
 }
 
 // 로케이션: 창고 안의 보관 위치. 코드 자체가 위치라 시스템 코드는 없다 (0025)
+// 코드는 등록 후 바꿀 수 없다 (재고·적치 기록이 이 주소를 가리킨다, 0028)
 model Location {
   id          String    @id @default(cuid())
   warehouseId String
   // 같은 창고 안에서 중복 금지 (예: A-01-01, DEFAULT)
   code        String
+  // 일괄 생성으로 만들면 함께 저장: 구역(A) / 열(01) / 단(02) — 구역별 거르기·정렬용 (docs/decisions/0028)
+  zone        String?
+  aisle       String?
+  level       String?
   isActive    Boolean   @default(true)
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
   warehouse   Warehouse @relation(fields: [warehouseId], references: [id], onDelete: Restrict)
 
   @@unique([warehouseId, code])
+  @@index([warehouseId, zone])
   @@map("location")
 }
 
