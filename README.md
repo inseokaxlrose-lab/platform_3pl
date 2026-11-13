@@ -29,9 +29,22 @@ npm install
 npx prisma migrate dev
 npm run db:check
 
-# 5. 개발용 슈퍼 계정 만들기 (.env의 SEED_ADMIN_PASSWORD를 먼저 채운다)
+# 5. 개발용 슈퍼 계정·견본 계정 만들기 (.env의 SEED_ADMIN_PASSWORD, SEED_SAMPLE_PASSWORD를 먼저 채운다)
 npm run db:seed
 ```
+
+### 개발용 견본 계정
+
+시드가 역할마다 하나씩 만든다. 비밀번호는 모두 `.env`의 `SEED_SAMPLE_PASSWORD`이다. 값이 비어 있거나 운영 환경이면 만들지 않는다.
+
+| 아이디 | 역할 | 소속 | 로그인 후 |
+|---|---|---|---|
+| `ops.admin` | 운영사 관리자 (슈퍼 관리자 그룹) | — | `/admin`, 모든 메뉴 |
+| `center.manager` | 센터 운영자 | 이천센터 | `/admin`, 시스템 메뉴 제외 |
+| `center.worker` | 센터 작업자 | 이천센터 | `/admin`, 검수·라벨·확정·적치·재고 조회·실사 등록 |
+| `shipper.user` | 화주사 사용자 | 가나식품 | `/portal` |
+
+역할별 권한은 `prisma/seed-roles.ts`에 있고, 시드를 실행할 때마다 그룹 권한이 이 정의와 같아진다. 계정은 없을 때만 만들어서, 화면에서 바꾼 비밀번호·소속은 그대로 남는다.
 
 DB 구조가 바뀐 코드를 받았을 때(`git pull` 후)는 `npx prisma migrate dev`를 다시 실행한다. 테스트 DB는 `npm run test` 때 자동으로 맞춰진다.
 
@@ -47,7 +60,7 @@ npm run db:check   # DB 연결 확인
 npm run test       # 전체 테스트 한 번 실행 (DB 테스트는 platform_3pl_test 사용)
 npm run test:watch # 파일을 고칠 때마다 테스트 자동 실행
 npm run db:studio  # DB 내용을 브라우저에서 보기
-npm run db:seed    # 개발용 슈퍼 계정·권한그룹 (여러 번 실행해도 안전, 새 메뉴 권한도 반영)
+npm run db:seed    # 개발용 슈퍼 계정·역할별 권한그룹·견본 계정 (여러 번 실행해도 안전, 새 메뉴 권한도 반영)
 ```
 
 ## 문제 해결
