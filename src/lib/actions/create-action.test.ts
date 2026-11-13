@@ -10,6 +10,7 @@ import { unwrap } from './unwrap'
 vi.mock('@/lib/session', () => ({
   getCurrentUser: vi.fn(),
   getCurrentPermissions: vi.fn(),
+  getCurrentScope: vi.fn(async () => ({ kind: 'CENTERS', centerIds: ['ICN'] })),
 }))
 
 const user: CurrentUser = { id: 'u1', name: '김운영', username: 'kim', userType: 'CENTER' }
@@ -83,7 +84,12 @@ describe('createAction 검사 순서', () => {
 
     expect(result).toEqual({ ok: true, data: { closed: 'A1' } })
     expect(handler).toHaveBeenCalledWith(
-      expect.objectContaining({ user, input: { asnId: 'A1', reason: '화주 요청' } }),
+      expect.objectContaining({
+        user,
+        input: { asnId: 'A1', reason: '화주 요청' },
+        // 처리 함수는 데이터 범위를 함께 받는다
+        scope: { kind: 'CENTERS', centerIds: ['ICN'] },
+      }),
     )
   })
 })

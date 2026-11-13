@@ -1,7 +1,13 @@
 import 'server-only'
 import { z } from 'zod'
 import type { PermissionCode } from '@/config/permissions'
-import { getCurrentPermissions, getCurrentUser, type CurrentUser } from '@/lib/session'
+import type { DataScope } from '@/lib/scope/data-scope'
+import {
+  getCurrentPermissions,
+  getCurrentScope,
+  getCurrentUser,
+  type CurrentUser,
+} from '@/lib/session'
 import { ActionError } from './action-error'
 import type { ActionErrorCode, ActionFailure, ActionResult } from './result'
 
@@ -9,7 +15,8 @@ export type ActionContext<TInput> = {
   user: CurrentUser
   input: TInput
   permissions: ReadonlySet<PermissionCode>
-  // 데이터 범위(소속 센터·화주사)는 "데이터 범위 장치" 작업에서 여기에 추가한다
+  // 데이터 범위: 조회는 scopeFilter(scope, …), 한 건 수정·삭제는 assertInScope(scope, …)
+  scope: DataScope
 }
 
 type CreateActionOptions<TSchema extends z.ZodType, TData> = {
@@ -57,7 +64,8 @@ export function createAction<TSchema extends z.ZodType, TData>({
     }
 
     try {
-      const data = await handler({ user, input: parsed.data, permissions })
+      const scope = await getCurrentScope()
+      const data = await handler({ user, input: parsed.data, permissions, scope })
       return { ok: true, data }
     } catch (error) {
       if (error instanceof ActionError) return failure(error.code, error.message)

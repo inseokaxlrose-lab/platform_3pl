@@ -6,6 +6,8 @@ import type { PermissionCode } from '@/config/permissions'
 import { auth } from '@/lib/auth'
 import { loadUserPermissions } from '@/lib/permissions/load-user-permissions'
 import { areaOf, homeOf, type Area, type UserTypeValue } from '@/lib/redirect'
+import type { DataScope } from '@/lib/scope/data-scope'
+import { loadDataScope } from '@/lib/scope/load-data-scope'
 
 export type CurrentUser = {
   id: string
@@ -51,3 +53,11 @@ export const getCurrentPermissions = cache(async (): Promise<ReadonlySet<Permiss
 export async function hasPermission(code: PermissionCode) {
   return (await getCurrentPermissions()).has(code)
 }
+
+// 현재 로그인 사용자의 데이터 범위 (한 요청 안에서는 한 번만 계산: cache)
+// 로그인 안 됨이면 NONE (아무것도 볼 수 없음)
+export const getCurrentScope = cache(async (): Promise<DataScope> => {
+  const user = await getCurrentUser()
+  if (!user) return { kind: 'NONE' }
+  return loadDataScope(user.id)
+})
