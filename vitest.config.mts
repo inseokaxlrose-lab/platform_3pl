@@ -19,7 +19,8 @@ export default defineConfig({
         test: {
           name: 'unit',
           environment: 'node',
-          include: ['src/**/*.test.ts'],
+          // prisma/: 시드의 역할별 권한 정의 검사
+          include: ['src/**/*.test.ts', 'prisma/**/*.test.ts'],
           exclude: [...configDefaults.exclude, '**/*.db.test.ts'],
         },
       },

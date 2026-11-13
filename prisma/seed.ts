@@ -1,43 +1,43 @@
 // 개발용 시드: npm run db:seed (여러 번 실행해도 안전)
-// - "슈퍼 관리자" 권한그룹: 운영사 화면의 모든 권한 (실행할 때마다 최신 권한 목록으로 맞춘다)
+// - 역할별 권한그룹 4개: 실행할 때마다 prisma/seed-roles.ts 정의와 똑같이 맞춘다
 // - 예시 센터·화주사 (코드 기준으로 없을 때만 만든다. 센터·화주사 관리 화면은 M2·M3)
 // - 슈퍼 계정: .env의 SEED_ADMIN_USERNAME / SEED_ADMIN_PASSWORD (비밀번호는 코드에 두지 않는다)
-//   이미 있는 계정의 비밀번호는 덮어쓰지 않는다
+// - 역할별 견본 계정 4개: .env의 SEED_SAMPLE_PASSWORD (비어 있거나 운영 환경이면 건너뛴다)
+// 이미 있는 계정은 비밀번호·소속을 덮어쓰지 않는다 (화면에서 바꾼 값을 지키기 위해)
 import 'dotenv/config'
-import {
-  ALL_PERMISSION_CODES,
-  PERMISSION_MENUS,
-  type PermissionMenu,
-} from '../src/config/permissions'
 import { prisma } from '../src/lib/prisma'
 import { createUserAccount } from '../src/lib/users/create-user-account'
+import { SAMPLE_ACCOUNTS, SEED_GROUPS, SUPER_GROUP_NAME } from './seed-roles'
 
-const SUPER_GROUP_NAME = '슈퍼 관리자'
+// 권한그룹을 만들고, 권한 목록을 정의와 똑같이 맞춘다 (새 메뉴 추가 시 시드만 다시 실행)
+// 돌려주는 값: 그룹 이름 → id
+async function seedGroups() {
+  const ids = new Map<string, string>()
+  for (const definition of SEED_GROUPS) {
+    const group = await prisma.permissionGroup.upsert({
+      where: { name: definition.name },
+      create: { name: definition.name, area: definition.area, description: definition.description },
+      update: { area: definition.area, description: definition.description },
+    })
+    const codes = [...new Set(definition.codes)]
+    await prisma.$transaction([
+      prisma.permissionGroupPermission.deleteMany({ where: { groupId: group.id } }),
+      prisma.permissionGroupPermission.createMany({
+        data: codes.map((permissionCode) => ({ groupId: group.id, permissionCode })),
+      }),
+    ])
+    ids.set(definition.name, group.id)
+    console.log(`권한그룹 '${definition.name}': 권한 ${codes.length}개`)
+  }
+  return ids
+}
 
-// 운영사 화면 영역의 모든 권한 코드
-const adminCodes = ALL_PERMISSION_CODES.filter((code) => {
-  const menu = code.slice(0, code.lastIndexOf('.')) as PermissionMenu
-  return PERMISSION_MENUS[menu].area === 'admin'
-})
-
-async function seedSuperGroup() {
-  const group = await prisma.permissionGroup.upsert({
-    where: { name: SUPER_GROUP_NAME },
-    create: {
-      name: SUPER_GROUP_NAME,
-      area: 'ADMIN',
-      description: '운영사 화면의 모든 권한 (시드가 관리)',
-    },
+async function linkGroup(userId: string, groupId: string) {
+  await prisma.userPermissionGroup.upsert({
+    where: { userId_groupId: { userId, groupId } },
+    create: { userId, groupId },
     update: {},
   })
-  // 권한 목록을 최신 코드 목록과 똑같이 맞춘다 (새 메뉴 추가 시 시드만 다시 실행)
-  await prisma.$transaction([
-    prisma.permissionGroupPermission.deleteMany({ where: { groupId: group.id } }),
-    prisma.permissionGroupPermission.createMany({
-      data: adminCodes.map((permissionCode) => ({ groupId: group.id, permissionCode })),
-    }),
-  ])
-  return group
 }
 
 async function seedSuperAdmin(groupId: string) {
@@ -64,11 +64,45 @@ async function seedSuperAdmin(groupId: string) {
   }
 
   await prisma.user.update({ where: { id: user.id }, data: { isActive: true } })
-  await prisma.userPermissionGroup.upsert({
-    where: { userId_groupId: { userId: user.id, groupId } },
-    create: { userId: user.id, groupId },
-    update: {},
-  })
+  await linkGroup(user.id, groupId)
+}
+
+// 역할별 견본 계정: 없을 때만 만든다
+async function seedSampleAccounts(groupIds: Map<string, string>) {
+  if (process.env.NODE_ENV === 'production') {
+    console.log('견본 계정: 운영 환경이라 건너뜀')
+    return
+  }
+  const password = process.env.SEED_SAMPLE_PASSWORD
+  if (!password) {
+    console.log('견본 계정: SEED_SAMPLE_PASSWORD가 비어 있어 건너뜀 (.env.example 참고)')
+    return
+  }
+
+  for (const account of SAMPLE_ACCOUNTS) {
+    if (await prisma.user.findUnique({ where: { username: account.username } })) {
+      console.log(`견본 계정 이미 있음: ${account.username} (그대로 둠)`)
+      continue
+    }
+    const centers = await prisma.center.findMany({
+      where: { code: { in: account.centerCodes ?? [] } },
+      select: { id: true },
+    })
+    const shipper = account.shipperCode
+      ? await prisma.shipper.findUniqueOrThrow({ where: { code: account.shipperCode } })
+      : null
+
+    await createUserAccount({
+      username: account.username,
+      password,
+      name: account.name,
+      userType: account.userType,
+      centerIds: centers.map((c) => c.id),
+      shipperId: shipper?.id,
+      permissionGroupIds: [groupIds.get(account.group)!],
+    })
+    console.log(`견본 계정 생성: ${account.username} (${account.group})`)
+  }
 }
 
 const SAMPLE_CENTERS = [
@@ -93,9 +127,9 @@ async function seedSampleOrganizations() {
 
 async function main() {
   await seedSampleOrganizations()
-  const group = await seedSuperGroup()
-  console.log(`'${SUPER_GROUP_NAME}' 권한그룹: 권한 ${adminCodes.length}개`)
-  await seedSuperAdmin(group.id)
+  const groupIds = await seedGroups()
+  await seedSuperAdmin(groupIds.get(SUPER_GROUP_NAME)!)
+  await seedSampleAccounts(groupIds)
 }
 
 main()
