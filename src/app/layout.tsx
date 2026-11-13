@@ -3,6 +3,7 @@ import { Geist_Mono } from 'next/font/google'
 // 한글 글꼴: 화면에 나온 글자가 포함된 조각 파일만 내려받는 분할 버전
 import 'pretendard/dist/web/variable/pretendardvariable-dynamic-subset.css'
 import { ThemeProvider } from '@/components/theme-provider'
+import { TooltipProvider } from '@/components/ui/tooltip'
 import './globals.css'
 
 // 코드·식별자 표시용 고정폭 글꼴 (본문 글꼴 Pretendard는 globals.css의 --font-sans)
@@ -25,7 +26,10 @@ export default function RootLayout({ children }: LayoutProps<'/'>) {
     // suppressHydrationWarning: 다크 모드 클래스를 브라우저에서 html에 붙이므로 경고를 끈다
     <html lang="ko" className={`${geistMono.variable} h-full antialiased`} suppressHydrationWarning>
       <body className="flex min-h-full flex-col">
-        <ThemeProvider>{children}</ThemeProvider>
+        <ThemeProvider>
+          {/* 접힌 사이드바의 메뉴 이름 등 툴팁이 동작하려면 앱 전체를 감싸야 한다 */}
+          <TooltipProvider>{children}</TooltipProvider>
+        </ThemeProvider>
       </body>
     </html>
   )
