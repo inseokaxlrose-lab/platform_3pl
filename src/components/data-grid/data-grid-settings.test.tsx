@@ -124,4 +124,57 @@ describe('DataGrid 사용자별 설정', () => {
     // 저장 순서에 없던 name은 기본 순서의 맨 앞이라 맨 앞에, 숨김 금지라 보인다
     expect(headers()).toEqual(['품목명', '상태', '수량'])
   })
+
+  describe('컬럼 너비', () => {
+    // 테스트 환경은 화면을 실제로 그리지 않아 잰 너비가 0 → 최소 너비(60)로 본다
+    const resizer = (name: string) => screen.getByRole('separator', { name: `${name} 너비 조절` })
+
+    it('키보드 →로 넓히면 보이는 컬럼 너비를 모두 고정하고 그 컬럼만 10px 넓혀 저장한다', () => {
+      const store = fakeStore()
+      renderWith(store)
+
+      fireEvent.keyDown(resizer('수량'), { key: 'ArrowRight' })
+
+      expect(store.save).toHaveBeenLastCalledWith(
+        'test-grid',
+        expect.objectContaining({ widths: { name: 60, qty: 70, status: 60 } }),
+      )
+      const qtyHeader = screen.getAllByRole('columnheader')[1]
+      expect(qtyHeader.style.width).toBe('70px')
+    })
+
+    it('저장된 너비로 시작하고, 두 번 클릭하면 그 컬럼만 기본 너비로 돌아간다', () => {
+      const store = fakeStore({ widths: { name: 200, qty: 150 } })
+      renderWith(store)
+      expect(screen.getAllByRole('columnheader')[0].style.width).toBe('200px')
+
+      fireEvent.doubleClick(resizer('수량'))
+
+      expect(store.save).toHaveBeenLastCalledWith(
+        'test-grid',
+        expect.objectContaining({ widths: { name: 200 } }),
+      )
+    })
+
+    it('끄는 동안에는 저장하지 않고, 손을 떼면 한 번 저장한다', () => {
+      const store = fakeStore({ widths: { qty: 100 } })
+      renderWith(store)
+      const handle = resizer('수량')
+      // jsdom에는 포인터 캡처가 없어서 빈 함수로 채운다
+      handle.setPointerCapture = () => {}
+
+      fireEvent.pointerDown(handle, { clientX: 0, pointerId: 1 })
+      fireEvent.pointerMove(handle, { clientX: 30, pointerId: 1 })
+      fireEvent.pointerMove(handle, { clientX: 50, pointerId: 1 })
+      expect(store.save).not.toHaveBeenCalled()
+      expect(screen.getAllByRole('columnheader')[1].style.width).toBe('150px')
+
+      fireEvent.pointerUp(handle, { clientX: 50, pointerId: 1 })
+      expect(store.save).toHaveBeenCalledTimes(1)
+      expect(store.save).toHaveBeenLastCalledWith(
+        'test-grid',
+        expect.objectContaining({ widths: { qty: 150 } }),
+      )
+    })
+  })
 })

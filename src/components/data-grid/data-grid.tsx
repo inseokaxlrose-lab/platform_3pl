@@ -26,12 +26,19 @@ import {
 import { cn } from '@/lib/utils'
 import { DataGridCellValue, defaultAlign } from './data-grid-cell'
 import { DataGridPagination } from './data-grid-pagination'
+import { ColumnResizer } from './data-grid-resizer'
 import { csvFileName, toCsv } from './csv'
 import { DataGridToolbar, type ExportMode } from './data-grid-toolbar'
 import { downloadTextFile } from './download'
 import { gridFeatures } from './features'
 import { useGridSettingsStore } from './grid-settings-context'
-import { resolveColumnOrder, resolveHidden, resolveWidths, type GridSettings } from './settings'
+import {
+  clampWidth,
+  resolveColumnOrder,
+  resolveHidden,
+  resolveWidths,
+  type GridSettings,
+} from './settings'
 import {
   changePageIndex,
   changePageSize,
@@ -168,6 +175,41 @@ export function DataGrid<TData extends RowData>({
     onStateChange({ ...state, pageSize: DEFAULT_PAGE_SIZE, sorting: [], pageIndex: 0 })
   }
 
+  // ── 컬럼 너비 조절
+  // 처음 조절할 때 지금 보이는 모든 컬럼의 너비를 재서 고정한다 (하나를 바꿔도 다른 컬럼이 들썩이지 않게)
+  // 너비를 하나라도 정했으면 표를 고정 배치(table-fixed)로 그린다
+  const headerCells = useRef(new Map<string, HTMLTableCellElement>())
+  const [widthPreview, setWidthPreview] = useState<{ id: string; width: number } | null>(null)
+  const fixedLayout = Object.keys(widths).length > 0 || widthPreview !== null
+
+  const measuredWidth = (columnId: string) =>
+    clampWidth(headerCells.current.get(columnId)?.getBoundingClientRect().width ?? 0)
+  const widthOf = (columnId: string) =>
+    widthPreview?.id === columnId
+      ? widthPreview.width
+      : (widths[columnId] ?? columnById.get(columnId)?.width)
+
+  // 고정 기준 너비: 이미 정한 너비가 있으면 그대로, 없으면 지금 화면에서 잰 값
+  function baseWidths() {
+    if (Object.keys(widths).length > 0) return widths
+    return Object.fromEntries(
+      columnOrder.filter((c) => !hidden.includes(c)).map((c) => [c, measuredWidth(c)]),
+    )
+  }
+
+  function commitWidth(columnId: string, width: number) {
+    setWidthPreview(null)
+    setWidths({ ...baseWidths(), [columnId]: clampWidth(width) })
+  }
+
+  // 두 번 클릭: 그 컬럼만 기본 너비로 (다른 컬럼 너비는 그대로)
+  function resetWidth(columnId: string) {
+    setWidthPreview(null)
+    const next = { ...widths }
+    delete next[columnId]
+    setWidths(next)
+  }
+
   // 컬럼 순서 한 칸 옮기기 (delta: -1 위로, 1 아래로)
   function moveColumn(columnId: string, delta: -1 | 1) {
     const from = columnOrder.indexOf(columnId)
@@ -298,7 +340,7 @@ export function DataGrid<TData extends RowData>({
       />
 
       <div className="rounded-lg border bg-card" aria-busy={loading}>
-        <Table>
+        <Table className={cn(fixedLayout && 'table-fixed')}>
           <TableHeader className="bg-muted/50">
             <TableRow className="hover:bg-transparent">
               {visibleColumns.map((column) => {
@@ -324,12 +366,14 @@ export function DataGrid<TData extends RowData>({
                 return (
                   <TableHead
                     key={column.id}
-                    style={
-                      (widths[column.id] ?? def.width)
-                        ? { width: widths[column.id] ?? def.width }
-                        : undefined
-                    }
+                    ref={(element) => {
+                      if (element) headerCells.current.set(column.id, element)
+                      else headerCells.current.delete(column.id)
+                    }}
+                    style={widthOf(column.id) ? { width: widthOf(column.id) } : undefined}
                     className={cn(
+                      'relative',
+                      fixedLayout && 'truncate',
                       align === 'right' && 'text-right',
                       align === 'center' && 'text-center',
                     )}
@@ -358,6 +402,13 @@ export function DataGrid<TData extends RowData>({
                     ) : (
                       def.header
                     )}
+                    <ColumnResizer
+                      label={def.header}
+                      getWidth={() => widthOf(column.id) ?? measuredWidth(column.id)}
+                      onPreview={(width) => setWidthPreview({ id: column.id, width })}
+                      onCommit={(width) => commitWidth(column.id, width)}
+                      onReset={() => resetWidth(column.id)}
+                    />
                   </TableHead>
                 )
               })}
@@ -419,6 +470,7 @@ export function DataGrid<TData extends RowData>({
                         key={cell.id}
                         className={cn(
                           cellPadding,
+                          fixedLayout && 'truncate',
                           align === 'right' && 'text-right tabular-nums',
                           align === 'center' && 'text-center',
                         )}
