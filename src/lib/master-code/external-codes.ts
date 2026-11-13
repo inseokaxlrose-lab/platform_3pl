@@ -1,5 +1,4 @@
 import 'server-only'
-import { z } from 'zod'
 import type { ExternalEntityType } from '@/generated/prisma/client'
 import {
   EXTERNAL_SYSTEMS,
@@ -8,26 +7,10 @@ import {
 } from '@/config/external-systems'
 import { ActionError } from '@/lib/actions/action-error'
 import { prisma } from '@/lib/prisma'
+import { EMPTY_EXTERNAL_CODES, type ExternalCodes } from './external-codes-schema'
 import type { Db } from './system-code'
 
 // 외부 코드 매핑 (docs/decisions/0025)
-
-// 연동 상대별 외부 코드 (없으면 빈 글자) — 화면 입력값과 같은 모양
-export type ExternalCodes = Record<ExternalSystemKey, string>
-
-// 입력 규칙: 연동 상대마다 한 칸, 비우면 매핑 삭제. 앞뒤 공백 제거, 50자 이하
-export const externalCodesSchema = z.object(
-  Object.fromEntries(
-    EXTERNAL_SYSTEM_KEYS.map((key) => [
-      key,
-      z.string().trim().max(50, '50자 이하로 입력해 주세요.').default(''),
-    ]),
-  ) as Record<ExternalSystemKey, z.ZodDefault<z.ZodString>>,
-)
-
-export const EMPTY_EXTERNAL_CODES = Object.fromEntries(
-  EXTERNAL_SYSTEM_KEYS.map((key) => [key, '']),
-) as ExternalCodes
 
 // 한 대상의 외부 코드
 export async function getExternalCodes(
