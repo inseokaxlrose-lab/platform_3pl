@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { z } from 'zod'
+import { STORAGE_CONDITIONS } from './warehouse-labels'
 import { createWarehouseSchema, type WarehouseCreateInput } from './warehouse-schema'
 
 const input = (overrides: Partial<WarehouseCreateInput> = {}): WarehouseCreateInput => ({
@@ -24,14 +25,15 @@ describe('창고 입력 규칙', () => {
 
   it('센터·창고명 필수, 코드 형식, 보관 조건은 상온·냉장·냉동만', () => {
     expect(
-      errorsOf(input({ centerId: '', name: ' ', code: '창고', storageCondition: 'HOT' })),
+      // 보관 조건은 일부러 없는 값
+      errorsOf(input({ centerId: '', name: ' ', code: '창고', storageCondition: 'HOT' as never })),
     ).toMatchObject({
       centerId: ['센터를 골라 주세요.'],
       name: ['창고명을 입력해 주세요.'],
       code: [expect.stringContaining('창고 코드')],
       storageCondition: ['보관 조건을 골라 주세요.'],
     })
-    for (const storageCondition of ['AMBIENT', 'CHILLED', 'FROZEN']) {
+    for (const storageCondition of STORAGE_CONDITIONS) {
       expect(errorsOf(input({ storageCondition }))).toEqual({})
     }
   })

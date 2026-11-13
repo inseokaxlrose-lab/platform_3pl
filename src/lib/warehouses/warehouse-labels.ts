@@ -11,7 +11,11 @@ export const STORAGE_CONDITION_LABELS = {
   FROZEN: '냉동',
 } as const
 export type StorageConditionKey = keyof typeof STORAGE_CONDITION_LABELS
-export const STORAGE_CONDITIONS = Object.keys(STORAGE_CONDITION_LABELS) as StorageConditionKey[]
+export const STORAGE_CONDITIONS = [
+  'AMBIENT',
+  'CHILLED',
+  'FROZEN',
+] as const satisfies readonly StorageConditionKey[]
 
 export const WAREHOUSE_TYPE_STATUS: StatusFormat = {
   GENERAL: { label: '일반', tone: 'neutral' },

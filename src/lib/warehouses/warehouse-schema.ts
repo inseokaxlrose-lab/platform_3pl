@@ -10,7 +10,7 @@ const warehouseFields = {
   // 사용자 코드: 같은 센터 안에서 중복 금지, 비우면 시스템 코드
   code: userCodeField('창고 코드'),
   name: requiredText('창고명을 입력해 주세요.', 50),
-  storageCondition: z.enum(STORAGE_CONDITIONS as [string, ...string[]], '보관 조건을 골라 주세요.'),
+  storageCondition: z.enum(STORAGE_CONDITIONS, '보관 조건을 골라 주세요.'),
   externalCodes: externalCodesSchema,
 }
 
