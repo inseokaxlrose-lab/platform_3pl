@@ -22,7 +22,11 @@ const adminCodes = ALL_PERMISSION_CODES.filter((code) => {
 async function seedSuperGroup() {
   const group = await prisma.permissionGroup.upsert({
     where: { name: SUPER_GROUP_NAME },
-    create: { name: SUPER_GROUP_NAME, description: '운영사 화면의 모든 권한 (시드가 관리)' },
+    create: {
+      name: SUPER_GROUP_NAME,
+      area: 'ADMIN',
+      description: '운영사 화면의 모든 권한 (시드가 관리)',
+    },
     update: {},
   })
   // 권한 목록을 최신 코드 목록과 똑같이 맞춘다 (새 메뉴 추가 시 시드만 다시 실행)

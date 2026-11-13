@@ -113,10 +113,18 @@ model Verification {
 // 권한 코드(예: inbound.asn.create)는 코드 한 곳에서 목록으로 관리하고, DB에는 코드 글자만 저장한다
 // ─────────────────────────────────────────────
 
+// 화면 영역: ADMIN = 운영사 화면(/admin), PORTAL = 화주 포털(/portal)
+enum AppArea {
+  ADMIN
+  PORTAL
+}
+
 // 권한그룹: 권한 코드 묶음 (예: "센터 운영자", "화주 담당자")
 model PermissionGroup {
   id          String   @id @default(cuid())
   name        String   @unique
+  // 이 그룹이 다루는 영역: 그 영역의 권한만 담고, 맞는 유형의 사용자에게만 배정한다 (등록 후 변경 불가)
+  area        AppArea  @default(ADMIN)
   description String?
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
