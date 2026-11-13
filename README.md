@@ -66,5 +66,5 @@ npm run db:seed    # 개발용 슈퍼 계정·역할별 권한그룹·견본 계
 ## 문제 해결
 
 - **CSS(색상 등)를 고쳤는데 화면에 반영되지 않을 때**: 개발 서버가 이전 빌드 결과(`.next` 폴더)를 재사용하는 경우가 있다. 개발 서버를 끄고 `rm -rf .next` 후 `npm run dev`로 다시 시작한다.
-- **개발 중 "Hydration failed" 오류에 `open-incognito-widget` 같은 낯선 요소가 보일 때**: 브라우저 확장 프로그램이 페이지에 요소를 끼워 넣은 것이다. 확장 프로그램을 끈 창(시크릿 모드 등)에서 확인한다.
+- **개발 중 "Hydration failed" 오류에 `open-incognito-widget` 같은 낯선 요소가 보일 때**: 브라우저 확장 프로그램이 페이지에 요소를 끼워 넣은 것이다. 확장 프로그램을 끈 창(시크릿 모드 등)에서 확인한다. 예전에는 이때 "Encountered a script tag" 경고도 함께 났는데, 다크 모드 스크립트 처리(`src/components/theme-provider.tsx`)로 없앴다.
 - **DB 구조를 바꾼 뒤(`prisma migrate dev`) 개발 서버에서 "Unknown field" 같은 Prisma 오류가 날 때**: 실행 중인 개발 서버가 이전 Prisma 코드를 쓰고 있는 것이다. 개발 서버를 끄고 `rm -rf .next` 후 다시 시작한다.
