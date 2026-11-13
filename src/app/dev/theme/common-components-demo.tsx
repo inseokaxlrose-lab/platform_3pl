@@ -7,6 +7,7 @@ import {
   EmptyState,
   FormColumns,
   FormField,
+  FormRow,
   FormSection,
   PageHeader,
   SearchField,
@@ -149,8 +150,8 @@ export function CommonComponentsDemo() {
       <section className="space-y-3">
         <h2 className="text-lg font-semibold">입력 화면 배치 (좌우 2단)</h2>
         <p className="text-sm text-muted-foreground">
-          정보가 적으면 왼쪽 단만, 많으면 왼쪽을 채우고 오른쪽으로 이어서. 단 안에서는 칸을 위에서
-          아래로 한 줄에 하나씩. 좁은 화면에서는 1단.
+          왼쪽에 다 담을 수 있으면 왼쪽만, 넘칠 때만 오른쪽으로 이어서. 단 안에서는 위에서 아래로,
+          관련 있는 짧은 칸은 한 줄에 2개까지(FormRow). 좁은 화면에서는 1단.
         </p>
         <p className="text-xs font-medium text-muted-foreground">정보가 적은 화면 (왼쪽만)</p>
         <FormColumns
@@ -159,6 +160,14 @@ export function CommonComponentsDemo() {
               <FormField label="이름" required htmlFor="demo-name">
                 <Input id="demo-name" />
               </FormField>
+              <FormRow>
+                <FormField label="업태" htmlFor="demo-type">
+                  <Input id="demo-type" />
+                </FormField>
+                <FormField label="종목" htmlFor="demo-item">
+                  <Input id="demo-item" />
+                </FormField>
+              </FormRow>
               <FormField label="설명" htmlFor="demo-desc">
                 <Input id="demo-desc" />
               </FormField>
