@@ -15,14 +15,18 @@ import {
   SidebarMenuItem,
   SidebarRail,
 } from '@/components/ui/sidebar'
+import { usePermission } from '@/components/permission'
 import { navigation, type NavAreaKey } from '@/config/navigation'
+import { filterNavigation } from './filter-navigation'
 import { findActiveHref } from './find-active-href'
 
 // 왼쪽 메뉴 사이드바
 // 아이콘(함수)은 서버→브라우저로 전달할 수 없으므로, 영역 이름(area)만 받아 메뉴 목록을 직접 불러온다
 export function AppSidebar({ area }: { area: NavAreaKey }) {
   const pathname = usePathname()
-  const { title, homeHref, groups } = navigation[area]
+  const { codes } = usePermission()
+  // 권한 없는 메뉴·빈 묶음은 숨긴다
+  const { title, homeHref, groups } = filterNavigation(navigation[area], codes)
   const activeHref = findActiveHref(
     pathname,
     groups.flatMap((group) => group.items),
