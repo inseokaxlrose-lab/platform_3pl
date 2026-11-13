@@ -1,4 +1,6 @@
 import { cookies } from 'next/headers'
+import { GridSettingsProvider } from '@/components/data-grid'
+import type { GridSettings } from '@/components/data-grid/settings'
 import { PermissionProvider } from '@/components/permission'
 import { SidebarInset, SidebarProvider } from '@/components/ui/sidebar'
 import type { NavAreaKey } from '@/config/navigation'
@@ -12,6 +14,7 @@ export async function AppShell({
   area,
   user,
   permissions,
+  gridSettings,
   children,
 }: {
   area: NavAreaKey
@@ -19,6 +22,8 @@ export async function AppShell({
   user: CurrentUser
   // 레이아웃에서 계산한 최종 권한 (메뉴·버튼 표시용)
   permissions: readonly PermissionCode[]
+  // 레이아웃에서 읽은 사용자별 그리드 설정 (그리드 이름 → 설정, 0021)
+  gridSettings: Record<string, GridSettings>
   children: React.ReactNode
 }) {
   // 사이드바 접힘 상태는 쿠키에 저장된다 → 다음 접속 때도 같은 상태로 그린다
@@ -27,13 +32,15 @@ export async function AppShell({
 
   return (
     <PermissionProvider codes={permissions}>
-      <SidebarProvider defaultOpen={defaultOpen}>
-        <AppSidebar area={area} />
-        <SidebarInset>
-          <AppHeader area={area} user={user} />
-          <div className="flex-1 p-6">{children}</div>
-        </SidebarInset>
-      </SidebarProvider>
+      <GridSettingsProvider initial={gridSettings}>
+        <SidebarProvider defaultOpen={defaultOpen}>
+          <AppSidebar area={area} />
+          <SidebarInset>
+            <AppHeader area={area} user={user} />
+            <div className="flex-1 p-6">{children}</div>
+          </SidebarInset>
+        </SidebarProvider>
+      </GridSettingsProvider>
     </PermissionProvider>
   )
 }

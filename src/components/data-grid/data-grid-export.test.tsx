@@ -91,8 +91,8 @@ describe('DataGrid 내보내기', () => {
 
   it('숨긴 컬럼은 내보내지 않는다', async () => {
     render(<Harness />)
-    fireEvent.keyDown(screen.getByRole('button', { name: /컬럼/ }), { key: 'Enter' })
-    fireEvent.click(screen.getByRole('menuitemcheckbox', { name: '수량' }))
+    fireEvent.click(screen.getByRole('button', { name: /컬럼/ }))
+    fireEvent.click(screen.getByRole('checkbox', { name: '수량' }))
     fireEvent.keyDown(document.activeElement!, { key: 'Escape' })
 
     openExportMenu()

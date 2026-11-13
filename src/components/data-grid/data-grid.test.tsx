@@ -74,8 +74,6 @@ function Harness({
 const sortButton = (name: string) => screen.getByRole('button', { name: new RegExp(name) })
 const headerCell = (name: string) => sortButton(name).closest('th')!
 const pageText = () => screen.getByText(/\d+ \/ \d+ 페이지/).textContent
-// Radix 드롭다운은 키보드(Enter)로 연다
-const openMenu = (button: HTMLElement) => fireEvent.keyDown(button, { key: 'Enter' })
 
 afterEach(() => {
   vi.useRealTimers()
@@ -326,15 +324,36 @@ describe('DataGrid 행 선택', () => {
   })
 })
 
-describe('DataGrid 컬럼 표시', () => {
-  it('컬럼 메뉴에서 끄면 표에서 사라지고, 숨김 금지 컬럼은 메뉴에 없다', () => {
+describe('DataGrid 컬럼 표시 · 순서', () => {
+  // 컬럼 설정 팝오버 열기
+  const openColumns = () => fireEvent.click(screen.getByRole('button', { name: /컬럼/ }))
+  const headers = () =>
+    screen
+      .getAllByRole('columnheader')
+      .map((th) => th.textContent)
+      .filter(Boolean)
+
+  it('끄면 표에서 사라지고, 숨김 금지 컬럼은 체크를 끌 수 없다', () => {
     render(<Harness />)
-    openMenu(screen.getByRole('button', { name: /컬럼/ }))
+    openColumns()
 
-    expect(screen.queryByRole('menuitemcheckbox', { name: '품목명' })).toBeNull()
-    fireEvent.click(screen.getByRole('menuitemcheckbox', { name: '수량' }))
+    expect(screen.getByRole('checkbox', { name: '품목명' })).toHaveProperty('disabled', true)
+    fireEvent.click(screen.getByRole('checkbox', { name: '수량' }))
 
-    expect(screen.queryByRole('button', { name: /수량/ })).toBeNull()
+    expect(headers()).toEqual(['품목명', '상태'])
     expect(screen.queryByText('1,000')).toBeNull()
+  })
+
+  it('위/아래 버튼으로 컬럼 순서를 바꾼다 (끝에서는 더 못 간다)', () => {
+    render(<Harness />)
+    expect(headers()).toEqual(['품목명', '수량', '상태'])
+    openColumns()
+
+    expect(screen.getByRole('button', { name: '품목명 위로' })).toHaveProperty('disabled', true)
+    expect(screen.getByRole('button', { name: '상태 아래로' })).toHaveProperty('disabled', true)
+    fireEvent.click(screen.getByRole('button', { name: '상태 위로' }))
+    fireEvent.click(screen.getByRole('button', { name: '상태 위로' }))
+
+    expect(headers()).toEqual(['상태', '품목명', '수량'])
   })
 })

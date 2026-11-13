@@ -2,12 +2,7 @@
 
 import Link from 'next/link'
 import { useEffect, useState } from 'react'
-import {
-  createDataGridState,
-  DataGrid,
-  type DataGridColumn,
-  type DataGridState,
-} from '@/components/data-grid'
+import { DataGrid, type DataGridColumn, useDataGridState } from '@/components/data-grid'
 import { listPermissionGroupsAction } from './actions'
 import { AREA_STATUS } from './area-labels'
 
@@ -53,7 +48,8 @@ const columns: DataGridColumn<Row>[] = [
 
 // 권한그룹 목록: 상태가 바뀌면 서버 액션으로 다시 조회한다
 export function RolesGrid() {
-  const [state, setState] = useState<DataGridState>(() => createDataGridState())
+  // 저장된 개인 설정(건수·정렬)으로 시작 — DataGrid id와 같은 이름
+  const [state, setState] = useDataGridState('system-roles')
   const [result, setResult] = useState<{ rows: Row[]; rowCount: number }>({ rows: [], rowCount: 0 })
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)

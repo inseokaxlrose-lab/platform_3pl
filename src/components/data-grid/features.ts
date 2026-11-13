@@ -1,4 +1,5 @@
 import {
+  columnOrderingFeature,
   columnVisibilityFeature,
   rowPaginationFeature,
   rowSelectionFeature,
@@ -13,6 +14,8 @@ export const gridFeatures = tableFeatures({
   rowPaginationFeature,
   rowSelectionFeature,
   columnVisibilityFeature,
+  // 컬럼 순서 (사용자별 설정, 0021)
+  columnOrderingFeature,
 })
 
 export type GridFeatures = typeof gridFeatures

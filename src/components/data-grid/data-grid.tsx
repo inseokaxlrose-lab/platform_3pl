@@ -2,6 +2,7 @@
 
 import {
   useTable,
+  type ColumnOrderState,
   type ColumnVisibilityState,
   type PaginationState,
   type RowData,
@@ -29,14 +30,24 @@ import { csvFileName, toCsv } from './csv'
 import { DataGridToolbar, type ExportMode } from './data-grid-toolbar'
 import { downloadTextFile } from './download'
 import { gridFeatures } from './features'
-import { changePageIndex, changePageSize, changeSearch, changeSorting, getPageCount } from './state'
+import { useGridSettingsStore } from './grid-settings-context'
+import { resolveColumnOrder, resolveHidden, resolveWidths, type GridSettings } from './settings'
+import {
+  changePageIndex,
+  changePageSize,
+  changeSearch,
+  changeSorting,
+  DEFAULT_PAGE_SIZE,
+  getPageCount,
+} from './state'
 import { SELECT_COLUMN_ID, toColumnDefs } from './to-column-defs'
 import type { DataGridColumn, DataGridDensity, DataGridState } from './types'
 
 const SKELETON_ROW_COUNT = 8
 
 export type DataGridProps<TData extends RowData> = {
-  // 그리드 이름 (2차: 사용자별 컬럼 설정 저장 키)
+  // 그리드 이름: 사용자별 설정 저장 키 (영문 소문자·숫자·하이픈, 예: system-users)
+  // 정렬·건수 저장값으로 시작하려면 화면에서 useDataGridState(같은 id)를 쓴다
   id: string
   columns: DataGridColumn<TData>[]
   // 현재 페이지의 행들 (서버가 정렬·검색·페이지를 적용해서 준 결과)
@@ -70,6 +81,7 @@ function resolve<T>(updater: Updater<T>, previous: T): T {
 
 // 공통 목록 그리드: 모든 목록 화면은 이 컴포넌트를 쓴다 (docs/decisions/0002-ui-and-datagrid.md)
 export function DataGrid<TData extends RowData>({
+  id,
   columns,
   data,
   rowCount,
@@ -86,8 +98,19 @@ export function DataGrid<TData extends RowData>({
   exportCsv,
 }: DataGridProps<TData>) {
   const [rowSelection, setRowSelection] = useState<RowSelectionState>({})
-  const [columnVisibility, setColumnVisibility] = useState<ColumnVisibilityState>({})
-  const [density, setDensity] = useState<DataGridDensity>('compact')
+
+  // ── 사용자별 설정 (0021): 저장된 값으로 시작하고, 바뀌면 자동 저장
+  const settingsStore = useGridSettingsStore()
+  const [saved] = useState<GridSettings>(() => settingsStore.get(id) ?? {})
+  const defaultOrder = useMemo(() => columns.map((c) => c.id), [columns])
+  const [columnOrderSetting, setColumnOrder] = useState<string[]>(() =>
+    resolveColumnOrder(defaultOrder, saved.columnOrder),
+  )
+  const [hiddenSetting, setHidden] = useState<string[]>(() => resolveHidden(columns, saved.hidden))
+  const [widthSetting, setWidths] = useState<Record<string, number>>(() =>
+    resolveWidths(columns, saved.widths),
+  )
+  const [density, setDensity] = useState<DataGridDensity>(saved.density ?? 'compact')
   const [exportBusy, setExportBusy] = useState(false)
   const [exportError, setExportError] = useState<string | null>(null)
 
@@ -96,6 +119,64 @@ export function DataGrid<TData extends RowData>({
     [columns, enableRowSelection],
   )
   const columnById = useMemo(() => new Map(columns.map((c) => [c.id, c])), [columns])
+
+  // 화면의 컬럼이 바뀌어도 맞도록 매번 정리한 값을 쓴다
+  const columnOrder = resolveColumnOrder(defaultOrder, columnOrderSetting)
+  const hidden = resolveHidden(columns, hiddenSetting)
+  const widths = resolveWidths(columns, widthSetting)
+  const columnVisibility: ColumnVisibilityState = Object.fromEntries(
+    hidden.map((columnId) => [columnId, false]),
+  )
+  const tableColumnOrder: ColumnOrderState = enableRowSelection
+    ? [SELECT_COLUMN_ID, ...columnOrder]
+    : columnOrder
+
+  // 설정이 바뀌면 저장 (처음 그릴 때와 같은 값이면 저장하지 않음)
+  const settings = buildSettings({
+    columnOrder,
+    hidden,
+    widths,
+    density,
+    pageSize: state.pageSize,
+    sorting: state.sorting,
+  })
+  const snapshot = JSON.stringify(settings)
+  const lastSnapshot = useRef(snapshot)
+  useEffect(() => {
+    if (snapshot === lastSnapshot.current) return
+    lastSnapshot.current = snapshot
+    settingsStore.save(id, JSON.parse(snapshot) as GridSettings)
+  }, [snapshot, id, settingsStore])
+
+  // 기본값 되돌리기: 저장값을 지우고 처음 모습으로
+  function resetSettings() {
+    settingsStore.reset(id)
+    lastSnapshot.current = JSON.stringify(
+      buildSettings({
+        columnOrder: defaultOrder,
+        hidden: [],
+        widths: {},
+        density: 'compact',
+        pageSize: DEFAULT_PAGE_SIZE,
+        sorting: [],
+      }),
+    )
+    setColumnOrder(defaultOrder)
+    setHidden([])
+    setWidths({})
+    setDensity('compact')
+    onStateChange({ ...state, pageSize: DEFAULT_PAGE_SIZE, sorting: [], pageIndex: 0 })
+  }
+
+  // 컬럼 순서 한 칸 옮기기 (delta: -1 위로, 1 아래로)
+  function moveColumn(columnId: string, delta: -1 | 1) {
+    const from = columnOrder.indexOf(columnId)
+    const to = from + delta
+    if (from < 0 || to < 0 || to >= columnOrder.length) return
+    const next = [...columnOrder]
+    ;[next[from], next[to]] = [next[to], next[from]]
+    setColumnOrder(next)
+  }
 
   // 전체 건수가 줄어 현재 페이지가 없어지면(예: 5페이지를 보는데 다른 사람이 삭제해 3페이지가 됨)
   // 마지막 페이지로 옮기라고 알린다. 로딩 중에는 아직 새 건수를 모르므로 기다린다
@@ -131,7 +212,7 @@ export function DataGrid<TData extends RowData>({
     manualPagination: true,
     rowCount,
     enableRowSelection,
-    state: { sorting, pagination, rowSelection, columnVisibility },
+    state: { sorting, pagination, rowSelection, columnVisibility, columnOrder: tableColumnOrder },
     onSortingChange: (updater) => onStateChange(changeSorting(state, resolve(updater, sorting))),
     onPaginationChange: (updater) => {
       const next = resolve(updater, pagination)
@@ -142,8 +223,10 @@ export function DataGrid<TData extends RowData>({
       )
     },
     onRowSelectionChange: updateSelection,
-    onColumnVisibilityChange: (updater) =>
-      setColumnVisibility((previous) => resolve(updater, previous)),
+    onColumnVisibilityChange: (updater) => {
+      const next = resolve(updater, columnVisibility)
+      setHidden(Object.keys(next).filter((columnId) => next[columnId] === false))
+    },
   })
 
   const visibleColumns = table.getVisibleLeafColumns()
@@ -196,15 +279,15 @@ export function DataGrid<TData extends RowData>({
         density={density}
         onDensityChange={setDensity}
         columns={{
-          items: table
-            .getAllLeafColumns()
-            .filter((column) => column.getCanHide())
-            .map((column) => ({
-              id: column.id,
-              header: columnById.get(column.id)?.header ?? column.id,
-              visible: column.getIsVisible(),
-            })),
-          onToggle: (id, visible) => table.getColumn(id)?.toggleVisibility(visible),
+          items: columnOrder.map((columnId) => ({
+            id: columnId,
+            header: columnById.get(columnId)?.header ?? columnId,
+            visible: !hidden.includes(columnId),
+            hideable: columnById.get(columnId)?.hideable !== false,
+          })),
+          onToggle: (columnId, visible) => table.getColumn(columnId)?.toggleVisibility(visible),
+          onMove: moveColumn,
+          onReset: resetSettings,
         }}
         actions={toolbarActions}
         exporting={
@@ -241,7 +324,11 @@ export function DataGrid<TData extends RowData>({
                 return (
                   <TableHead
                     key={column.id}
-                    style={def.width ? { width: def.width } : undefined}
+                    style={
+                      (widths[column.id] ?? def.width)
+                        ? { width: widths[column.id] ?? def.width }
+                        : undefined
+                    }
                     className={cn(
                       align === 'right' && 'text-right',
                       align === 'center' && 'text-center',
@@ -359,4 +446,16 @@ export function DataGrid<TData extends RowData>({
       />
     </div>
   )
+}
+
+// 저장할 설정 모양 (항목 순서를 고정해 같은 설정이면 같은 글자가 되게 한다)
+function buildSettings(settings: Required<GridSettings>): GridSettings {
+  return {
+    columnOrder: settings.columnOrder,
+    hidden: settings.hidden,
+    widths: settings.widths,
+    density: settings.density,
+    pageSize: settings.pageSize,
+    sorting: settings.sorting,
+  }
 }

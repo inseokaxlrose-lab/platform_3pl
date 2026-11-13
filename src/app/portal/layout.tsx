@@ -1,5 +1,6 @@
 import type { Metadata } from 'next'
 import { AppShell } from '@/components/app-shell'
+import { loadUserGridSettings } from '@/lib/grid/grid-settings'
 import { getCurrentPermissions, requireUser } from '@/lib/session'
 
 export const metadata: Metadata = {
@@ -13,9 +14,12 @@ export const metadata: Metadata = {
 // 들어오기 전에 로그인·사용 여부·영역을 검사한다 (아니면 로그인 화면이나 자기 영역으로 이동)
 export default async function PortalLayout({ children }: LayoutProps<'/portal'>) {
   const user = await requireUser('portal')
-  const permissions = await getCurrentPermissions()
+  const [permissions, gridSettings] = await Promise.all([
+    getCurrentPermissions(),
+    loadUserGridSettings(user.id),
+  ])
   return (
-    <AppShell area="portal" user={user} permissions={[...permissions]}>
+    <AppShell area="portal" user={user} permissions={[...permissions]} gridSettings={gridSettings}>
       {children}
     </AppShell>
   )

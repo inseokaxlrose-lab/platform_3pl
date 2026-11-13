@@ -1,19 +1,22 @@
 'use client'
 
 import {
+  ArrowDownIcon,
+  ArrowUpIcon,
   ChevronDownIcon,
   Columns3Icon,
   DownloadIcon,
   Rows3Icon,
   Rows4Icon,
+  RotateCcwIcon,
   SearchIcon,
   XIcon,
 } from 'lucide-react'
 import { useEffect, useEffectEvent, useState } from 'react'
 import { Button } from '@/components/ui/button'
+import { Checkbox } from '@/components/ui/checkbox'
 import {
   DropdownMenu,
-  DropdownMenuCheckboxItem,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuLabel,
@@ -21,12 +24,22 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { Input } from '@/components/ui/input'
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { formatNumber } from './format'
 import type { DataGridDensity } from './types'
 
 const SEARCH_DELAY_MS = 300
 
-type ColumnToggleItem = { id: string; header: string; visible: boolean }
+type ColumnItem = { id: string; header: string; visible: boolean; hideable: boolean }
+
+type ColumnSettings = {
+  // 지금 보이는 순서대로
+  items: ColumnItem[]
+  onToggle: (id: string, visible: boolean) => void
+  onMove: (id: string, delta: -1 | 1) => void
+  // 기본값 되돌리기: 숨김·순서·너비·행 높이·건수·정렬 전부
+  onReset: () => void
+}
 
 export type ExportMode = 'all' | 'selected'
 
@@ -43,7 +56,7 @@ type DataGridToolbarProps = {
   onClearSelection: () => void
   density: DataGridDensity
   onDensityChange: (density: DataGridDensity) => void
-  columns?: { items: ColumnToggleItem[]; onToggle: (id: string, visible: boolean) => void }
+  columns?: ColumnSettings
   // 화면별 버튼 (예: 선택 행 일괄 처리)
   actions?: React.ReactNode
   // CSV 내보내기 (DataGrid에 exportCsv를 줬을 때만)
@@ -91,33 +104,72 @@ export function DataGridToolbar({
         >
           {density === 'compact' ? <Rows3Icon /> : <Rows4Icon />}
         </Button>
-        {columns && (
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="outline">
-                <Columns3Icon />
-                컬럼
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-auto min-w-40">
-              <DropdownMenuLabel>표시할 컬럼</DropdownMenuLabel>
-              <DropdownMenuSeparator />
-              {columns.items.map((item) => (
-                <DropdownMenuCheckboxItem
-                  key={item.id}
-                  checked={item.visible}
-                  // 여러 컬럼을 연달아 바꿀 수 있도록 선택해도 메뉴를 닫지 않는다
-                  onSelect={(e) => e.preventDefault()}
-                  onCheckedChange={(checked) => columns.onToggle(item.id, checked === true)}
-                >
-                  {item.header}
-                </DropdownMenuCheckboxItem>
-              ))}
-            </DropdownMenuContent>
-          </DropdownMenu>
-        )}
+        {columns && <ColumnMenu {...columns} />}
       </div>
     </div>
+  )
+}
+
+// 컬럼 설정: 표시 여부(체크) · 순서(위/아래) · 기본값 되돌리기
+// 메뉴 대신 팝오버: 줄 안의 체크박스·버튼을 Tab 키로 차례로 오갈 수 있게
+function ColumnMenu({ items, onToggle, onMove, onReset }: ColumnSettings) {
+  return (
+    <Popover>
+      <PopoverTrigger asChild>
+        <Button variant="outline">
+          <Columns3Icon />
+          컬럼
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent align="end" className="w-64 gap-1 p-1.5">
+        <p className="px-2 py-1 text-xs font-medium text-muted-foreground">컬럼 표시 · 순서</p>
+        <ul aria-label="컬럼 목록">
+          {items.map((item, index) => {
+            const checkboxId = `grid-column-${item.id}`
+            return (
+              <li
+                key={item.id}
+                className="flex items-center gap-2 rounded-md px-2 py-1 hover:bg-muted"
+              >
+                <Checkbox
+                  id={checkboxId}
+                  checked={item.visible}
+                  disabled={!item.hideable}
+                  onCheckedChange={(checked) => onToggle(item.id, checked === true)}
+                />
+                <label htmlFor={checkboxId} className="flex-1 truncate">
+                  {item.header}
+                </label>
+                <Button
+                  variant="ghost"
+                  size="icon-xs"
+                  aria-label={`${item.header} 위로`}
+                  disabled={index === 0}
+                  onClick={() => onMove(item.id, -1)}
+                >
+                  <ArrowUpIcon />
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="icon-xs"
+                  aria-label={`${item.header} 아래로`}
+                  disabled={index === items.length - 1}
+                  onClick={() => onMove(item.id, 1)}
+                >
+                  <ArrowDownIcon />
+                </Button>
+              </li>
+            )
+          })}
+        </ul>
+        <div className="border-t pt-1">
+          <Button variant="ghost" size="sm" className="w-full justify-start" onClick={onReset}>
+            <RotateCcwIcon />
+            기본값 되돌리기
+          </Button>
+        </div>
+      </PopoverContent>
+    </Popover>
   )
 }
 
