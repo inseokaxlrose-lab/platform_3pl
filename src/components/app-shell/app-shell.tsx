@@ -20,7 +20,7 @@ export async function AppShell({
     <SidebarProvider defaultOpen={defaultOpen}>
       <AppSidebar area={area} />
       <SidebarInset>
-        <AppHeader />
+        <AppHeader area={area} />
         <div className="flex-1 p-6">{children}</div>
       </SidebarInset>
     </SidebarProvider>
