@@ -184,6 +184,34 @@ describe('DataGrid 페이지', () => {
     expect(pageText()).toBe('1 / 3 페이지')
   })
 
+  it('전체 건수가 줄어 현재 페이지가 없어지면 마지막 페이지로 이동한다', () => {
+    const onState = vi.fn()
+    // 5페이지를 보던 중 데이터가 줄어 전체 45건(3페이지)이 된 상황
+    render(<Harness onState={onState} initial={createDataGridState({ pageIndex: 4 })} />)
+
+    expect(onState).toHaveBeenLastCalledWith(expect.objectContaining({ pageIndex: 2 }))
+    expect(pageText()).toBe('3 / 3 페이지')
+  })
+
+  it('데이터가 0건이 되면 1페이지로 돌아간다', () => {
+    const onState = vi.fn()
+    render(
+      <Harness
+        onState={onState}
+        rowsFor={() => []}
+        rowCount={0}
+        initial={createDataGridState({ pageIndex: 3 })}
+      />,
+    )
+    expect(onState).toHaveBeenLastCalledWith(expect.objectContaining({ pageIndex: 0 }))
+  })
+
+  it('로딩 중에는 페이지를 보정하지 않는다 (아직 새 건수를 모르므로)', () => {
+    const onState = vi.fn()
+    render(<Harness onState={onState} loading initial={createDataGridState({ pageIndex: 4 })} />)
+    expect(onState).not.toHaveBeenCalled()
+  })
+
   it('한 페이지 건수를 바꾸면 1페이지로 돌아간다', () => {
     const onState = vi.fn()
     render(<Harness onState={onState} initial={createDataGridState({ pageIndex: 2 })} />)

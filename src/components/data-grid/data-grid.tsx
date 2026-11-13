@@ -10,7 +10,7 @@ import {
   type Updater,
 } from '@tanstack/react-table'
 import { ArrowDownIcon, ArrowUpDownIcon, ArrowUpIcon } from 'lucide-react'
-import { useMemo, useRef, useState } from 'react'
+import { useEffect, useEffectEvent, useMemo, useRef, useState } from 'react'
 import { EmptyState } from '@/components/common'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Skeleton } from '@/components/ui/skeleton'
@@ -29,7 +29,7 @@ import { csvFileName, toCsv } from './csv'
 import { DataGridToolbar, type ExportMode } from './data-grid-toolbar'
 import { downloadTextFile } from './download'
 import { gridFeatures } from './features'
-import { changePageIndex, changePageSize, changeSearch, changeSorting } from './state'
+import { changePageIndex, changePageSize, changeSearch, changeSorting, getPageCount } from './state'
 import { SELECT_COLUMN_ID, toColumnDefs } from './to-column-defs'
 import type { DataGridColumn, DataGridDensity, DataGridState } from './types'
 
@@ -96,6 +96,16 @@ export function DataGrid<TData extends RowData>({
     [columns, enableRowSelection],
   )
   const columnById = useMemo(() => new Map(columns.map((c) => [c.id, c])), [columns])
+
+  // 전체 건수가 줄어 현재 페이지가 없어지면(예: 5페이지를 보는데 다른 사람이 삭제해 3페이지가 됨)
+  // 마지막 페이지로 옮기라고 알린다. 로딩 중에는 아직 새 건수를 모르므로 기다린다
+  const lastPageIndex = getPageCount(rowCount, state.pageSize) - 1
+  const moveToLastPage = useEffectEvent(() =>
+    onStateChange(changePageIndex(state, lastPageIndex, rowCount)),
+  )
+  useEffect(() => {
+    if (!loading && state.pageIndex > lastPageIndex) moveToLastPage()
+  }, [loading, state.pageIndex, lastPageIndex])
 
   const sorting: SortingState = state.sorting
   const pagination: PaginationState = { pageIndex: state.pageIndex, pageSize: state.pageSize }
