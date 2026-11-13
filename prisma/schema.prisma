@@ -41,14 +41,20 @@ model User {
   userType        UserType
   // false면 로그인·사용 불가 (퇴사자 등). 기록 보존을 위해 계정을 지우지 않고 막는다
   isActive        Boolean  @default(true)
+  // 화주사 사용자의 소속 화주사 (화주사 사용자만, DB 검사 조건으로 강제: user_shipper_matches_type)
+  shipperId       String?
+  shipper         Shipper? @relation(fields: [shipperId], references: [id], onDelete: Restrict)
 
   sessions            Session[]
   accounts            Account[]
   permissionGroups    UserPermissionGroup[]
   permissionOverrides UserPermissionOverride[]
+  // 센터 직원의 소속 센터 (여러 개 가능)
+  centers             UserCenter[]
 
   @@unique([email])
   @@unique([username])
+  @@index([shipperId])
   @@map("user")
 }
 
@@ -160,4 +166,52 @@ model UserPermissionOverride {
 
   @@id([userId, permissionCode])
   @@map("user_permission_override")
+}
+
+// ─────────────────────────────────────────────
+// 조직 (0003 결정 1) — 데이터 범위에 필요한 최소 정보만. 자세한 정보는 M2(센터)·M3(화주사)에서 추가
+// ─────────────────────────────────────────────
+
+// 센터: 운영사의 물류센터
+model Center {
+  id        String   @id @default(cuid())
+  code      String   @unique
+  name      String
+  // false면 데이터 범위에서 빠진다 (소속 직원도 이 센터 데이터를 볼 수 없음)
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  users UserCenter[]
+
+  @@map("center")
+}
+
+// 화주사: 운영사에 물건 보관·배송을 맡기는 회사
+model Shipper {
+  id        String   @id @default(cuid())
+  code      String   @unique
+  name      String
+  // false면 데이터 범위에서 빠진다 (소속 사용자도 데이터를 볼 수 없음)
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  users User[]
+
+  @@map("shipper")
+}
+
+// 센터 직원 ↔ 소속 센터 (한 직원이 여러 센터를 맡을 수 있다)
+// 직원이 소속된 센터는 지울 수 없다 (Restrict)
+model UserCenter {
+  userId    String
+  centerId  String
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  center    Center   @relation(fields: [centerId], references: [id], onDelete: Restrict)
+
+  @@id([userId, centerId])
+  @@index([centerId])
+  @@map("user_center")
 }

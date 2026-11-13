@@ -1,6 +1,7 @@
 import { afterAll, beforeEach, describe, expect, it } from 'vitest'
 import { ACCOUNT_DISABLED, auth } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
+import { createTestCenter, createTestShipper } from '@/test/factories'
 import { resetDatabase } from '@/test/reset-database'
 import { createUserAccount } from './create-user-account'
 
@@ -11,8 +12,14 @@ function signIn(username: string, password = PASSWORD) {
   return auth.api.signInUsername({ body: { username, password } })
 }
 
+// 테스트마다 새로 만드는 소속 센터·화주사
+let centerId = ''
+let shipperId = ''
+
 beforeEach(async () => {
   await resetDatabase()
+  centerId = (await createTestCenter('ICN')).id
+  shipperId = (await createTestShipper('GANA')).id
 })
 
 afterAll(async () => {
@@ -26,6 +33,7 @@ describe('계정 만들기 + 로그인 (Better Auth)', () => {
       password: PASSWORD,
       name: '김작업',
       userType: 'CENTER',
+      centerIds: [centerId],
     })
 
     const result = await signIn('worker1')
@@ -40,6 +48,7 @@ describe('계정 만들기 + 로그인 (Better Auth)', () => {
       password: PASSWORD,
       name: '이작업',
       userType: 'CENTER',
+      centerIds: [centerId],
     })
     const account = await prisma.account.findFirstOrThrow({ where: { userId: user.id } })
 
@@ -54,6 +63,7 @@ describe('계정 만들기 + 로그인 (Better Auth)', () => {
       password: PASSWORD,
       name: '박작업',
       userType: 'CENTER',
+      centerIds: [centerId],
     })
     expect(user.email).toBe('nomail@users.local')
   })
@@ -64,6 +74,7 @@ describe('계정 만들기 + 로그인 (Better Auth)', () => {
       password: PASSWORD,
       name: '최작업',
       userType: 'CENTER',
+      centerIds: [centerId],
     })
     await expect(signIn('worker3', 'wrong-password')).rejects.toBeTruthy()
     expect(await prisma.session.count()).toBe(0)
@@ -79,6 +90,7 @@ describe('계정 만들기 + 로그인 (Better Auth)', () => {
       password: PASSWORD,
       name: '퇴사자',
       userType: 'CENTER',
+      centerIds: [centerId],
     })
     await prisma.user.update({ where: { id: user.id }, data: { isActive: false } })
 
@@ -92,6 +104,7 @@ describe('계정 만들기 + 로그인 (Better Auth)', () => {
       password: PASSWORD,
       name: '김작업',
       userType: 'SHIPPER',
+      shipperId,
     })
     const result = await signIn('KIM.WORKER')
     expect(result?.user).toMatchObject({ username: 'kim.worker' })
@@ -103,9 +116,16 @@ describe('계정 만들기 + 로그인 (Better Auth)', () => {
       password: PASSWORD,
       name: '중복',
       userType: 'CENTER',
+      centerIds: [centerId],
     })
     await expect(
-      createUserAccount({ username: 'DUP', password: PASSWORD, name: '중복2', userType: 'CENTER' }),
+      createUserAccount({
+        username: 'DUP',
+        password: PASSWORD,
+        name: '중복2',
+        userType: 'CENTER',
+        centerIds: [centerId],
+      }),
     ).rejects.toMatchObject({ code: 'P2002' })
   })
 
@@ -116,10 +136,83 @@ describe('계정 만들기 + 로그인 (Better Auth)', () => {
         password: PASSWORD,
         name: 'x',
         userType: 'CENTER',
+        centerIds: [centerId],
       }),
     ).rejects.toThrow(/아이디/)
     await expect(
-      createUserAccount({ username: 'short', password: '1234', name: 'x', userType: 'CENTER' }),
+      createUserAccount({
+        username: 'short',
+        password: '1234',
+        name: 'x',
+        userType: 'CENTER',
+        centerIds: [centerId],
+      }),
     ).rejects.toThrow(/8자 이상/)
+  })
+
+  it('센터 직원은 소속 센터가, 화주사 사용자는 소속 화주사가 있어야 한다', async () => {
+    await expect(
+      createUserAccount({
+        username: 'nocenter',
+        password: PASSWORD,
+        name: 'x',
+        userType: 'CENTER',
+      }),
+    ).rejects.toThrow(/소속 센터를 1개 이상/)
+    await expect(
+      createUserAccount({ username: 'noship', password: PASSWORD, name: 'x', userType: 'SHIPPER' }),
+    ).rejects.toThrow(/소속 화주사/)
+  })
+
+  it('다른 유형의 소속은 가질 수 없다 (운영사에게 화주사, 화주사 사용자에게 센터)', async () => {
+    await expect(
+      createUserAccount({
+        username: 'op1',
+        password: PASSWORD,
+        name: 'x',
+        userType: 'OPERATOR',
+        shipperId,
+      }),
+    ).rejects.toThrow(/화주사 사용자만/)
+    await expect(
+      createUserAccount({
+        username: 'sh1',
+        password: PASSWORD,
+        name: 'x',
+        userType: 'SHIPPER',
+        shipperId,
+        centerIds: [centerId],
+      }),
+    ).rejects.toThrow(/센터 직원만/)
+  })
+
+  it('센터 직원은 여러 센터에 소속될 수 있다', async () => {
+    const second = await createTestCenter('PUS')
+    const user = await createUserAccount({
+      username: 'multi',
+      password: PASSWORD,
+      name: '두센터',
+      userType: 'CENTER',
+      centerIds: [centerId, second.id, centerId],
+    })
+    expect(await prisma.userCenter.count({ where: { userId: user.id } })).toBe(2)
+  })
+
+  it('DB 검사 조건: 프로그램을 거치지 않아도 화주사 소속 규칙이 지켜진다', async () => {
+    const user = await createUserAccount({
+      username: 'ship2',
+      password: PASSWORD,
+      name: 'x',
+      userType: 'SHIPPER',
+      shipperId,
+    })
+    // 화주사 사용자의 화주사 연결을 지우려 하면 DB가 거부
+    await expect(
+      prisma.user.update({ where: { id: user.id }, data: { shipperId: null } }),
+    ).rejects.toThrow(/user_shipper_matches_type/)
+    // 화주사 사용자를 운영사로 바꾸면서 화주사 연결을 남기면 DB가 거부
+    await expect(
+      prisma.user.update({ where: { id: user.id }, data: { userType: 'OPERATOR' } }),
+    ).rejects.toThrow(/user_shipper_matches_type/)
   })
 })

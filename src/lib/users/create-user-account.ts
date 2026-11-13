@@ -15,14 +15,48 @@ export const passwordSchema = z
   .min(8, '비밀번호는 8자 이상입니다.')
   .max(128, '비밀번호는 128자 이하입니다.')
 
-const createUserAccountSchema = z.object({
-  username: usernameSchema,
-  password: passwordSchema,
-  name: z.string().trim().min(1, '이름을 입력해 주세요.').max(50),
-  userType: z.enum(['OPERATOR', 'CENTER', 'SHIPPER']),
-  // 이메일이 없으면 내부용 주소를 채운다 (Better Auth는 이메일 칸이 필수)
-  email: z.email().optional(),
-})
+const createUserAccountSchema = z
+  .object({
+    username: usernameSchema,
+    password: passwordSchema,
+    name: z.string().trim().min(1, '이름을 입력해 주세요.').max(50),
+    userType: z.enum(['OPERATOR', 'CENTER', 'SHIPPER']),
+    // 이메일이 없으면 내부용 주소를 채운다 (Better Auth는 이메일 칸이 필수)
+    email: z.email().optional(),
+    // 소속 (데이터 범위 기준): 센터 직원 → 센터 1개 이상, 화주사 사용자 → 화주사 1개, 운영사 → 없음
+    centerIds: z.array(z.string().min(1)).default([]),
+    shipperId: z.string().min(1).optional(),
+  })
+  .superRefine((data, ctx) => {
+    if (data.userType === 'CENTER' && data.centerIds.length === 0) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['centerIds'],
+        message: '센터 직원은 소속 센터를 1개 이상 선택해야 합니다.',
+      })
+    }
+    if (data.userType !== 'CENTER' && data.centerIds.length > 0) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['centerIds'],
+        message: '소속 센터는 센터 직원만 가질 수 있습니다.',
+      })
+    }
+    if (data.userType === 'SHIPPER' && !data.shipperId) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['shipperId'],
+        message: '화주사 사용자는 소속 화주사를 선택해야 합니다.',
+      })
+    }
+    if (data.userType !== 'SHIPPER' && data.shipperId) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['shipperId'],
+        message: '소속 화주사는 화주사 사용자만 가질 수 있습니다.',
+      })
+    }
+  })
 
 export type CreateUserAccountInput = z.input<typeof createUserAccountSchema>
 
@@ -47,6 +81,8 @@ export async function createUserAccount(input: CreateUserAccountInput) {
         username,
         displayUsername: data.username,
         userType: data.userType,
+        shipperId: data.shipperId,
+        centers: { create: [...new Set(data.centerIds)].map((centerId) => ({ centerId })) },
       },
     })
     // 아이디·비밀번호 로그인 수단 (Better Auth 형식: providerId 'credential', accountId = 사용자 id)
