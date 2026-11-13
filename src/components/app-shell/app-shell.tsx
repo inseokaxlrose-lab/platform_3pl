@@ -1,10 +1,13 @@
 import { cookies } from 'next/headers'
 import { GridSettingsProvider } from '@/components/data-grid'
 import type { GridSettings } from '@/components/data-grid/settings'
+import { HelpProvider } from '@/components/help'
 import { PermissionProvider } from '@/components/permission'
 import { SidebarInset, SidebarProvider } from '@/components/ui/sidebar'
 import type { NavAreaKey } from '@/config/navigation'
 import type { PermissionCode } from '@/config/permissions'
+import { loadHelpAction } from '@/lib/help/help-actions'
+import { listHelpMenuHrefs } from '@/lib/help/load-help'
 import { setFavoriteMenuAction } from '@/lib/navigation/favorite-actions'
 import type { CurrentUser } from '@/lib/session'
 import { AppHeader } from './app-header'
@@ -40,18 +43,21 @@ export async function AppShell({
   return (
     <PermissionProvider codes={permissions}>
       <GridSettingsProvider initial={gridSettings}>
-        <SidebarProvider defaultOpen={defaultOpen}>
-          <AppSidebar
-            area={area}
-            favorites={favoriteMenus}
-            initialTab={initialTab}
-            onToggleFavorite={setFavoriteMenuAction}
-          />
-          <SidebarInset>
-            <AppHeader area={area} user={user} />
-            <div className="flex-1 p-6">{children}</div>
-          </SidebarInset>
-        </SidebarProvider>
+        {/* 화면 도움말: 도움말 파일이 있는 메뉴 목록 + 불러오기 서버 액션 (0023) */}
+        <HelpProvider menuHrefs={listHelpMenuHrefs()} load={loadHelpAction}>
+          <SidebarProvider defaultOpen={defaultOpen}>
+            <AppSidebar
+              area={area}
+              favorites={favoriteMenus}
+              initialTab={initialTab}
+              onToggleFavorite={setFavoriteMenuAction}
+            />
+            <SidebarInset>
+              <AppHeader area={area} user={user} />
+              <div className="flex-1 p-6">{children}</div>
+            </SidebarInset>
+          </SidebarProvider>
+        </HelpProvider>
       </GridSettingsProvider>
     </PermissionProvider>
   )
