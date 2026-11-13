@@ -100,6 +100,11 @@ export function GridShowcase() {
         현재 상태: {JSON.stringify(state)} · 선택 id: {selectedIds.slice(0, 5).join(', ')}
         {selectedIds.length > 5 && ` 외 ${selectedIds.length - 5}건`}
       </p>
+      <p className="mt-1 text-xs text-muted-foreground">
+        컬럼 순서·숨김은 [컬럼] 메뉴, 너비는 제목 칸 오른쪽 끝을 끌어서(두 번 클릭하면 기본 너비)
+        바꿉니다. 이 쇼케이스는 로그인 없이 쓰는 화면이라 설정을 저장하지 않고 이 화면 안에서만
+        기억합니다. 운영사 화면·포털의 목록은 사용자별로 저장됩니다 (0021).
+      </p>
     </>
   )
 }
