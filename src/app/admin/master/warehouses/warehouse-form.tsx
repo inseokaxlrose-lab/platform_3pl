@@ -1,6 +1,6 @@
 'use client'
 
-import { PowerIcon, SaveIcon } from 'lucide-react'
+import { LayersIcon, PowerIcon, SaveIcon } from 'lucide-react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useState, useTransition } from 'react'
@@ -13,6 +13,7 @@ import {
   FormSection,
   StatusBadge,
 } from '@/components/common'
+import { usePermission } from '@/components/permission'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import {
@@ -59,6 +60,7 @@ type Errors = Record<string, string>
 // 입고대기 창고: 유형·코드가 잠기고 사용 중지 버튼이 없다
 export function WarehouseForm(props: WarehouseFormProps) {
   const router = useRouter()
+  const { can } = usePermission()
   const editing = props.mode === 'edit' ? props.warehouse : null
   const isStaging = editing?.type === 'INBOUND_STAGING'
   const readOnly = props.mode === 'edit' && props.readOnly
@@ -295,7 +297,30 @@ export function WarehouseForm(props: WarehouseFormProps) {
       </FormSection>
       <FormSection
         title={`로케이션 (${editing.locationCount})`}
-        description="로케이션 추가·일괄 생성은 로케이션 메뉴에서 합니다."
+        description={
+          isStaging
+            ? '입고대기 창고는 기본 로케이션 하나만 씁니다.'
+            : '로케이션 추가·일괄 생성은 로케이션 메뉴에서 합니다.'
+        }
+        action={
+          <div className="flex gap-2">
+            {can('master.locations.read') && (
+              <Button asChild type="button" variant="outline" size="sm">
+                <Link href={`/admin/master/locations?warehouseId=${editing.id}`}>
+                  로케이션 관리
+                </Link>
+              </Button>
+            )}
+            {!isStaging && editing.isActive && can('master.locations.create') && (
+              <Button asChild type="button" size="sm">
+                <Link href={`/admin/master/locations/bulk?warehouseId=${editing.id}`}>
+                  <LayersIcon />
+                  일괄 생성
+                </Link>
+              </Button>
+            )}
+          </div>
+        }
       >
         {editing.locations.length === 0 ? (
           <p className="text-sm text-muted-foreground">등록된 로케이션이 없습니다.</p>

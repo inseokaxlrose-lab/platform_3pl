@@ -1,5 +1,5 @@
 import { cookies } from 'next/headers'
-import { GridSettingsProvider } from '@/components/data-grid'
+import { GridSettingsProvider } from '@/components/data-grid/grid-settings-provider'
 import type { GridSettings } from '@/components/data-grid/settings'
 import { HelpProvider } from '@/components/help'
 import { PermissionProvider } from '@/components/permission'

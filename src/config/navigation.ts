@@ -87,7 +87,7 @@ const adminNavigation: NavArea = {
           title: '로케이션',
           href: '/admin/master/locations',
           icon: MapPinIcon,
-          ready: false,
+          ready: true,
           permission: 'master.locations.read',
         },
         {
