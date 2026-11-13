@@ -2,9 +2,10 @@ import type { Metadata } from 'next'
 import { notFound } from 'next/navigation'
 import { PageHeader } from '@/components/common'
 import { AccessDenied } from '@/components/permission'
-import { hasPermission } from '@/lib/session'
+import { getCurrentUser, hasPermission } from '@/lib/session'
 import { AccountPanel } from '../account-panel'
-import { getUserForEdit, getUserFormOptions } from '../queries'
+import { OverridePanel } from '../override-panel'
+import { getUserForEdit, getUserFormOptions, getUserOverrides } from '../queries'
 import { UserForm } from '../user-form'
 
 export const metadata: Metadata = { title: '사용자 수정' }
@@ -14,13 +15,19 @@ export default async function EditUserPage({ params }: PageProps<'/admin/system/
   if (!(await hasPermission('system.users.read'))) return <AccessDenied />
 
   const { id } = await params
-  const [user, options] = await Promise.all([getUserForEdit(id), getUserFormOptions()])
-  if (!user) notFound()
+  const [user, options, overrides, currentUser] = await Promise.all([
+    getUserForEdit(id),
+    getUserFormOptions(),
+    getUserOverrides(id),
+    getCurrentUser(),
+  ])
+  if (!user || !overrides) notFound()
 
   return (
     <div className="space-y-6">
       <PageHeader title={`${user.name} (${user.username})`} className="mb-0" />
       <UserForm options={options} user={user} />
+      <OverridePanel user={user} overrides={overrides} isSelf={currentUser?.id === user.id} />
       <AccountPanel user={user} />
     </div>
   )

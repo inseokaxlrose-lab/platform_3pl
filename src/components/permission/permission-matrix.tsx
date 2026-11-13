@@ -9,23 +9,28 @@ import {
   type PermissionCode,
   type PermissionMenu,
 } from '@/config/permissions'
+import { isOperatorOnly } from '@/lib/permissions/compute-permissions'
 import { cn } from '@/lib/utils'
 import { menusCheckState, toggleMenus, togglePermission } from '@/lib/permissions/permission-toggle'
 
-const ACTIONS = Object.keys(PERMISSION_ACTION_LABELS) as PermissionAction[]
+export const PERMISSION_ACTIONS = Object.keys(PERMISSION_ACTION_LABELS) as PermissionAction[]
+const ACTIONS = PERMISSION_ACTIONS
 
 type PermissionMatrixProps = {
   area: PermissionArea
   value: readonly PermissionCode[]
   onChange: (codes: PermissionCode[]) => void
   disabled?: boolean
+  // false면 운영사 전용 메뉴(시스템) 줄을 숨긴다 (센터 직원의 권한 미리보기 등)
+  includeOperatorOnly?: boolean
 }
 
 // 영역의 메뉴를 묶음(기준정보·입고 등)별로
-function groupedMenus(area: PermissionArea) {
+export function groupedMenus(area: PermissionArea, includeOperatorOnly = true) {
   const groups = new Map<string, PermissionMenu[]>()
   for (const [menu, definition] of Object.entries(PERMISSION_MENUS)) {
     if (definition.area !== area) continue
+    if (!includeOperatorOnly && isOperatorOnly(`${menu}.read` as PermissionCode)) continue
     groups.set(definition.group, [...(groups.get(definition.group) ?? []), menu as PermissionMenu])
   }
   return [...groups.entries()]
@@ -33,7 +38,13 @@ function groupedMenus(area: PermissionArea) {
 
 // 권한 체크 표: 메뉴(줄) × 동작(칸). 그 메뉴에 있는 동작만 체크박스가 나온다
 // 버튼 권한을 체크하면 조회도 체크, 조회를 해제하면 줄 전체 해제 (permission-toggle.ts)
-export function PermissionMatrix({ area, value, onChange, disabled }: PermissionMatrixProps) {
+export function PermissionMatrix({
+  area,
+  value,
+  onChange,
+  disabled,
+  includeOperatorOnly = true,
+}: PermissionMatrixProps) {
   const selected = new Set(value)
   const gridColumns = {
     gridTemplateColumns: `minmax(8rem, 1.5fr) repeat(${ACTIONS.length + 1}, minmax(3.5rem, 1fr))`,
@@ -56,7 +67,7 @@ export function PermissionMatrix({ area, value, onChange, disabled }: Permission
           ))}
         </div>
 
-        {groupedMenus(area).map(([group, menus]) => (
+        {groupedMenus(area, includeOperatorOnly).map(([group, menus]) => (
           <div key={group} role="group" aria-label={group}>
             {/* 묶음 줄: 묶음 전체 체크 */}
             <div className="flex items-center gap-2 border-b bg-muted/20 px-3 py-1.5">
