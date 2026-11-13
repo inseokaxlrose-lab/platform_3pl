@@ -2,6 +2,7 @@ import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { createDataGridState } from '@/components/data-grid/state'
 import type { PermissionCode } from '@/config/permissions'
 import { auth } from '@/lib/auth'
+import { loadUserPermissions } from '@/lib/permissions/load-user-permissions'
 import { prisma } from '@/lib/prisma'
 import { getCurrentPermissions, getCurrentUser } from '@/lib/session'
 import { createUserAccount } from '@/lib/users/create-user-account'
@@ -13,8 +14,9 @@ import {
   resetUserPasswordAction,
   setUserActiveAction,
   updateUserAction,
+  updateUserOverridesAction,
 } from './actions'
-import { getUserForEdit } from './queries'
+import { getUserForEdit, getUserOverrides } from './queries'
 
 vi.mock('@/lib/session', () => ({
   getCurrentUser: vi.fn(),
@@ -234,6 +236,86 @@ describe('목록 · 운영사 전용', () => {
     expect(await listUsersAction(createDataGridState())).toMatchObject({
       ok: false,
       error: { code: 'FORBIDDEN', message: '사용자 관리는 운영사 사용자만 할 수 있습니다.' },
+    })
+  })
+})
+
+describe('사용자별 추가·제외 권한', () => {
+  // 그룹 권한: 품목 조회·수정 → 센터 직원 생성
+  async function createWorker() {
+    await prisma.permissionGroupPermission.createMany({
+      data: ['master.items.read', 'master.items.update'].map((permissionCode) => ({
+        groupId: adminGroupId,
+        permissionCode,
+      })),
+    })
+    const created = await createUserAction(newUser())
+    return created.ok ? created.data.id : ''
+  }
+
+  it('추가는 권한을 더하고, 제외는 그룹 권한을 뺀다 (최종 권한에 바로 반영)', async () => {
+    const id = await createWorker()
+
+    expect(
+      await updateUserOverridesAction({
+        id,
+        grants: ['master.items.create'],
+        denies: ['master.items.update'],
+      }),
+    ).toMatchObject({ ok: true, data: { grants: 1, denies: 1 } })
+
+    expect(await getUserOverrides(id)).toEqual({
+      groupCodes: expect.arrayContaining(['master.items.read', 'master.items.update']),
+      grants: ['master.items.create'],
+      denies: ['master.items.update'],
+    })
+    const { codes } = await loadUserPermissions(id)
+    expect([...codes].sort()).toEqual(['master.items.create', 'master.items.read'])
+  })
+
+  it('저장할 때마다 전체를 새 목록으로 바꾼다 (빈 목록 = 모두 그룹대로)', async () => {
+    const id = await createWorker()
+    await updateUserOverridesAction({ id, grants: ['master.items.create'], denies: [] })
+    await updateUserOverridesAction({ id, grants: [], denies: [] })
+
+    expect(await prisma.userPermissionOverride.count({ where: { userId: id } })).toBe(0)
+  })
+
+  it('센터 직원에게 시스템 권한·포털 권한은 줄 수 없고, 추가와 제외를 겹칠 수 없다', async () => {
+    const id = await createWorker()
+    for (const input of [
+      { grants: ['system.users.read'], denies: [] },
+      { grants: ['portal.items.read'], denies: [] },
+      { grants: ['master.items.delete'], denies: ['master.items.delete'] },
+      { grants: ['old.code'], denies: [] },
+    ]) {
+      expect(await updateUserOverridesAction({ id, ...input })).toMatchObject({
+        ok: false,
+        error: { code: 'VALIDATION' },
+      })
+    }
+    expect(await prisma.userPermissionOverride.count({ where: { userId: id } })).toBe(0)
+  })
+
+  it('자기 자신의 개별 권한은 바꿀 수 없다', async () => {
+    expect(
+      await updateUserOverridesAction({
+        id: operatorId,
+        grants: [],
+        denies: ['system.users.read'],
+      }),
+    ).toMatchObject({
+      ok: false,
+      error: { code: 'CONFLICT', message: '자기 자신의 개별 권한은 바꿀 수 없습니다.' },
+    })
+  })
+
+  it('수정 권한이 없으면 거부한다', async () => {
+    const id = await createWorker()
+    vi.mocked(getCurrentPermissions).mockResolvedValue(new Set(['system.users.read']))
+    expect(await updateUserOverridesAction({ id, grants: [], denies: [] })).toMatchObject({
+      ok: false,
+      error: { code: 'FORBIDDEN' },
     })
   })
 })

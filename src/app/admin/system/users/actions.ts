@@ -4,6 +4,7 @@ import { z } from 'zod'
 import { ActionError } from '@/lib/actions/action-error'
 import { createAction } from '@/lib/actions/create-action'
 import { dataGridStateSchema, toPrismaQuery } from '@/lib/grid/grid-query'
+import { overridesIssue } from '@/lib/permissions/override-state'
 import { prisma } from '@/lib/prisma'
 import type { CurrentUser } from '@/lib/session'
 import { affiliationIssues, internalEmail } from '@/lib/users/affiliation'
@@ -226,5 +227,51 @@ export const resetUserPasswordAction = createAction({
     }
     await resetUserPassword(input.id, input.password)
     return { id: input.id }
+  },
+})
+
+// 사용자별 추가·제외 권한 저장 (0019): 기존 목록을 지우고 새로 넣는다 (한 트랜잭션)
+// 자기 자신은 바꿀 수 없다: 실수로 자기 시스템 권한을 빼서 잠기거나, 스스로 권한을 올리는 것을 막는다
+export const updateUserOverridesAction = createAction({
+  permission: 'system.users.update',
+  input: z.object({
+    id: z.string().min(1),
+    grants: z.array(z.string().min(1)).max(500),
+    denies: z.array(z.string().min(1)).max(500),
+  }),
+  handler: async ({ user, input }) => {
+    requireOperator(user)
+    if (input.id === user.id) {
+      throw new ActionError('CONFLICT', '자기 자신의 개별 권한은 바꿀 수 없습니다.')
+    }
+    const target = await prisma.user.findUnique({
+      where: { id: input.id },
+      select: { userType: true },
+    })
+    if (!target) throw new ActionError('NOT_FOUND', '사용자를 찾을 수 없습니다.')
+
+    const grants = [...new Set(input.grants)]
+    const denies = [...new Set(input.denies)]
+    const issue = overridesIssue(target.userType, grants, denies)
+    if (issue) throw new ActionError('VALIDATION', issue)
+
+    await prisma.$transaction([
+      prisma.userPermissionOverride.deleteMany({ where: { userId: input.id } }),
+      prisma.userPermissionOverride.createMany({
+        data: [
+          ...grants.map((permissionCode) => ({
+            userId: input.id,
+            permissionCode,
+            effect: 'GRANT' as const,
+          })),
+          ...denies.map((permissionCode) => ({
+            userId: input.id,
+            permissionCode,
+            effect: 'DENY' as const,
+          })),
+        ],
+      }),
+    ])
+    return { id: input.id, grants: grants.length, denies: denies.length }
   },
 })

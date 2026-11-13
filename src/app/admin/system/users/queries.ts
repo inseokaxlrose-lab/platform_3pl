@@ -1,4 +1,5 @@
 import 'server-only'
+import { isPermissionCode } from '@/config/permissions'
 import { prisma } from '@/lib/prisma'
 
 // 등록·수정 화면의 선택지: 사용 중인 센터·화주사, 권한그룹(영역 포함)
@@ -57,3 +58,36 @@ export async function getUserForEdit(id: string) {
 }
 
 export type UserForEdit = NonNullable<Awaited<ReturnType<typeof getUserForEdit>>>
+
+// 개별 권한 화면용: 저장된 그룹 권한 코드 + 사용자 추가·제외 목록
+// 목록에 없는 옛 코드는 화면에 보이지 않는다 (계산에서도 무시되고, 다음 저장 때 정리된다)
+export async function getUserOverrides(id: string) {
+  const user = await prisma.user.findUnique({
+    where: { id },
+    select: {
+      permissionGroups: {
+        select: { group: { select: { permissions: { select: { permissionCode: true } } } } },
+      },
+      permissionOverrides: { select: { permissionCode: true, effect: true } },
+    },
+  })
+  if (!user) return null
+  const codesOf = (effect: 'GRANT' | 'DENY') =>
+    user.permissionOverrides
+      .filter((o) => o.effect === effect)
+      .map((o) => o.permissionCode)
+      .filter(isPermissionCode)
+  return {
+    groupCodes: [
+      ...new Set(
+        user.permissionGroups.flatMap(({ group }) =>
+          group.permissions.map((p) => p.permissionCode),
+        ),
+      ),
+    ].filter(isPermissionCode),
+    grants: codesOf('GRANT'),
+    denies: codesOf('DENY'),
+  }
+}
+
+export type UserOverrides = NonNullable<Awaited<ReturnType<typeof getUserOverrides>>>
