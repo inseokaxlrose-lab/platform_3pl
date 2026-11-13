@@ -4,12 +4,11 @@ import { SaveIcon, Trash2Icon, TriangleAlertIcon } from 'lucide-react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useState, useTransition } from 'react'
-import { ConfirmDialog } from '@/components/common'
+import { ConfirmDialog, FormColumns, FormField, FormSection } from '@/components/common'
 import { Can, usePermission } from '@/components/permission'
 import { PermissionMatrix } from '@/components/permission/permission-matrix'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
 import {
   Select,
   SelectContent,
@@ -83,56 +82,55 @@ export function RoleForm({ group }: RoleFormProps) {
 
   return (
     <form onSubmit={save} className="space-y-6">
-      <div className="grid gap-4 sm:grid-cols-2">
-        <div className="grid gap-2">
-          <Label htmlFor="role-name">
-            이름 <span className="text-destructive">*</span>
-          </Label>
-          <Input
-            id="role-name"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            disabled={readOnly || pending}
-            aria-invalid={Boolean(fieldError('name'))}
-            maxLength={50}
-          />
-          {fieldError('name') && <p className="text-xs text-destructive">{fieldError('name')}</p>}
-        </div>
-        <div className="grid gap-2">
-          <Label htmlFor="role-area">영역</Label>
-          <Select
-            value={area}
-            onValueChange={(next) => {
-              // 영역을 바꾸면 다른 영역의 권한은 의미가 없으므로 비운다
-              setArea(next as 'ADMIN' | 'PORTAL')
-              setCodes([])
-            }}
-            disabled={!isNew || readOnly || pending}
-          >
-            <SelectTrigger id="role-area" className="w-full">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="ADMIN">{AREA_LABELS.ADMIN}</SelectItem>
-              <SelectItem value="PORTAL">{AREA_LABELS.PORTAL}</SelectItem>
-            </SelectContent>
-          </Select>
-          {!isNew && (
-            <p className="text-xs text-muted-foreground">영역은 등록 후 바꿀 수 없습니다.</p>
-          )}
-        </div>
-        <div className="grid gap-2 sm:col-span-2">
-          <Label htmlFor="role-description">설명</Label>
-          <Textarea
-            id="role-description"
-            value={description}
-            onChange={(e) => setDescription(e.target.value)}
-            disabled={readOnly || pending}
-            maxLength={200}
-            rows={2}
-          />
-        </div>
-      </div>
+      {/* 정보가 적어 왼쪽 단만 쓴다. 권한 체크 표는 아래에 전체 너비로 */}
+      <FormColumns
+        left={
+          <FormSection title="기본 정보">
+            <FormField label="이름" required error={fieldError('name')} htmlFor="role-name">
+              <Input
+                id="role-name"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                disabled={readOnly || pending}
+                aria-invalid={Boolean(fieldError('name'))}
+                maxLength={50}
+              />
+            </FormField>
+            <FormField label="영역" htmlFor="role-area">
+              <Select
+                value={area}
+                onValueChange={(next) => {
+                  // 영역을 바꾸면 다른 영역의 권한은 의미가 없으므로 비운다
+                  setArea(next as 'ADMIN' | 'PORTAL')
+                  setCodes([])
+                }}
+                disabled={!isNew || readOnly || pending}
+              >
+                <SelectTrigger id="role-area" className="w-full">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="ADMIN">{AREA_LABELS.ADMIN}</SelectItem>
+                  <SelectItem value="PORTAL">{AREA_LABELS.PORTAL}</SelectItem>
+                </SelectContent>
+              </Select>
+              {!isNew && (
+                <p className="text-xs text-muted-foreground">영역은 등록 후 바꿀 수 없습니다.</p>
+              )}
+            </FormField>
+            <FormField label="설명" htmlFor="role-description">
+              <Textarea
+                id="role-description"
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                disabled={readOnly || pending}
+                maxLength={200}
+                rows={2}
+              />
+            </FormField>
+          </FormSection>
+        }
+      />
 
       {group && group.obsoleteCodes.length > 0 && (
         <div
