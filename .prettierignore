@@ -7,6 +7,7 @@ node_modules
 # 자동 생성 파일
 package-lock.json
 next-env.d.ts
+src/generated
 
 # 문서는 손으로 관리 (자동 정리 제외)
 docs

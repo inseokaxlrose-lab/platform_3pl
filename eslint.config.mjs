@@ -10,7 +10,7 @@ const eslintConfig = defineConfig([
   // 반드시 마지막에 두어야 앞 설정의 모양 규칙을 덮어쓴다
   prettier,
   // eslint-config-next 기본 제외 경로를 명시적으로 지정
-  globalIgnores(['.next/**', 'out/**', 'build/**', 'next-env.d.ts']),
+  globalIgnores(['.next/**', 'out/**', 'build/**', 'next-env.d.ts', 'src/generated/**']),
 ])
 
 export default eslintConfig

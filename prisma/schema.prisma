@@ -1,0 +1,12 @@
+// DB 구조 설계도 (모델은 M1부터 추가)
+// 문서: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+// 연결 주소는 prisma.config.ts(명령어용)와 src/lib/prisma.ts(앱 실행용)에서 지정한다
+datasource db {
+  provider = "postgresql"
+}
