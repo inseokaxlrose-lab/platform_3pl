@@ -2,7 +2,9 @@ import 'server-only'
 import { headers } from 'next/headers'
 import { redirect } from 'next/navigation'
 import { cache } from 'react'
+import type { PermissionCode } from '@/config/permissions'
 import { auth } from '@/lib/auth'
+import { loadUserPermissions } from '@/lib/permissions/load-user-permissions'
 import { areaOf, homeOf, type Area, type UserTypeValue } from '@/lib/redirect'
 
 export type CurrentUser = {
@@ -34,4 +36,18 @@ export async function requireUser(area: Area): Promise<CurrentUser> {
   if (!user) redirect('/login')
   if (areaOf(user.userType) !== area) redirect(homeOf(user.userType))
   return user
+}
+
+// 현재 로그인 사용자의 최종 권한 (한 요청 안에서는 한 번만 계산: cache)
+// 로그인 안 됨(또는 사용 중지)이면 빈 목록
+export const getCurrentPermissions = cache(async (): Promise<ReadonlySet<PermissionCode>> => {
+  const user = await getCurrentUser()
+  if (!user) return new Set()
+  return (await loadUserPermissions(user.id)).codes
+})
+
+// 화면(page.tsx)에서 권한 확인: 없으면 <AccessDenied />를 보여준다
+// 예) if (!(await hasPermission('inbound.asn.read'))) return <AccessDenied />
+export async function hasPermission(code: PermissionCode) {
+  return (await getCurrentPermissions()).has(code)
 }
