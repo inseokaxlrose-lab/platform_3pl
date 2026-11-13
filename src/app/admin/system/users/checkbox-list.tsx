@@ -21,7 +21,7 @@ export function CheckboxList({
 }) {
   if (options.length === 0) return <p className="text-sm text-muted-foreground">{emptyText}</p>
   return (
-    <div className="grid gap-2 rounded-lg border p-3 sm:grid-cols-2">
+    <div className="grid gap-2 rounded-lg border p-3">
       {options.map((option) => {
         const id = `${name}-${option.id}`
         return (

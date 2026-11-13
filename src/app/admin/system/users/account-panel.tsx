@@ -77,10 +77,7 @@ export function AccountPanel({
           />
         </div>
 
-        <form
-          onSubmit={resetPassword}
-          className="grid gap-3 border-t pt-4 sm:grid-cols-[1fr_1fr_auto] sm:items-end"
-        >
+        <form onSubmit={resetPassword} className="grid gap-4 border-t pt-4">
           <div className="grid gap-2">
             <Label htmlFor="reset-password">새 비밀번호</Label>
             <Input
@@ -104,18 +101,19 @@ export function AccountPanel({
               disabled={pending}
             />
           </div>
-          <Button type="submit" variant="outline" disabled={pending || !password}>
+          <Button
+            type="submit"
+            variant="outline"
+            className="justify-self-start"
+            disabled={pending || !password}
+          >
             <KeyRoundIcon />
             비밀번호 초기화
           </Button>
           {message && (
             <p
               role={message.ok ? 'status' : 'alert'}
-              className={
-                message.ok
-                  ? 'text-sm text-success sm:col-span-3'
-                  : 'text-sm text-destructive sm:col-span-3'
-              }
+              className={message.ok ? 'text-sm text-success' : 'text-sm text-destructive'}
             >
               {message.text}
             </p>
