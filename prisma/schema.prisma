@@ -1,5 +1,6 @@
-// DB 구조 설계도 (모델은 M1부터 추가)
+// DB 구조 설계도
 // 문서: https://pris.ly/d/prisma-schema
+// 데이터 구조 결정: docs/decisions/0003-domain-model.md, 0010-auth-and-permission-model.md
 
 generator client {
   provider = "prisma-client"
@@ -9,4 +10,154 @@ generator client {
 // 연결 주소는 prisma.config.ts(명령어용)와 src/lib/prisma.ts(앱 실행용)에서 지정한다
 datasource db {
   provider = "postgresql"
+}
+
+// ─────────────────────────────────────────────
+// 인증 (Better Auth)
+// user / session / account / verification 은 Better Auth가 사용하는 표다.
+// `npx auth generate`로 만든 뒤 우리 정보(userType, isActive, 권한 연결)를 더했다.
+// Better Auth 필드 이름·구조는 바꾸지 않는다.
+// ─────────────────────────────────────────────
+
+// 사용자 유형: 데이터 범위(볼 수 있는 데이터)를 정하는 기준
+enum UserType {
+  OPERATOR // 운영사 → 전체
+  CENTER // 센터 운영자·작업자 → 소속 센터
+  SHIPPER // 화주사 사용자 → 자기 화주사
+}
+
+model User {
+  id              String   @id
+  name            String
+  // 아이디 로그인을 쓰므로 이메일이 없는 사용자는 내부용 주소를 자동으로 채운다 (사용자 관리 작업에서)
+  email           String
+  emailVerified   Boolean  @default(false)
+  image           String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  // 로그인 아이디 (username 플러그인)
+  username        String?
+  displayUsername String?
+  userType        UserType
+  // false면 로그인·사용 불가 (퇴사자 등). 기록 보존을 위해 계정을 지우지 않고 막는다
+  isActive        Boolean  @default(true)
+
+  sessions            Session[]
+  accounts            Account[]
+  permissionGroups    UserPermissionGroup[]
+  permissionOverrides UserPermissionOverride[]
+
+  @@unique([email])
+  @@unique([username])
+  @@map("user")
+}
+
+model Session {
+  id        String   @id
+  expiresAt DateTime
+  token     String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  ipAddress String?
+  userAgent String?
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([token])
+  @@index([userId])
+  @@map("session")
+}
+
+// 로그인 수단: 아이디·비밀번호 로그인의 비밀번호(암호화된 값)가 여기에 저장된다
+model Account {
+  id                    String    @id
+  accountId             String
+  providerId            String
+  userId                String
+  user                  User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  accessToken           String?
+  refreshToken          String?
+  idToken               String?
+  accessTokenExpiresAt  DateTime?
+  refreshTokenExpiresAt DateTime?
+  scope                 String?
+  password              String?
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  @@index([userId])
+  @@map("account")
+}
+
+model Verification {
+  id         String   @id
+  identifier String
+  value      String
+  expiresAt  DateTime
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@index([identifier])
+  @@map("verification")
+}
+
+// ─────────────────────────────────────────────
+// 권한 (0003 결정 7)
+// 최종 권한 = 그룹 권한 합 + 사용자 추가(GRANT) − 사용자 제외(DENY)
+// 권한 코드(예: inbound.asn.create)는 코드 한 곳에서 목록으로 관리하고, DB에는 코드 글자만 저장한다
+// ─────────────────────────────────────────────
+
+// 권한그룹: 권한 코드 묶음 (예: "센터 운영자", "화주 담당자")
+model PermissionGroup {
+  id          String   @id @default(cuid())
+  name        String   @unique
+  description String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  permissions PermissionGroupPermission[]
+  users       UserPermissionGroup[]
+
+  @@map("permission_group")
+}
+
+// 권한그룹에 들어 있는 권한 코드 (그룹을 지우면 함께 지워진다)
+model PermissionGroupPermission {
+  groupId        String
+  permissionCode String
+  group          PermissionGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
+
+  @@id([groupId, permissionCode])
+  @@map("permission_group_permission")
+}
+
+// 사용자 ↔ 권한그룹 (한 사용자가 여러 그룹에 속할 수 있다)
+// 사용자가 남아 있는 그룹은 지울 수 없다 (Restrict): 실수로 여러 사람의 권한이 사라지는 것을 막는다
+model UserPermissionGroup {
+  userId    String
+  groupId   String
+  createdAt DateTime        @default(now())
+  user      User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  group     PermissionGroup @relation(fields: [groupId], references: [id], onDelete: Restrict)
+
+  @@id([userId, groupId])
+  @@index([groupId])
+  @@map("user_permission_group")
+}
+
+enum PermissionEffect {
+  GRANT // 그룹에 없어도 이 사용자에게 추가
+  DENY // 그룹에 있어도 이 사용자에게서 제외
+}
+
+// 사용자별 권한 예외: 같은 사용자·같은 코드에는 하나만 (추가와 제외가 동시에 있을 수 없다)
+model UserPermissionOverride {
+  userId         String
+  permissionCode String
+  effect         PermissionEffect
+  createdAt      DateTime         @default(now())
+  user           User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([userId, permissionCode])
+  @@map("user_permission_override")
 }
