@@ -12,13 +12,9 @@ export const optionalText = (max: number) =>
     .max(max, `${max}자 이하로 입력해 주세요.`)
     .transform((value) => value || null)
 
-// 필수 입력 글자
-export const requiredText = (label: string, max: number) =>
-  z
-    .string()
-    .trim()
-    .min(1, `${label}을(를) 입력해 주세요.`)
-    .max(max, `${max}자 이하로 입력해 주세요.`)
+// 필수 입력 글자 (message: 비었을 때 문구, 예 '센터명을 입력해 주세요.')
+export const requiredText = (message: string, max: number) =>
+  z.string().trim().min(1, message).max(max, `${max}자 이하로 입력해 주세요.`)
 
 // 전화·팩스: 숫자·하이픈, 숫자 8~12자리 (예: 02-123-4567, 010-1234-5678, 1588-1234)
 export const optionalPhone = z
