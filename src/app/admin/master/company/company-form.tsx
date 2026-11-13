@@ -3,7 +3,7 @@
 import { PlusIcon, SaveIcon, Trash2Icon } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { useState, useTransition } from 'react'
-import { AddressFields, FormField } from '@/components/common'
+import { AddressFields, FormColumns, FormField, FormSection } from '@/components/common'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import {
@@ -121,130 +121,142 @@ export function CompanyForm({ initial, readOnly }: CompanyFormProps) {
 
   return (
     <form onSubmit={submit} className="space-y-6">
-      <Section title="기본 정보">
-        <div className="grid gap-4 sm:grid-cols-2">
-          {text('name', '회사명', { required: true })}
-          {text('businessNumber', '사업자등록번호', {
-            required: true,
-            placeholder: '000-00-00000',
-            inputMode: 'numeric',
-          })}
-          {text('ceoName', '대표자')}
-          <div className="grid gap-4 sm:grid-cols-2">
-            {text('businessType', '업태')}
-            {text('businessItem', '종목')}
-          </div>
-        </div>
-      </Section>
+      {/* 정보가 많아 좌우 2단: 왼쪽 기본 정보·연락처 → 오른쪽 주소·담당자 */}
+      <FormColumns
+        left={
+          <>
+            <FormSection title="기본 정보">
+              {text('name', '회사명', { required: true })}
+              {text('businessNumber', '사업자등록번호', {
+                required: true,
+                placeholder: '000-00-00000',
+                inputMode: 'numeric',
+              })}
+              {text('ceoName', '대표자')}
+              {text('businessType', '업태')}
+              {text('businessItem', '종목')}
+            </FormSection>
 
-      <Section title="연락처">
-        <div className="grid gap-4 sm:grid-cols-3">
-          {text('phone', '대표 전화', { placeholder: '02-123-4567', inputMode: 'tel' })}
-          {text('fax', '팩스', { placeholder: '02-123-4568', inputMode: 'tel' })}
-          {text('email', '대표 이메일', { inputMode: 'email' })}
-        </div>
-      </Section>
-
-      <Section title="주소">
-        <AddressFields
-          idPrefix="company-address"
-          value={{
-            zipCode: form.zipCode,
-            address: form.address,
-            addressDetail: form.addressDetail,
-          }}
-          onChange={(address) => set(address)}
-          disabled={disabled}
-          errors={{
-            zipCode: errors.zipCode,
-            address: errors.address,
-            addressDetail: errors.addressDetail,
-          }}
-        />
-      </Section>
-
-      <Section
-        title={`담당자 (${form.contacts.length}/${MAX_COMPANY_CONTACTS})`}
-        action={
-          !readOnly && (
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              disabled={pending || form.contacts.length >= MAX_COMPANY_CONTACTS}
-              onClick={() => set({ contacts: [...form.contacts, { ...EMPTY_CONTACT }] })}
-            >
-              <PlusIcon />
-              담당자 추가
-            </Button>
-          )
+            <FormSection title="연락처">
+              {text('phone', '대표 전화', { placeholder: '02-123-4567', inputMode: 'tel' })}
+              {text('fax', '팩스', { placeholder: '02-123-4568', inputMode: 'tel' })}
+              {text('email', '대표 이메일', { inputMode: 'email' })}
+            </FormSection>
+          </>
         }
-      >
-        {form.contacts.length === 0 ? (
-          <p className="text-sm text-muted-foreground">등록된 담당자가 없습니다.</p>
-        ) : (
-          <ul className="space-y-3">
-            {form.contacts.map((contact, index) => {
-              const field = (key: keyof CompanyContactInput) => `contacts.${index}.${key}`
-              const contactInput = (
-                key: keyof CompanyContactInput,
-                label: string,
-                required = false,
-                inputMode?: 'tel' | 'email',
-              ) => (
-                <FormField
-                  label={label}
-                  required={required}
-                  error={errors[field(key)]}
-                  htmlFor={`company-${field(key)}`}
-                >
-                  <Input
-                    id={`company-${field(key)}`}
-                    value={contact[key]}
-                    onChange={(e) => setContact(index, { [key]: e.target.value })}
-                    disabled={disabled}
-                    inputMode={inputMode}
-                    aria-invalid={Boolean(errors[field(key)])}
-                  />
-                </FormField>
-              )
-              return (
-                <li
-                  key={index}
-                  aria-label={`담당자 ${index + 1}`}
-                  className="grid items-start gap-3 rounded-md border p-3 sm:grid-cols-[1fr_1fr_1fr_1fr_auto]"
-                >
-                  {contactInput('duty', '담당 업무', true)}
-                  {contactInput('name', '담당자명', true)}
-                  {contactInput('phone', '연락처', false, 'tel')}
-                  {contactInput('email', '이메일', false, 'email')}
-                  {!readOnly && (
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon"
-                      className="sm:mt-6"
-                      aria-label={`담당자 ${index + 1} 삭제`}
-                      disabled={pending}
-                      onClick={() => {
-                        set({ contacts: form.contacts.filter((_, i) => i !== index) })
-                        setErrors({})
-                      }}
-                    >
-                      <Trash2Icon />
-                    </Button>
-                  )}
-                </li>
-              )
-            })}
-          </ul>
-        )}
-        {errors.contacts && (
-          <p role="alert" className="text-xs text-destructive">
-            {errors.contacts}
-          </p>
-        )}
-      </Section>
+        right={
+          <>
+            <FormSection title="주소">
+              <AddressFields
+                idPrefix="company-address"
+                value={{
+                  zipCode: form.zipCode,
+                  address: form.address,
+                  addressDetail: form.addressDetail,
+                }}
+                onChange={(address) => set(address)}
+                disabled={disabled}
+                errors={{
+                  zipCode: errors.zipCode,
+                  address: errors.address,
+                  addressDetail: errors.addressDetail,
+                }}
+              />
+            </FormSection>
+
+            <FormSection
+              title={`담당자 (${form.contacts.length}/${MAX_COMPANY_CONTACTS})`}
+              action={
+                !readOnly && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    disabled={pending || form.contacts.length >= MAX_COMPANY_CONTACTS}
+                    onClick={() => set({ contacts: [...form.contacts, { ...EMPTY_CONTACT }] })}
+                  >
+                    <PlusIcon />
+                    담당자 추가
+                  </Button>
+                )
+              }
+            >
+              {form.contacts.length === 0 ? (
+                <p className="text-sm text-muted-foreground">등록된 담당자가 없습니다.</p>
+              ) : (
+                <ul className="space-y-3">
+                  {form.contacts.map((contact, index) => {
+                    const field = (key: keyof CompanyContactInput) => `contacts.${index}.${key}`
+                    const contactInput = (
+                      key: keyof CompanyContactInput,
+                      label: string,
+                      required = false,
+                      inputMode?: 'tel' | 'email',
+                    ) => (
+                      <FormField
+                        label={label}
+                        required={required}
+                        error={errors[field(key)]}
+                        htmlFor={`company-${field(key)}`}
+                      >
+                        <Input
+                          id={`company-${field(key)}`}
+                          value={contact[key]}
+                          onChange={(e) => setContact(index, { [key]: e.target.value })}
+                          disabled={disabled}
+                          inputMode={inputMode}
+                          aria-invalid={Boolean(errors[field(key)])}
+                        />
+                      </FormField>
+                    )
+                    return (
+                      <li
+                        key={index}
+                        aria-label={`담당자 ${index + 1}`}
+                        className="space-y-3 rounded-md border p-3"
+                      >
+                        {/* 카드 머리: 순번 + 삭제 */}
+                        <div className="flex items-center justify-between">
+                          <span className="text-sm font-medium text-muted-foreground">
+                            담당자 {index + 1}
+                          </span>
+                          {!readOnly && (
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon-sm"
+                              aria-label={`담당자 ${index + 1} 삭제`}
+                              disabled={pending}
+                              onClick={() => {
+                                set({ contacts: form.contacts.filter((_, i) => i !== index) })
+                                setErrors({})
+                              }}
+                            >
+                              <Trash2Icon />
+                            </Button>
+                          )}
+                        </div>
+                        {/* 반쪽 너비 안이라 두 칸씩: 업무·이름 / 연락처·이메일 */}
+                        <div className="grid items-start gap-3 sm:grid-cols-2">
+                          {contactInput('duty', '담당 업무', true)}
+                          {contactInput('name', '담당자명', true)}
+                          {contactInput('phone', '연락처', false, 'tel')}
+                          {contactInput('email', '이메일', false, 'email')}
+                        </div>
+                      </li>
+                    )
+                  })}
+                </ul>
+              )}
+              {errors.contacts && (
+                <p role="alert" className="text-xs text-destructive">
+                  {errors.contacts}
+                </p>
+              )}
+            </FormSection>
+          </>
+        }
+      />
 
       <div className="flex items-center justify-end gap-3">
         {message && (
@@ -263,26 +275,5 @@ export function CompanyForm({ initial, readOnly }: CompanyFormProps) {
         )}
       </div>
     </form>
-  )
-}
-
-// 입력 묶음 상자: 제목 + (오른쪽 버튼) + 내용
-function Section({
-  title,
-  action,
-  children,
-}: {
-  title: string
-  action?: React.ReactNode
-  children: React.ReactNode
-}) {
-  return (
-    <section className="space-y-4 rounded-lg border p-4">
-      <div className="flex items-center justify-between gap-2">
-        <h2 className="text-base font-semibold">{title}</h2>
-        {action}
-      </div>
-      {children}
-    </section>
   )
 }
