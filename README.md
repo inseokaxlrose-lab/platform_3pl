@@ -36,5 +36,7 @@ npm run build   # 배포용 빌드
 npm run lint    # 코드 규칙 검사
 npm run format  # 코드 모양 자동 정리
 npm run db:check   # DB 연결 확인
+npm run test       # 전체 테스트 한 번 실행 (DB 테스트는 platform_3pl_test 사용)
+npm run test:watch # 파일을 고칠 때마다 테스트 자동 실행
 npm run db:studio  # DB 내용을 브라우저에서 보기
 ```

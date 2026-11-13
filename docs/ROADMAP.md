@@ -5,7 +5,7 @@
 > 끝난 작업은 `[x]`로 바꿉니다.
 > 데이터 구조는 `docs/decisions/0003-domain-model.md`를 따릅니다.
 
-## 현재 위치: M0 진행 중 — 다음: 테스트 도구 설정 (Vitest)
+## 현재 위치: M0 완료 — 다음: M0.5 디자인 토큰 정하기
 
 ---
 
@@ -18,7 +18,7 @@
 - [x] Tailwind + shadcn/ui 설정
 - [x] 로컬 PostgreSQL 준비 + Prisma 연결
 - [x] 기본 레이아웃 뼈대 (운영사 화면 `/admin`, 화주 포털 `/portal`)
-- [ ] 테스트 도구 설정 (Vitest)
+- [x] 테스트 도구 설정 (Vitest)
 
 완료 기준: `npm run dev`로 두 화면이 뜨고, DB 연결 확인 테스트가 통과한다.
 
