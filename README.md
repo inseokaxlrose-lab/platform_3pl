@@ -19,13 +19,18 @@ brew services start postgresql@18
   -c "CREATE DATABASE platform_3pl_dev OWNER platform_3pl;" \
   -c "CREATE DATABASE platform_3pl_test OWNER platform_3pl;"
 
-# 3. 환경변수 파일 만들기 (로컬 기본값이 이미 채워져 있음)
+# 3. 환경변수 파일 만들기 (DB 주소는 로컬 기본값이 채워져 있음)
 cp .env.example .env
+#    .env의 BETTER_AUTH_SECRET에 아래 명령의 결과를 넣는다 (로그인 정보 암호화 열쇠)
+openssl rand -base64 32
 
-# 4. 패키지 설치 (Prisma 코드도 자동 생성) + DB 연결 확인
+# 4. 패키지 설치 (Prisma 코드도 자동 생성) + 개발 DB에 표 만들기 + 연결 확인
 npm install
+npx prisma migrate dev
 npm run db:check
 ```
+
+DB 구조가 바뀐 코드를 받았을 때(`git pull` 후)는 `npx prisma migrate dev`를 다시 실행한다. 테스트 DB는 `npm run test` 때 자동으로 맞춰진다.
 
 ## 실행
 
