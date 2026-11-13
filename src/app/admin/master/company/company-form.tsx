@@ -3,7 +3,7 @@
 import { PlusIcon, SaveIcon, Trash2Icon } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { useState, useTransition } from 'react'
-import { AddressFields, FormColumns, FormField, FormSection } from '@/components/common'
+import { AddressFields, FormColumns, FormField, FormRow, FormSection } from '@/components/common'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import {
@@ -121,31 +121,34 @@ export function CompanyForm({ initial, readOnly }: CompanyFormProps) {
 
   return (
     <form onSubmit={submit} className="space-y-6">
-      {/* 정보가 많아 좌우 2단: 왼쪽 기본 정보·연락처 → 오른쪽 주소·담당자 */}
+      {/* 왼쪽: 회사 정보(기본·연락처·주소) / 오른쪽: 담당자 (최대 5명이라 길어질 수 있어 따로) */}
       <FormColumns
         left={
           <>
             <FormSection title="기본 정보">
               {text('name', '회사명', { required: true })}
-              {text('businessNumber', '사업자등록번호', {
-                required: true,
-                placeholder: '000-00-00000',
-                inputMode: 'numeric',
-              })}
-              {text('ceoName', '대표자')}
-              {text('businessType', '업태')}
-              {text('businessItem', '종목')}
+              <FormRow>
+                {text('businessNumber', '사업자등록번호', {
+                  required: true,
+                  placeholder: '000-00-00000',
+                  inputMode: 'numeric',
+                })}
+                {text('ceoName', '대표자')}
+              </FormRow>
+              <FormRow>
+                {text('businessType', '업태')}
+                {text('businessItem', '종목')}
+              </FormRow>
             </FormSection>
 
             <FormSection title="연락처">
-              {text('phone', '대표 전화', { placeholder: '02-123-4567', inputMode: 'tel' })}
-              {text('fax', '팩스', { placeholder: '02-123-4568', inputMode: 'tel' })}
+              <FormRow>
+                {text('phone', '대표 전화', { placeholder: '02-123-4567', inputMode: 'tel' })}
+                {text('fax', '팩스', { placeholder: '02-123-4568', inputMode: 'tel' })}
+              </FormRow>
               {text('email', '대표 이메일', { inputMode: 'email' })}
             </FormSection>
-          </>
-        }
-        right={
-          <>
+
             <FormSection title="주소">
               <AddressFields
                 idPrefix="company-address"
@@ -163,7 +166,10 @@ export function CompanyForm({ initial, readOnly }: CompanyFormProps) {
                 }}
               />
             </FormSection>
-
+          </>
+        }
+        right={
+          <>
             <FormSection
               title={`담당자 (${form.contacts.length}/${MAX_COMPANY_CONTACTS})`}
               action={

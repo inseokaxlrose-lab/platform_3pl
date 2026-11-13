@@ -4,7 +4,7 @@ import { SaveIcon, Trash2Icon, TriangleAlertIcon } from 'lucide-react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useState, useTransition } from 'react'
-import { ConfirmDialog, FormColumns, FormField, FormSection } from '@/components/common'
+import { ConfirmDialog, FormColumns, FormField, FormRow, FormSection } from '@/components/common'
 import { Can, usePermission } from '@/components/permission'
 import { PermissionMatrix } from '@/components/permission/permission-matrix'
 import { Button } from '@/components/ui/button'
@@ -86,38 +86,41 @@ export function RoleForm({ group }: RoleFormProps) {
       <FormColumns
         left={
           <FormSection title="기본 정보">
-            <FormField label="이름" required error={fieldError('name')} htmlFor="role-name">
-              <Input
-                id="role-name"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                disabled={readOnly || pending}
-                aria-invalid={Boolean(fieldError('name'))}
-                maxLength={50}
-              />
-            </FormField>
-            <FormField label="영역" htmlFor="role-area">
-              <Select
-                value={area}
-                onValueChange={(next) => {
-                  // 영역을 바꾸면 다른 영역의 권한은 의미가 없으므로 비운다
-                  setArea(next as 'ADMIN' | 'PORTAL')
-                  setCodes([])
-                }}
-                disabled={!isNew || readOnly || pending}
-              >
-                <SelectTrigger id="role-area" className="w-full">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="ADMIN">{AREA_LABELS.ADMIN}</SelectItem>
-                  <SelectItem value="PORTAL">{AREA_LABELS.PORTAL}</SelectItem>
-                </SelectContent>
-              </Select>
-              {!isNew && (
-                <p className="text-xs text-muted-foreground">영역은 등록 후 바꿀 수 없습니다.</p>
-              )}
-            </FormField>
+            {/* 이름·영역은 한 줄에 2칸 */}
+            <FormRow>
+              <FormField label="이름" required error={fieldError('name')} htmlFor="role-name">
+                <Input
+                  id="role-name"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  disabled={readOnly || pending}
+                  aria-invalid={Boolean(fieldError('name'))}
+                  maxLength={50}
+                />
+              </FormField>
+              <FormField label="영역" htmlFor="role-area">
+                <Select
+                  value={area}
+                  onValueChange={(next) => {
+                    // 영역을 바꾸면 다른 영역의 권한은 의미가 없으므로 비운다
+                    setArea(next as 'ADMIN' | 'PORTAL')
+                    setCodes([])
+                  }}
+                  disabled={!isNew || readOnly || pending}
+                >
+                  <SelectTrigger id="role-area" className="w-full">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="ADMIN">{AREA_LABELS.ADMIN}</SelectItem>
+                    <SelectItem value="PORTAL">{AREA_LABELS.PORTAL}</SelectItem>
+                  </SelectContent>
+                </Select>
+                {!isNew && (
+                  <p className="text-xs text-muted-foreground">영역은 등록 후 바꿀 수 없습니다.</p>
+                )}
+              </FormField>
+            </FormRow>
             <FormField label="설명" htmlFor="role-description">
               <Textarea
                 id="role-description"

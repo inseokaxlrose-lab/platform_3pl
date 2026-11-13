@@ -3,7 +3,7 @@
 import { KeyRoundIcon, PowerIcon } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { useState, useTransition } from 'react'
-import { ConfirmDialog, StatusBadge } from '@/components/common'
+import { ConfirmDialog, FormRow, StatusBadge } from '@/components/common'
 import { Can } from '@/components/permission'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -78,29 +78,32 @@ export function AccountPanel({
         </div>
 
         <form onSubmit={resetPassword} className="grid gap-4 border-t pt-4">
-          <div className="grid gap-2">
-            <Label htmlFor="reset-password">새 비밀번호</Label>
-            <Input
-              id="reset-password"
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              autoComplete="new-password"
-              placeholder="8자 이상"
-              disabled={pending}
-            />
-          </div>
-          <div className="grid gap-2">
-            <Label htmlFor="reset-password-confirm">새 비밀번호 확인</Label>
-            <Input
-              id="reset-password-confirm"
-              type="password"
-              value={passwordConfirm}
-              onChange={(e) => setPasswordConfirm(e.target.value)}
-              autoComplete="new-password"
-              disabled={pending}
-            />
-          </div>
+          {/* 새 비밀번호·확인은 한 줄에 2칸 */}
+          <FormRow>
+            <div className="grid gap-2">
+              <Label htmlFor="reset-password">새 비밀번호</Label>
+              <Input
+                id="reset-password"
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                autoComplete="new-password"
+                placeholder="8자 이상"
+                disabled={pending}
+              />
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="reset-password-confirm">새 비밀번호 확인</Label>
+              <Input
+                id="reset-password-confirm"
+                type="password"
+                value={passwordConfirm}
+                onChange={(e) => setPasswordConfirm(e.target.value)}
+                autoComplete="new-password"
+                disabled={pending}
+              />
+            </div>
+          </FormRow>
           <Button
             type="submit"
             variant="outline"

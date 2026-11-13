@@ -4,7 +4,7 @@ import { SaveIcon } from 'lucide-react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useState, useTransition } from 'react'
-import { FormColumns, FormField, FormSection, StatusBadge } from '@/components/common'
+import { FormColumns, FormField, FormRow, FormSection, StatusBadge } from '@/components/common'
 import { usePermission } from '@/components/permission'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -95,113 +95,117 @@ export function UserForm({ options, user }: UserFormProps) {
 
   return (
     <form onSubmit={save} className="space-y-6">
+      {/* 왼쪽 단에 다 담기므로 한쪽만 쓴다 (관련 있는 짧은 칸은 한 줄에 2개) */}
       <FormColumns
         left={
-          <FormSection title="기본 정보">
-            <FormField
-              label="아이디"
-              required
-              error={fieldError('username')}
-              htmlFor="user-username"
-            >
-              {isNew ? (
-                <Input
-                  id="user-username"
-                  value={username}
-                  onChange={(e) => setUsername(e.target.value)}
-                  disabled={disabled}
-                  autoComplete="off"
-                  placeholder="영문·숫자·점·밑줄·하이픈 3~30자"
-                />
-              ) : (
-                <p className="py-2 font-medium">{username}</p>
-              )}
-            </FormField>
-            <FormField label="이름" required error={fieldError('name')} htmlFor="user-name">
-              <Input
-                id="user-name"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                disabled={disabled}
-                maxLength={50}
-              />
-            </FormField>
-            <FormField label="사용자 유형" required htmlFor="user-type">
-              {isNew ? (
-                <Select
-                  value={userType}
-                  onValueChange={(v) => changeUserType(v as UserTypeKey)}
-                  disabled={disabled}
-                >
-                  <SelectTrigger id="user-type" className="w-full">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {(Object.keys(USER_TYPE_LABELS) as UserTypeKey[]).map((type) => (
-                      <SelectItem key={type} value={type}>
-                        {USER_TYPE_LABELS[type]}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              ) : (
-                <div className="py-1.5">
-                  <StatusBadge tone="neutral">{USER_TYPE_LABELS[userType]}</StatusBadge>
-                  <span className="ml-2 text-xs text-muted-foreground">
-                    유형은 등록 후 바꿀 수 없습니다.
-                  </span>
-                </div>
-              )}
-            </FormField>
-            <FormField label="이메일" error={fieldError('email')} htmlFor="user-email">
-              <Input
-                id="user-email"
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                disabled={disabled}
-                placeholder="없으면 비워 두세요"
-              />
-            </FormField>
-            {isNew && (
-              <>
-                <FormField
-                  label="초기 비밀번호"
-                  required
-                  error={fieldError('password')}
-                  htmlFor="user-password"
-                >
-                  <Input
-                    id="user-password"
-                    type="password"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    disabled={disabled}
-                    autoComplete="new-password"
-                    placeholder="8자 이상"
-                  />
-                </FormField>
-                <FormField
-                  label="비밀번호 확인"
-                  required
-                  error={fieldError('passwordConfirm')}
-                  htmlFor="user-password-confirm"
-                >
-                  <Input
-                    id="user-password-confirm"
-                    type="password"
-                    value={passwordConfirm}
-                    onChange={(e) => setPasswordConfirm(e.target.value)}
-                    disabled={disabled}
-                    autoComplete="new-password"
-                  />
-                </FormField>
-              </>
-            )}
-          </FormSection>
-        }
-        right={
           <>
+            <FormSection title="기본 정보">
+              <FormRow>
+                <FormField
+                  label="아이디"
+                  required
+                  error={fieldError('username')}
+                  htmlFor="user-username"
+                >
+                  {isNew ? (
+                    <Input
+                      id="user-username"
+                      value={username}
+                      onChange={(e) => setUsername(e.target.value)}
+                      disabled={disabled}
+                      autoComplete="off"
+                      placeholder="영문·숫자·점·밑줄·하이픈 3~30자"
+                    />
+                  ) : (
+                    <p className="py-2 font-medium">{username}</p>
+                  )}
+                </FormField>
+                <FormField label="이름" required error={fieldError('name')} htmlFor="user-name">
+                  <Input
+                    id="user-name"
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    disabled={disabled}
+                    maxLength={50}
+                  />
+                </FormField>
+              </FormRow>
+              <FormRow>
+                <FormField label="사용자 유형" required htmlFor="user-type">
+                  {isNew ? (
+                    <Select
+                      value={userType}
+                      onValueChange={(v) => changeUserType(v as UserTypeKey)}
+                      disabled={disabled}
+                    >
+                      <SelectTrigger id="user-type" className="w-full">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {(Object.keys(USER_TYPE_LABELS) as UserTypeKey[]).map((type) => (
+                          <SelectItem key={type} value={type}>
+                            {USER_TYPE_LABELS[type]}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  ) : (
+                    <div className="py-1.5">
+                      <StatusBadge tone="neutral">{USER_TYPE_LABELS[userType]}</StatusBadge>
+                      <span className="ml-2 text-xs text-muted-foreground">
+                        유형은 등록 후 바꿀 수 없습니다.
+                      </span>
+                    </div>
+                  )}
+                </FormField>
+                <FormField label="이메일" error={fieldError('email')} htmlFor="user-email">
+                  <Input
+                    id="user-email"
+                    type="email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    disabled={disabled}
+                    placeholder="없으면 비워 두세요"
+                  />
+                </FormField>
+              </FormRow>
+              {isNew && (
+                <FormRow>
+                  <FormField
+                    label="초기 비밀번호"
+                    required
+                    error={fieldError('password')}
+                    htmlFor="user-password"
+                  >
+                    <Input
+                      id="user-password"
+                      type="password"
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      disabled={disabled}
+                      autoComplete="new-password"
+                      placeholder="8자 이상"
+                    />
+                  </FormField>
+                  <FormField
+                    label="비밀번호 확인"
+                    required
+                    error={fieldError('passwordConfirm')}
+                    htmlFor="user-password-confirm"
+                  >
+                    <Input
+                      id="user-password-confirm"
+                      type="password"
+                      value={passwordConfirm}
+                      onChange={(e) => setPasswordConfirm(e.target.value)}
+                      disabled={disabled}
+                      autoComplete="new-password"
+                    />
+                  </FormField>
+                </FormRow>
+              )}
+            </FormSection>
+
             {userType === 'CENTER' && (
               <FormSection
                 title="소속 센터"
@@ -263,27 +267,27 @@ export function UserForm({ options, user }: UserFormProps) {
                 emptyText="배정할 수 있는 권한그룹이 없습니다."
               />
             </FormSection>
+
+            {/* 왼쪽만 쓰는 화면이라 버튼도 왼쪽 단 끝에 붙인다 */}
+            {failure && !failure.fieldErrors && (
+              <p role="alert" className="text-sm text-destructive">
+                {failure.message}
+              </p>
+            )}
+            <div className="flex justify-end gap-2">
+              <Button asChild type="button" variant="outline">
+                <Link href={LIST_HREF}>{readOnly ? '목록으로' : '취소'}</Link>
+              </Button>
+              {!readOnly && (
+                <Button type="submit" disabled={pending}>
+                  <SaveIcon />
+                  {pending ? '저장 중…' : '저장'}
+                </Button>
+              )}
+            </div>
           </>
         }
       />
-
-      {failure && !failure.fieldErrors && (
-        <p role="alert" className="text-sm text-destructive">
-          {failure.message}
-        </p>
-      )}
-
-      <div className="flex justify-end gap-2">
-        <Button asChild type="button" variant="outline">
-          <Link href={LIST_HREF}>{readOnly ? '목록으로' : '취소'}</Link>
-        </Button>
-        {!readOnly && (
-          <Button type="submit" disabled={pending}>
-            <SaveIcon />
-            {pending ? '저장 중…' : '저장'}
-          </Button>
-        )}
-      </div>
     </form>
   )
 }
