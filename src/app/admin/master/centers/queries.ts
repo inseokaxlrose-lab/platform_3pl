@@ -17,6 +17,7 @@ export async function getCenterForEdit(id: string, scope: DataScope) {
           code: true,
           name: true,
           type: true,
+          storageCondition: true,
           isActive: true,
           _count: { select: { locations: true } },
         },

@@ -80,7 +80,7 @@ const adminNavigation: NavArea = {
           title: '창고',
           href: '/admin/master/warehouses',
           icon: BoxesIcon,
-          ready: false,
+          ready: true,
           permission: 'master.warehouses.read',
         },
         {

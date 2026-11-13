@@ -12,9 +12,11 @@ export const metadata: Metadata = { title: '센터 수정' }
 export default async function EditCenterPage({ params }: PageProps<'/admin/master/centers/[id]'>) {
   if (!(await hasPermission('master.centers.read'))) return <AccessDenied />
   const { id } = await params
-  const [scope, canUpdate] = await Promise.all([
+  const [scope, canUpdate, canViewWarehouses, canAddWarehouse] = await Promise.all([
     getCurrentScope(),
     hasPermission('master.centers.update'),
+    hasPermission('master.warehouses.read'),
+    hasPermission('master.warehouses.create'),
   ])
   const center = await getCenterForEdit(id, scope)
   if (!center) notFound()
@@ -26,6 +28,7 @@ export default async function EditCenterPage({ params }: PageProps<'/admin/maste
         center={center}
         readOnly={!canUpdate}
         canToggleActive={canUpdate && scope.kind === 'ALL'}
+        warehouseAccess={{ canView: canViewWarehouses, canAdd: canAddWarehouse }}
       />
     </>
   )

@@ -45,6 +45,8 @@ type CenterFormProps = {
   readOnly: boolean
   // 사용 중지/다시 사용 가능 여부 (운영사 + 수정 권한)
   canToggleActive?: boolean
+  // 창고 요약: 조회 권한이면 창고로 이동, 등록 권한이면 [창고 추가]
+  warehouseAccess?: { canView: boolean; canAdd: boolean }
 }
 
 // 오류 위치 → 문구 ('code', 'externalCodes.SAP' …)
@@ -52,7 +54,12 @@ type Errors = Record<string, string>
 
 // 센터 등록·수정 폼 (docs/decisions/0026)
 // 입력은 왼쪽 단에 다 담긴다. 수정 화면에서는 오른쪽에 창고 요약(읽기 전용)을 보여준다
-export function CenterForm({ center, readOnly, canToggleActive = false }: CenterFormProps) {
+export function CenterForm({
+  center,
+  readOnly,
+  canToggleActive = false,
+  warehouseAccess = { canView: false, canAdd: false },
+}: CenterFormProps) {
   const router = useRouter()
   const isNew = !center
   const [form, setForm] = useState<CenterInput>(center?.input ?? EMPTY)
@@ -223,7 +230,12 @@ export function CenterForm({ center, readOnly, canToggleActive = false }: Center
           )}
         </div>
       </FormSection>
-      <WarehouseSummary warehouses={center.warehouses} />
+      <WarehouseSummary
+        centerId={center.id}
+        warehouses={center.warehouses}
+        canView={warehouseAccess.canView}
+        canAdd={warehouseAccess.canAdd && center.isActive}
+      />
     </>
   )
 
