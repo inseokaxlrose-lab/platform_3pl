@@ -207,7 +207,7 @@ const adminNavigation: NavArea = {
           title: '사용자',
           href: '/admin/system/users',
           icon: UsersIcon,
-          ready: false,
+          ready: true,
           permission: 'system.users.read',
         },
         {

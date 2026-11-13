@@ -1,5 +1,6 @@
 // 개발용 시드: npm run db:seed (여러 번 실행해도 안전)
 // - "슈퍼 관리자" 권한그룹: 운영사 화면의 모든 권한 (실행할 때마다 최신 권한 목록으로 맞춘다)
+// - 예시 센터·화주사 (코드 기준으로 없을 때만 만든다. 센터·화주사 관리 화면은 M2·M3)
 // - 슈퍼 계정: .env의 SEED_ADMIN_USERNAME / SEED_ADMIN_PASSWORD (비밀번호는 코드에 두지 않는다)
 //   이미 있는 계정의 비밀번호는 덮어쓰지 않는다
 import 'dotenv/config'
@@ -70,7 +71,28 @@ async function seedSuperAdmin(groupId: string) {
   })
 }
 
+const SAMPLE_CENTERS = [
+  { code: 'ICN', name: '이천센터' },
+  { code: 'GMH', name: '김해센터' },
+]
+const SAMPLE_SHIPPERS = [
+  { code: 'GANA', name: '가나식품' },
+  { code: 'DARA', name: '다라전자' },
+]
+
+// 예시 조직: 이미 있으면 건드리지 않는다 (화면에서 바꾼 이름을 덮어쓰지 않기 위해)
+async function seedSampleOrganizations() {
+  for (const center of SAMPLE_CENTERS) {
+    await prisma.center.upsert({ where: { code: center.code }, create: center, update: {} })
+  }
+  for (const shipper of SAMPLE_SHIPPERS) {
+    await prisma.shipper.upsert({ where: { code: shipper.code }, create: shipper, update: {} })
+  }
+  console.log(`예시 센터 ${SAMPLE_CENTERS.length}곳 · 화주사 ${SAMPLE_SHIPPERS.length}곳 확인`)
+}
+
 async function main() {
+  await seedSampleOrganizations()
   const group = await seedSuperGroup()
   console.log(`'${SUPER_GROUP_NAME}' 권한그룹: 권한 ${adminCodes.length}개`)
   await seedSuperAdmin(group.id)
