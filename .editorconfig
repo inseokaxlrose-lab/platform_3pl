@@ -1,0 +1,14 @@
+# 편집기 공통 설정 (VS Code, JetBrains 등)
+root = true
+
+[*]
+charset = utf-8
+indent_style = space
+indent_size = 2
+end_of_line = lf
+insert_final_newline = true
+trim_trailing_whitespace = true
+
+[*.md]
+# 마크다운은 줄 끝 공백 2칸이 줄바꿈 의미를 가질 수 있음
+trim_trailing_whitespace = false
