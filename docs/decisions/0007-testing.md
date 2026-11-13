@@ -26,6 +26,7 @@
 
 - Vitest 5.1 (Vite 8). 경로 별칭 `@/...`은 Vite 기본 기능 `resolve.tsconfigPaths`로 처리 → `vite-tsconfig-paths` 불필요.
 - `@vitejs/plugin-react`는 선택 의존성이 Babel 8을 요구해 shadcn CLI(Babel 7)와 설치 충돌 → 제외. Vite 8 내장 변환기(Oxc)가 tsconfig의 `jsx: react-jsx` 설정으로 JSX를 처리하므로 테스트에는 불필요.
+  - 검토: 5.2.0(Babel 7 사용)은 충돌 없이 설치 가능하지만, 이 플러그인의 주 기능(개발 서버 즉시 갱신)은 Next.js가 담당해 쓰지 않고, 이전 세대 버전에 묶이게 되므로 채택하지 않음.
 - `@types/node`를 24로 상향 (실행 Node 버전 24와 일치, Vitest 요구사항).
 
 ## 나중에 할 일
