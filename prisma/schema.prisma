@@ -53,6 +53,8 @@ model User {
   centers             UserCenter[]
   // 목록 그리드 개인 설정 (숨긴 컬럼·순서·너비 등)
   gridSettings        UserGridSetting[]
+  // 사이드바 즐겨찾기 메뉴
+  favoriteMenus       UserFavoriteMenu[]
 
   @@unique([email])
   @@unique([username])
@@ -237,4 +239,17 @@ model UserGridSetting {
 
   @@id([userId, gridId])
   @@map("user_grid_setting")
+}
+
+// 사용자별 사이드바 즐겨찾기 메뉴 (docs/decisions/0022)
+// 메뉴는 주소(href)로 구분한다 (메뉴 목록: src/config/navigation.ts). 추가한 순서(createdAt)대로 보여준다
+// 권한이 사라지거나 목록에서 없어진 메뉴는 화면에서만 숨기고 기록은 남긴다 (권한이 돌아오면 다시 보임)
+model UserFavoriteMenu {
+  userId    String
+  href      String
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([userId, href])
+  @@map("user_favorite_menu")
 }
