@@ -104,4 +104,33 @@ describe('최종 권한 계산', () => {
     const result = computePermissions({ ...base, denies: ['gone.menu.read'] })
     expect(result.ignored).toEqual([{ code: 'gone.menu.read', reason: 'unknown' }])
   })
+
+  it('7. 시스템 메뉴(사용자·권한그룹)는 운영사 사용자만 가진다 (권한 상승 방지)', () => {
+    const groupCodes = [
+      'system.users.read',
+      'system.roles.read',
+      'system.roles.update',
+      'stock.inventory.read',
+    ]
+    const center = computePermissions({ ...base, userType: 'CENTER', groupCodes })
+    expect([...center.codes]).toEqual(['stock.inventory.read'])
+    expect(center.ignored.map((i) => i.reason)).toEqual([
+      'operator-only',
+      'operator-only',
+      'operator-only',
+    ])
+
+    expect(codesOf({ userType: 'OPERATOR', groupCodes })).toEqual([
+      'stock.inventory.read',
+      'system.roles.read',
+      'system.roles.update',
+      'system.users.read',
+    ])
+  })
+
+  it('7. 센터 직원에게 개별 추가(GRANT)로 줘도 시스템 권한은 생기지 않는다', () => {
+    expect(
+      codesOf({ userType: 'CENTER', grants: ['system.users.read', 'system.users.create'] }),
+    ).toEqual([])
+  })
 })

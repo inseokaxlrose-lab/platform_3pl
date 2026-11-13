@@ -17,7 +17,7 @@ export type PermissionInput = {
   denies: readonly string[]
 }
 
-export type IgnoredReason = 'unknown' | 'other-area'
+export type IgnoredReason = 'unknown' | 'other-area' | 'operator-only'
 
 export type PermissionResult = {
   codes: ReadonlySet<PermissionCode>
@@ -30,11 +30,17 @@ function menuOf(code: PermissionCode) {
   return code.slice(0, code.lastIndexOf('.')) as PermissionMenu
 }
 
+// 운영사 사용자만 가질 수 있는 권한: 시스템 메뉴 (센터 직원이 자기에게 높은 권한을 주는 것을 막는다)
+export function isOperatorOnly(code: PermissionCode) {
+  return code.startsWith('system.')
+}
+
 // 최종 권한 계산 (0003 결정 7, docs/decisions/0013-permission-computation.md)
 // 최종 권한 = 그룹 권한 합 + 사용자 추가 − 사용자 제외, 그리고:
 // - 목록에 없는 옛 코드, 다른 영역(운영사 화면/포털)의 코드는 무시한다
 // - 메뉴 조회(read) 권한이 없으면 그 메뉴의 다른 버튼 권한도 무효
 // - 사용 중지 계정은 권한 없음
+// - 시스템 메뉴(system.*: 사용자·권한그룹 등)는 운영사 사용자만 (권한 상승 방지, 0018)
 export function computePermissions(input: PermissionInput): PermissionResult {
   const ignored: PermissionResult['ignored'] = []
   if (!input.isActive) return { codes: new Set(), ignored }
@@ -51,6 +57,11 @@ export function computePermissions(input: PermissionInput): PermissionResult {
     }
     if (PERMISSION_MENUS[menuOf(raw)].area !== area) {
       if (!seenIgnored.has(raw)) ignored.push({ code: raw, reason: 'other-area' })
+      seenIgnored.add(raw)
+      return null
+    }
+    if (isOperatorOnly(raw) && input.userType !== 'OPERATOR') {
+      if (!seenIgnored.has(raw)) ignored.push({ code: raw, reason: 'operator-only' })
       seenIgnored.add(raw)
       return null
     }
