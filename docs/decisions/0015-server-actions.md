@@ -35,6 +35,11 @@ export const closeAsnAction = createAction({
 - `server-actions-guard.test.ts`: `'use server'` 파일의 모든 export가 `createAction`인지 검사. 예외는 로그인·로그아웃뿐.
 - 권한 검사 없는 임시 액션 파일을 넣어 파일·이름과 함께 실패하는 것을 확인했다.
 
+### 보완 (0021): 로그인만 필요한 개인 설정
+
+- `permission: 'signed-in'`이면 메뉴 권한 없이 로그인만 검사한다. 그리드 설정처럼 **본인 것만** 다루는 액션용.
+- 이 경우 handler는 반드시 `context.user.id`의 데이터만 다룬다 (입력으로 받은 사용자 id를 쓰지 않는다).
+
 ## 다음
 
 - 데이터 범위(소속 센터·화주사)는 "데이터 범위 장치" 작업에서 `ActionContext`에 추가한다.
