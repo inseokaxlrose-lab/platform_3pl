@@ -299,3 +299,34 @@ model CompanyContact {
   @@index([companyId, sortOrder])
   @@map("company_contact")
 }
+
+// 외부 코드 매핑 (docs/decisions/0025): 우리 기준정보 ↔ SAP·ERP 등 외부 시스템 코드
+// 한 줄 = 연동 상대 + 대상 종류 + 대상 id + 외부 코드
+// - 같은 연동 상대·같은 종류 안에서 외부 코드 중복 금지
+// - 한 대상은 연동 상대마다 외부 코드 1개
+model ExternalCode {
+  id         String             @id @default(cuid())
+  // 연동 상대 키 (src/config/external-systems.ts)
+  system     String
+  entityType ExternalEntityType
+  entityId   String
+  code       String
+  createdAt  DateTime           @default(now())
+  updatedAt  DateTime           @updatedAt
+
+  @@unique([system, entityType, code])
+  @@unique([system, entityType, entityId])
+  @@index([entityType, entityId])
+  @@map("external_code")
+}
+
+enum ExternalEntityType {
+  CENTER
+  WAREHOUSE
+  LOCATION
+  SHIPPER
+  ITEM
+  CUSTOMER
+  DELIVERY_ZONE
+  UNIT
+}
