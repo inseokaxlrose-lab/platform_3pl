@@ -8,7 +8,8 @@ import type { PermissionCode } from '@/config/permissions'
 import { setFavoriteMenuAction } from '@/lib/navigation/favorite-actions'
 import type { CurrentUser } from '@/lib/session'
 import { AppHeader } from './app-header'
-import { AppSidebar, SIDEBAR_TAB_COOKIE } from './app-sidebar'
+import { AppSidebar } from './app-sidebar'
+import { parseSidebarTab, SIDEBAR_TAB_COOKIE } from './sidebar-tab'
 
 // 운영사 화면 · 화주 포털 공통 뼈대: 사이드바 + 상단 바 + 본문
 export async function AppShell({
@@ -34,8 +35,7 @@ export async function AppShell({
   const cookieStore = await cookies()
   const defaultOpen = cookieStore.get('sidebar_state')?.value !== 'false'
   // 사이드바 탭도 마지막으로 연 탭으로 그린다
-  const initialTab =
-    cookieStore.get(SIDEBAR_TAB_COOKIE)?.value === 'favorites' ? 'favorites' : 'all'
+  const initialTab = parseSidebarTab(cookieStore.get(SIDEBAR_TAB_COOKIE)?.value)
 
   return (
     <PermissionProvider codes={permissions}>

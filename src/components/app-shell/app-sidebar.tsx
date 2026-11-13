@@ -24,12 +24,7 @@ import { favoriteNavigation, filterNavigation } from './filter-navigation'
 import { findActiveHref } from './find-active-href'
 import { searchNavigation } from './search-navigation'
 import { SidebarNavList } from './sidebar-nav-list'
-
-export type SidebarTab = 'all' | 'favorites'
-
-// 마지막으로 연 탭을 기억하는 쿠키 (서버가 처음부터 그 탭으로 그리도록)
-export const SIDEBAR_TAB_COOKIE = 'sidebar_tab'
-const SIDEBAR_TAB_COOKIE_MAX_AGE = 60 * 60 * 24 * 365
+import { SIDEBAR_TAB_COOKIE, SIDEBAR_TAB_COOKIE_MAX_AGE, type SidebarTab } from './sidebar-tab'
 
 type AppSidebarProps = {
   area: NavAreaKey

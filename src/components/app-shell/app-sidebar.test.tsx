@@ -4,7 +4,8 @@ import { PermissionProvider } from '@/components/permission'
 import { SidebarProvider } from '@/components/ui/sidebar'
 import { TooltipProvider } from '@/components/ui/tooltip'
 import type { PermissionCode } from '@/config/permissions'
-import { AppSidebar, type SidebarTab } from './app-sidebar'
+import { AppSidebar } from './app-sidebar'
+import type { SidebarTab } from './sidebar-tab'
 
 // jsdom에는 matchMedia가 없다: 사이드바의 모바일 판단용으로 "데스크톱 화면"이라고 답하게 채운다
 window.matchMedia ??= ((query: string) => ({
