@@ -23,5 +23,9 @@ export function formatSystemCode(type: SystemCodeType, sequence: number | bigint
   return `${prefix}${String(sequence).padStart(digits, '0')}`
 }
 
-// 사용자 코드 규칙: 영문 대문자·숫자·하이픈·밑줄 (입력은 소문자도 받아 대문자로 바꾼다)
-export const USER_CODE_PATTERN = /^[A-Z0-9_-]+$/
+// 시스템 코드 모양인지 (예: 센터 → CT + 6자리). 사용자 코드로는 쓸 수 없다 (자기 시스템 코드 제외)
+// 이유: 코드를 비워 등록한 대상이 시스템 코드를 사용자 코드로 받을 때 겹치지 않게
+export function looksLikeSystemCode(type: SystemCodeType, value: string) {
+  const { prefix, digits } = SYSTEM_CODE_TYPES[type]
+  return new RegExp(`^${prefix}\\d{${digits}}$`).test(value)
+}

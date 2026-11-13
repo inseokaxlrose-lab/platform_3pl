@@ -42,3 +42,16 @@ export const addressShape = {
   address: optionalText(200),
   addressDetail: optionalText(200),
 }
+
+// 사용자 코드 (docs/decisions/0025): 비우면 시스템 코드를 쓴다. 소문자는 대문자로
+// 영문·숫자·하이픈·밑줄 2~20자 (시스템 코드 모양 금지는 저장할 때 서버에서 검사)
+export const userCodeField = (label: string) =>
+  z
+    .string()
+    .trim()
+    .toUpperCase()
+    .max(20, '20자 이하로 입력해 주세요.')
+    .refine(
+      (value) => value === '' || (value.length >= 2 && /^[A-Z0-9_-]+$/.test(value)),
+      `${label}는 영문·숫자·하이픈·밑줄 2~20자입니다.`,
+    )

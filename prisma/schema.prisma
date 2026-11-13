@@ -214,6 +214,16 @@ model Center {
   @@map("center")
 }
 
+// 창고 보관 조건 (docs/decisions/0027): 냉장 물건을 상온 창고에 적치하는 실수를 나중에 경고하는 데 쓴다
+enum StorageCondition {
+  // 상온
+  AMBIENT
+  // 냉장
+  CHILLED
+  // 냉동
+  FROZEN
+}
+
 enum WarehouseType {
   // 일반 보관 창고
   GENERAL
@@ -223,19 +233,20 @@ enum WarehouseType {
 
 // 창고: 센터 안의 보관 구역 (관리 화면은 "센터별 창고 관리" 작업에서)
 model Warehouse {
-  id         String        @id @default(cuid())
-  centerId   String
+  id               String           @id @default(cuid())
+  centerId         String
   // 시스템 코드: WH000001
-  systemCode String        @unique
+  systemCode       String           @unique
   // 사용자 코드: 같은 센터 안에서 중복 금지
-  code       String
-  name       String
-  type       WarehouseType @default(GENERAL)
-  isActive   Boolean       @default(true)
-  createdAt  DateTime      @default(now())
-  updatedAt  DateTime      @updatedAt
-  center     Center        @relation(fields: [centerId], references: [id], onDelete: Restrict)
-  locations  Location[]
+  code             String
+  name             String
+  type             WarehouseType    @default(GENERAL)
+  storageCondition StorageCondition @default(AMBIENT)
+  isActive         Boolean          @default(true)
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime         @updatedAt
+  center           Center           @relation(fields: [centerId], references: [id], onDelete: Restrict)
+  locations        Location[]
 
   // 센터마다 입고대기 창고 1개: 마이그레이션 SQL의 부분 고유 인덱스 warehouse_one_inbound_staging_per_center
   @@unique([centerId, code])

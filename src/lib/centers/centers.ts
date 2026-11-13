@@ -1,16 +1,17 @@
 import 'server-only'
+import { looksLikeSystemCode } from '@/config/master-codes'
 import { ActionError } from '@/lib/actions/action-error'
 import { saveExternalCodes } from '@/lib/master-code/external-codes'
 import { nextSystemCode } from '@/lib/master-code/system-code'
 import { prisma } from '@/lib/prisma'
 import { ensureCenterDefaults } from './center-defaults'
-import { CENTER_SYSTEM_CODE_PATTERN, type CenterData } from './center-schema'
+import type { CenterData } from './center-schema'
 
 // 센터 저장 (docs/decisions/0026). 권한·데이터 범위 검사는 서버 액션에서 한다
 
 // 사용자 코드 검사: 시스템 코드 모양 금지(자기 것 제외), 다른 센터와 중복 금지
 async function assertUserCode(code: string, ownSystemCode: string, exceptId?: string) {
-  if (code !== ownSystemCode && CENTER_SYSTEM_CODE_PATTERN.test(code)) {
+  if (code !== ownSystemCode && looksLikeSystemCode('CENTER', code)) {
     throw new ActionError(
       'VALIDATION',
       `'${code}'는 시스템 코드 모양이라 센터 코드로 쓸 수 없습니다.`,
