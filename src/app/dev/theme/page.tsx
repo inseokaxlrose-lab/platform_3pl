@@ -2,6 +2,7 @@ import type { Metadata } from 'next'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { ThemeToggle } from '@/components/theme-toggle'
+import { CommonComponentsDemo } from './common-components-demo'
 
 export const metadata: Metadata = { title: '디자인 견본' }
 
@@ -25,7 +26,9 @@ export default function ThemePreviewPage() {
       <header className="flex flex-wrap items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-semibold">디자인 견본</h1>
-          <p className="text-sm text-muted-foreground">색상 토큰 · 글꼴 · 기본 부품</p>
+          <p className="text-sm text-muted-foreground">
+            색상 토큰 · 글꼴 · 기본 부품 · 공통 컴포넌트
+          </p>
         </div>
         <ThemeToggle />
       </header>
@@ -104,6 +107,9 @@ export default function ThemePreviewPage() {
           </div>
         </div>
       </section>
+
+      <hr className="border-border" />
+      <CommonComponentsDemo />
     </div>
   )
 }
