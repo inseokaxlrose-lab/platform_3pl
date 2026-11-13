@@ -41,6 +41,7 @@ Next.js (App Router) · TypeScript · PostgreSQL · Prisma · Tailwind + shadcn/
 - 그리드에 필요한 기능이 없으면 화면에서 우회하지 말고 `DataGrid`에 기능을 추가하고, `/dev/grid` 쇼케이스에도 반영한다.
 - 목록 그리드의 상태는 `useDataGridState('그리드-id')`로 만들고 `<DataGrid id>`에 같은 id를 준다 → 사용자별 설정(숨김·순서·너비·건수·정렬)이 자동 저장된다 (`docs/decisions/0021`)
 - 자세한 설계: `docs/decisions/0002-ui-and-datagrid.md`
+- **입력 화면 배치**: 등록·수정 화면은 `FormColumns`(좌우 2단) + `FormSection`(묶음) + `FormField`(이름표 위, 입력 아래)로 만든다. 정보가 적으면 `left`만, 많으면 `left` → `right`로 이어서. 단 안에서는 칸을 한 줄에 하나씩 세로로 쌓고, 넓은 표(권한 표 등)는 `FormColumns` 밖에 전체 너비로 둔다 (`docs/decisions/0002`)
 - **화면 도움말**: 화면을 완성하면(`ready: true`) `src/content/help/{메뉴 주소}.md` 도움말을 함께 쓴다. 버튼 설명 단락에는 `<!-- 권한: 메뉴.동작 -->`를 붙인다. 빠지면 `help-files.test.ts`가 실패한다 (`docs/decisions/0023`)
 - **화면 권한**: 각 화면(page.tsx) 맨 위에서 `hasPermission('메뉴.read')`로 확인하고 없으면 `<AccessDenied />`. 버튼은 `<Can permission="…">`으로 감싼다. 권한 코드는 `src/config/permissions.ts`에만 정의한다 (`docs/decisions/0011`, `0014`)
 
