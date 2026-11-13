@@ -214,7 +214,7 @@ const adminNavigation: NavArea = {
           title: '권한그룹',
           href: '/admin/system/roles',
           icon: ShieldIcon,
-          ready: false,
+          ready: true,
           permission: 'system.roles.read',
         },
         {
