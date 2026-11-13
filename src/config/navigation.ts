@@ -66,7 +66,7 @@ const adminNavigation: NavArea = {
           title: '운영사',
           href: '/admin/master/company',
           icon: BuildingIcon,
-          ready: false,
+          ready: true,
           permission: 'master.company.read',
         },
         {

@@ -2,6 +2,7 @@
 // - 역할별 권한그룹 4개: 실행할 때마다 prisma/seed-roles.ts 정의와 똑같이 맞춘다
 // - 예시 센터·화주사 (코드 기준으로 없을 때만 만든다. 센터·화주사 관리 화면은 M2·M3)
 // - 슈퍼 계정: .env의 SEED_ADMIN_USERNAME / SEED_ADMIN_PASSWORD (비밀번호는 코드에 두지 않는다)
+// - 예시 운영사 정보 (아직 없을 때만, 사업자번호는 검증번호 규칙으로 만든 가상 번호)
 // - 역할별 견본 계정 4개: .env의 SEED_SAMPLE_PASSWORD (비어 있거나 운영 환경이면 건너뛴다)
 // 이미 있는 계정은 비밀번호·소속을 덮어쓰지 않는다 (화면에서 바꾼 값을 지키기 위해)
 import 'dotenv/config'
@@ -125,8 +126,31 @@ async function seedSampleOrganizations() {
   console.log(`예시 센터 ${SAMPLE_CENTERS.length}곳 · 화주사 ${SAMPLE_SHIPPERS.length}곳 확인`)
 }
 
+// 예시 운영사 정보: 없을 때만 만든다 (화면에서 입력한 실제 정보를 덮어쓰지 않기 위해)
+async function seedSampleCompany() {
+  const exists = await prisma.company.findUnique({ where: { id: 'default' } })
+  if (exists) {
+    console.log(`운영사 정보 이미 있음: ${exists.name} (그대로 둠)`)
+    return
+  }
+  await prisma.company.create({
+    data: {
+      id: 'default',
+      name: '예시물류(주)',
+      businessNumber: '220-81-12341',
+      ceoName: '홍길동',
+      businessType: '서비스',
+      businessItem: '물류대행',
+      phone: '02-123-4567',
+      contacts: { create: [{ sortOrder: 0, duty: '입고 문의', name: '김입고' }] },
+    },
+  })
+  console.log('예시 운영사 정보 생성')
+}
+
 async function main() {
   await seedSampleOrganizations()
+  await seedSampleCompany()
   const groupIds = await seedGroups()
   await seedSuperAdmin(groupIds.get(SUPER_GROUP_NAME)!)
   await seedSampleAccounts(groupIds)
