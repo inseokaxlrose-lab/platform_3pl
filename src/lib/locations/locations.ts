@@ -94,7 +94,7 @@ function assertNoneProtected(locations: LocationWithWarehouse[], what: string) {
 }
 
 // 쓰인 적 있는 로케이션 id (재고·이력이 있음)
-// TODO(재고 작업, ROADMAP M5): 재고·재고 이력 표가 생기면 여기서 검사한다. 지금은 쓰일 곳이 없어 빈 목록
+// TODO(재고 작업, ROADMAP M4 재고 기반): 재고·재고 이력 표가 생기면 여기서 검사한다. 지금은 쓰일 곳이 없어 빈 목록
 export async function findUsedLocationIds(ids: string[]): Promise<string[]> {
   void ids // 재고 표가 생기면 이 id들로 검사한다
   return []
