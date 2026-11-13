@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { navigation } from '@/config/navigation'
 import type { PermissionCode } from '@/config/permissions'
-import { filterNavigation } from './filter-navigation'
+import { favoriteNavigation, filterNavigation } from './filter-navigation'
 
 const titlesOf = (codes: PermissionCode[]) =>
   filterNavigation(navigation.admin, new Set(codes)).groups.map((group) => ({
@@ -33,5 +33,26 @@ describe('filterNavigation', () => {
     const before = JSON.stringify(navigation.admin.groups.map((g) => g.items.length))
     filterNavigation(navigation.admin, new Set())
     expect(JSON.stringify(navigation.admin.groups.map((g) => g.items.length))).toBe(before)
+  })
+})
+
+describe('favoriteNavigation', () => {
+  const area = filterNavigation(
+    navigation.admin,
+    new Set(['master.items.read', 'stock.history.read']),
+  )
+
+  it('추가한 순서대로, 권한 있는 메뉴만 (권한 없는 메뉴·없는 주소는 숨김)', () => {
+    const groups = favoriteNavigation(area, [
+      '/admin/stock/history',
+      '/admin/system/users', // 권한 없음
+      '/admin/old-menu', // 목록에 없음
+      '/admin/master/items',
+    ])
+    expect(groups.map((g) => g.items.map((item) => item.title))).toEqual([['재고 이력', '품목']])
+  })
+
+  it('보일 즐겨찾기가 없으면 빈 목록', () => {
+    expect(favoriteNavigation(area, ['/admin/system/users'])).toEqual([])
   })
 })

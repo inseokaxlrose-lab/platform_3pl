@@ -1,4 +1,4 @@
-import type { NavArea } from '@/config/navigation'
+import type { NavArea, NavGroup } from '@/config/navigation'
 import type { PermissionCode } from '@/config/permissions'
 
 // 권한으로 메뉴 걸러내기
@@ -15,4 +15,14 @@ export function filterNavigation(area: NavArea, codes: ReadonlySet<PermissionCod
       }))
       .filter((group) => group.items.length > 0),
   }
+}
+
+// 즐겨찾기 탭의 메뉴: 추가한 순서대로, 권한으로 거른 목록(area)에 있는 메뉴만
+// (권한이 사라졌거나 목록에서 없어진 메뉴는 숨긴다. 기록은 DB에 남아 권한이 돌아오면 다시 보인다)
+export function favoriteNavigation(area: NavArea, favorites: readonly string[]): NavGroup[] {
+  const items = new Map(
+    area.groups.flatMap((group) => group.items).map((item) => [item.href, item]),
+  )
+  const favoriteItems = favorites.flatMap((href) => items.get(href) ?? [])
+  return favoriteItems.length > 0 ? [{ items: favoriteItems }] : []
 }
