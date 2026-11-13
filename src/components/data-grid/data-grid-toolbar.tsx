@@ -1,12 +1,21 @@
 'use client'
 
-import { Columns3Icon, Rows3Icon, Rows4Icon, SearchIcon, XIcon } from 'lucide-react'
+import {
+  ChevronDownIcon,
+  Columns3Icon,
+  DownloadIcon,
+  Rows3Icon,
+  Rows4Icon,
+  SearchIcon,
+  XIcon,
+} from 'lucide-react'
 import { useEffect, useEffectEvent, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import {
   DropdownMenu,
   DropdownMenuCheckboxItem,
   DropdownMenuContent,
+  DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
@@ -19,6 +28,15 @@ const SEARCH_DELAY_MS = 300
 
 type ColumnToggleItem = { id: string; header: string; visible: boolean }
 
+export type ExportMode = 'all' | 'selected'
+
+type ExportOption = {
+  totalCount: number
+  busy: boolean
+  error: string | null
+  onExport: (mode: ExportMode) => void
+}
+
 type DataGridToolbarProps = {
   search?: { value: string; placeholder?: string; onChange: (value: string) => void }
   selectedCount: number
@@ -28,6 +46,8 @@ type DataGridToolbarProps = {
   columns?: { items: ColumnToggleItem[]; onToggle: (id: string, visible: boolean) => void }
   // 화면별 버튼 (예: 선택 행 일괄 처리)
   actions?: React.ReactNode
+  // CSV 내보내기 (DataGrid에 exportCsv를 줬을 때만)
+  exporting?: ExportOption
 }
 
 // 그리드 위 도구 줄: 검색 · 선택 건수 · 화면별 버튼 · 행 높이 · 컬럼 표시
@@ -39,6 +59,7 @@ export function DataGridToolbar({
   onDensityChange,
   columns,
   actions,
+  exporting,
 }: DataGridToolbarProps) {
   return (
     <div className="flex flex-wrap items-center gap-2">
@@ -54,7 +75,13 @@ export function DataGridToolbar({
       )}
 
       <div className="ml-auto flex items-center gap-2">
+        {exporting?.error && (
+          <p role="alert" className="text-sm text-destructive">
+            {exporting.error}
+          </p>
+        )}
         {actions}
+        {exporting && <ExportMenu {...exporting} selectedCount={selectedCount} />}
         <Button
           variant="outline"
           size="icon"
@@ -91,6 +118,38 @@ export function DataGridToolbar({
         )}
       </div>
     </div>
+  )
+}
+
+// 내보내기 메뉴: 조건에 맞는 전체 / 선택 행만
+function ExportMenu({
+  totalCount,
+  selectedCount,
+  busy,
+  onExport,
+}: ExportOption & { selectedCount: number }) {
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button variant="outline" disabled={busy}>
+          <DownloadIcon />
+          {busy ? '내보내는 중…' : '내보내기'}
+          <ChevronDownIcon />
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="w-auto">
+        <DropdownMenuLabel>CSV 내보내기</DropdownMenuLabel>
+        <DropdownMenuSeparator />
+        <DropdownMenuItem disabled={totalCount === 0} onSelect={() => onExport('all')}>
+          조건에 맞는 전체 ({formatNumber(totalCount)}건)
+        </DropdownMenuItem>
+        {selectedCount > 0 && (
+          <DropdownMenuItem onSelect={() => onExport('selected')}>
+            선택 행만 ({formatNumber(selectedCount)}건)
+          </DropdownMenuItem>
+        )}
+      </DropdownMenuContent>
+    </DropdownMenu>
   )
 }
 

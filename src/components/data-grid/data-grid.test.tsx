@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, within } from '@testing-library/react'
+import { act, fireEvent, render, screen, within } from '@testing-library/react'
 import { useState } from 'react'
 import { describe, expect, it, vi } from 'vitest'
 import { DataGrid } from './data-grid'
@@ -88,6 +88,21 @@ describe('DataGrid', () => {
     render(<Harness onSelectionChange={onSelectionChange} />)
 
     fireEvent.click(screen.getByRole('checkbox', { name: '현재 페이지 전체 선택' }))
+
+    expect(onSelectionChange).toHaveBeenLastCalledWith(['r1', 'r2'])
+    expect(screen.getByText('2건 선택')).toBeTruthy()
+  })
+
+  it('화면이 다시 그려지기 전에 연달아 선택해도 선택이 사라지지 않는다', () => {
+    const onSelectionChange = vi.fn()
+    render(<Harness onSelectionChange={onSelectionChange} />)
+    const [first, second] = screen.getAllByRole('checkbox', { name: '행 선택' })
+
+    // 두 클릭을 한 번에 처리 (사이에 화면 다시 그리기 없음)
+    act(() => {
+      first.click()
+      second.click()
+    })
 
     expect(onSelectionChange).toHaveBeenLastCalledWith(['r1', 'r2'])
     expect(screen.getByText('2건 선택')).toBeTruthy()

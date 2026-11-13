@@ -11,7 +11,7 @@ import {
   type DataGridState,
 } from '@/components/data-grid'
 import type { FakeInventoryRow } from './fake-inventory'
-import { queryFakeInventory } from './fake-server'
+import { queryAllFakeInventory, queryFakeInventory } from './fake-server'
 
 const columns: DataGridColumn<FakeInventoryRow>[] = [
   { id: 'centerName', header: '센터', accessor: 'centerName', sortable: true },
@@ -88,6 +88,7 @@ export function GridShowcase() {
         enableRowSelection
         onSelectionChange={setSelectedIds}
         searchPlaceholder="품목명·코드·로케이션·화주사·로트 검색"
+        exportCsv={{ fileName: '재고목록', fetchRows: () => queryAllFakeInventory(state) }}
         toolbarActions={
           <Button variant="outline" disabled={selectedIds.length === 0}>
             <PrinterIcon />

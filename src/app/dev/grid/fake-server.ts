@@ -23,9 +23,8 @@ function compare(a: FakeInventoryRow, b: FakeInventoryRow, id: string) {
   return String(x).localeCompare(String(y), 'ko')
 }
 
-export async function queryFakeInventory(state: DataGridState) {
-  await new Promise((resolve) => setTimeout(resolve, DELAY_MS))
-
+// 검색 → 정렬까지 적용한 전체 행
+function filterAndSort(state: DataGridState) {
   const keyword = state.search.toLowerCase()
   let rows = keyword
     ? ALL_ROWS.filter((row) =>
@@ -47,6 +46,21 @@ export async function queryFakeInventory(state: DataGridState) {
     })
   }
 
+  return rows
+}
+
+const wait = () => new Promise((resolve) => setTimeout(resolve, DELAY_MS))
+
+// 현재 페이지 조회
+export async function queryFakeInventory(state: DataGridState) {
+  await wait()
+  const rows = filterAndSort(state)
   const start = state.pageIndex * state.pageSize
   return { rows: rows.slice(start, start + state.pageSize), rowCount: rows.length }
+}
+
+// 내보내기용: 현재 조건에 맞는 전체 행 (페이지 자르기 없음)
+export async function queryAllFakeInventory(state: DataGridState) {
+  await wait()
+  return filterAndSort(state)
 }

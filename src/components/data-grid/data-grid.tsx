@@ -10,7 +10,7 @@ import {
   type Updater,
 } from '@tanstack/react-table'
 import { ArrowDownIcon, ArrowUpDownIcon, ArrowUpIcon } from 'lucide-react'
-import { useMemo, useState } from 'react'
+import { useMemo, useRef, useState } from 'react'
 import { EmptyState } from '@/components/common'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Skeleton } from '@/components/ui/skeleton'
@@ -25,7 +25,9 @@ import {
 import { cn } from '@/lib/utils'
 import { DataGridCellValue, defaultAlign } from './data-grid-cell'
 import { DataGridPagination } from './data-grid-pagination'
-import { DataGridToolbar } from './data-grid-toolbar'
+import { csvFileName, toCsv } from './csv'
+import { DataGridToolbar, type ExportMode } from './data-grid-toolbar'
+import { downloadTextFile } from './download'
 import { gridFeatures } from './features'
 import { changePageIndex, changePageSize, changeSearch, changeSorting } from './state'
 import { SELECT_COLUMN_ID, toColumnDefs } from './to-column-defs'
@@ -56,6 +58,9 @@ export type DataGridProps<TData extends RowData> = {
   toolbarActions?: React.ReactNode
   // 데이터가 없을 때 안내 (검색 결과가 없을 때는 자동 문구)
   empty?: { title: string; description?: React.ReactNode; action?: React.ReactNode }
+  // CSV 내보내기: 주면 툴바에 [내보내기] 버튼이 생긴다
+  // fetchRows는 "현재 검색·정렬 조건에 맞는 전체 행"을 돌려줘야 한다 (현재 페이지만이 아님)
+  exportCsv?: { fileName: string; fetchRows: () => Promise<TData[]> }
 }
 
 // 업데이트 값(값 또는 함수) 풀기: TanStack은 "새 값" 대신 "이전 값을 받아 새 값을 만드는 함수"를 줄 때가 있다
@@ -78,10 +83,13 @@ export function DataGrid<TData extends RowData>({
   searchPlaceholder,
   toolbarActions,
   empty,
+  exportCsv,
 }: DataGridProps<TData>) {
   const [rowSelection, setRowSelection] = useState<RowSelectionState>({})
   const [columnVisibility, setColumnVisibility] = useState<ColumnVisibilityState>({})
   const [density, setDensity] = useState<DataGridDensity>('compact')
+  const [exportBusy, setExportBusy] = useState(false)
+  const [exportError, setExportError] = useState<string | null>(null)
 
   const columnDefs = useMemo(
     () => toColumnDefs(columns, enableRowSelection),
@@ -92,7 +100,13 @@ export function DataGrid<TData extends RowData>({
   const sorting: SortingState = state.sorting
   const pagination: PaginationState = { pageIndex: state.pageIndex, pageSize: state.pageSize }
 
-  function updateSelection(next: RowSelectionState) {
+  // 선택 목록의 최신 값: 화면이 다시 그려지기 전에 연달아 선택해도(빠른 연속 클릭)
+  // 이전 선택을 잃지 않도록, 렌더링 시점 값이 아니라 이 최신 값을 기준으로 계산한다
+  const latestSelection = useRef<RowSelectionState>({})
+
+  function updateSelection(updater: Updater<RowSelectionState>) {
+    const next = resolve(updater, latestSelection.current)
+    latestSelection.current = next
     setRowSelection(next)
     onSelectionChange?.(Object.keys(next).filter((id) => next[id]))
   }
@@ -117,7 +131,7 @@ export function DataGrid<TData extends RowData>({
           : changePageIndex(state, next.pageIndex, rowCount),
       )
     },
-    onRowSelectionChange: (updater) => updateSelection(resolve(updater, rowSelection)),
+    onRowSelectionChange: updateSelection,
     onColumnVisibilityChange: (updater) =>
       setColumnVisibility((previous) => resolve(updater, previous)),
   })
@@ -127,6 +141,30 @@ export function DataGrid<TData extends RowData>({
   const isFirstLoading = loading && data.length === 0
   const isEmpty = !loading && data.length === 0
   const cellPadding = density === 'compact' ? 'py-1.5' : 'py-3'
+
+  // 내보내기: 화면에 보이는 컬럼만, 보이는 순서대로
+  async function handleExport(mode: ExportMode) {
+    if (!exportCsv) return
+    setExportBusy(true)
+    setExportError(null)
+    try {
+      const allRows = await exportCsv.fetchRows()
+      const rowsToExport =
+        mode === 'selected' ? allRows.filter((row) => rowSelection[getRowId(row)]) : allRows
+      const exportColumns = visibleColumns
+        .map((column) => columnById.get(column.id))
+        .filter((column): column is DataGridColumn<TData> => column !== undefined)
+      downloadTextFile(
+        toCsv(exportColumns, rowsToExport),
+        csvFileName(exportCsv.fileName),
+        'text/csv;charset=utf-8',
+      )
+    } catch {
+      setExportError('내보내기에 실패했습니다. 다시 시도해 주세요.')
+    } finally {
+      setExportBusy(false)
+    }
+  }
 
   const allPageSelected = table.getIsAllPageRowsSelected()
   const somePageSelected = table.getIsSomePageRowsSelected()
@@ -159,6 +197,11 @@ export function DataGrid<TData extends RowData>({
           onToggle: (id, visible) => table.getColumn(id)?.toggleVisibility(visible),
         }}
         actions={toolbarActions}
+        exporting={
+          exportCsv
+            ? { totalCount: rowCount, busy: exportBusy, error: exportError, onExport: handleExport }
+            : undefined
+        }
       />
 
       <div className="rounded-lg border bg-card" aria-busy={loading}>
