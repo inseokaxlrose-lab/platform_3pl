@@ -17,6 +17,18 @@ export const dataGridStateSchema = z.object({
   search: z.string().trim().max(100),
 })
 
+// 엑셀 내보내기 한 번에 읽는 최대 건수. 넘으면 서버에서 파일을 만드는 방식으로 바꾼다 (docs/ui-guidelines.md)
+export const EXPORT_LIMIT = 10_000
+
+// 목록 화면 공통 요청 (MasterListPage·useListQuery): 그리드 상태 + 검색 조건 + 엑셀용 전체 읽기
+// filters: 조건 키 → 글자 (URL과 같은 모양, 해석은 list-filters.ts의 함수로)
+export const listQuerySchema = dataGridStateSchema.extend({
+  filters: z.record(z.string().max(40), z.string().max(400)).default({}),
+  // true면 페이지 대신 조건에 맞는 전체(최대 EXPORT_LIMIT건)를 읽는다
+  exportAll: z.boolean().optional(),
+})
+export type ListQuery = z.output<typeof listQuerySchema>
+
 type GridQueryOptions = {
   // 검색어를 찾을 칸 (대소문자 무시, 부분 일치)
   searchFields: string[]
@@ -36,7 +48,10 @@ function nested(path: string, value: unknown): Record<string, unknown> {
 
 // 그리드 상태 → Prisma 조회 조건 { where, orderBy, skip, take }
 // 데이터 범위 조건(scopeFilter)은 호출하는 쪽에서 where에 함께 넣는다
-export function toPrismaQuery(state: DataGridState, options: GridQueryOptions) {
+export function toPrismaQuery(
+  state: DataGridState & { exportAll?: boolean },
+  options: GridQueryOptions,
+) {
   const keyword = state.search.trim()
   const where = keyword
     ? {
@@ -54,7 +69,7 @@ export function toPrismaQuery(state: DataGridState, options: GridQueryOptions) {
   return {
     where,
     orderBy: orderBy.length > 0 ? orderBy : [options.defaultOrderBy],
-    skip: state.pageIndex * state.pageSize,
-    take: state.pageSize,
+    skip: state.exportAll ? 0 : state.pageIndex * state.pageSize,
+    take: state.exportAll ? EXPORT_LIMIT : state.pageSize,
   }
 }
