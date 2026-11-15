@@ -9,6 +9,7 @@ import { prisma, type Db } from '@/lib/prisma'
 import { assertRowVersion, withVersionGuard } from '@/lib/row-version'
 import { assertAllFound, assertNoCodeConflict } from '@/lib/soft-delete'
 import { DELETED_ONLY, NOT_DELETED, isActiveStatus, toStatus } from '@/lib/status'
+import { checkQtyDecimals } from '@/lib/units/convert'
 import { isYes } from '@/lib/yn'
 import { effectiveItemOptions, type ItemCreateData, type ItemData } from './item-schema'
 
@@ -75,8 +76,7 @@ async function assertUnits(db: Db, data: SaveItemData, keep: bigint[] = []) {
     if (!pack || pack.kind !== 'PACK') {
       throw new ActionError('VALIDATION', '환산단위는 사용 중인 환산단위 중에서 골라 주세요.')
     }
-    const fraction = row.convQty.split('.')[1] ?? ''
-    if (fraction.replace(/0+$/, '').length > base.decimals) {
+    if (!checkQtyDecimals(row.convQty, base.decimals)) {
       throw new ActionError(
         'VALIDATION',
         base.decimals === 0

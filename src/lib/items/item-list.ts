@@ -12,6 +12,7 @@ import { prisma } from '@/lib/prisma'
 import { scopeFilter, type DataScope } from '@/lib/scope/data-scope'
 import { DELETED_ONLY, withIsActive } from '@/lib/status'
 import { isYes } from '@/lib/yn'
+import { formatQty } from '@/lib/units/convert'
 import { effectiveItemOptions } from './item-schema'
 
 // 품목 목록·범위 검사 (docs/decisions/0041) — 운영사 화면·화주 포털 서버 액션이 같이 쓴다
@@ -33,9 +34,6 @@ export async function assertItemsInScope(ids: bigint[], scope: DataScope, delete
   }
   return unique
 }
-
-// 숫자(Decimal) → 보기 좋은 글자 ('24.000' → '24', '2.500' → '2.5')
-const qtyText = (value: { toString(): string }) => Number(value.toString()).toLocaleString('ko-KR')
 
 // 목록 (검색 조건 키 — keyword·shipper·status·lot·expiry·createdAt, 권한·엑셀 검사는 서버 액션에서)
 export async function listItems(input: ListQuery, scope: DataScope) {
@@ -124,7 +122,7 @@ export async function listItems(input: ListQuery, scope: DataScope) {
         shipper: `${shipper.name} (${shipper.code})`,
         baseUnit: baseUnit.code,
         // 환산단위 요약: 'BOX 24 · PLT 1,440'
-        units: units.map((u) => `${u.unit.code} ${qtyText(u.convQty)}`).join(' · ') || null,
+        units: units.map((u) => `${u.unit.code} ${formatQty(u.convQty)}`).join(' · ') || null,
         useLot: options.useLot,
         useExpiry: options.useExpiry,
         labelUnit: options.labelUnit,
