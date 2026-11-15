@@ -56,13 +56,12 @@ export function createAction<TSchema extends z.ZodType, TData>({
 
     const parsed = input.safeParse(rawInput)
     if (!parsed.success) {
-      const { fieldErrors } = z.flattenError(parsed.error)
       return {
         ok: false,
         error: {
           code: 'VALIDATION',
           message: MESSAGES.VALIDATION,
-          fieldErrors: fieldErrors as Record<string, string[]>,
+          fieldErrors: toFieldErrors(parsed.error),
         },
       }
     }
@@ -83,4 +82,17 @@ export function createAction<TSchema extends z.ZodType, TData>({
 // 실패 결과 만들기
 function failure(code: ActionErrorCode, message: string): ActionFailure {
   return { ok: false, error: { code, message } }
+}
+
+// 입력 오류 → 칸 위치별 문구 목록. 위치는 전체 경로 ('name', 'contacts.0.phone', 표 전체는 'contacts')
+// 화면(useMasterForm)의 오류 위치와 같은 모양이라 1:N 표의 행·칸 오류까지 그대로 보인다
+// 특정 칸이 아닌 전체 오류(경로 없음)는 빼고 공통 문구로만 알린다
+function toFieldErrors(error: z.ZodError): Record<string, string[]> {
+  const result: Record<string, string[]> = {}
+  for (const issue of error.issues) {
+    if (issue.path.length === 0) continue
+    const key = issue.path.join('.')
+    ;(result[key] ??= []).push(issue.message)
+  }
+  return result
 }

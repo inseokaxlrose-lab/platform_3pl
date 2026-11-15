@@ -77,6 +77,29 @@ describe('createAction 검사 순서', () => {
     expect(handler).not.toHaveBeenCalled()
   })
 
+  it('③ 목록 안의 칸 오류는 전체 위치(contacts.0.phone)로, 목록 전체 오류는 목록 이름으로', async () => {
+    signedIn(['inbound.asn.close'])
+    const saveContacts = createAction({
+      permission: 'inbound.asn.close',
+      input: z.object({
+        contacts: z
+          .array(z.object({ phone: z.string().min(1, '연락처를 입력해 주세요.') }))
+          .max(1, '1명까지입니다.'),
+      }),
+      handler: async () => null,
+    })
+    expect(await saveContacts({ contacts: [{ phone: '' }, { phone: '1' }] })).toMatchObject({
+      ok: false,
+      error: {
+        code: 'VALIDATION',
+        fieldErrors: {
+          'contacts.0.phone': ['연락처를 입력해 주세요.'],
+          contacts: ['1명까지입니다.'],
+        },
+      },
+    })
+  })
+
   it('④ 모두 통과하면 정리된 입력으로 처리하고 결과를 돌려준다', async () => {
     signedIn(['inbound.asn.read', 'inbound.asn.close'])
 
