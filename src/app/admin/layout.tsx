@@ -2,7 +2,7 @@ import type { Metadata } from 'next'
 import { AppShell } from '@/components/app-shell'
 import { loadUserGridSettings } from '@/lib/grid/grid-settings'
 import { loadFavoriteMenus } from '@/lib/navigation/favorites'
-import { getCurrentPermissions, requireUser } from '@/lib/session'
+import { getActingOperator, getCurrentPermissions, requireUser } from '@/lib/session'
 
 export const metadata: Metadata = {
   title: {
@@ -15,10 +15,12 @@ export const metadata: Metadata = {
 // 들어오기 전에 로그인·사용 여부·영역을 검사한다 (아니면 로그인 화면이나 자기 영역으로 이동)
 export default async function AdminLayout({ children }: LayoutProps<'/admin'>) {
   const user = await requireUser('admin')
-  const [permissions, gridSettings, favoriteMenus] = await Promise.all([
+  const [permissions, gridSettings, favoriteMenus, actingOperator] = await Promise.all([
     getCurrentPermissions(),
     loadUserGridSettings(user.id),
     loadFavoriteMenus(user.id),
+    // 플랫폼 관리자가 운영사로 전환해 들어왔으면 그 운영사 (0039)
+    getActingOperator(),
   ])
   return (
     <AppShell
@@ -27,6 +29,7 @@ export default async function AdminLayout({ children }: LayoutProps<'/admin'>) {
       permissions={[...permissions]}
       gridSettings={gridSettings}
       favoriteMenus={favoriteMenus}
+      actingOperator={actingOperator}
     >
       {children}
     </AppShell>

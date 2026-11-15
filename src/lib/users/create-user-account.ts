@@ -12,12 +12,12 @@ export { passwordSchema, usernameSchema } from './user-schema'
 // 서버 안에서만 부르므로 키는 bigint 그대로 받는다
 const createUserAccountSchema = z
   .object({
-    // 소속 운영사 (아이디는 운영사와 상관없이 전체에서 하나, 0039)
-    operatorId: z.bigint(),
+    // 소속 운영사 (아이디는 운영사와 상관없이 전체에서 하나, 0039). 플랫폼 관리자만 null
+    operatorId: z.bigint().nullable(),
     username: usernameSchema,
     password: passwordSchema,
     name: z.string().trim().min(1, '이름을 입력해 주세요.').max(50),
-    userType: z.enum(['OPERATOR', 'CENTER', 'SHIPPER']),
+    userType: z.enum(['OPERATOR', 'CENTER', 'SHIPPER', 'PLATFORM']),
     // 이메일이 없으면 내부용 주소를 채운다 (Better Auth는 이메일 칸이 필수)
     email: z.email().optional(),
     // 소속 (데이터 범위 기준): 센터 직원 → 센터 1개 이상, 화주사 사용자 → 화주사 1개, 운영사 → 없음
@@ -27,6 +27,14 @@ const createUserAccountSchema = z
     permissionGroupIds: z.array(z.bigint()).default([]),
   })
   .superRefine((data, ctx) => {
+    // 플랫폼 관리자만 운영사가 없다 (DB 검사 조건 tb_user_operator_matches_type과 같은 규칙)
+    if ((data.userType === 'PLATFORM') !== (data.operatorId === null)) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['operatorId'],
+        message: '플랫폼 관리자만 운영사 없이 만들 수 있습니다.',
+      })
+    }
     for (const issue of affiliationIssues(data.userType, data.centerIds, data.shipperId)) {
       ctx.addIssue({ code: 'custom', path: [issue.path], message: issue.message })
     }

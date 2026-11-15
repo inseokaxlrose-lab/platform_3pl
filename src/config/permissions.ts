@@ -13,12 +13,13 @@ export const PERMISSION_ACTION_LABELS = {
   close: '잔량 마감',
   print: '출력',
   export: '엑셀',
+  switch: '운영사로 작업',
 } as const
 
 export type PermissionAction = keyof typeof PERMISSION_ACTION_LABELS
 
-// 영역: admin = 운영사 화면(/admin), portal = 화주 포털(/portal)
-export type PermissionArea = 'admin' | 'portal'
+// 영역: admin = 운영사 화면(/admin), portal = 화주 포털(/portal), platform = 플랫폼 화면(/platform)
+export type PermissionArea = 'admin' | 'portal' | 'platform'
 
 type PermissionMenuDefinition = {
   label: string
@@ -144,6 +145,14 @@ export const PERMISSION_MENUS = {
   'portal.items': { label: '품목', group: '포털', area: 'portal', actions: CRUD },
   'portal.asn': { label: 'ASN', group: '포털', area: 'portal', actions: CRUD },
   'portal.stock': { label: '내 재고', group: '포털', area: 'portal', actions: ['read', 'export'] },
+
+  // ── 플랫폼 화면 (플랫폼 관리자는 이 영역의 권한을 모두 갖는다, 권한그룹 없음 — 0039)
+  'platform.operators': {
+    label: '운영사',
+    group: '플랫폼',
+    area: 'platform',
+    actions: ['read', 'switch'],
+  },
 } as const satisfies Record<string, PermissionMenuDefinition>
 
 export type PermissionMenu = keyof typeof PERMISSION_MENUS

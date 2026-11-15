@@ -133,4 +133,19 @@ describe('최종 권한 계산', () => {
       codesOf({ userType: 'CENTER', grants: ['system.users.read', 'system.users.create'] }),
     ).toEqual([])
   })
+
+  it('6. 플랫폼 관리자는 권한그룹과 상관없이 플랫폼 권한만 모두 갖는다 (0039)', () => {
+    expect(
+      codesOf({
+        userType: 'PLATFORM',
+        groupCodes: ['system.users.read', 'portal.items.read'],
+        grants: ['master.centers.read'],
+      }),
+    ).toEqual(['platform.operators.read', 'platform.operators.switch'])
+    expect(codesOf({ userType: 'PLATFORM', isActive: false })).toEqual([])
+  })
+
+  it('6. 운영사·센터 직원은 권한그룹에 플랫폼 코드가 있어도 받지 못한다', () => {
+    expect(codesOf({ userType: 'OPERATOR', groupCodes: ['platform.operators.read'] })).toEqual([])
+  })
 })

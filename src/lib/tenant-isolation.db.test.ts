@@ -229,6 +229,24 @@ describe('로그인 아이디는 운영사와 상관없이 전체에서 하나',
   })
 })
 
+describe('플랫폼 관리자가 운영사로 전환해 작업 (3b)', () => {
+  it('그 운영사의 데이터로 만들어지고, 등록자는 플랫폼 관리자 아이디', async () => {
+    // session.ts가 전환 중인 플랫폼 관리자에게 주는 값과 같게: 그 운영사 전체 범위 + 운영사 화면 권한
+    vi.mocked(getCurrentUser).mockResolvedValue({
+      id: 99n,
+      name: '플랫폼',
+      username: 'Platform',
+      userType: 'PLATFORM',
+    })
+    vi.mocked(getCurrentScope).mockResolvedValue(scopeOf(B))
+    const unit = dataOf(await createUnitAction(unitInput('BOX')))
+    expect(await prisma.unit.findUniqueOrThrow({ where: { id: BigInt(unit.id) } })).toMatchObject({
+      operatorId: B,
+      createdBy: 'platform',
+    })
+  })
+})
+
 describe('Prisma 안전망 (운영사 출입증)', () => {
   const inA = <T>(fn: () => Promise<T>) => runInContext({ actor: 'test', operatorId: A }, fn)
 
