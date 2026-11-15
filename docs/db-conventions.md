@@ -57,6 +57,10 @@
   - 화면·입력 규칙은 지금처럼 사용 여부 `isActive`(true/false). DB에 쓸 때 `toStatus`/`withStatus`, 읽을 때 `isActiveStatus`/`withIsActive`, 조건은 `ACTIVE_ONLY`, 목록 검색은 `statusWhere(filters)`.
   - 주의: 타입 검사가 못 보는 곳 — 목록 정렬 매핑(`sortable: { isActive: 'status' }`), 조건 목록 안의 객체, 입력값을 통째로 저장하는 `data`(반드시 `withStatus`).
   - Better Auth 사용자 추가 칸도 `status` (`ACTIVE`만 로그인).
+- **논리 삭제 `del_yn` (2c 적용)**: 10개 표(사용자 제외). 지우기는 `del_yn = 'Y'`로만 (`DELETED_ONLY`), 실제로 지우지 않는다.
+  - 자동 제외: `prisma.ts`가 읽기·개수·수정·upsert 조건에 `delYn: 'N'`을 붙인다. 지운 것을 다루려면 조건에 `delYn`을 직접 적는다(`DELETED_ONLY`). **include·select 안의 관계 목록, `_count`, 관계 조건(`zone: {…}`)은 자동으로 안 걸리므로 `NOT_DELETED`를 직접 붙인다.**
+  - 코드(이름) 고유는 삭제 안 된 것끼리만: Prisma `partialIndexes`(미리보기) `@@unique([...], where: raw("del_yn = 'N'"))`. 지운 코드는 새로 쓸 수 있다.
+  - 되살리기: 목록 상태 거르기 "삭제됨"(`DELETED_STATUS_OPTION`, 서버 `deletedWhere`) → [되살리기](`RestoreButton`). 공통코드는 [지운 항목] 팝업. 권한은 삭제 권한과 같다. 같은 코드가 다시 쓰이고 있거나(배송권역은 담당 지역도) 부모(코드 그룹)가 지워졌으면 거부 (`src/lib/soft-delete.ts`). 외부 코드는 되살아나지 않는다.
 - **동시 수정 막기 (2a 적용)**: 수정 화면·팝업은 불러올 때의 `rowVersion`을 들고 있다가 저장 때 보낸다(`useMasterForm`의 `version`, 결과의 새 버전으로 자동 갱신). 서버는 `assertRowVersion` + 수정 조건에 버전(`where: { id, rowVersion }`) + `withVersionGuard`(`src/lib/row-version.ts`). 사용 중지·일괄 처리는 검사 없이 버전만 올린다.
 
 ## 표·칸 대응표 (1단계 — 지금 25개 표, 197개 칸)
