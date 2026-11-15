@@ -2,6 +2,7 @@
 
 - 날짜: 2026-11-15
 - 상태: 채택
+- 갱신: 2026-11-15 — 여기서 미뤘던 플랫폼 "운영사 목록"(멀티테넌트)은 M2.5에서 만들었다: `/platform/operators` (0039·0040)
 - 관련: 0002 (DataGrid), 0021 (그리드 사용자 설정), 0031 (입력 화면 틀), 0030 (공통코드), 0016 (데이터 범위)
 - 가이드: `docs/ui-guidelines.md` "목록·검색 화면" · 견본: `/dev/components`
 - 코드: `src/components/master-list/`, `src/components/data-grid/`, `src/lib/grid/`, `src/app/admin/master/centers/`

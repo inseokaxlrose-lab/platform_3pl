@@ -2,6 +2,7 @@
 
 - 날짜: 2026-11-13
 - 상태: 채택
+- 갱신: 2026-11-15 — 운영사 1곳·고정 키 방식은 멀티테넌트로 바뀌었다(0039). 칸·화면·주소(`/admin/master/operator`)·코드(`src/lib/operator/`, `src/components/operator/`)는 0040·`docs/operator-columns.md` 기준
 - 관련: PRD 4장 기준정보 1번, 0003 (위치 계층), 0015 (서버 액션), 0023 (도움말)
 - 화면: `/admin/master/company`
 - 코드: `src/lib/company/`, `src/app/admin/master/company/`, `src/components/common/address-fields.tsx`
