@@ -5,7 +5,7 @@
 > 끝난 작업은 `[x]`로 바꿉니다.
 > 데이터 구조는 `docs/decisions/0003-domain-model.md`를 따릅니다.
 
-## 현재 위치: M2.5 진행 중 — 다음: 1b 내부 키 BIGINT (M3 화주사 품목은 M2.5 뒤에)
+## 현재 위치: M2.5 진행 중 — 다음: 1c 예/아니오 칸 CHAR(1) Y/N (M3 화주사 품목은 M2.5 뒤에)
 
 ---
 
@@ -78,7 +78,7 @@
 목표: 운영사 정의서(tb_operator)의 규칙을 모든 표에 맞추고, 여러 운영사가 한 시스템을 쓰는 구조로 바꾼다. 업무 화면(품목·재고)을 만들기 전에 끝낸다 (나중에 바꾸면 더 어렵다).
 
 - [x] 1a. DB 이름 바꾸기 — 표 `tb_` + snake_case, 칸 접미사(`_id`·`_cd`·`_nm`·`_no`·`_yn`·`_dt`·`_at`), 코드 이름은 그대로(Prisma `@map`), 데이터 보존(RENAME) (`docs/db-conventions.md`, 0037)
-- [ ] 1b. 내부 키 BIGINT (Better Auth serial 키 시험 먼저, 주소·입력 규칙의 id는 글자 ↔ bigint)
+- [x] 1b. 내부 키 BIGINT 자동 증가 — 기존 데이터는 등록 순서대로 번호를 다시 매겨 보존, Better Auth `serial`, 서버는 bigint · 화면은 글자 (`src/lib/id.ts`)
 - [ ] 1c. 예/아니오 칸 CHAR(1) `'Y'`/`'N'` (코드 `Yn` 타입, 입력 경계에서 boolean ↔ Y/N)
 - [ ] 2. 기준정보 공통 칸 — `status_cd`(isActive 대체)·`del_yn` 논리 삭제·등록/수정 일시·사람·`row_version` 낙관적 락 (0038)
 - [ ] 3. 멀티테넌트 — 운영사(`tb_operator`) 여러 곳, 업무 표에 `operator_id`, 플랫폼 관리자(`/platform`), 운영사 등록 때 공통코드·단위·권한그룹 기본값 복사, 아이디 전체 고유 (0039)

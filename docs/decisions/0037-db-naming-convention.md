@@ -21,6 +21,14 @@
 - 빈 DB에 마이그레이션 전부 적용 → `prisma migrate diff --from-config-datasource --to-schema` 차이 없음.
 - 개발 DB(백업 후) 적용: 기존 데이터·로그인 세션 유지, 주요 화면 10곳 정상, 전체 테스트 463개 통과, 빌드 통과.
 
+## 1b. 내부 키 BIGINT (2026-11-15 적용)
+
+- 모든 표의 키·참조 칸을 글자(cuid) → BIGINT 자동 증가로. 마이그레이션 `20261115083253_bigint_keys`:
+  표마다 등록 순서대로 1, 2, 3… 번호를 다시 매기고(외래키 ON UPDATE CASCADE로 자식 칸도 함께), 외래키가 없는 외부 코드 `entity_id`는 종류별로 직접 바꾼 뒤, 형식을 BIGINT로 바꾸고 시퀀스를 최댓값 다음부터 시작. 로그인 세션은 비운다(모두 다시 로그인).
+- Better Auth: `generateId: 'serial'`. 아이디·비밀번호 계정의 상대 키(`provider_account_id`)는 사용자 키 글자.
+- 코드 규칙: 서버·DB는 bigint, 화면·주소·서버 액션 입출력은 글자. 경계 처리는 `src/lib/id.ts`(`parseId`·`idSchema`·`idField`·`textIds`)와 `createAction`(결과 자동 변환) — 표는 `docs/db-conventions.md`.
+- 검증: 개발 데이터 복사본·빈 DB 모두 적용 후 스키마 차이 없음, 관계(사용자↔화주사·센터·권한그룹) 보존, 시드(빈 DB) 정상, 전체 테스트 467개, 빌드, 브라우저(로그인·목록·수정 화면 `/centers/1`·검색 조건·저장·잘못된 주소 404).
+
 ## 주의
 
 - 원시 SQL을 쓸 때는 새 이름(`tb_…`, snake_case)을 쓴다. 지금 원시 SQL은 시퀀스 번호 발급·테스트 DB 비우기뿐이라 영향 없음.
