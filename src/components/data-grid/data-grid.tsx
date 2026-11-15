@@ -10,9 +10,11 @@ import {
   type SortingState,
   type Updater,
 } from '@tanstack/react-table'
-import { ArrowDownIcon, ArrowUpDownIcon, ArrowUpIcon } from 'lucide-react'
-import { useEffect, useEffectEvent, useMemo, useRef, useState } from 'react'
+import { ArrowDownIcon, ArrowUpDownIcon, ArrowUpIcon, RotateCcwIcon } from 'lucide-react'
+import { useEffect, useEffectEvent, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { EmptyState } from '@/components/common'
+import { useAllCodeOptions } from '@/components/common-code'
+import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Skeleton } from '@/components/ui/skeleton'
 import {
@@ -27,16 +29,18 @@ import { cn } from '@/lib/utils'
 import { DataGridCellValue, defaultAlign } from './data-grid-cell'
 import { DataGridPagination } from './data-grid-pagination'
 import { ColumnResizer } from './data-grid-resizer'
-import { csvFileName, toCsv } from './csv'
 import { DataGridToolbar, type ExportMode } from './data-grid-toolbar'
-import { downloadTextFile } from './download'
+import { exportFileName, toExportSheet } from './export-rows'
+import { downloadXlsx } from './export-xlsx'
 import { gridFeatures } from './features'
 import { useGridSettingsStore } from './grid-settings-context'
 import {
   clampWidth,
+  defaultHiddenIds,
   resolveColumnOrder,
   resolveHidden,
   resolveWidths,
+  withPinnedFirst,
   type GridSettings,
 } from './settings'
 import {
@@ -76,14 +80,17 @@ export type DataGridProps<TData extends RowData> = {
   toolbarActions?: React.ReactNode
   // 데이터가 없을 때 안내 (검색 결과가 없을 때는 자동 문구)
   empty?: { title: string; description?: React.ReactNode; action?: React.ReactNode }
-  // CSV 내보내기: 주면 툴바에 [내보내기] 버튼이 생긴다
+  // 엑셀 내보내기: 주면 툴바에 [엑셀] 버튼이 생긴다 (파일: 이름_YYYYMMDD_HHmm.xlsx)
   // fetchRows는 "현재 검색·정렬 조건에 맞는 전체 행"을 돌려줘야 한다 (현재 페이지만이 아님)
-  exportCsv?: { fileName: string; fetchRows: () => Promise<TData[]> }
+  exportExcel?: { fileName: string; fetchRows: () => Promise<TData[]> }
   // 행을 누르면(또는 행에서 Enter) 호출: 왼쪽 목록에서 고른 행의 상세를 오른쪽에 보여줄 때 (예: 공통코드 그룹 → 코드)
   // 행 안의 버튼·링크·체크박스를 누른 것은 행 클릭으로 치지 않는다
   onRowClick?: (row: TData) => void
   // 강조해서 보여줄 행 id (onRowClick으로 고른 행)
   activeRowId?: string
+  // 조회 실패 문구: 주면 표 자리에 오류와 [다시 시도] (onRetry)를 보여준다
+  error?: string | null
+  onRetry?: () => void
 }
 
 // 행 안의 다른 조작 요소를 누른 것인지 (그때는 행 클릭으로 치지 않는다)
@@ -111,9 +118,11 @@ export function DataGrid<TData extends RowData>({
   searchPlaceholder,
   toolbarActions,
   empty,
-  exportCsv,
+  exportExcel,
   onRowClick,
   activeRowId,
+  error,
+  onRetry,
 }: DataGridProps<TData>) {
   const [rowSelection, setRowSelection] = useState<RowSelectionState>({})
 
@@ -131,6 +140,7 @@ export function DataGrid<TData extends RowData>({
   const [density, setDensity] = useState<DataGridDensity>(saved.density ?? 'compact')
   const [exportBusy, setExportBusy] = useState(false)
   const [exportError, setExportError] = useState<string | null>(null)
+  const codeOptions = useAllCodeOptions()
 
   const columnDefs = useMemo(
     () => toColumnDefs(columns, enableRowSelection),
@@ -139,7 +149,11 @@ export function DataGrid<TData extends RowData>({
   const columnById = useMemo(() => new Map(columns.map((c) => [c.id, c])), [columns])
 
   // 화면의 컬럼이 바뀌어도 맞도록 매번 정리한 값을 쓴다
-  const columnOrder = resolveColumnOrder(defaultOrder, columnOrderSetting)
+  const pinnedIds = columns.filter((c) => c.pinned).map((c) => c.id)
+  const columnOrder = withPinnedFirst(
+    resolveColumnOrder(defaultOrder, columnOrderSetting),
+    pinnedIds,
+  )
   const hidden = resolveHidden(columns, hiddenSetting)
   const widths = resolveWidths(columns, widthSetting)
   const columnVisibility: ColumnVisibilityState = Object.fromEntries(
@@ -172,7 +186,7 @@ export function DataGrid<TData extends RowData>({
     lastSnapshot.current = JSON.stringify(
       buildSettings({
         columnOrder: defaultOrder,
-        hidden: [],
+        hidden: defaultHiddenIds(columns),
         widths: {},
         density: 'compact',
         pageSize: DEFAULT_PAGE_SIZE,
@@ -180,7 +194,7 @@ export function DataGrid<TData extends RowData>({
       }),
     )
     setColumnOrder(defaultOrder)
-    setHidden([])
+    setHidden(defaultHiddenIds(columns))
     setWidths({})
     setDensity('compact')
     onStateChange({ ...state, pageSize: DEFAULT_PAGE_SIZE, sorting: [], pageIndex: 0 })
@@ -225,6 +239,8 @@ export function DataGrid<TData extends RowData>({
   function moveColumn(columnId: string, delta: -1 | 1) {
     const from = columnOrder.indexOf(columnId)
     const to = from + delta
+    // 고정 컬럼은 맨 앞 자리를 지킨다 (옮기지도, 그 자리로 끼어들지도 못함)
+    if (from < pinnedIds.length || to < pinnedIds.length) return
     if (from < 0 || to < 0 || to >= columnOrder.length) return
     const next = [...columnOrder]
     ;[next[from], next[to]] = [next[to], next[from]]
@@ -288,22 +304,21 @@ export function DataGrid<TData extends RowData>({
   const isEmpty = !loading && data.length === 0
   const cellPadding = density === 'compact' ? 'py-1.5' : 'py-3'
 
-  // 내보내기: 화면에 보이는 컬럼만, 보이는 순서대로
+  // 엑셀 내보내기: 현재 조건의 전체 결과(fetchRows), 화면에 보이는 컬럼만 보이는 순서대로
   async function handleExport(mode: ExportMode) {
-    if (!exportCsv) return
+    if (!exportExcel) return
     setExportBusy(true)
     setExportError(null)
     try {
-      const allRows = await exportCsv.fetchRows()
+      const allRows = await exportExcel.fetchRows()
       const rowsToExport =
         mode === 'selected' ? allRows.filter((row) => rowSelection[getRowId(row)]) : allRows
       const exportColumns = visibleColumns
         .map((column) => columnById.get(column.id))
         .filter((column): column is DataGridColumn<TData> => column !== undefined)
-      downloadTextFile(
-        toCsv(exportColumns, rowsToExport),
-        csvFileName(exportCsv.fileName),
-        'text/csv;charset=utf-8',
+      await downloadXlsx(
+        toExportSheet(exportColumns, rowsToExport, codeOptions),
+        exportFileName(exportExcel.fileName),
       )
     } catch {
       setExportError('내보내기에 실패했습니다. 다시 시도해 주세요.')
@@ -311,6 +326,39 @@ export function DataGrid<TData extends RowData>({
       setExportBusy(false)
     }
   }
+
+  // ── 왼쪽 고정 컬럼: 그린 뒤 앞 고정 컬럼들의 실제 너비를 재서 왼쪽 위치(px)를 정한다
+  const visiblePinned = pinnedIds.filter((columnId) => !hidden.includes(columnId))
+  const stickyIds =
+    visiblePinned.length > 0 && enableRowSelection
+      ? [SELECT_COLUMN_ID, ...visiblePinned]
+      : visiblePinned
+  // 그린 뒤 너비를 재서 각 고정 칸의 left를 직접 적는다 (상태로 두면 다시 그리기가 한 번 더 돈다)
+  const tableBox = useRef<HTMLDivElement>(null)
+  useLayoutEffect(() => {
+    let left = 0
+    for (const columnId of stickyIds) {
+      tableBox.current
+        ?.querySelectorAll<HTMLElement>(`[data-sticky="${columnId}"]`)
+        .forEach((cell) => (cell.style.left = `${left}px`))
+      left += headerCells.current.get(columnId)?.getBoundingClientRect().width ?? 0
+    }
+  })
+  const lastStickyId = stickyIds.at(-1)
+  const isSticky = (columnId: string) => stickyIds.includes(columnId)
+  // 고정 칸 모양: 제자리에 붙고, 뒤 칸이 비치지 않게 바탕색 (행 강조·선택·마우스 올림 색도 같이)
+  const stickyProps = (columnId: string) => (isSticky(columnId) ? { 'data-sticky': columnId } : {})
+  const stickyStyle = (columnId: string): React.CSSProperties | undefined =>
+    isSticky(columnId) ? { position: 'sticky' } : undefined
+  const stickyClass = (columnId: string, header = false) =>
+    isSticky(columnId) &&
+    cn(
+      'z-10',
+      header
+        ? 'bg-muted'
+        : 'bg-card group-hover/row:bg-muted group-data-[state=selected]/row:bg-muted group-data-[active]/row:bg-accent',
+      columnId === lastStickyId && 'border-r',
+    )
 
   const allPageSelected = table.getIsAllPageRowsSelected()
   const somePageSelected = table.getIsSomePageRowsSelected()
@@ -344,20 +392,29 @@ export function DataGrid<TData extends RowData>({
         }}
         actions={toolbarActions}
         exporting={
-          exportCsv
+          exportExcel
             ? { totalCount: rowCount, busy: exportBusy, error: exportError, onExport: handleExport }
             : undefined
         }
       />
 
-      <div className="rounded-lg border bg-card" aria-busy={loading}>
+      <div ref={tableBox} className="rounded-lg border bg-card" aria-busy={loading}>
         <Table className={cn(fixedLayout && 'table-fixed')}>
-          <TableHeader className="bg-muted/50">
+          <TableHeader className="bg-muted">
             <TableRow className="hover:bg-transparent">
               {visibleColumns.map((column) => {
                 if (column.id === SELECT_COLUMN_ID) {
                   return (
-                    <TableHead key={column.id} className="w-10">
+                    <TableHead
+                      key={column.id}
+                      ref={(element) => {
+                        if (element) headerCells.current.set(column.id, element)
+                        else headerCells.current.delete(column.id)
+                      }}
+                      {...stickyProps(column.id)}
+                      style={stickyStyle(column.id)}
+                      className={cn('w-10', stickyClass(column.id, true))}
+                    >
                       <Checkbox
                         aria-label="현재 페이지 전체 선택"
                         checked={
@@ -381,9 +438,14 @@ export function DataGrid<TData extends RowData>({
                       if (element) headerCells.current.set(column.id, element)
                       else headerCells.current.delete(column.id)
                     }}
-                    style={widthOf(column.id) ? { width: widthOf(column.id) } : undefined}
+                    {...stickyProps(column.id)}
+                    style={{
+                      ...(widthOf(column.id) ? { width: widthOf(column.id) } : {}),
+                      ...stickyStyle(column.id),
+                    }}
                     className={cn(
                       'relative',
+                      stickyClass(column.id, true),
                       fixedLayout && 'truncate',
                       align === 'right' && 'text-right',
                       align === 'center' && 'text-center',
@@ -440,7 +502,26 @@ export function DataGrid<TData extends RowData>({
                 </TableRow>
               ))}
 
-            {isEmpty && (
+            {error && !loading && (
+              <TableRow className="hover:bg-transparent">
+                <TableCell colSpan={visibleColumns.length}>
+                  <EmptyState
+                    title="목록을 불러오지 못했습니다"
+                    description={error}
+                    action={
+                      onRetry && (
+                        <Button type="button" variant="outline" onClick={onRetry}>
+                          <RotateCcwIcon />
+                          다시 시도
+                        </Button>
+                      )
+                    }
+                  />
+                </TableCell>
+              </TableRow>
+            )}
+
+            {isEmpty && !error && (
               <TableRow className="hover:bg-transparent">
                 <TableCell colSpan={visibleColumns.length}>
                   {state.search ? (
@@ -468,6 +549,9 @@ export function DataGrid<TData extends RowData>({
                   aria-selected={onRowClick ? row.id === activeRowId : undefined}
                   tabIndex={onRowClick ? 0 : undefined}
                   className={cn(
+                    'group/row',
+                    // 고정 칸과 같은 색으로 (고정 칸은 비치지 않는 바탕색이라 반투명 색을 못 쓴다)
+                    stickyIds.length > 0 && 'hover:bg-muted',
                     onRowClick &&
                       'cursor-pointer focus-visible:outline-2 focus-visible:outline-ring',
                     row.id === activeRowId && 'bg-accent hover:bg-accent',
@@ -490,7 +574,12 @@ export function DataGrid<TData extends RowData>({
                   {row.getVisibleCells().map((cell) => {
                     if (cell.column.id === SELECT_COLUMN_ID) {
                       return (
-                        <TableCell key={cell.id} className={cellPadding}>
+                        <TableCell
+                          key={cell.id}
+                          {...stickyProps(cell.column.id)}
+                          style={stickyStyle(cell.column.id)}
+                          className={cn(cellPadding, stickyClass(cell.column.id))}
+                        >
                           <Checkbox
                             aria-label="행 선택"
                             checked={row.getIsSelected()}
@@ -504,8 +593,11 @@ export function DataGrid<TData extends RowData>({
                     return (
                       <TableCell
                         key={cell.id}
+                        {...stickyProps(cell.column.id)}
+                        style={stickyStyle(cell.column.id)}
                         className={cn(
                           cellPadding,
+                          stickyClass(cell.column.id),
                           fixedLayout && 'truncate',
                           align === 'right' && 'text-right tabular-nums',
                           align === 'center' && 'text-center',
@@ -514,7 +606,11 @@ export function DataGrid<TData extends RowData>({
                         {def.cell ? (
                           def.cell(row.original)
                         ) : (
-                          <DataGridCellValue value={cell.getValue()} format={def.format} />
+                          <DataGridCellValue
+                            value={cell.getValue()}
+                            format={def.format}
+                            href={def.href?.(row.original)}
+                          />
                         )}
                       </TableCell>
                     )

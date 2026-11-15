@@ -59,7 +59,7 @@ type DataGridToolbarProps = {
   columns?: ColumnSettings
   // 화면별 버튼 (예: 선택 행 일괄 처리)
   actions?: React.ReactNode
-  // CSV 내보내기 (DataGrid에 exportCsv를 줬을 때만)
+  // 엑셀 내보내기 (DataGrid에 exportExcel을 줬을 때만)
   exporting?: ExportOption
 }
 
@@ -185,12 +185,12 @@ function ExportMenu({
       <DropdownMenuTrigger asChild>
         <Button variant="outline" disabled={busy}>
           <DownloadIcon />
-          {busy ? '내보내는 중…' : '내보내기'}
+          {busy ? '내보내는 중…' : '엑셀'}
           <ChevronDownIcon />
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-auto">
-        <DropdownMenuLabel>CSV 내보내기</DropdownMenuLabel>
+        <DropdownMenuLabel>엑셀 내려받기</DropdownMenuLabel>
         <DropdownMenuSeparator />
         <DropdownMenuItem disabled={totalCount === 0} onSelect={() => onExport('all')}>
           조건에 맞는 전체 ({formatNumber(totalCount)}건)

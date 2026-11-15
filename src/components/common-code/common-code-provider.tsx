@@ -24,3 +24,8 @@ const EMPTY: readonly CodeOption[] = []
 export function useCodeOptions(group: string): readonly CodeOption[] {
   return useContext(CommonCodeContext)[group] ?? EMPTY
 }
+
+// 공통코드 전체 (그룹 → 목록). 엑셀 내보내기처럼 여러 그룹을 한꺼번에 이름으로 바꿀 때
+export function useAllCodeOptions(): CodeOptions {
+  return useContext(CommonCodeContext)
+}

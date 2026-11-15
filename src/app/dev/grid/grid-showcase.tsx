@@ -92,7 +92,7 @@ export function GridShowcase() {
         onRowClick={setActiveRow}
         activeRowId={activeRow?.id}
         searchPlaceholder="품목명·코드·로케이션·화주사·로트 검색"
-        exportCsv={{ fileName: '재고목록', fetchRows: () => queryAllFakeInventory(state) }}
+        exportExcel={{ fileName: '재고목록', fetchRows: () => queryAllFakeInventory(state) }}
         toolbarActions={
           <Button variant="outline" disabled={selectedIds.length === 0}>
             <PrinterIcon />

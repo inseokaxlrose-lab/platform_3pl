@@ -39,7 +39,7 @@ export function parseGridSettings(raw: unknown): GridSettings {
 }
 
 // 정리에 필요한 컬럼 정보 (DataGridColumn의 일부)
-type ColumnInfo = { id: string; hideable?: boolean; sortable?: boolean }
+type ColumnInfo = { id: string; hideable?: boolean; sortable?: boolean; defaultHidden?: boolean }
 
 // 컬럼 순서: 저장된 순서를 따르되
 // - 지금 없는 컬럼은 버린다
@@ -57,10 +57,19 @@ export function resolveColumnOrder(defaultIds: readonly string[], saved?: readon
   return order
 }
 
-// 숨긴 컬럼: 지금 있고 숨길 수 있는 컬럼만
+// 처음 숨겨 둘 컬럼 (defaultHidden)
+export const defaultHiddenIds = (columns: readonly ColumnInfo[]) =>
+  columns.filter((c) => c.defaultHidden && c.hideable !== false).map((c) => c.id)
+
+// 숨긴 컬럼: 지금 있고 숨길 수 있는 컬럼만. 저장값이 없으면 기본 숨김 컬럼
 export function resolveHidden(columns: readonly ColumnInfo[], hidden?: readonly string[]) {
   const allowed = new Set(columns.filter((c) => c.hideable !== false).map((c) => c.id))
-  return (hidden ?? []).filter((id) => allowed.has(id))
+  return (hidden ?? defaultHiddenIds(columns)).filter((id) => allowed.has(id))
+}
+
+// 고정 컬럼(pinned)은 항상 맨 앞, 나머지는 정리된 순서대로
+export function withPinnedFirst(order: readonly string[], pinnedIds: readonly string[]) {
+  return [...pinnedIds, ...order.filter((id) => !pinnedIds.includes(id))]
 }
 
 export function clampWidth(width: number) {

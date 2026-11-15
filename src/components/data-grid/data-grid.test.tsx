@@ -383,3 +383,48 @@ describe('DataGrid 행 클릭 (목록 → 상세)', () => {
     expect(screen.getByText('품목1').closest('tr')!.getAttribute('aria-selected')).toBe('false')
   })
 })
+
+describe('DataGrid 목록 공통 기능', () => {
+  const headerTexts = () =>
+    screen
+      .getAllByRole('columnheader')
+      .map((th) => th.textContent)
+      .filter(Boolean)
+
+  it('기본 숨김 컬럼은 처음에 안 보이고, 고정 컬럼은 맨 앞에 붙는다', () => {
+    render(
+      <Harness
+        enableRowSelection={false}
+        columns={[
+          columns[1],
+          { ...columns[0], pinned: true },
+          { ...columns[2], defaultHidden: true },
+        ]}
+      />,
+    )
+    expect(headerTexts()).toEqual(['품목명', '수량'])
+    const pinnedHeader = screen.getByRole('button', { name: /품목명/ }).closest('th')!
+    expect(pinnedHeader.style.position).toBe('sticky')
+  })
+
+  it('href를 주면 값을 링크로 그린다', () => {
+    render(<Harness columns={[{ ...columns[0], href: (row) => `/items/${row.id}` }]} />)
+    expect(screen.getByRole('link', { name: '품목1' }).getAttribute('href')).toBe('/items/r1')
+  })
+
+  it('조회 오류는 문구와 [다시 시도]를 보여준다', () => {
+    const onRetry = vi.fn()
+    render(<Harness rowsFor={() => []} rowCount={0} error="서버 오류" onRetry={onRetry} />)
+    expect(screen.getByText('목록을 불러오지 못했습니다')).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: '다시 시도' }))
+    expect(onRetry).toHaveBeenCalled()
+    expect(screen.queryByText('조회된 데이터가 없습니다')).toBeNull()
+  })
+
+  it('정렬 기본값: 숫자 오른쪽, 상태 가운데, 글자 왼쪽', () => {
+    render(<Harness />)
+    expect(screen.getByText('1,000').closest('td')!.className).toContain('text-right')
+    expect(screen.getAllByText('완료')[0].closest('td')!.className).toContain('text-center')
+    expect(screen.getByText('품목1').closest('td')!.className).not.toContain('text-center')
+  })
+})
