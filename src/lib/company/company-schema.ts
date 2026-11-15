@@ -5,7 +5,7 @@ import {
   optionalPhone,
   optionalText,
 } from '@/lib/validation/common-fields'
-import { formatBusinessNumber, isValidBusinessNumber } from './business-number'
+import { digitsOnly, isValidBusinessNumber } from '@/lib/format'
 
 // 운영사 정보 입력 규칙 — 화면과 서버가 같은 규칙을 쓴다 (docs/decisions/0024)
 
@@ -28,7 +28,7 @@ export const companySchema = z.object({
     .string()
     .trim()
     .refine(isValidBusinessNumber, '사업자등록번호를 확인해 주세요. (10자리, 검증번호 불일치)')
-    .transform(formatBusinessNumber),
+    .transform(digitsOnly),
   ceoName: optionalText(30),
   businessType: optionalText(50),
   businessItem: optionalText(50),
@@ -41,7 +41,7 @@ export const companySchema = z.object({
     .max(MAX_COMPANY_CONTACTS, `담당자는 ${MAX_COMPANY_CONTACTS}명까지 등록할 수 있습니다.`),
 })
 
-// 화면 입력값 (모두 글자) / 저장할 값 (빈 칸은 null, 사업자번호는 000-00-00000)
+// 화면 입력값 (모두 글자) / 저장할 값 (빈 칸은 null, 사업자번호·전화번호는 숫자만)
 export type CompanyInput = z.input<typeof companySchema>
 export type CompanyData = z.output<typeof companySchema>
 export type CompanyContactInput = z.input<typeof companyContactSchema>

@@ -19,9 +19,12 @@ describe('사업자등록번호', () => {
     expect(isValidBusinessNumber('')).toBe(false)
   })
 
-  it('000-00-00000 모양으로 바꾼다', () => {
+  it('000-00-00000 모양으로, 입력 중인 짧은 값은 자리까지만 끊는다', () => {
     expect(formatBusinessNumber('1234567891')).toBe('123-45-67891')
     expect(formatBusinessNumber('123-4567891')).toBe('123-45-67891')
     expect(formatBusinessNumber('123')).toBe('123')
+    expect(formatBusinessNumber('1234')).toBe('123-4')
+    expect(formatBusinessNumber('123456')).toBe('123-45-6')
+    expect(formatBusinessNumber('123456789123')).toBe('123-45-67891')
   })
 })

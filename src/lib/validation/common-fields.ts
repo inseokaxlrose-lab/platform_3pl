@@ -1,8 +1,7 @@
 import { z } from 'zod'
+import { digitsOnly, isValidPhone } from '@/lib/format'
 
 // 입력 칸 공통 규칙 — 화면·서버 공용 (운영사·센터·화주사·거래처 등 기준정보 입력에서 재사용)
-
-const digitsOnly = (value: string) => value.replace(/\D/g, '')
 
 // 선택 입력 글자: 앞뒤 공백 제거, 비어 있으면 null
 export const optionalText = (max: number) =>
@@ -16,15 +15,16 @@ export const optionalText = (max: number) =>
 export const requiredText = (message: string, max: number) =>
   z.string().trim().min(1, message).max(max, `${max}자 이하로 입력해 주세요.`)
 
-// 전화·팩스: 숫자·하이픈, 숫자 8~12자리 (예: 02-123-4567, 010-1234-5678, 1588-1234)
+// 전화·팩스: 하이픈·띄어쓰기는 받아 주고, 저장은 숫자만 (docs/decisions/0029)
+// 예: 02-123-4567 → '021234567', 010-1234-5678, 1588-1234
 export const optionalPhone = z
   .string()
   .trim()
   .refine(
-    (value) => value === '' || (/^[\d-]+$/.test(value) && /^\d{8,12}$/.test(digitsOnly(value))),
-    '숫자와 하이픈(-)으로 8~12자리를 입력해 주세요.',
+    (value) => value === '' || isValidPhone(value),
+    '전화번호를 확인해 주세요. (예: 02-123-4567, 010-1234-5678, 1588-1234)',
   )
-  .transform((value) => value || null)
+  .transform((value) => digitsOnly(value) || null)
 
 export const optionalEmail = z
   .string()

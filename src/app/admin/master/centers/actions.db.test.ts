@@ -81,6 +81,15 @@ describe('센터 등록', () => {
     ])
   })
 
+  it('전화번호는 하이픈 없이 숫자만 저장 (docs/decisions/0029)', async () => {
+    const center = await create()
+    expect(await prisma.center.findUniqueOrThrow({ where: { id: center.id } })).toMatchObject({
+      phone: '0311234567',
+      fax: null,
+      managerPhone: '01011112222',
+    })
+  })
+
   it('사용자 코드는 대문자로 저장, 외부 코드도 함께 저장', async () => {
     const center = await create({ code: 'icn-1', externalCodes: { SAP: '1000', ERP: '' } })
     expect(center.code).toBe('ICN-1')

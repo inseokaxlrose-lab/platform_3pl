@@ -63,7 +63,7 @@ describe('운영사 정보 저장', () => {
     const company = await getCompany()
     expect(company).toMatchObject({
       id: COMPANY_ID,
-      businessNumber: '123-45-67891',
+      businessNumber: '1234567891',
       email: null,
       updatedById: adminId,
     })
