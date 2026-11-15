@@ -171,5 +171,7 @@
   }
   html {
     @apply font-sans;
+    /* 스크롤 막대 자리를 늘 비워 둔다: 긴 화면·짧은 화면에서 헤더 버튼([도움말] 등) 위치가 같게 */
+    scrollbar-gutter: stable;
   }
 }
