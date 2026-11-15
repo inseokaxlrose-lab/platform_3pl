@@ -240,6 +240,7 @@ model Center {
   warehouses    Warehouse[]
   deliveryZones DeliveryZone[]
   shippers      ShipperCenter[]
+  stocks        Stock[]
 
   // 논리 삭제: 'Y'면 지운 것 (목록·조회에서 빠지고 되살릴 수 있다, 0038)
   delYn String @default("N") @map("del_yn") @db.Char(1)
@@ -289,6 +290,7 @@ model Warehouse {
   rowVersion       Int              @default(1) @map("row_version")
   center           Center           @relation(fields: [centerId], references: [id], onDelete: Restrict)
   locations        Location[]
+  stocks           Stock[]
 
   // 코드는 삭제 안 된 것끼리만 겹치면 안 된다 (지운 코드는 다시 쓸 수 있다, 0038)
   // 논리 삭제: 'Y'면 지운 것 (목록·조회에서 빠지고 되살릴 수 있다, 0038)
@@ -324,6 +326,7 @@ model Location {
   updatedBy   String    @default("system") @map("updated_by") @db.VarChar(50)
   rowVersion  Int       @default(1) @map("row_version")
   warehouse   Warehouse @relation(fields: [warehouseId], references: [id], onDelete: Restrict)
+  stocks      Stock[]
 
   // 코드는 삭제 안 된 것끼리만 겹치면 안 된다 (지운 코드는 다시 쓸 수 있다, 0038)
   // 논리 삭제: 'Y'면 지운 것 (목록·조회에서 빠지고 되살릴 수 있다, 0038)
@@ -381,6 +384,7 @@ model Shipper {
   contacts  ShipperContact[]
   items     Item[]
   customers Customer[]
+  stocks    Stock[]
 
   // 논리 삭제: 'Y'면 지운 것 (목록·조회에서 빠지고 되살릴 수 있다, 0038)
   delYn String @default("N") @map("del_yn") @db.Char(1)
@@ -580,6 +584,8 @@ model Operator {
   units            Unit[]
   items            Item[]
   customers        Customer[]
+  stocks           Stock[]
+  stockTxns        StockTxn[]
 
   // 논리 삭제: 'Y'면 지운 것 (목록·조회에서 빠지고 되살릴 수 있다, 0038)
   delYn String @default("N") @map("del_yn") @db.Char(1)
@@ -856,7 +862,8 @@ model Item {
   rowVersion Int      @default(1) @map("row_version")
 
   // 환산단위 (BOX·CARTON·PLT… + 입수량)
-  units ItemUnit[]
+  units  ItemUnit[]
+  stocks Stock[]
 
   // 논리 삭제: 'Y'면 지운 것 (목록·조회에서 빠지고 되살릴 수 있다, 0038)
   delYn String @default("N") @map("del_yn") @db.Char(1)
@@ -951,4 +958,99 @@ model CustomerContact {
 
   @@index([customerId, sortOrder])
   @@map("tb_customer_contact")
+}
+
+// ── 재고 (docs/decisions/0044, 0003 결정 4): 한 줄 = 재고 주소 하나의 지금 수량
+// 재고 주소: 센터 + 창고 + 로케이션 + 화주사 + 품목 + 로트번호 + 유통기한
+// - 수량은 직접 고치지 않는다: 재고 변경 공통 함수(이력 기록과 한 트랜잭션)로만 바꾼다 (CLAUDE.md)
+// - 수량은 기본단위, Decimal. 로트·유통기한을 쓰지 않는 품목은 비어 있다(null)
+// - 같은 주소는 한 줄: 로케이션 + 품목 + 로트 + 유통기한 고유 (빈 칸도 같게 본다 — NULLS NOT DISTINCT, 마이그레이션 SQL에서)
+// - 센터·창고·화주사는 로케이션·품목에서 정해지지만 조회가 빠르도록 함께 둔다 (재고 변경 함수가 맞춰 넣는다)
+// - 수량이 0이 돼도 줄은 남긴다 (이력이 이 줄을 가리킨다)
+model Stock {
+  id          BigInt    @id @default(autoincrement()) @map("stock_id")
+  // 운영사 (멀티테넌트: 같은 운영사 사람만 보고 고친다, docs/decisions/0039)
+  operatorId  BigInt    @map("operator_id")
+  operator    Operator  @relation(fields: [operatorId], references: [id], onDelete: Restrict)
+  centerId    BigInt    @map("center_id")
+  center      Center    @relation(fields: [centerId], references: [id], onDelete: Restrict)
+  warehouseId BigInt    @map("warehouse_id")
+  warehouse   Warehouse @relation(fields: [warehouseId], references: [id], onDelete: Restrict)
+  locationId  BigInt    @map("location_id")
+  location    Location  @relation(fields: [locationId], references: [id], onDelete: Restrict)
+  shipperId   BigInt    @map("shipper_id")
+  shipper     Shipper   @relation(fields: [shipperId], references: [id], onDelete: Restrict)
+  itemId      BigInt    @map("item_id")
+  item        Item      @relation(fields: [itemId], references: [id], onDelete: Restrict)
+  lotNo       String?   @map("lot_no") @db.VarChar(50)
+  expiryOn    DateTime? @map("expiry_dt") @db.Date
+
+  // 수량 (기본단위). 0 이상
+  qty          Decimal @default(0) @map("stock_qty") @db.Decimal(18, 3)
+  // 할당(출고 예약) 수량: 0 이상, 수량 이하 (출고 작업에서 쓴다, 사용자 결정으로 미리 둔다)
+  allocatedQty Decimal @default(0) @map("alloc_qty") @db.Decimal(18, 3)
+
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
+  // 동시 처리 안전: 재고 변경 함수가 줄을 잠그고 바꾼다. 버전은 화면 확인용
+  rowVersion Int      @default(1) @map("row_version")
+
+  txns StockTxn[]
+
+  @@unique([locationId, itemId, lotNo, expiryOn], map: "tb_stock_address_key")
+  @@index([operatorId])
+  @@index([centerId, shipperId, itemId])
+  @@index([itemId])
+  @@map("tb_stock")
+}
+
+// 재고 이력 유형 (프로그램이 값에 따라 동작이 다르므로 enum, 0030)
+enum StockTxnType {
+  // 입고 확정: 입고대기 창고에 재고가 생긴다
+  RECEIVE
+  // 이동(적치 포함): 출발 로케이션에서 나감 / 도착 로케이션에 들어옴 (두 줄, 같은 묶음 번호)
+  MOVE_OUT
+  MOVE_IN
+  // 재고 조정: 사유 필수
+  ADJUST
+}
+
+// 재고 이력 (docs/decisions/0044): 수량이 바뀐 한 번 = 한 줄. 지우거나 고치지 않는 기록 (DB가 막는다)
+// 주소 칸은 그때 모습 그대로 함께 둔다 (재고 줄과 같지만, 이력만 봐도 알 수 있게)
+model StockTxn {
+  id          BigInt       @id @default(autoincrement()) @map("stock_txn_id")
+  operatorId  BigInt       @map("operator_id")
+  operator    Operator     @relation(fields: [operatorId], references: [id], onDelete: Restrict)
+  stockId     BigInt       @map("stock_id")
+  stock       Stock        @relation(fields: [stockId], references: [id], onDelete: Restrict)
+  centerId    BigInt       @map("center_id")
+  warehouseId BigInt       @map("warehouse_id")
+  locationId  BigInt       @map("location_id")
+  shipperId   BigInt       @map("shipper_id")
+  itemId      BigInt       @map("item_id")
+  lotNo       String?      @map("lot_no") @db.VarChar(50)
+  expiryOn    DateTime?    @map("expiry_dt") @db.Date
+  type        StockTxnType @map("txn_type_cd")
+  // 변동 수량 (+ 늘어남 / − 줄어듦, 기본단위, 0 아님)과 변동 후 수량
+  qtyChange   Decimal      @map("chg_qty") @db.Decimal(18, 3)
+  qtyAfter    Decimal      @map("after_qty") @db.Decimal(18, 3)
+  // 묶음 번호: 이동처럼 여러 줄이 한 번의 작업일 때 같은 값 (첫 줄의 이력 키)
+  groupId     BigInt?      @map("txn_group_id")
+  // 원본 문서: 종류(예: RECEIPT 입고확정, ADJUSTMENT 조정) + 키 + 화면에 보일 번호
+  refType     String?      @map("ref_type_cd") @db.VarChar(20)
+  refId       BigInt?      @map("ref_id")
+  refNo       String?      @map("ref_no") @db.VarChar(50)
+  // 사유 (조정은 필수)
+  reason      String?      @db.VarChar(200)
+  txnAt       DateTime     @default(now()) @map("txn_at")
+  // 처리한 사람 아이디 (재고 변경 함수가 지금 작업자로 채운다)
+  createdBy   String       @default("system") @map("created_by") @db.VarChar(50)
+
+  @@index([stockId, txnAt])
+  @@index([operatorId, txnAt])
+  @@index([itemId, txnAt])
+  @@index([locationId, txnAt])
+  @@index([refType, refId])
+  @@index([groupId])
+  @@map("tb_stock_txn")
 }
