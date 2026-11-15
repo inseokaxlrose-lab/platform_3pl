@@ -142,7 +142,7 @@ const adminNavigation: NavArea = {
           title: 'ASN 조회',
           href: '/admin/inbound/asn',
           icon: ClipboardListIcon,
-          ready: false,
+          ready: true,
           permission: 'inbound.asn.read',
         },
         {
@@ -270,7 +270,7 @@ const portalNavigation: NavArea = {
           title: 'ASN 조회',
           href: '/portal/asn',
           icon: ClipboardListIcon,
-          ready: false,
+          ready: true,
           permission: 'portal.asn.read',
         },
       ],
