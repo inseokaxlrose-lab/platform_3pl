@@ -1,6 +1,7 @@
 import type { Metadata } from 'next'
 import { notFound } from 'next/navigation'
 import { PageHeader } from '@/components/common'
+import { BackToListButton } from '@/components/master-list'
 import { AccessDenied } from '@/components/permission'
 import { getCurrentScope, hasPermission } from '@/lib/session'
 import { CenterForm } from '../center-form'
@@ -23,7 +24,11 @@ export default async function EditCenterPage({ params }: PageProps<'/admin/maste
 
   return (
     <>
-      <PageHeader title={`${center.input.name} (${center.input.code})`} />
+      <PageHeader
+        title={`${center.input.name} (${center.input.code})`}
+        // 마지막으로 본 목록(검색 조건·페이지·정렬 그대로)으로
+        actions={<BackToListButton listPath="/admin/master/centers" />}
+      />
       <CenterForm
         center={center}
         readOnly={!canUpdate}

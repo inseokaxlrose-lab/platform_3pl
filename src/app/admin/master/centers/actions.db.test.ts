@@ -11,6 +11,7 @@ import {
   createCenterAction,
   listCentersAction,
   setCenterActiveAction,
+  setCentersActiveAction,
   updateCenterAction,
 } from './actions'
 
@@ -223,5 +224,77 @@ describe('목록 · 데이터 범위 · 권한', () => {
       ok: false,
       error: { code: 'FORBIDDEN' },
     })
+  })
+})
+
+describe('목록 검색 조건 · 일괄 처리 · 엑셀', () => {
+  const list = (filters: Record<string, string>, extra = {}) =>
+    listCentersAction({ ...createDataGridState(), filters, ...extra })
+  const codes = async (filters: Record<string, string>) => {
+    const result = await list(filters)
+    return result.ok ? result.data.rows.map((r) => r.code).sort() : result.error
+  }
+
+  it('상태·전화(하이픈 넣어도)·센터장·보관 조건·등록일로 거른다', async () => {
+    const icn = await create({ code: 'ICN', phone: '031-123-4567', managerName: '김센터' })
+    const gmh = await create({
+      code: 'GMH',
+      name: '김해',
+      phone: '055-999-0000',
+      managerName: '박센터',
+    })
+    await prisma.center.update({ where: { id: gmh.id }, data: { isActive: false } })
+    await prisma.warehouse.create({
+      data: {
+        centerId: icn.id,
+        systemCode: 'WH-T1',
+        code: 'COLD',
+        name: '냉동',
+        type: 'GENERAL',
+        storageCondition: 'FROZEN',
+      },
+    })
+
+    expect(await codes({ status: 'ACTIVE' })).toEqual(['ICN'])
+    expect(await codes({ status: 'INACTIVE' })).toEqual(['GMH'])
+    expect(await codes({ phone: '055-999' })).toEqual(['GMH'])
+    expect(await codes({ manager: '김' })).toEqual(['ICN'])
+    expect(await codes({ storage: 'FROZEN,CHILLED' })).toEqual(['ICN'])
+    expect(await codes({ storage: 'HOT' })).toEqual(['GMH', 'ICN']) // 모르는 값은 조건 없음
+    expect(await codes({ createdAt: '2000-01-01~2000-01-02' })).toEqual([])
+  })
+
+  it('일괄 사용 중지·다시 사용: 운영사만, 하나라도 없으면 전체 거부', async () => {
+    const a = await create({ code: 'AAA' })
+    const b = await create({ code: 'BBB' })
+    expect(await setCentersActiveAction({ ids: [a.id, b.id], isActive: false })).toEqual({
+      ok: true,
+      data: { count: 2 },
+    })
+    expect(await codes({ status: 'INACTIVE' })).toEqual(['AAA', 'BBB'])
+
+    expect(await setCentersActiveAction({ ids: [a.id, 'nope'], isActive: true })).toMatchObject({
+      ok: false,
+      error: { code: 'NOT_FOUND' },
+    })
+    expect(await codes({ status: 'ACTIVE' })).toEqual([])
+
+    signIn({ kind: 'CENTERS', centerIds: [a.id] })
+    expect(await setCentersActiveAction({ ids: [a.id], isActive: true })).toMatchObject({
+      ok: false,
+      error: { code: 'FORBIDDEN' },
+    })
+  })
+
+  it('엑셀 전체 읽기는 엑셀 권한이 있어야 하고, 페이지와 상관없이 조건에 맞는 전체를 준다', async () => {
+    await create({ code: 'AAA' })
+    await create({ code: 'BBB' })
+    expect(await list({}, { exportAll: true })).toMatchObject({
+      ok: false,
+      error: { code: 'FORBIDDEN' },
+    })
+    signIn({ kind: 'ALL' }, [...ALL_CODES, 'master.centers.export'])
+    const result = await list({}, { exportAll: true, pageIndex: 5 })
+    expect(result.ok && result.data.rows.map((r) => r.code)).toEqual(['AAA', 'BBB'])
   })
 })
