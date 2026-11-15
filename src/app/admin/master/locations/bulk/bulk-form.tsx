@@ -4,7 +4,7 @@ import { EyeIcon, LayersIcon } from 'lucide-react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useState, useTransition } from 'react'
-import { FormColumns, FormField, FormRow, FormSection } from '@/components/common'
+import { FormField, FormRow, FormSection } from '@/components/common'
 import { formatNumber } from '@/components/data-grid'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -155,8 +155,9 @@ export function BulkLocationForm({
     </FormField>
   )
 
-  const left = (
-    <>
+  // 도구 화면: 입력이 적어 좁은 폭 한 단 (기준정보 입력 틀은 쓰지 않음 — 저장이 아니라 미리보기→생성)
+  return (
+    <div className="max-w-2xl space-y-6">
       <FormSection title="창고">
         <FormField label="창고" required error={errors.warehouseId} htmlFor="bulk-warehouse">
           <Select
@@ -289,8 +290,6 @@ export function BulkLocationForm({
           {pending ? '처리 중…' : '생성'}
         </Button>
       </div>
-    </>
+    </div>
   )
-
-  return <FormColumns left={left} />
 }

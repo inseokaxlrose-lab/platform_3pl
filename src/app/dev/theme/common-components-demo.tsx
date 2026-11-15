@@ -2,18 +2,8 @@
 
 import { FilePlusIcon, PackageIcon } from 'lucide-react'
 import { useState } from 'react'
-import {
-  ConfirmDialog,
-  EmptyState,
-  FormColumns,
-  FormField,
-  FormRow,
-  FormSection,
-  PageHeader,
-  StatusBadge,
-} from '@/components/common'
+import { ConfirmDialog, EmptyState, PageHeader, StatusBadge } from '@/components/common'
 import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
 
 // 공통 컴포넌트 견본 (버튼을 눌러 동작을 확인할 수 있다)
 export function CommonComponentsDemo() {
@@ -103,56 +93,9 @@ export function CommonComponentsDemo() {
         </div>
       </section>
 
-      <section className="space-y-3">
-        <h2 className="text-lg font-semibold">입력 화면 배치 (좌우 2단)</h2>
-        <p className="text-sm text-muted-foreground">
-          왼쪽에 다 담을 수 있으면 왼쪽만, 넘칠 때만 오른쪽으로 이어서. 단 안에서는 위에서 아래로,
-          관련 있는 짧은 칸은 한 줄에 2개까지(FormRow). 좁은 화면에서는 1단.
-        </p>
-        <p className="text-xs font-medium text-muted-foreground">정보가 적은 화면 (왼쪽만)</p>
-        <FormColumns
-          left={
-            <FormSection title="기본 정보">
-              <FormField label="이름" required htmlFor="demo-name">
-                <Input id="demo-name" />
-              </FormField>
-              <FormRow>
-                <FormField label="업태" htmlFor="demo-type">
-                  <Input id="demo-type" />
-                </FormField>
-                <FormField label="종목" htmlFor="demo-item">
-                  <Input id="demo-item" />
-                </FormField>
-              </FormRow>
-              <FormField label="설명" htmlFor="demo-desc">
-                <Input id="demo-desc" />
-              </FormField>
-            </FormSection>
-          }
-        />
-        <p className="text-xs font-medium text-muted-foreground">
-          정보가 많은 화면 (왼쪽 → 오른쪽)
-        </p>
-        <FormColumns
-          left={
-            <FormSection title="기본 정보">
-              <FormField label="회사명" required htmlFor="demo-company">
-                <Input id="demo-company" />
-              </FormField>
-              <FormField label="대표자" htmlFor="demo-ceo">
-                <Input id="demo-ceo" />
-              </FormField>
-            </FormSection>
-          }
-          right={
-            <FormSection title="연락처" required description="오른쪽 단으로 이어지는 묶음">
-              <FormField label="대표 전화" error="오류 문구 예시" htmlFor="demo-phone">
-                <Input id="demo-phone" aria-invalid />
-              </FormField>
-            </FormSection>
-          }
-        />
-      </section>
+      <p className="text-sm text-muted-foreground">
+        입력 화면 틀(MasterFormPage)·목록 화면 틀(MasterListPage) 견본은 /dev/components에 있습니다.
+      </p>
     </div>
   )
 }

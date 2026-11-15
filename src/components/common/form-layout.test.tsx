@@ -1,22 +1,9 @@
 import { render, screen } from '@testing-library/react'
 import { describe, expect, it } from 'vitest'
-import { FormColumns, FormRow, FormSection } from './form-layout'
-
-describe('FormColumns', () => {
-  it('왼쪽만 주면 오른쪽 단을 만들지 않는다 (정보가 적은 화면)', () => {
-    const { container } = render(<FormColumns left={<p>왼쪽</p>} />)
-    expect(container.querySelector('[data-column="left"]')?.textContent).toBe('왼쪽')
-    expect(container.querySelector('[data-column="right"]')).toBeNull()
-  })
-
-  it('오른쪽도 주면 왼쪽에서 오른쪽으로 이어서 배치한다 (정보가 많은 화면)', () => {
-    const { container } = render(<FormColumns left={<p>왼쪽</p>} right={<p>오른쪽</p>} />)
-    expect(container.querySelector('[data-column="right"]')?.textContent).toBe('오른쪽')
-  })
-})
+import { FormRow, FormSection } from './form-layout'
 
 describe('FormSection', () => {
-  it('제목으로 찾을 수 있는 묶음 상자, 오른쪽 버튼 자리', () => {
+  it('제목으로 찾을 수 있는 묶음 (카드 대신 구분선), 오른쪽 버튼 자리', () => {
     render(
       <FormSection title="담당자" action={<button type="button">추가</button>}>
         <input aria-label="이름" />

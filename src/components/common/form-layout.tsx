@@ -1,35 +1,9 @@
 import { cn } from '@/lib/utils'
 
-// 입력 화면 공통 배치 (docs/decisions/0002 "입력 화면")
-// 책을 펼친 모양: 왼쪽 단에 다 담을 수 있으면 왼쪽만, 넘칠 만큼 많을 때만 오른쪽 단으로 이어서 쓴다
-// - 단 안에서는 위에서 아래로 쌓는다. 관련 있는 짧은 칸은 FormRow로 한 줄에 2개까지
-// - 넓은 화면(lg 이상)에서만 2단, 그보다 좁으면 1단으로 위아래로 이어진다
-// - 표처럼 넓어야 하는 내용(권한 체크 표 등)은 FormColumns 밖에 전체 너비로 둔다
-export function FormColumns({
-  left,
-  right,
-  className,
-}: {
-  left: React.ReactNode
-  // 없으면 왼쪽 단만 쓰고 오른쪽은 비워 둔다
-  right?: React.ReactNode
-  className?: string
-}) {
-  return (
-    <div className={cn('grid items-start gap-6 lg:grid-cols-2', className)}>
-      <div data-column="left" className="grid gap-6">
-        {left}
-      </div>
-      {right && (
-        <div data-column="right" className="grid gap-6">
-          {right}
-        </div>
-      )}
-    </div>
-  )
-}
+// 기준정보 등록·수정 화면은 MasterFormPage(@/components/master-form)를 쓴다 (docs/decisions/0031)
+// 아래 부품은 그 밖의 작은 입력(팝업, 일괄 생성 같은 도구 화면)용
 
-// 제목이 있는 입력 묶음 상자 (기본 정보, 연락처 등): 안의 칸은 위에서 아래로 쌓인다
+// 제목이 있는 입력 묶음: 카드 대신 위쪽 구분선으로 나눈다 (첫 묶음은 선 없음), 안의 칸은 위에서 아래로
 export function FormSection({
   title,
   required,
@@ -48,7 +22,10 @@ export function FormSection({
   children: React.ReactNode
 }) {
   return (
-    <section aria-label={title} className={cn('space-y-4 rounded-lg border p-4', className)}>
+    <section
+      aria-label={title}
+      className={cn('space-y-4 border-t pt-6 first:border-t-0 first:pt-0', className)}
+    >
       <div className="flex items-start justify-between gap-2">
         <div className="space-y-1">
           <h2 className="text-base font-semibold">
