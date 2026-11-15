@@ -8,10 +8,11 @@ import type { Db } from '@/lib/prisma'
 // 공통코드는 운영사마다 따로라, 같은 운영사의 행만 센다 (0039)
 type CountUsage = (db: Db, operatorId: bigint, code: string) => Promise<number>
 const CODE_USAGES: Record<string, CountUsage> = {
-  // 담당 업무: 운영사·화주사 담당자 (거래처 담당자를 만들면 여기에 더한다)
+  // 담당 업무: 운영사·화주사·거래처 담당자
   CONTACT_ROLE: async (db, operatorId, code) =>
     (await db.operatorContact.count({ where: { operatorId, duty: code } })) +
-    (await db.shipperContact.count({ where: { shipper: { operatorId }, duty: code } })),
+    (await db.shipperContact.count({ where: { shipper: { operatorId }, duty: code } })) +
+    (await db.customerContact.count({ where: { customer: { operatorId }, duty: code } })),
   // 제공 서비스: 운영사 (0040)
   SERVICE_TYPE: async (db, operatorId, code) =>
     db.operatorService.count({ where: { operatorId, serviceCd: code } }),

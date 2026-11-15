@@ -25,6 +25,8 @@ type AddressInputProps = {
   idPrefix?: string // 주소 검색으로 고르면 지번주소를 알려 준다 (지번주소를 따로 저장하는 화면만, 예: 운영사 addr_jibun)
   // 직접 입력으로 주소를 바꾸면 빈 글자를 알려 준다 (검색 결과와 어긋나지 않게)
   onJibunAddress?: (jibunAddress: string) => void
+  // 주소 검색으로 고르면 법정동코드 10자리를 알려 준다 (예: 거래처 — 배송권역 맞추기, 0043). 직접 고치면 빈 글자
+  onRegionCode?: (regionCode: string) => void
 }
 
 // 주소 입력 (권장 span 12): [우편번호][주소 검색] 한 줄 → 기본주소 → 상세주소 (docs/decisions/0024)
@@ -37,6 +39,7 @@ export function AddressInput({
   errors = {},
   idPrefix = 'address',
   onJibunAddress,
+  onRegionCode,
 }: AddressInputProps) {
   const [open, setOpen] = useState(false)
   const [manual, setManual] = useState(false)
@@ -80,6 +83,7 @@ export function AddressInput({
         onChange={(e) => {
           set({ address: e.target.value })
           onJibunAddress?.('')
+          onRegionCode?.('')
         }}
       />
       <Input
@@ -115,9 +119,10 @@ export function AddressInput({
           </DialogHeader>
           {open && (
             <PostcodeEmbed
-              onSelect={({ jibunAddress, ...found }) => {
+              onSelect={({ jibunAddress, regionCode, ...found }) => {
                 set({ ...found, addressDetail: value.addressDetail })
                 onJibunAddress?.(jibunAddress)
+                onRegionCode?.(regionCode)
                 selected.current = true
                 setOpen(false)
               }}
@@ -141,7 +146,12 @@ function PostcodeEmbed({
   onSelect,
   onError,
 }: {
-  onSelect: (value: { zipCode: string; address: string; jibunAddress: string }) => void
+  onSelect: (value: {
+    zipCode: string
+    address: string
+    jibunAddress: string
+    regionCode: string
+  }) => void
   onError: () => void
 }) {
   const box = useRef<HTMLDivElement>(null)

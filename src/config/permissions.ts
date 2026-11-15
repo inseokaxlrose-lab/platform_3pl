@@ -75,7 +75,12 @@ export const PERMISSION_MENUS = {
     area: 'admin',
     actions: [...CRUD, 'export'],
   },
-  'master.customers': { label: '거래처', group: '기준정보', area: 'admin', actions: CRUD },
+  'master.customers': {
+    label: '거래처',
+    group: '기준정보',
+    area: 'admin',
+    actions: [...CRUD, 'export'],
+  },
 
   // ── 운영사 화면 · 입고
   'inbound.asn': {

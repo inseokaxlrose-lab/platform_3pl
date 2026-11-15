@@ -123,7 +123,7 @@ const adminNavigation: NavArea = {
           title: '거래처',
           href: '/admin/master/customers',
           icon: ContactIcon,
-          ready: false,
+          ready: true,
           permission: 'master.customers.read',
         },
       ],

@@ -13,6 +13,7 @@ const RESULT: KakaoPostcodeResult = {
   buildingName: '테스트빌딩',
   apartment: 'N',
   bname: '백현동',
+  bcode: '4113510900',
 }
 
 // 가짜 카카오 우편번호: embed 하면 바로 검색 결과 하나를 고른 것처럼 동작
@@ -50,6 +51,7 @@ describe('toAddress (검색 결과 → 저장할 주소)', () => {
       address: '경기 성남시 분당구 판교역로 166 (백현동)',
       // 지번주소도 함께 (따로 저장하는 화면용, 0040)
       jibunAddress: '경기 성남시 분당구 백현동 532',
+      regionCode: '4113510900',
     })
     expect(toAddress({ ...RESULT, apartment: 'Y' }).address).toBe(
       '경기 성남시 분당구 판교역로 166 (백현동, 테스트빌딩)',

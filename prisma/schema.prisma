@@ -376,10 +376,11 @@ model Shipper {
   updatedBy      String    @default("system") @map("updated_by") @db.VarChar(50)
   rowVersion     Int       @default(1) @map("row_version")
 
-  users    User[]
-  centers  ShipperCenter[]
-  contacts ShipperContact[]
-  items    Item[]
+  users     User[]
+  centers   ShipperCenter[]
+  contacts  ShipperContact[]
+  items     Item[]
+  customers Customer[]
 
   // 논리 삭제: 'Y'면 지운 것 (목록·조회에서 빠지고 되살릴 수 있다, 0038)
   delYn String @default("N") @map("del_yn") @db.Char(1)
@@ -578,6 +579,7 @@ model Operator {
   deliveryZones    DeliveryZone[]
   units            Unit[]
   items            Item[]
+  customers        Customer[]
 
   // 논리 삭제: 'Y'면 지운 것 (목록·조회에서 빠지고 되살릴 수 있다, 0038)
   delYn String @default("N") @map("del_yn") @db.Char(1)
@@ -883,4 +885,70 @@ model ItemUnit {
   @@unique([itemId, unitId])
   @@index([unitId])
   @@map("tb_item_unit")
+}
+
+// ── 거래처 (docs/decisions/0043): 화주사의 고객사 — 출고(MVP 이후) 때 물건을 받는 곳
+// 코드 3층 (0025): systemCode CU00000001(자동·불변) / code(거래처코드, 같은 화주사 안에서 중복 금지, 비우면 시스템 코드) / 외부 코드(ExternalCode CUSTOMER)
+model Customer {
+  id             BigInt   @id @default(autoincrement()) @map("customer_id")
+  // 운영사 (멀티테넌트: 같은 운영사 사람만 보고 고친다, docs/decisions/0039)
+  operatorId     BigInt   @map("operator_id")
+  operator       Operator @relation(fields: [operatorId], references: [id], onDelete: Restrict)
+  shipperId      BigInt   @map("shipper_id")
+  shipper        Shipper  @relation(fields: [shipperId], references: [id], onDelete: Restrict)
+  systemCode     String   @unique @map("sys_cd")
+  code           String   @map("customer_cd") @db.VarChar(30)
+  name           String   @map("customer_nm") @db.VarChar(200)
+  // 사업자등록번호·전화번호는 하이픈 없이 숫자만 (0029)
+  businessNumber String?  @map("biz_reg_no") @db.Char(10)
+  ceoName        String?  @map("ceo_nm") @db.VarChar(50)
+  phone          String?  @map("tel_no") @db.VarChar(15)
+  email          String?  @db.VarChar(100)
+
+  // ── 배송지: 카카오 우편번호 서비스로 검색해 채우고, 상세주소만 직접 입력
+  zipCode       String? @map("zip_cd") @db.VarChar(10)
+  address       String? @map("addr1") @db.VarChar(200)
+  addressDetail String? @map("addr2") @db.VarChar(200)
+  // 법정동코드 10자리 (주소 검색 결과를 자동 저장, 화면 미노출) — 배송권역(앞 2·5자리)과 맞춰 본다
+  regionCode    String? @map("region_cd") @db.Char(10)
+  receiverName  String? @map("receiver_nm") @db.VarChar(50)
+  receiverPhone String? @map("receiver_tel_no") @db.VarChar(15)
+  // 배송 메모 (예: 정문 경비실에 맡겨 주세요)
+  deliveryMemo  String? @map("delivery_memo") @db.VarChar(200)
+
+  remark     String?  @db.VarChar(1000)
+  status     String   @default("ACTIVE") @map("status_cd") @db.VarChar(10)
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
+  // 등록·수정한 사람 아이디(username, 자동: 현재 작업자 / 시드 seed / 기존 데이터 system), 동시 수정 막기용 버전 (docs/db-conventions.md 공통 칸)
+  createdBy  String   @default("system") @map("created_by") @db.VarChar(50)
+  updatedBy  String   @default("system") @map("updated_by") @db.VarChar(50)
+  rowVersion Int      @default(1) @map("row_version")
+
+  contacts CustomerContact[]
+
+  // 논리 삭제: 'Y'면 지운 것 (목록·조회에서 빠지고 되살릴 수 있다, 0038)
+  delYn String @default("N") @map("del_yn") @db.Char(1)
+
+  // 거래처코드는 같은 화주사의 삭제 안 된 것끼리만 겹치면 안 된다 (0038)
+  @@unique([shipperId, code], where: raw("del_yn = 'N'"), map: "tb_customer_shipper_id_customer_cd_key")
+  @@index([operatorId])
+  @@index([regionCode])
+  @@map("tb_customer")
+}
+
+// 거래처 담당자 (화주사·운영사 담당자와 같은 모양: 최대 5명, 대표 1명, 담당 업무는 공통코드 CONTACT_ROLE). 거래처의 이력으로 본다 (0038)
+model CustomerContact {
+  id         BigInt   @id @default(autoincrement()) @map("contact_id")
+  customerId BigInt   @map("customer_id")
+  sortOrder  Int      @map("sort_seq")
+  duty       String   @map("role_cd") @db.VarChar(20)
+  name       String   @map("contact_nm") @db.VarChar(50)
+  phone      String?  @map("tel_no") @db.VarChar(15)
+  email      String?  @db.VarChar(100)
+  isPrimary  String   @default("N") @map("primary_yn") @db.Char(1)
+  customer   Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+
+  @@index([customerId, sortOrder])
+  @@map("tb_customer_contact")
 }
