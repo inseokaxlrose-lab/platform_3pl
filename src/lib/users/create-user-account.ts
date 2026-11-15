@@ -1,20 +1,14 @@
 import 'server-only'
 import { randomUUID } from 'node:crypto'
 import { z } from 'zod'
+import { passwordSchema, usernameSchema } from './user-schema'
 import { auth } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { affiliationIssues, internalEmail } from './affiliation'
 
 // 아이디 규칙: 영문·숫자·점·밑줄·하이픈 3~30자 (Better Auth username 플러그인 설정과 같게)
-export const usernameSchema = z
-  .string()
-  .trim()
-  .regex(/^[a-zA-Z0-9._-]{3,30}$/, '아이디는 영문·숫자·점·밑줄·하이픈 3~30자입니다.')
-
-export const passwordSchema = z
-  .string()
-  .min(8, '비밀번호는 8자 이상입니다.')
-  .max(128, '비밀번호는 128자 이하입니다.')
+// 아이디·비밀번호 규칙은 화면과 함께 쓰는 user-schema.ts에 있다
+export { passwordSchema, usernameSchema } from './user-schema'
 
 const createUserAccountSchema = z
   .object({

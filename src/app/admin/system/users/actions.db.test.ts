@@ -13,6 +13,7 @@ import {
   listUsersAction,
   resetUserPasswordAction,
   setUserActiveAction,
+  setUsersActiveAction,
   updateUserAction,
   updateUserOverridesAction,
 } from './actions'
@@ -118,9 +119,13 @@ describe('사용자 등록', () => {
   })
 
   it('유형별 소속 규칙과, 유형에 맞지 않는 영역의 권한그룹을 막는다', async () => {
+    // 소속 규칙은 입력 규칙에서 칸 오류로 (화면이 그 칸 옆에 보여준다)
     expect(await createUserAction(newUser({ centerIds: [] }))).toMatchObject({
       ok: false,
-      error: { code: 'VALIDATION', message: '센터 직원은 소속 센터를 1개 이상 선택해야 합니다.' },
+      error: {
+        code: 'VALIDATION',
+        fieldErrors: { centerIds: ['센터 직원은 소속 센터를 1개 이상 선택해야 합니다.'] },
+      },
     })
     expect(
       await createUserAction(
@@ -314,6 +319,63 @@ describe('사용자별 추가·제외 권한', () => {
     const id = await createWorker()
     vi.mocked(getCurrentPermissions).mockResolvedValue(new Set(['system.users.read']))
     expect(await updateUserOverridesAction({ id, grants: [], denies: [] })).toMatchObject({
+      ok: false,
+      error: { code: 'FORBIDDEN' },
+    })
+  })
+})
+
+describe('목록 검색 조건 · 일괄 처리 · 엑셀', () => {
+  const usernames = async (filters: Record<string, string>) => {
+    const result = await listUsersAction({ ...createDataGridState(), filters })
+    return result.ok ? result.data.rows.map((r) => r.username).sort() : result.error
+  }
+
+  it('유형·상태·권한그룹·소속 센터·화주사로 거르고, 내부용 이메일은 보여주지 않는다', async () => {
+    await createUserAction(newUser())
+    await createUserAction(
+      newUser({
+        username: 'gana.user',
+        userType: 'SHIPPER',
+        centerIds: [],
+        shipperId,
+        permissionGroupIds: [portalGroupId],
+      }),
+    )
+
+    expect(await usernames({ userType: 'CENTER' })).toEqual(['Kim.Worker'])
+    expect(await usernames({ userType: 'OPERATOR' })).toEqual(['boss'])
+    expect(await usernames({ group: portalGroupId })).toEqual(['gana.user'])
+    expect(await usernames({ center: centerId })).toEqual(['Kim.Worker'])
+    expect(await usernames({ shipper: shipperId })).toEqual(['gana.user'])
+    expect(await usernames({ status: 'INACTIVE' })).toEqual([])
+    expect(await usernames({ userType: 'NOPE' })).toHaveLength(3) // 모르는 값은 조건 없음
+
+    const result = await listUsersAction(createDataGridState())
+    expect(result.ok && result.data.rows.every((r) => r.email === null)).toBe(true)
+  })
+
+  it('일괄 사용 중지: 자기 자신이 섞이면 거부, 없는 사용자가 섞이면 전체 거부, 기존 로그인 끊기', async () => {
+    const created = await createUserAction(newUser())
+    const id = created.ok ? created.data.id : ''
+
+    expect(await setUsersActiveAction({ ids: [id, operatorId], isActive: false })).toMatchObject({
+      ok: false,
+      error: { code: 'CONFLICT' },
+    })
+    expect(await setUsersActiveAction({ ids: [id, 'nope'], isActive: false })).toMatchObject({
+      ok: false,
+      error: { code: 'NOT_FOUND' },
+    })
+    expect(await setUsersActiveAction({ ids: [id], isActive: false })).toEqual({
+      ok: true,
+      data: { count: 1 },
+    })
+    expect(await usernames({ status: 'INACTIVE' })).toEqual(['Kim.Worker'])
+  })
+
+  it('엑셀 전체 읽기는 엑셀 권한이 필요하다', async () => {
+    expect(await listUsersAction({ ...createDataGridState(), exportAll: true })).toMatchObject({
       ok: false,
       error: { code: 'FORBIDDEN' },
     })

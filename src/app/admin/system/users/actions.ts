@@ -3,12 +3,15 @@
 import { z } from 'zod'
 import { ActionError } from '@/lib/actions/action-error'
 import { createAction } from '@/lib/actions/create-action'
-import { dataGridStateSchema, toPrismaQuery } from '@/lib/grid/grid-query'
+import { listQuerySchema, toPrismaQuery } from '@/lib/grid/grid-query'
+import { dateRangeFilter } from '@/lib/grid/list-filters'
+import { USER_TYPES } from '@/lib/users/user-schema'
 import { overridesIssue } from '@/lib/permissions/override-state'
 import { prisma } from '@/lib/prisma'
 import type { CurrentUser } from '@/lib/session'
 import { affiliationIssues, internalEmail } from '@/lib/users/affiliation'
-import { createUserAccount, passwordSchema, usernameSchema } from '@/lib/users/create-user-account'
+import { createUserAccount } from '@/lib/users/create-user-account'
+import { createUserSchema, passwordSchema, updateUserSchema } from '@/lib/users/user-schema'
 import { resetUserPassword, setUserActive } from '@/lib/users/manage-user'
 
 // 사용자 관리 서버 액션 (docs/decisions/0018-user-admin.md)
@@ -20,20 +23,6 @@ function requireOperator(user: CurrentUser) {
   if (user.userType !== 'OPERATOR') {
     throw new ActionError('FORBIDDEN', '사용자 관리는 운영사 사용자만 할 수 있습니다.')
   }
-}
-
-const nameSchema = z.string().trim().min(1, '이름을 입력해 주세요.').max(50)
-const emailSchema = z
-  .union([z.literal(''), z.email('이메일 형식이 아닙니다.')])
-  .optional()
-  .transform((value) => value || undefined)
-const affiliationShape = {
-  centerIds: z.array(z.string().min(1)).max(50).default([]),
-  shipperId: z
-    .string()
-    .optional()
-    .transform((value) => value || undefined),
-  permissionGroupIds: z.array(z.string().min(1)).max(50).default([]),
 }
 
 // 권한그룹은 사용자 유형에 맞는 영역만 (운영사·센터 → 운영사 화면 그룹, 화주사 → 포털 그룹)
@@ -61,11 +50,16 @@ async function assertEmailFree(email: string, exceptUserId?: string) {
   }
 }
 
+// 목록 (검색 조건: 사용자 목록 화면의 searchFields와 같은 키). 엑셀 전체는 엑셀 권한 필요
 export const listUsersAction = createAction({
   permission: 'system.users.read',
-  input: dataGridStateSchema,
-  handler: async ({ user, input }) => {
+  input: listQuerySchema,
+  handler: async ({ user, input, permissions }) => {
     requireOperator(user)
+    if (input.exportAll && !permissions.has('system.users.export')) {
+      throw new ActionError('FORBIDDEN', '엑셀 내려받기 권한이 없습니다.')
+    }
+    const { filters } = input
     const query = toPrismaQuery(input, {
       searchFields: ['username', 'name', 'email'],
       sortable: {
@@ -77,14 +71,32 @@ export const listUsersAction = createAction({
       },
       defaultOrderBy: { username: 'asc' },
     })
+    const userType = (USER_TYPES as readonly string[]).includes(filters.userType ?? '')
+      ? (filters.userType as (typeof USER_TYPES)[number])
+      : undefined
+    const createdAt = dateRangeFilter(filters, 'createdAt')
+    const where = {
+      AND: [
+        query.where,
+        userType ? { userType } : {},
+        filters.status === 'ACTIVE' ? { isActive: true } : {},
+        filters.status === 'INACTIVE' ? { isActive: false } : {},
+        filters.group ? { permissionGroups: { some: { groupId: filters.group } } } : {},
+        filters.center ? { centers: { some: { centerId: filters.center } } } : {},
+        filters.shipper ? { shipperId: filters.shipper } : {},
+        createdAt ? { createdAt } : {},
+      ],
+    }
     const [rows, rowCount] = await prisma.$transaction([
       prisma.user.findMany({
         ...query,
+        where,
         select: {
           id: true,
           username: true,
           displayUsername: true,
           name: true,
+          email: true,
           userType: true,
           isActive: true,
           createdAt: true,
@@ -93,13 +105,15 @@ export const listUsersAction = createAction({
           permissionGroups: { select: { group: { select: { name: true } } } },
         },
       }),
-      prisma.user.count({ where: query.where }),
+      prisma.user.count({ where }),
     ])
     return {
       rows: rows.map((row) => ({
         id: row.id,
         username: row.displayUsername ?? row.username ?? '',
         name: row.name,
+        // 이메일이 없는 사용자의 내부용 주소는 보여주지 않는다
+        email: row.email.endsWith('@users.local') ? null : row.email,
         userType: row.userType,
         isActive: row.isActive,
         createdAt: row.createdAt,
@@ -114,20 +128,7 @@ export const listUsersAction = createAction({
 
 export const createUserAction = createAction({
   permission: 'system.users.create',
-  input: z
-    .object({
-      username: usernameSchema,
-      name: nameSchema,
-      userType: z.enum(['OPERATOR', 'CENTER', 'SHIPPER']),
-      email: emailSchema,
-      password: passwordSchema,
-      passwordConfirm: z.string(),
-      ...affiliationShape,
-    })
-    .refine((data) => data.password === data.passwordConfirm, {
-      path: ['passwordConfirm'],
-      message: '비밀번호가 서로 다릅니다.',
-    }),
+  input: createUserSchema,
   handler: async ({ user, input }) => {
     requireOperator(user)
     assertAffiliation(input.userType, input.centerIds, input.shipperId)
@@ -156,12 +157,7 @@ export const createUserAction = createAction({
 // 사용자 유형·아이디는 바꿀 수 없다 (유형이 바뀌면 소속·데이터 범위가 통째로 바뀐다)
 export const updateUserAction = createAction({
   permission: 'system.users.update',
-  input: z.object({
-    id: z.string().min(1),
-    name: nameSchema,
-    email: emailSchema,
-    ...affiliationShape,
-  }),
+  input: updateUserSchema,
   handler: async ({ user, input }) => {
     requireOperator(user)
     const target = await prisma.user.findUnique({
@@ -209,6 +205,26 @@ export const setUserActiveAction = createAction({
     }
     await setUserActive(input.id, input.isActive)
     return { id: input.id, isActive: input.isActive }
+  },
+})
+
+// 여러 사용자 한꺼번에 사용 중지 / 다시 사용 (목록 일괄 처리). 사용 중지하면 기존 로그인을 끊는다
+// 자기 자신이 섞여 있으면 사용 중지를 거부, 없는 사용자가 섞이면 전체 거부
+export const setUsersActiveAction = createAction({
+  permission: 'system.users.update',
+  input: z.object({ ids: z.array(z.string().min(1)).min(1).max(200), isActive: z.boolean() }),
+  handler: async ({ user, input }) => {
+    requireOperator(user)
+    const ids = [...new Set(input.ids)]
+    if (!input.isActive && ids.includes(user.id)) {
+      throw new ActionError('CONFLICT', '자기 자신은 사용 중지할 수 없습니다.')
+    }
+    const found = await prisma.user.count({ where: { id: { in: ids } } })
+    if (found !== ids.length) {
+      throw new ActionError('NOT_FOUND', '찾을 수 없는 사용자가 섞여 있습니다.')
+    }
+    for (const id of ids) await setUserActive(id, input.isActive)
+    return { count: ids.length }
   },
 })
 

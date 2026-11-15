@@ -115,7 +115,12 @@ export const PERMISSION_MENUS = {
   },
 
   // ── 운영사 화면 · 시스템
-  'system.users': { label: '사용자', group: '시스템', area: 'admin', actions: CRUD },
+  'system.users': {
+    label: '사용자',
+    group: '시스템',
+    area: 'admin',
+    actions: [...CRUD, 'export'],
+  },
   'system.roles': { label: '권한그룹', group: '시스템', area: 'admin', actions: CRUD },
   'system.codes': { label: '공통코드', group: '시스템', area: 'admin', actions: CRUD },
   'system.exports': {
