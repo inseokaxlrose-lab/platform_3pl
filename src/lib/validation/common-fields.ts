@@ -55,3 +55,34 @@ export const userCodeField = (label: string) =>
       (value) => value === '' || (value.length >= 2 && /^[A-Z0-9_-]+$/.test(value)),
       `${label}는 영문·숫자·하이픈·밑줄 2~20자입니다.`,
     )
+
+// ── 여러 칸을 함께 보는 규칙 (화면·서버 공용) ──
+
+// "둘(이상) 중 하나는 필수": 객체 규칙에 .superRefine(requireOneOf([...], '문구'))로 붙인다
+// 오류는 첫 번째 칸에 붙는다 (화면에서 그 칸으로 이동·표시)
+export function requireOneOf<T extends Record<string, unknown>>(
+  keys: readonly (keyof T & string)[],
+  message: string,
+) {
+  return (value: T, ctx: z.RefinementCtx) => {
+    const filled = keys.some((key) => {
+      const v = value[key]
+      return v !== null && v !== undefined && String(v).trim() !== ''
+    })
+    if (!filled) ctx.addIssue({ code: 'custom', message, path: [keys[0]] })
+  }
+}
+
+// 목록 안에서 하나만 골라야 하는 칸 (예: 대표 담당자): 행이 있으면 정확히 1개
+// 배열 규칙에 .superRefine(exactlyOne('isPrimary', '문구'))로 붙인다. 오류는 목록 전체에 붙는다
+export function exactlyOne<T extends Record<string, unknown>>(
+  key: keyof T & string,
+  message: string,
+) {
+  return (rows: readonly T[], ctx: z.RefinementCtx) => {
+    if (rows.length === 0) return
+    if (rows.filter((row) => row[key] === true).length !== 1) {
+      ctx.addIssue({ code: 'custom', message })
+    }
+  }
+}
