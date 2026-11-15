@@ -10,6 +10,7 @@ import { ensureCenterDefaults } from '../src/lib/centers/center-defaults'
 import { nextSystemCode } from '../src/lib/master-code/system-code'
 import { prisma } from '../src/lib/prisma'
 import { createUserAccount } from '../src/lib/users/create-user-account'
+import { SEED_CODE_GROUPS } from './seed-codes'
 import { SAMPLE_ACCOUNTS, SEED_GROUPS, SUPER_GROUP_NAME } from './seed-roles'
 
 // 권한그룹을 만들고, 권한 목록을 정의와 똑같이 맞춘다 (새 메뉴 추가 시 시드만 다시 실행)
@@ -157,7 +158,27 @@ async function seedSampleCompany() {
   console.log('예시 운영사 정보 생성')
 }
 
+// 공통코드 시스템 그룹 (0030): 없으면 만들고, 이미 있으면 시스템 표시만 맞춘다 (고친 이름·순서는 그대로)
+async function seedCommonCodes() {
+  for (const { items, ...group } of SEED_CODE_GROUPS) {
+    const saved = await prisma.codeGroup.upsert({
+      where: { code: group.code },
+      create: { ...group, isSystem: true },
+      update: { isSystem: true },
+    })
+    for (const [index, item] of items.entries()) {
+      await prisma.codeItem.upsert({
+        where: { groupId_code: { groupId: saved.id, code: item.code } },
+        create: { ...item, groupId: saved.id, sortOrder: (index + 1) * 10 },
+        update: {},
+      })
+    }
+  }
+  console.log(`공통코드: 시스템 그룹 ${SEED_CODE_GROUPS.length}개 확인`)
+}
+
 async function main() {
+  await seedCommonCodes()
   await seedSampleOrganizations()
   await seedSampleCompany()
   const groupIds = await seedGroups()

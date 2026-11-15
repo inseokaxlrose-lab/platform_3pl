@@ -406,3 +406,43 @@ enum ExternalEntityType {
   DELIVERY_ZONE
   UNIT
 }
+
+// ── 공통코드 (docs/decisions/0030): 코드 그룹(서랍) → 코드(서랍 속 물건) 2단계
+// 분류·표시용 값만 공통코드로 관리한다. 프로그램이 값에 따라 동작을 바꾸는 값(창고 유형 등)은 enum으로 둔다
+// 업무 표에는 코드 글자(CodeItem.code)를 그대로 저장한다 (예: 담당자 업무 'INBOUND')
+
+model CodeGroup {
+  id          String     @id @default(cuid())
+  // 그룹 코드: 영문 대문자·숫자·밑줄 (예: CONTACT_DUTY), 등록 후 변경 불가
+  code        String     @unique
+  name        String
+  description String?
+  sortOrder   Int        @default(0)
+  isActive    Boolean    @default(true)
+  // 시스템 그룹: 프로그램이 직접 쓰는 그룹 (시드가 만들고, 삭제할 수 없다)
+  isSystem    Boolean    @default(false)
+  items       CodeItem[]
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+
+  @@map("code_group")
+}
+
+model CodeItem {
+  id          String    @id @default(cuid())
+  groupId     String
+  // 코드: 그룹 안에서 중복 금지, 등록 후 변경 불가 (업무 표에 이 글자가 저장되므로)
+  code        String
+  name        String
+  description String?
+  sortOrder   Int       @default(0)
+  // 사용 중지: 새로 고를 때만 숨기고, 이미 저장된 값은 이름으로 계속 보여준다
+  isActive    Boolean   @default(true)
+  group       CodeGroup @relation(fields: [groupId], references: [id], onDelete: Restrict)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@unique([groupId, code])
+  @@index([groupId, sortOrder])
+  @@map("code_item")
+}
