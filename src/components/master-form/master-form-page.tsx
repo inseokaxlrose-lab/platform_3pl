@@ -1,7 +1,7 @@
 'use client'
 
 import { RotateCcwIcon, SaveIcon } from 'lucide-react'
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useId, useRef, useState } from 'react'
 import { StatusBadge } from '@/components/common'
 import {
   AlertDialog,
@@ -26,6 +26,9 @@ export type MasterFormSection = {
   // 제목 오른쪽 (예: 안내 배지)
   action?: React.ReactNode
   content: React.ReactNode
+  // true면 "따로 처리하는 섹션": 자기 버튼으로 바로 처리하는 내용(계정 사용 중지, 요약 표 등)
+  // 폼 밖에 그려 저장 막대·변경 감지에서 빠지고, 폼 섹션들 뒤에 온다 (목차에는 함께)
+  standalone?: boolean
 }
 
 type MasterFormPageProps = {
@@ -46,8 +49,18 @@ const sectionDomId = (id: string) => `section-${id}`
 // - 섹션은 카드 대신 구분선으로 나눈다 (테두리 중첩 금지)
 // - 아래 고정 저장 막대: 변경사항 있음 · [취소] · [저장]. 변경이 없으면 둘 다 꺼진다
 // - 저장 검사에 실패하면 첫 오류 칸으로 스크롤·초점, 저장하지 않은 채 떠나려 하면 확인 창
-export function MasterFormPage({ form, sections, readOnly = false, meta }: MasterFormPageProps) {
+export function MasterFormPage({
+  form,
+  sections: allSections,
+  readOnly = false,
+  meta,
+}: MasterFormPageProps) {
   const formRef = useRef<HTMLFormElement>(null)
+  const formId = useId()
+  // 폼 섹션 먼저, 따로 처리하는 섹션은 뒤로 (폼 안에 다른 폼이 들어가지 않게 폼 밖에 그린다)
+  const formSections = allSections.filter((s) => !s.standalone)
+  const standaloneSections = allSections.filter((s) => s.standalone)
+  const sections = [...formSections, ...standaloneSections]
   const [activeId, setActiveId] = useState(sections[0]?.id)
   const [errorSectionIds, setErrorSectionIds] = useState<string[]>([])
   const guard = useDirtyGuard(form.dirty && !readOnly)
@@ -73,8 +86,9 @@ export function MasterFormPage({ form, sections, readOnly = false, meta }: Maste
     const root = formRef.current
     if (!root) return
     const invalid = (el: Element) => el.querySelector('[aria-invalid="true"], [role="alert"]')
+    // 폼 섹션만 본다 (따로 처리하는 섹션의 안내 문구는 저장 오류가 아님)
     setErrorSectionIds(
-      sections
+      formSections
         .map((s) => s.id)
         .filter((id) => {
           const el = document.getElementById(sectionDomId(id))
@@ -93,7 +107,7 @@ export function MasterFormPage({ form, sections, readOnly = false, meta }: Maste
   }, [form.submitCount, form.errors])
 
   return (
-    <form ref={formRef} onSubmit={form.submit} noValidate className="mx-auto w-full max-w-5xl">
+    <div className="mx-auto w-full max-w-5xl">
       <div className="lg:grid lg:grid-cols-[10rem_minmax(0,1fr)] lg:gap-10">
         <nav aria-label="섹션 목차" className="hidden lg:block">
           <ul className="sticky top-20 space-y-1 border-l text-sm">
@@ -132,32 +146,16 @@ export function MasterFormPage({ form, sections, readOnly = false, meta }: Maste
         </nav>
 
         <div className="min-w-0">
-          {sections.map((s) => (
-            <section
-              key={s.id}
-              id={sectionDomId(s.id)}
-              data-section-id={s.id}
-              aria-labelledby={`${sectionDomId(s.id)}-title`}
-              className="scroll-mt-20 border-b py-8 first:pt-0 last:border-b-0"
-            >
-              <div className="mb-5 flex items-start justify-between gap-3">
-                <div className="space-y-1">
-                  <h2 id={`${sectionDomId(s.id)}-title`} className="text-base font-semibold">
-                    {s.title}
-                  </h2>
-                  {s.description && (
-                    <p className="text-sm text-muted-foreground">{s.description}</p>
-                  )}
-                </div>
-                {s.action}
-              </div>
-              {s.content}
-            </section>
-          ))}
+          <form id={formId} ref={formRef} onSubmit={form.submit} noValidate>
+            {formSections.map((section, index) => renderSection(section, index))}
+          </form>
+          {standaloneSections.map((section, index) =>
+            renderSection(section, formSections.length + index),
+          )}
         </div>
       </div>
 
-      {!readOnly && (
+      {!readOnly && formSections.length > 0 && (
         <div className="sticky bottom-0 z-10 mt-4 flex flex-wrap items-center justify-end gap-3 border-t bg-background/95 py-3 backdrop-blur supports-[backdrop-filter]:bg-background/80">
           <div className="mr-auto flex items-center gap-3 text-xs text-muted-foreground">
             {meta}
@@ -181,7 +179,8 @@ export function MasterFormPage({ form, sections, readOnly = false, meta }: Maste
             <RotateCcwIcon />
             취소
           </Button>
-          <Button type="submit" disabled={!form.dirty || form.pending}>
+          {/* 저장 막대는 폼 밖에 있어서 form 속성으로 폼과 잇는다 */}
+          <Button type="submit" form={formId} disabled={!form.dirty || form.pending}>
             <SaveIcon />
             {form.pending ? '저장 중…' : '저장'}
           </Button>
@@ -204,6 +203,32 @@ export function MasterFormPage({ form, sections, readOnly = false, meta }: Maste
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-    </form>
+    </div>
+  )
+}
+
+// 섹션 하나: 카드 대신 위쪽 구분선 (첫 섹션은 선 없음)
+function renderSection(section: MasterFormSection, index: number) {
+  return (
+    <section
+      key={section.id}
+      id={sectionDomId(section.id)}
+      data-section-id={section.id}
+      aria-labelledby={`${sectionDomId(section.id)}-title`}
+      className={cn('scroll-mt-20 pb-8', index > 0 && 'border-t pt-8')}
+    >
+      <div className="mb-5 flex items-start justify-between gap-3">
+        <div className="space-y-1">
+          <h2 id={`${sectionDomId(section.id)}-title`} className="text-base font-semibold">
+            {section.title}
+          </h2>
+          {section.description && (
+            <p className="text-sm text-muted-foreground">{section.description}</p>
+          )}
+        </div>
+        {section.action}
+      </div>
+      {section.content}
+    </section>
   )
 }

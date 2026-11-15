@@ -173,7 +173,10 @@ function FormSample() {
     },
     schema: demoSchema,
     // 견본: 서버 대신 0.5초 뒤 성공
-    save: () => new Promise((resolve) => setTimeout(() => resolve({ ok: true, data: null }), 500)),
+    save: () =>
+      new Promise<{ ok: true; data: null }>((resolve) =>
+        setTimeout(() => resolve({ ok: true, data: null }), 500),
+      ),
   })
   const { value, set, errors, pending } = form
   return (

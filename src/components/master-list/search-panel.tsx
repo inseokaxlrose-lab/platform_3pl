@@ -22,7 +22,12 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { cn } from '@/lib/utils'
-import type { SearchFieldDef, SearchValues } from './search-fields'
+import {
+  applySearchChange,
+  optionsOf,
+  type SearchFieldDef,
+  type SearchValues,
+} from './search-fields'
 
 const SPAN_CLASS: Record<number, string> = {
   2: 'md:col-span-2',
@@ -87,13 +92,17 @@ function SearchInput({
   field,
   id,
   value,
+  values,
   onChange,
 }: {
   field: SearchFieldDef
   id: string
   value: string
+  // 다른 조건 값 (선택지가 다른 조건에 따라 바뀔 때)
+  values: SearchValues
   onChange: (value: string) => void
 }) {
+  const options = optionsOf(field, values)
   switch (field.type) {
     case 'keyword':
     case 'text':
@@ -121,7 +130,7 @@ function SearchInput({
           </SelectTrigger>
           <SelectContent>
             <SelectItem value={ALL}>전체</SelectItem>
-            {field.options?.map((o) => (
+            {options.map((o) => (
               <SelectItem key={o.value} value={o.value}>
                 {o.label}
               </SelectItem>
@@ -131,13 +140,7 @@ function SearchInput({
       )
     case 'segment':
       return (
-        <Segment
-          id={id}
-          label={field.label}
-          value={value}
-          onChange={onChange}
-          options={field.options ?? []}
-        />
+        <Segment id={id} label={field.label} value={value} onChange={onChange} options={options} />
       )
     case 'yn': {
       const [yes, no] = field.ynLabels ?? ['예', '아니오']
@@ -158,7 +161,7 @@ function SearchInput({
       return (
         <MultiSelect
           id={id}
-          options={field.options ?? []}
+          options={options}
           value={splitList(value)}
           onChange={(list) => onChange(list.join(','))}
         />
@@ -261,7 +264,8 @@ export function SearchPanel({ fields, values, onSearch, onReset }: SearchPanelPr
           field={field}
           id={id}
           value={draft[field.key] ?? ''}
-          onChange={(value) => setDraft((d) => ({ ...d, [field.key]: value }))}
+          values={draft}
+          onChange={(value) => setDraft((d) => applySearchChange(fields, d, field.key, value))}
         />
       </div>
     )

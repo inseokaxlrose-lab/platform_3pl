@@ -2,7 +2,7 @@ import { act, fireEvent, render, renderHook, screen, waitFor } from '@testing-li
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { parseListUrl, toListQueryString } from './list-url'
 import { SearchPanel } from './search-panel'
-import type { SearchFieldDef } from './search-fields'
+import { applySearchChange, optionsOf, type SearchFieldDef } from './search-fields'
 import { useListQuery, type ListRequest } from './use-list-query'
 
 // 주소창 흉내: replace하면 URL 값이 바뀌고, 훅을 다시 그리면 그 값을 읽는다
@@ -175,5 +175,31 @@ describe('useListQuery', () => {
     expect(fetch).toHaveBeenLastCalledWith(
       expect.objectContaining({ filters: { status: 'ACTIVE' }, exportAll: true }),
     )
+  })
+})
+
+describe('이어지는 고르기 (dependsOn)', () => {
+  const chain: SearchFieldDef[] = [
+    { key: 'center', label: '센터', type: 'select', options: [{ value: 'C1', label: '센터1' }] },
+    {
+      key: 'warehouse',
+      label: '창고',
+      type: 'select',
+      dependsOn: ['center'],
+      options: (v) => (v.center === 'C1' ? [{ value: 'W1', label: '창고1' }] : []),
+    },
+    { key: 'zone', label: '구역', type: 'select', dependsOn: ['warehouse'], options: [] },
+  ]
+
+  it('앞 조건을 바꾸면 딸린 조건이 연달아 비고, 선택지는 앞 조건 값으로 계산된다', () => {
+    const values = { center: 'C1', warehouse: 'W1', zone: 'A' }
+    expect(applySearchChange(chain, values, 'center', 'C2')).toEqual({
+      center: 'C2',
+      warehouse: '',
+      zone: '',
+    })
+    expect(applySearchChange(chain, values, 'zone', 'B')).toEqual({ ...values, zone: 'B' })
+    expect(optionsOf(chain[1], { center: 'C1' })).toEqual([{ value: 'W1', label: '창고1' }])
+    expect(optionsOf(chain[1], {})).toEqual([])
   })
 })

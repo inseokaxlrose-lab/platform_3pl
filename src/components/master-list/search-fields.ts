@@ -29,7 +29,10 @@ export type SearchFieldDef = {
   // true면 [상세 조건]을 펼쳐야 보인다 (자주 쓰는 3~4개만 기본으로)
   detail?: boolean
   placeholder?: string
-  options?: readonly SearchOption[]
+  // 선택지: 고정 목록, 또는 다른 조건 값에 따라 바뀌는 목록 (예: 고른 센터의 창고만)
+  options?: readonly SearchOption[] | ((values: SearchValues) => readonly SearchOption[])
+  // 이 조건들이 바뀌면 이 조건 값을 비운다 (예: 창고는 센터에, 구역은 창고에 딸림)
+  dependsOn?: readonly string[]
   codeGroup?: string
   // 'yn'의 예/아니오 이름 (기본: 예 / 아니오)
   ynLabels?: [string, string]
@@ -45,3 +48,28 @@ export type SearchValues = Record<string, string>
 
 // URL에서 목록 상태가 쓰는 예약 이름
 export const RESERVED_PARAMS = ['q', 'page', 'size', 'sort'] as const
+
+// 선택지 꺼내기 (함수면 지금 조건 값으로 계산)
+export function optionsOf(field: SearchFieldDef, values: SearchValues): readonly SearchOption[] {
+  return typeof field.options === 'function' ? field.options(values) : (field.options ?? [])
+}
+
+// 조건 하나를 바꾸면, 그 조건에 딸린 조건들(dependsOn)을 연달아 비운다
+export function applySearchChange(
+  fields: readonly SearchFieldDef[],
+  values: SearchValues,
+  key: string,
+  value: string,
+): SearchValues {
+  const next: SearchValues = { ...values, [key]: value }
+  const clear = (changed: string) => {
+    for (const field of fields) {
+      if (field.dependsOn?.includes(changed) && next[field.key]) {
+        next[field.key] = ''
+        clear(field.key)
+      }
+    }
+  }
+  clear(key)
+  return next
+}

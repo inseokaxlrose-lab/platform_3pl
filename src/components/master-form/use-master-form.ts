@@ -8,24 +8,27 @@ import type { ActionResult } from '@/lib/actions'
 // 오류 위치 → 문구 (예: 'businessNumber', 'contacts.0.name', 'contacts' = 표 전체)
 export type FormErrors = Record<string, string>
 
-type UseMasterFormOptions<TSchema extends z.ZodType> = {
+type UseMasterFormOptions<TSchema extends z.ZodType, TResult> = {
   // 처음 값 = 변경 감지·[취소]의 기준
   initial: z.input<TSchema>
   // 화면·서버 공용 입력 규칙: 저장 전에 화면에서 먼저 검사한다
   schema: TSchema
   // 서버 액션 호출 (서버도 같은 규칙으로 다시 검사)
-  save: (value: z.input<TSchema>) => Promise<ActionResult<unknown>>
+  save: (value: z.input<TSchema>) => Promise<ActionResult<TResult>>
   // 저장 성공 후 화면에 다시 채울 값 (예: 저장된 모양으로 정리). 없으면 입력값 그대로
   afterSave?: (saved: z.output<TSchema>) => z.input<TSchema>
+  // 저장 성공 후 할 일 (예: 등록 화면 → 만든 항목의 수정 화면으로 이동). 서버 액션의 결과를 받는다
+  onSuccess?: (result: TResult) => void
 }
 
 // 기준정보 입력 화면의 공통 동작: 값·오류·변경 감지·취소·저장 (MasterFormPage와 함께 쓴다)
-export function useMasterForm<TSchema extends z.ZodType>({
+export function useMasterForm<TSchema extends z.ZodType, TResult = unknown>({
   initial,
   schema,
   save,
   afterSave,
-}: UseMasterFormOptions<TSchema>) {
+  onSuccess,
+}: UseMasterFormOptions<TSchema, TResult>) {
   type Input = z.input<TSchema>
   const router = useRouter()
   const [value, setValue] = useState<Input>(initial)
@@ -93,7 +96,8 @@ export function useMasterForm<TSchema extends z.ZodType>({
         setValue(next)
         setBaseline(next)
         setMessage({ ok: true, text: '저장했습니다.' })
-        router.refresh()
+        if (onSuccess) onSuccess(result.data)
+        else router.refresh()
       })
     },
   }

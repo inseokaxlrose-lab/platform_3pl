@@ -193,3 +193,64 @@ describe('MasterFormPage + useMasterForm', () => {
     expect(push).toHaveBeenCalledWith('/elsewhere')
   })
 })
+
+describe('MasterFormPage 따로 처리하는 섹션 · 저장 후 동작', () => {
+  function Standalone({ onSuccess }: { onSuccess: (id: string) => void }) {
+    const form = useMasterForm({
+      initial: { name: '', phone: '', email: 'a@b.c' },
+      schema,
+      save: async () => ({ ok: true as const, data: 'new-id' }),
+      onSuccess,
+    })
+    return (
+      <MasterFormPage
+        form={form}
+        sections={[
+          {
+            id: 'account',
+            title: '계정 관리',
+            standalone: true,
+            content: (
+              <form aria-label="비밀번호 초기화">
+                <button type="submit">초기화</button>
+              </form>
+            ),
+          },
+          {
+            id: 'basic',
+            title: '기본 정보',
+            content: (
+              <input
+                aria-label="이름"
+                value={form.value.name}
+                onChange={(e) => form.set({ name: e.target.value })}
+              />
+            ),
+          },
+        ]}
+      />
+    )
+  }
+
+  it('따로 처리하는 섹션은 폼 밖·뒤에 그리고, 목차에는 함께 나온다', () => {
+    render(<Standalone onSuccess={vi.fn()} />)
+    const nav = screen.getByRole('navigation', { name: '섹션 목차' })
+    expect(
+      within(nav)
+        .getAllByRole('link')
+        .map((a) => a.textContent),
+    ).toEqual(['기본 정보', '계정 관리'])
+    // 폼 안에 폼이 들어가지 않는다
+    const inner = screen.getByRole('form', { name: '비밀번호 초기화' })
+    expect(inner.parentElement?.closest('form')).toBeNull()
+  })
+
+  it('저장 성공 후 onSuccess에 서버 결과를 넘긴다 (저장 막대는 form 속성으로 폼과 연결)', async () => {
+    const onSuccess = vi.fn()
+    render(<Standalone onSuccess={onSuccess} />)
+    fireEvent.change(screen.getByLabelText('이름'), { target: { value: '새' } })
+    await act(async () => fireEvent.click(screen.getByRole('button', { name: '저장' })))
+    expect(onSuccess).toHaveBeenCalledWith('new-id')
+    expect(refresh).not.toHaveBeenCalled()
+  })
+})
