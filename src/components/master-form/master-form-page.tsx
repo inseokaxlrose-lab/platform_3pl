@@ -52,7 +52,7 @@ const BELOW_HEADER = 'calc(3.5rem + var(--page-header-h, 0px) + 1rem)'
 
 // 기준정보 입력 화면 틀 (docs/ui-guidelines.md "입력 화면", "페이지 틀")
 // - AppPage(form): 헤더는 화면 전체 폭·고정, 왼쪽 목차 + 본문(최대 폭, 왼쪽 정렬)
-// - 헤더 오른쪽: [도움말] → 보조 버튼 → 변경사항 있음 · [취소] · [저장] (스크롤해도 늘 보인다)
+// - 헤더 오른쪽: 보조 버튼 → 변경사항 있음 · [취소] · [저장] → [도움말] (스크롤해도 늘 보인다)
 // - 섹션은 카드 대신 구분선, 저장 검사에 실패하면 첫 오류 칸으로, 저장하지 않고 떠나면 확인 창
 export function MasterFormPage({
   form,
