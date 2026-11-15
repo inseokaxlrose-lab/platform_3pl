@@ -21,7 +21,39 @@ export const AUDITED_MODELS: ReadonlySet<string> = new Set([
   'Unit',
 ])
 
+// 논리 삭제(del_yn)가 있는 표 (사용자는 계정을 지우지 않으므로 없음)
+export const SOFT_DELETE_MODELS: ReadonlySet<string> = new Set([
+  'PermissionGroup',
+  'Center',
+  'Warehouse',
+  'Location',
+  'Shipper',
+  'Company',
+  'CodeGroup',
+  'CodeItem',
+  'DeliveryZone',
+  'Unit',
+])
+
 type Data = Record<string, unknown>
+
+// 조건에 del_yn을 직접 적었는지 (지운 것 보기·되살리기는 delYn: 'Y'를 직접 적는다)
+function mentionsDelYn(where: unknown): boolean {
+  if (!where || typeof where !== 'object') return false
+  return Object.entries(where as Data).some(
+    ([key, value]) =>
+      key === 'delYn' ||
+      ((key === 'AND' || key === 'OR' || key === 'NOT') &&
+        (Array.isArray(value) ? value.some(mentionsDelYn) : mentionsDelYn(value))),
+  )
+}
+
+// 지운 줄 빼기: 조건에 delYn이 없으면 'N'(삭제 안 됨)만
+// (include·select 안의 관계 목록과 _count는 여기서 거르지 못한다 → 그 자리에서 where: NOT_DELETED)
+function notDeleted<T extends { where?: unknown }>(model: string, args: T): T {
+  if (!SOFT_DELETE_MODELS.has(model) || mentionsDelYn(args.where)) return args
+  return { ...args, where: { ...(args.where as Data | undefined), delYn: 'N' } }
+}
 
 // 등록: 등록·수정자를 지금 작업자로
 const forCreate = (data: Data): Data => ({
@@ -49,6 +81,31 @@ function createPrismaClient() {
     name: 'audit-columns',
     query: {
       $allModels: {
+        // 읽기·수정·개수는 지운 줄을 빼고 (지운 것을 다루려면 조건에 delYn을 직접 적는다)
+        findUnique({ model, args, query }) {
+          return query(notDeleted(model, args))
+        },
+        findUniqueOrThrow({ model, args, query }) {
+          return query(notDeleted(model, args))
+        },
+        findFirst({ model, args, query }) {
+          return query(notDeleted(model, args))
+        },
+        findFirstOrThrow({ model, args, query }) {
+          return query(notDeleted(model, args))
+        },
+        findMany({ model, args, query }) {
+          return query(notDeleted(model, args))
+        },
+        count({ model, args, query }) {
+          return query(notDeleted(model, args))
+        },
+        aggregate({ model, args, query }) {
+          return query(notDeleted(model, args))
+        },
+        groupBy({ model, args, query }) {
+          return query(notDeleted(model, args))
+        },
         create({ model, args, query }) {
           if (AUDITED_MODELS.has(model)) args.data = forCreate(args.data as Data) as never
           return query(args)
@@ -62,18 +119,19 @@ function createPrismaClient() {
         },
         update({ model, args, query }) {
           if (AUDITED_MODELS.has(model)) args.data = forUpdate(args.data as Data) as never
-          return query(args)
+          return query(notDeleted(model, args))
         },
         updateMany({ model, args, query }) {
           if (AUDITED_MODELS.has(model)) args.data = forUpdate(args.data as Data) as never
-          return query(args)
+          return query(notDeleted(model, args))
         },
         upsert({ model, args, query }) {
           if (AUDITED_MODELS.has(model)) {
             args.create = forCreate(args.create as Data) as never
             args.update = forUpdate(args.update as Data) as never
           }
-          return query(args)
+          // 지운 줄은 찾지 않는다 → 없으면 새로 만든다 (부분 고유 조건과도 맞다)
+          return query(notDeleted(model, args))
         },
       },
     },

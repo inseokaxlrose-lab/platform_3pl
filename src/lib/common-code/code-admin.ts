@@ -1,9 +1,10 @@
 import 'server-only'
+import { assertAllFound, assertNoCodeConflict } from '@/lib/soft-delete'
 import type { z } from 'zod'
 import { ActionError } from '@/lib/actions/action-error'
 import { prisma } from '@/lib/prisma'
 import { assertRowVersion, withVersionGuard } from '@/lib/row-version'
-import { withStatus } from '@/lib/status'
+import { DELETED_ONLY, NOT_DELETED, withStatus } from '@/lib/status'
 import { isYes } from '@/lib/yn'
 import type {
   codeGroupCreateSchema,
@@ -52,7 +53,11 @@ export async function updateCodeGroup({ id, rowVersion, ...data }: GroupUpdate) 
 export async function deleteCodeGroup(id: bigint) {
   const group = await prisma.codeGroup.findUnique({
     where: { id },
-    select: { code: true, isSystem: true, _count: { select: { items: true } } },
+    select: {
+      code: true,
+      isSystem: true,
+      _count: { select: { items: { where: NOT_DELETED } } },
+    },
   })
   if (!group) throw new ActionError('NOT_FOUND', '코드 그룹을 찾을 수 없습니다.')
   if (isYes(group.isSystem)) {
@@ -64,7 +69,8 @@ export async function deleteCodeGroup(id: bigint) {
       `코드가 ${group._count.items}개 있는 그룹은 지울 수 없습니다. 코드를 먼저 지우거나 사용 중지하세요.`,
     )
   }
-  await prisma.codeGroup.delete({ where: { id } })
+  // 논리 삭제 (되살릴 수 있다)
+  await prisma.codeGroup.update({ where: { id }, data: DELETED_ONLY })
 }
 
 export async function createCodeItem(data: ItemCreate) {
@@ -106,6 +112,48 @@ export async function deleteCodeItem(id: bigint) {
         `'${item.code}'는 ${used.toLocaleString()}건에서 쓰고 있어 지울 수 없습니다. 사용 중지하세요.`,
       )
     }
-    await tx.codeItem.delete({ where: { id } })
+    // 논리 삭제 (되살릴 수 있다)
+    await tx.codeItem.update({ where: { id }, data: DELETED_ONLY })
   })
+}
+
+// 되살리기: 지운 코드 그룹 (같은 그룹 코드가 이미 다시 생겼으면 거부)
+export async function restoreCodeGroup(id: bigint) {
+  const group = await prisma.codeGroup.findUnique({
+    where: { id, ...DELETED_ONLY },
+    select: { code: true },
+  })
+  assertAllFound(group ? 1 : 0, 1, '코드 그룹')
+  const taken = await prisma.codeGroup.findMany({
+    where: { code: group!.code },
+    select: { code: true },
+  })
+  assertNoCodeConflict(
+    taken.map((t) => t.code),
+    '그룹 코드',
+  )
+  await prisma.codeGroup.update({ where: { id, ...DELETED_ONLY }, data: NOT_DELETED })
+  return { id }
+}
+
+// 되살리기: 지운 코드 (그룹이 살아 있어야 하고, 같은 코드가 이미 다시 생겼으면 거부)
+export async function restoreCodeItem(id: bigint) {
+  const item = await prisma.codeItem.findUnique({
+    where: { id, ...DELETED_ONLY },
+    select: { groupId: true, code: true, group: { select: { delYn: true } } },
+  })
+  assertAllFound(item ? 1 : 0, 1, '코드')
+  if (isYes(item!.group.delYn)) {
+    throw new ActionError('CONFLICT', '지운 그룹의 코드입니다. 그룹을 먼저 되살려 주세요.')
+  }
+  const taken = await prisma.codeItem.findMany({
+    where: { groupId: item!.groupId, code: item!.code },
+    select: { code: true },
+  })
+  assertNoCodeConflict(
+    taken.map((t) => t.code),
+    '코드',
+  )
+  await prisma.codeItem.update({ where: { id, ...DELETED_ONLY }, data: NOT_DELETED })
+  return { id }
 }

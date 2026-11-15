@@ -1,9 +1,10 @@
 import 'server-only'
+import { assertAllFound, assertNoCodeConflict } from '@/lib/soft-delete'
 import { ActionError } from '@/lib/actions/action-error'
 import { DEFAULT_LOCATION_CODE } from '@/lib/centers/center-defaults'
 import { prisma } from '@/lib/prisma'
 import { expandLocationRange, type GeneratedLocation, type LocationRange } from './location-range'
-import { isActiveStatus, toStatus } from '@/lib/status'
+import { DELETED_ONLY, isActiveStatus, NOT_DELETED, toStatus } from '@/lib/status'
 
 // 로케이션 저장 (docs/decisions/0028). 권한·데이터 범위 검사는 서버 액션에서 한다
 // - 코드는 등록 후 바꿀 수 없다 (재고·적치 기록이 이 주소를 가리킨다)
@@ -126,7 +127,32 @@ export async function deleteLocations(locations: (LocationWithWarehouse & { id: 
   }
   const [, result] = await prisma.$transaction([
     prisma.externalCode.deleteMany({ where: { entityType: 'LOCATION', entityId: { in: ids } } }),
-    prisma.location.deleteMany({ where: { id: { in: ids } } }),
+    // 논리 삭제 (되살릴 수 있다). 외부 코드는 지운다
+    prisma.location.updateMany({ where: { id: { in: ids } }, data: DELETED_ONLY }),
   ])
   return { deleted: result.count }
+}
+
+// 되살리기: 지운 로케이션을 다시 목록에 (같은 창고에 같은 코드가 이미 다시 생겼으면 거부)
+export async function restoreLocations(ids: bigint[]) {
+  return prisma.$transaction(async (tx) => {
+    const rows = await tx.location.findMany({
+      where: { id: { in: ids }, ...DELETED_ONLY },
+      select: { id: true, warehouseId: true, code: true },
+    })
+    assertAllFound(rows.length, ids.length, '로케이션')
+    const taken = await tx.location.findMany({
+      where: { OR: rows.map((r) => ({ warehouseId: r.warehouseId, code: r.code })) },
+      select: { code: true },
+    })
+    assertNoCodeConflict(
+      taken.map((t) => t.code),
+      '로케이션 코드',
+    )
+    const { count } = await tx.location.updateMany({
+      where: { id: { in: ids }, ...DELETED_ONLY },
+      data: NOT_DELETED,
+    })
+    return { count }
+  })
 }

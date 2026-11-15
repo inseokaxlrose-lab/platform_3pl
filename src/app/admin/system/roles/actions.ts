@@ -6,7 +6,10 @@ import { createAction } from '@/lib/actions/create-action'
 import { listQuerySchema, toPrismaQuery } from '@/lib/grid/grid-query'
 import { normalizeGroupCodes, toPermissionArea } from '@/lib/permissions/normalize-group-codes'
 import { ROLE_AREAS, roleSchema, updateRoleSchema } from '@/lib/permissions/role-schema'
+import { deletedWhere } from '@/lib/grid/list-filters'
 import { prisma } from '@/lib/prisma'
+import { assertAllFound, assertNoCodeConflict } from '@/lib/soft-delete'
+import { DELETED_ONLY, NOT_DELETED } from '@/lib/status'
 import { assertRowVersion, withVersionGuard } from '@/lib/row-version'
 import { idSchema } from '@/lib/id'
 
@@ -31,7 +34,8 @@ export const listPermissionGroupsAction = createAction({
     const area = (ROLE_AREAS as readonly string[]).includes(input.filters.area ?? '')
       ? (input.filters.area as (typeof ROLE_AREAS)[number])
       : undefined
-    const where = { AND: [query.where, area ? { area } : {}] }
+    // '삭제됨'을 고르면 지운 것만 (아니면 prisma.ts가 지운 것을 뺀다)
+    const where = { AND: [query.where, area ? { area } : {}, deletedWhere(input.filters)] }
     const [rows, rowCount] = await prisma.$transaction([
       prisma.permissionGroup.findMany({
         ...query,
@@ -132,7 +136,34 @@ export const deletePermissionGroupAction = createAction({
         `사용자 ${group._count.users}명이 이 권한그룹을 사용 중입니다. 먼저 사용자에게서 그룹을 빼 주세요.`,
       )
     }
-    await prisma.permissionGroup.delete({ where: { id: input.id } })
+    // 논리 삭제 (되살릴 수 있다). 권한 목록은 되살릴 때를 위해 남긴다
+    await prisma.permissionGroup.update({ where: { id: input.id }, data: DELETED_ONLY })
+    return { id: input.id }
+  },
+})
+
+// 되살리기: 지운 권한그룹 (삭제 권한). 같은 이름으로 다시 만든 그룹이 있으면 거부
+export const restorePermissionGroupAction = createAction({
+  permission: 'system.roles.delete',
+  input: z.object({ id: idSchema }),
+  handler: async ({ input }) => {
+    const group = await prisma.permissionGroup.findUnique({
+      where: { id: input.id, ...DELETED_ONLY },
+      select: { name: true },
+    })
+    assertAllFound(group ? 1 : 0, 1, '권한그룹')
+    const taken = await prisma.permissionGroup.findMany({
+      where: { name: group!.name },
+      select: { name: true },
+    })
+    assertNoCodeConflict(
+      taken.map((t) => t.name),
+      '이름',
+    )
+    await prisma.permissionGroup.update({
+      where: { id: input.id, ...DELETED_ONLY },
+      data: NOT_DELETED,
+    })
     return { id: input.id }
   },
 })

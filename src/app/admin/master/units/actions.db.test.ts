@@ -11,6 +11,7 @@ import {
   createUnitAction,
   deleteUnitsAction,
   listUnitsAction,
+  restoreUnitsAction,
   setUnitsActiveAction,
   updateUnitAction,
 } from './actions'
@@ -154,6 +155,71 @@ describe('목록 · 일괄 처리 · 권한', () => {
   it('권한이 없으면 거부', async () => {
     signIn(['master.units.read'])
     expect(await createUnitAction(input())).toMatchObject({
+      ok: false,
+      error: { code: 'FORBIDDEN' },
+    })
+  })
+})
+
+describe('논리 삭제 · 되살리기 (0038)', () => {
+  const codesOf = async (status?: string) => {
+    const result = await listUnitsAction({
+      ...createDataGridState({ pageSize: 50 }),
+      filters: status ? { status } : {},
+    })
+    return result.ok ? result.data.rows.map((r) => r.code) : result.error
+  }
+
+  it('지우면 목록에서 빠지고 "삭제됨"에서만 보이며, 같은 코드를 새로 만들 수 있다', async () => {
+    const created = await createUnitAction(input({ code: 'KG' }))
+    const id = created.ok ? created.data.id : ''
+    expect(await deleteUnitsAction({ ids: [id] })).toMatchObject({ ok: true, data: { count: 1 } })
+
+    expect(await codesOf()).toEqual([])
+    expect(await codesOf('DELETED')).toEqual(['KG'])
+    // DB에는 남아 있다 (del_yn 'Y')
+    expect(await prisma.unit.count({ where: { delYn: 'Y' } })).toBe(1)
+    // 지운 코드는 다시 쓸 수 있다
+    expect(await createUnitAction(input({ code: 'KG', name: '새 킬로그램' }))).toMatchObject({
+      ok: true,
+    })
+  })
+
+  it('되살리기: 같은 코드가 다시 쓰이고 있으면 거부, 비어 있으면 지우기 전 상태로 돌아온다', async () => {
+    const first = await createUnitAction(input({ code: 'KG', isActive: false }))
+    const oldId = first.ok ? first.data.id : ''
+    await deleteUnitsAction({ ids: [oldId] })
+    const second = await createUnitAction(input({ code: 'KG' }))
+    const newId = second.ok ? second.data.id : ''
+
+    expect(await restoreUnitsAction({ ids: [oldId] })).toMatchObject({
+      ok: false,
+      error: { code: 'CONFLICT', message: expect.stringContaining('KG') },
+    })
+    // 새로 만든 것을 지우면 옛 것을 되살릴 수 있다
+    await deleteUnitsAction({ ids: [newId] })
+    expect(await restoreUnitsAction({ ids: [oldId] })).toMatchObject({
+      ok: true,
+      data: { count: 1 },
+    })
+    expect(await prisma.unit.findUniqueOrThrow({ where: { id: BigInt(oldId) } })).toMatchObject({
+      code: 'KG',
+      status: 'INACTIVE',
+      delYn: 'N',
+    })
+    // 지우지 않은 것·없는 것은 되살릴 수 없다
+    expect(await restoreUnitsAction({ ids: [oldId] })).toMatchObject({
+      ok: false,
+      error: { code: 'NOT_FOUND' },
+    })
+  })
+
+  it('되살리기는 삭제 권한이 있어야 한다', async () => {
+    const created = await createUnitAction(input({ code: 'KG' }))
+    const id = created.ok ? created.data.id : ''
+    await deleteUnitsAction({ ids: [id] })
+    signIn(CODES.filter((c) => c !== 'master.units.delete'))
+    expect(await restoreUnitsAction({ ids: [id] })).toMatchObject({
       ok: false,
       error: { code: 'FORBIDDEN' },
     })

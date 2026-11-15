@@ -4,13 +4,19 @@ import { z } from 'zod'
 import { createAction } from '@/lib/actions/create-action'
 import { listQuerySchema, toPrismaQuery } from '@/lib/grid/grid-query'
 import { getExternalCodes } from '@/lib/master-code/external-codes'
-import { statusWhere } from '@/lib/grid/list-filters'
+import { deletedWhere, statusWhere } from '@/lib/grid/list-filters'
 import { prisma } from '@/lib/prisma'
 import { withIsActive } from '@/lib/status'
 import { isYes } from '@/lib/yn'
 import { UNIT_KINDS } from '@/lib/units/unit-labels'
 import { unitCreateSchema, unitUpdateSchema } from '@/lib/units/unit-schema'
-import { createUnit, deleteUnits, setUnitsActive, updateUnit } from '@/lib/units/units'
+import {
+  createUnit,
+  deleteUnits,
+  restoreUnits,
+  setUnitsActive,
+  updateUnit,
+} from '@/lib/units/units'
 import { idSchema } from '@/lib/id'
 
 // 단위 관리 서버 액션 (docs/decisions/0034)
@@ -39,7 +45,8 @@ export const listUnitsAction = createAction({
       ? (filters.kind as (typeof UNIT_KINDS)[number])
       : undefined
     const where = {
-      AND: [query.where, kind ? { kind } : {}, statusWhere(filters)],
+      // '삭제됨'을 고르면 지운 것만 (아니면 prisma.ts가 지운 것을 뺀다)
+      AND: [query.where, kind ? { kind } : {}, statusWhere(filters), deletedWhere(filters)],
     }
     const [rows, rowCount] = await prisma.$transaction([
       prisma.unit.findMany({
@@ -100,4 +107,11 @@ export const deleteUnitsAction = createAction({
   permission: 'master.units.delete',
   input: z.object({ ids: idsSchema }),
   handler: ({ input }) => deleteUnits(input.ids),
+})
+
+// 되살리기: 지운 단위 (삭제 권한). 같은 코드가 다시 생겼으면 거부
+export const restoreUnitsAction = createAction({
+  permission: 'master.units.delete',
+  input: z.object({ ids: idsSchema }),
+  handler: ({ input }) => restoreUnits([...new Set(input.ids)]),
 })

@@ -4,11 +4,23 @@ import { PlayIcon, PlusIcon, PowerIcon, Trash2Icon } from 'lucide-react'
 import { useState } from 'react'
 import { ACTIVE_STATUS, ConfirmDialog } from '@/components/common'
 import type { DataGridColumn } from '@/components/data-grid'
-import { MasterListPage, useListQuery, type SearchFieldDef } from '@/components/master-list'
+import {
+  DELETED_STATUS_OPTION,
+  isDeletedView,
+  MasterListPage,
+  RestoreButton,
+  type SearchFieldDef,
+  useListQuery,
+} from '@/components/master-list'
 import { Button } from '@/components/ui/button'
 import { unwrap } from '@/lib/actions'
 import { UNIT_KIND_LABELS, UNIT_KIND_STATUS, UNIT_KINDS } from '@/lib/units/unit-labels'
-import { deleteUnitsAction, listUnitsAction, setUnitsActiveAction } from './actions'
+import {
+  deleteUnitsAction,
+  listUnitsAction,
+  restoreUnitsAction,
+  setUnitsActiveAction,
+} from './actions'
 import { UnitDialog, type UnitRow } from './unit-dialog'
 
 const SEARCH_FIELDS: SearchFieldDef[] = [
@@ -26,6 +38,8 @@ const SEARCH_FIELDS: SearchFieldDef[] = [
     options: [
       { value: 'ACTIVE', label: '사용' },
       { value: 'INACTIVE', label: '사용 중지' },
+      // 지운 단위 보기 → [되살리기]
+      DELETED_STATUS_OPTION,
     ],
   },
 ]
@@ -116,7 +130,7 @@ export function UnitsList({ can }: { can: { create: boolean; update: boolean; de
         title={`단위 ${ids.length}개를 ${label}할까요?`}
         description={
           kind === 'delete'
-            ? '품목에서 쓰지 않는 단위만 지워집니다. 시스템 단위(EA·BOX·PLT)는 지울 수 없습니다. 되돌릴 수 없습니다.'
+            ? '품목에서 쓰지 않는 단위만 지워집니다. 시스템 단위(EA·BOX·PLT)는 지울 수 없습니다. 상태 거르기의 "삭제됨"에서 되살릴 수 있습니다.'
             : kind === 'deactivate'
               ? '새로 고르는 목록에서 빠집니다. 시스템 단위는 사용 중지할 수 없습니다.'
               : undefined
@@ -151,17 +165,30 @@ export function UnitsList({ can }: { can: { create: boolean; update: boolean; de
         list={list}
         columns={COLUMNS}
         getRowId={(row) => row.id}
-        onRowClick={(row) => setEditing(row)}
+        // "삭제됨" 보기에서는 수정 팝업을 열지 않는다
+        onRowClick={isDeletedView(list.values) ? undefined : (row) => setEditing(row)}
         bulkActions={
-          can.update || can.delete
-            ? ({ ids, done }) => (
-                <>
-                  {can.update && bulk(ids, done, 'deactivate')}
-                  {can.update && bulk(ids, done, 'activate')}
-                  {can.delete && bulk(ids, done, 'delete')}
-                </>
-              )
-            : undefined
+          // "삭제됨" 보기에서는 [되살리기]만 (삭제 권한)
+          isDeletedView(list.values)
+            ? can.delete
+              ? ({ ids, done }) => (
+                  <RestoreButton
+                    ids={ids}
+                    noun="단위"
+                    restore={(restoreIds) => restoreUnitsAction({ ids: restoreIds })}
+                    done={done}
+                  />
+                )
+              : undefined
+            : can.update || can.delete
+              ? ({ ids, done }) => (
+                  <>
+                    {can.update && bulk(ids, done, 'deactivate')}
+                    {can.update && bulk(ids, done, 'activate')}
+                    {can.delete && bulk(ids, done, 'delete')}
+                  </>
+                )
+              : undefined
         }
         emptyTitle="등록된 단위가 없습니다"
       />

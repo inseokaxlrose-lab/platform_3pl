@@ -122,7 +122,7 @@ describe('권한그룹 서버 액션', () => {
     expect(await prisma.permissionGroup.count()).toBe(1)
   })
 
-  it('삭제: 사용자가 없으면 삭제되고 권한 코드도 함께 지워진다', async () => {
+  it('삭제: 사용자가 없으면 논리 삭제되고, 같은 이름으로 다시 만들 수 있다', async () => {
     const group = await prisma.permissionGroup.create({
       data: {
         name: '임시',
@@ -134,7 +134,13 @@ describe('권한그룹 서버 액션', () => {
       ok: true,
       data: { id: String(group.id) },
     })
-    expect(await prisma.permissionGroupPermission.count()).toBe(0)
+    // 보통 조회에서는 안 보이고, 권한 목록은 되살릴 때를 위해 남는다
+    expect(await prisma.permissionGroup.count()).toBe(0)
+    expect(await prisma.permissionGroupPermission.count()).toBe(1)
+    // 지운 이름은 다시 쓸 수 있다 (부분 고유 조건)
+    await expect(
+      prisma.permissionGroup.create({ data: { name: '임시', area: 'ADMIN' } }),
+    ).resolves.toMatchObject({ name: '임시' })
   })
 
   it('목록: 검색·정렬·페이지와 권한 수·사용자 수', async () => {

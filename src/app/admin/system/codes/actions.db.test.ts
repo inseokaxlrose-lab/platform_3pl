@@ -13,6 +13,8 @@ import {
   deleteCodeItemAction,
   listCodeGroupsAction,
   listCodeItemsAction,
+  restoreCodeGroupAction,
+  restoreCodeItemAction,
   updateCodeGroupAction,
   updateCodeItemAction,
 } from './actions'
@@ -227,5 +229,23 @@ describe('공통코드 읽기·검사', () => {
     await expect(
       assertCodeValues(prisma, 'DUTY', ['OFF'], { label: '담당 업무', keep: ['OFF'] }),
     ).resolves.toBeUndefined()
+  })
+})
+
+describe('되살리기 (0038)', () => {
+  it('지운 코드는 그룹이 살아 있어야 되살릴 수 있고, 지운 그룹 코드는 다시 쓸 수 있다', async () => {
+    const g = await createGroup({ code: 'temp_group' })
+    const item = await createItem(BigInt(g.id), 'A')
+    expect(await deleteCodeItemAction({ id: item.id })).toMatchObject({ ok: true })
+    // 코드를 지웠으므로 (지운 코드는 세지 않아) 그룹도 지울 수 있다
+    expect(await deleteCodeGroupAction({ id: g.id })).toMatchObject({ ok: true })
+
+    expect(await restoreCodeItemAction({ id: item.id })).toMatchObject({
+      ok: false,
+      error: { code: 'CONFLICT', message: expect.stringContaining('그룹을 먼저') },
+    })
+    expect(await restoreCodeGroupAction({ id: g.id })).toMatchObject({ ok: true })
+    expect(await restoreCodeItemAction({ id: item.id })).toMatchObject({ ok: true })
+    expect((await loadCodeOptions()).TEMP_GROUP?.map((i) => i.code)).toEqual(['A'])
   })
 })

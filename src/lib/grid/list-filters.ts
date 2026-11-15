@@ -42,6 +42,11 @@ export function statusWhere(filters: Filters): { status?: Status } {
   return value === STATUS.ACTIVE || value === STATUS.INACTIVE ? { status: value } : {}
 }
 
+// 논리 삭제 보기: 상태 거르기에서 '삭제됨'(DELETED)을 고르면 지운 것만, 아니면 조건 없음(자동으로 지운 것 제외)
+export function deletedWhere(filters: Filters): { delYn?: 'Y' } {
+  return filters.status === 'DELETED' ? { delYn: 'Y' } : {}
+}
+
 // 예/아니오 칸(_yn, DB에 'Y'/'N'): 'Y'·'N'만 조건으로, 그 밖 → 조건 없음
 export function ynFilter(filters: Filters, key: string): Yn | undefined {
   const value = filters[key]

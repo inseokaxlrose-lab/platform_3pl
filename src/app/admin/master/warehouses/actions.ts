@@ -12,7 +12,7 @@ import { createWarehouseSchema, updateWarehouseSchema } from '@/lib/warehouses/w
 import { createWarehouse, setWarehouseActive, updateWarehouse } from '@/lib/warehouses/warehouses'
 import { rowVersionField } from '@/lib/row-version'
 import { idSchema } from '@/lib/id'
-import { isActiveStatus, toStatus, withIsActive } from '@/lib/status'
+import { NOT_DELETED, isActiveStatus, toStatus, withIsActive } from '@/lib/status'
 
 // 창고 관리 서버 액션 (docs/decisions/0027)
 // 데이터 범위: 센터 직원은 소속 센터의 창고만 보고 다룬다 (창고 추가도 자기 센터 안에서만)
@@ -87,7 +87,7 @@ export const listWarehousesAction = createAction({
           createdAt: true,
           updatedAt: true,
           center: { select: { code: true, name: true } },
-          _count: { select: { locations: true } },
+          _count: { select: { locations: { where: NOT_DELETED } } },
         },
       }),
       prisma.warehouse.count({ where }),

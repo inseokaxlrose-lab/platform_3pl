@@ -3,7 +3,7 @@ import type { CenterInput } from '@/lib/centers/center-schema'
 import { getExternalCodes } from '@/lib/master-code/external-codes'
 import { textIds } from '@/lib/id'
 import { prisma } from '@/lib/prisma'
-import { isActiveStatus, withIsActive } from '@/lib/status'
+import { NOT_DELETED, isActiveStatus, withIsActive } from '@/lib/status'
 import { isInScope, type DataScope } from '@/lib/scope/data-scope'
 
 // 수정 화면용 센터 한 건 (데이터 범위 밖이면 null → 화면은 "찾을 수 없음")
@@ -12,7 +12,9 @@ export async function getCenterForEdit(id: bigint, scope: DataScope) {
   const center = await prisma.center.findUnique({
     where: { id },
     include: {
+      // 관계 목록·개수는 지운 줄을 직접 뺀다 (NOT_DELETED)
       warehouses: {
+        where: NOT_DELETED,
         select: {
           id: true,
           systemCode: true,
@@ -21,11 +23,12 @@ export async function getCenterForEdit(id: bigint, scope: DataScope) {
           type: true,
           storageCondition: true,
           status: true,
-          _count: { select: { locations: true } },
+          _count: { select: { locations: { where: NOT_DELETED } } },
         },
         orderBy: [{ type: 'desc' }, { code: 'asc' }],
       },
       deliveryZones: {
+        where: NOT_DELETED,
         select: {
           id: true,
           code: true,
