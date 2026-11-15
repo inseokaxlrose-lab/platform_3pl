@@ -2,6 +2,7 @@
 // 사용 예시: /dev/components, 가이드: docs/ui-guidelines.md
 export { AddressInput, type AddressValue } from './address-input'
 export { CodeSelect } from './code-select'
+export { CodeMultiSelect, MultiSelect, type MultiSelectOption } from './multi-select'
 export { DateInput, DateRangeInput, type DateRange } from './date-input'
 export { EmailInput } from './email-input'
 export { BizNoInput, CorpRegNoInput, PhoneInput } from './number-mask-inputs'
