@@ -1,5 +1,5 @@
 import 'server-only'
-import { isPermissionCode } from '@/config/permissions'
+import { ALL_PERMISSION_CODES, isPermissionCode } from '@/config/permissions'
 import { prisma } from '@/lib/prisma'
 
 // 수정 화면용: 권한그룹 한 건 (화면에서 hasPermission으로 확인한 뒤 호출)
@@ -17,7 +17,12 @@ export async function getPermissionGroup(id: string) {
   })
   if (!group) return null
 
-  const codes = group.permissions.map((p) => p.permissionCode)
+  // DB는 순서를 보장하지 않으므로 권한 정의 순서(메뉴 → 동작)로 맞춘다 (모르는 옛 코드는 뒤로)
+  const order = (code: string) => {
+    const index = (ALL_PERMISSION_CODES as readonly string[]).indexOf(code)
+    return index === -1 ? Number.MAX_SAFE_INTEGER : index
+  }
+  const codes = group.permissions.map((p) => p.permissionCode).sort((a, b) => order(a) - order(b))
   return {
     id: group.id,
     name: group.name,
