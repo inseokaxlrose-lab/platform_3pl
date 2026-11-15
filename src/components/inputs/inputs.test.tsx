@@ -6,6 +6,8 @@ import { codeName, selectableCodes } from '@/lib/common-code'
 import { CodeSelect } from './code-select'
 import { BizNoInput, PhoneInput } from './number-mask-inputs'
 import { NumberInput } from './number-input'
+import { QtyInput } from './qty-input'
+import { SearchSelect } from './search-select'
 
 // 상태를 들고 있는 감싸기: 바깥으로 나간 값을 화면에 적어 둔다
 function Harness<T>({
@@ -117,5 +119,53 @@ describe('공통코드 고르기', () => {
       </CommonCodeProvider>,
     )
     expect(screen.getByRole('combobox').textContent).toContain('옛 업무')
+  })
+})
+
+describe('수량 입력 (QtyInput)', () => {
+  it('값은 글자, 소수 자리 넘는 입력은 무시, 떠나면 쉼표', () => {
+    render(
+      <Harness
+        initial=""
+        render={(v, set) => <QtyInput aria-label="수량" value={v} onChange={set} decimals={1} />}
+      />,
+    )
+    const input = screen.getByLabelText('수량') as HTMLInputElement
+    fireEvent.focus(input)
+    fireEvent.change(input, { target: { value: '1234.5' } })
+    expect(output()).toBe('1234.5')
+    fireEvent.change(input, { target: { value: '1234.55' } })
+    expect(output()).toBe('1234.5')
+    fireEvent.change(input, { target: { value: '-1' } })
+    expect(output()).toBe('1234.5')
+    fireEvent.blur(input)
+    expect(input.value).toBe('1,234.5')
+  })
+})
+
+describe('검색 선택 (SearchSelect)', () => {
+  it('검색어로 좁히고 눌러서 고른다 (keywords도 검색)', () => {
+    render(
+      <Harness
+        initial=""
+        render={(v, set) => (
+          <SearchSelect
+            id="pick"
+            value={v}
+            onChange={set}
+            options={[
+              { value: '1', label: 'WATER 생수', keywords: '8801' },
+              { value: '2', label: 'MILK 우유' },
+            ]}
+          />
+        )}
+      />,
+    )
+    fireEvent.click(screen.getByRole('combobox'))
+    fireEvent.change(screen.getByLabelText('검색'), { target: { value: '8801' } })
+    expect(screen.queryByText('MILK 우유')).toBeNull()
+    fireEvent.click(screen.getByText('WATER 생수'))
+    expect(output()).toBe('1')
+    expect(screen.getByRole('combobox').textContent).toContain('WATER 생수')
   })
 })

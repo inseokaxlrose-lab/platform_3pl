@@ -12,6 +12,8 @@ import {
   DateRangeInput,
   EmailInput,
   NumberInput,
+  QtyInput,
+  SearchSelect,
   PhoneInput,
   YnToggle,
 } from '@/components/inputs'
@@ -77,6 +79,8 @@ function InputSamples() {
   const [address, setAddress] = useState({ zipCode: '', address: '', addressDetail: '' })
   const [duty, setDuty] = useState('OLD')
   const [weight, setWeight] = useState<number | null>(1234.5)
+  const [qty, setQty] = useState('1440')
+  const [picked, setPicked] = useState('')
   const [date, setDate] = useState('')
   const [range, setRange] = useState({ from: '', to: '' })
   const [yn, setYn] = useState(true)
@@ -116,6 +120,31 @@ function InputSamples() {
           min={0}
           max={10000}
           unit="kg"
+        />
+      </Sample>
+      <Sample
+        title="QtyInput"
+        note="수량은 글자 그대로 (Number 금지), 소수 3자리, 단위 KG"
+        value={qty}
+      >
+        <QtyInput aria-label="수량" value={qty} onChange={setQty} decimals={3} unit="KG" />
+      </Sample>
+      <Sample title="SearchSelect" note="선택지가 많을 때 검색해서 하나 (품목 등)" value={picked}>
+        <SearchSelect
+          options={[
+            {
+              value: '1',
+              label: 'WATER · 생수 500ml',
+              description: 'EA · BOX 24',
+              keywords: '8801',
+            },
+            { value: '2', label: 'MILK · 우유 1L', description: 'EA · 로트·유통기한' },
+            { value: '3', label: 'RICE · 쌀 10kg', description: 'KG' },
+          ]}
+          value={picked}
+          onChange={setPicked}
+          placeholder="품목 선택"
+          searchPlaceholder="품목코드·이름·바코드"
         />
       </Sample>
       <Sample title="DateInput" note="span 3~4 · 'YYYY-MM-DD'" value={date}>
