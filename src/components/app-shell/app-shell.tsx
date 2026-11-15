@@ -12,17 +12,19 @@ import { loadHelpAction } from '@/lib/help/help-actions'
 import { listHelpMenuHrefs } from '@/lib/help/load-help'
 import { setFavoriteMenuAction } from '@/lib/navigation/favorite-actions'
 import { getCurrentScope, type CurrentUser } from '@/lib/session'
+import { ActingOperatorBanner } from './acting-operator-banner'
 import { AppHeader } from './app-header'
 import { AppSidebar } from './app-sidebar'
 import { parseSidebarTab, SIDEBAR_TAB_COOKIE } from './sidebar-tab'
 
-// 운영사 화면 · 화주 포털 공통 뼈대: 사이드바 + 상단 바 + 본문
+// 운영사 화면 · 화주 포털 · 플랫폼 공통 뼈대: 사이드바 + 상단 바 + 본문
 export async function AppShell({
   area,
   user,
   permissions,
   gridSettings,
   favoriteMenus,
+  actingOperator,
   children,
 }: {
   area: NavAreaKey
@@ -34,6 +36,8 @@ export async function AppShell({
   gridSettings: Record<string, GridSettings>
   // 사이드바 즐겨찾기 메뉴 주소 (추가한 순서, 0022)
   favoriteMenus: string[]
+  // 플랫폼 관리자가 운영사로 전환해 작업 중이면 그 운영사 (화면 위에 띠를 보여 준다, 0039)
+  actingOperator?: { name: string } | null
   children: React.ReactNode
 }) {
   // 사이드바 접힘 상태는 쿠키에 저장된다 → 다음 접속 때도 같은 상태로 그린다
@@ -59,6 +63,7 @@ export async function AppShell({
               />
               <SidebarInset>
                 <AppHeader area={area} user={user} />
+                {actingOperator && <ActingOperatorBanner name={actingOperator.name} />}
                 <div className="flex-1 p-page">{children}</div>
               </SidebarInset>
             </SidebarProvider>

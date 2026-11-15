@@ -3,6 +3,7 @@
 // - 역할별 권한그룹 4개: 실행할 때마다 prisma/seed-roles.ts 정의와 똑같이 맞춘다
 // - 예시 센터·화주사 (코드 기준으로 없을 때만 만든다) + 센터마다 입고대기 창고·기본 로케이션
 // - 슈퍼 계정: .env의 SEED_ADMIN_USERNAME / SEED_ADMIN_PASSWORD (비밀번호는 코드에 두지 않는다)
+// - 플랫폼 관리자: .env의 SEED_PLATFORM_USERNAME / SEED_PLATFORM_PASSWORD (비어 있으면 건너뛴다, 0039)
 // - 역할별 견본 계정 4개: .env의 SEED_SAMPLE_PASSWORD (비어 있거나 운영 환경이면 건너뛴다)
 // 이미 있는 계정은 비밀번호·소속을 덮어쓰지 않는다 (화면에서 바꾼 값을 지키기 위해)
 import 'dotenv/config'
@@ -84,6 +85,35 @@ async function seedSuperAdmin(operatorId: bigint, groupId: bigint) {
 
   await prisma.user.update({ where: { id: user.id }, data: { status: 'ACTIVE' } })
   await linkGroup(user.id, groupId)
+}
+
+// 플랫폼 관리자: 운영사에 속하지 않고 권한그룹도 없다 (플랫폼 권한은 유형으로 정해진다, 0039)
+// 없을 때만 만든다 (비밀번호는 덮어쓰지 않는다)
+async function seedPlatformAdmin() {
+  const username = (process.env.SEED_PLATFORM_USERNAME ?? 'platform').toLowerCase()
+  const password = process.env.SEED_PLATFORM_PASSWORD
+  if (!password) {
+    console.log('플랫폼 관리자: SEED_PLATFORM_PASSWORD가 비어 있어 건너뜀 (.env.example 참고)')
+    return
+  }
+  const user = await findUserByUsername(username)
+  if (user) {
+    if (user.userType !== 'PLATFORM') {
+      throw new Error(
+        `'${username}' 계정이 플랫폼 관리자 유형이 아니라 플랫폼 관리자로 쓸 수 없습니다.`,
+      )
+    }
+    console.log(`플랫폼 관리자 이미 있음: ${username} (비밀번호는 그대로)`)
+    return
+  }
+  await createUserAccount({
+    operatorId: null,
+    username,
+    password,
+    name: '플랫폼 관리자',
+    userType: 'PLATFORM',
+  })
+  console.log(`플랫폼 관리자 생성: ${username}`)
 }
 
 // 역할별 견본 계정: 없을 때만 만든다
@@ -253,6 +283,8 @@ async function main() {
     await seedSuperAdmin(operatorId, groupIds.get(SUPER_GROUP_NAME)!)
     await seedSampleAccounts(operatorId, groupIds)
   })
+  // 플랫폼 관리자는 운영사 밖 (출입증 없이)
+  await runAsActor('seed', seedPlatformAdmin)
 }
 
 // 시드가 만든 데이터의 등록·수정자는 'seed'

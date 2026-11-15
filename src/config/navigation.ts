@@ -51,7 +51,7 @@ export type NavArea = {
   groups: NavGroup[]
 }
 
-export type NavAreaKey = 'admin' | 'portal'
+export type NavAreaKey = 'admin' | 'portal' | 'platform'
 
 const adminNavigation: NavArea = {
   title: '운영사 화면',
@@ -290,7 +290,31 @@ const portalNavigation: NavArea = {
   ],
 }
 
+// 플랫폼 화면: 플랫폼 관리자가 운영사를 관리하고, 운영사를 골라 그 운영사로 작업한다 (0039)
+const platformNavigation: NavArea = {
+  title: '플랫폼',
+  homeHref: '/platform',
+  groups: [
+    {
+      items: [{ title: '홈', href: '/platform', icon: HouseIcon, ready: true, exact: true }],
+    },
+    {
+      label: '운영사',
+      items: [
+        {
+          title: '운영사',
+          href: '/platform/operators',
+          icon: BuildingIcon,
+          ready: true,
+          permission: 'platform.operators.read',
+        },
+      ],
+    },
+  ],
+}
+
 export const navigation: Record<NavAreaKey, NavArea> = {
   admin: adminNavigation,
   portal: portalNavigation,
+  platform: platformNavigation,
 }
