@@ -1,6 +1,7 @@
 import 'server-only'
 import { z } from 'zod'
 import type { PermissionCode } from '@/config/permissions'
+import { runAsActor } from '@/lib/actor'
 import { textIds, type WithTextIds } from '@/lib/id'
 import type { DataScope } from '@/lib/scope/data-scope'
 import {
@@ -69,7 +70,10 @@ export function createAction<TSchema extends z.ZodType, TData>({
 
     try {
       const scope = await getCurrentScope()
-      const data = await handler({ user, input: parsed.data, permissions, scope })
+      // 처리 안의 DB 쓰기는 이 사용자가 한 것으로 기록된다 (등록·수정자 칸, 아이디는 소문자로 저장된 값)
+      const data = await runAsActor(user.username.toLowerCase(), () =>
+        handler({ user, input: parsed.data, permissions, scope }),
+      )
       // 결과는 화면으로 가므로 안의 키(bigint)를 모두 글자로 바꾼다 (docs/db-conventions.md)
       return { ok: true, data: textIds(data) }
     } catch (error) {

@@ -1,10 +1,7 @@
 import 'server-only'
-import type { Prisma } from '@/generated/prisma/client'
 import { ActionError } from '@/lib/actions/action-error'
-import { prisma } from '@/lib/prisma'
+import { prisma, type Db } from '@/lib/prisma'
 import type { CodeOptions } from './code-options'
-
-type Db = Prisma.TransactionClient
 
 // 공통코드 읽기·검사 (docs/decisions/0030)
 

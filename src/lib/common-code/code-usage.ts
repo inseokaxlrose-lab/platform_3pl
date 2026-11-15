@@ -1,7 +1,5 @@
 import 'server-only'
-import type { Prisma } from '@/generated/prisma/client'
-
-type Db = Prisma.TransactionClient
+import type { Db } from '@/lib/prisma'
 
 // 공통코드가 어느 업무 표에서 쓰이는지 (docs/decisions/0030)
 // 그룹 코드 → "이 코드를 쓰는 행 수"를 세는 함수. 공통코드를 쓰는 칸을 새로 만들면 여기에 등록한다
