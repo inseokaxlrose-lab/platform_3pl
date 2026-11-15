@@ -5,7 +5,7 @@
 > 끝난 작업은 `[x]`로 바꿉니다.
 > 데이터 구조는 `docs/decisions/0003-domain-model.md`를 따릅니다.
 
-## 현재 위치: M2.5 진행 중 — 다음: 2단계 기준정보 공통 칸 (M3 화주사 품목은 M2.5 뒤에)
+## 현재 위치: M2.5 진행 중 — 다음: 2b status_cd (M3 화주사 품목은 M2.5 뒤에)
 
 ---
 
@@ -80,7 +80,10 @@
 - [x] 1a. DB 이름 바꾸기 — 표 `tb_` + snake_case, 칸 접미사(`_id`·`_cd`·`_nm`·`_no`·`_yn`·`_dt`·`_at`), 코드 이름은 그대로(Prisma `@map`), 데이터 보존(RENAME) (`docs/db-conventions.md`, 0037)
 - [x] 1b. 내부 키 BIGINT 자동 증가 — 기존 데이터는 등록 순서대로 번호를 다시 매겨 보존, Better Auth `serial`, 서버는 bigint · 화면은 글자 (`src/lib/id.ts`)
 - [x] 1c. 예/아니오 칸(`_yn`) CHAR(1) `'Y'`/`'N'` + 검사 조건, 화면은 true/false 그대로·DB 경계에서 `toYn`/`isYes` (`is_active`는 2단계 `status_cd`로)
-- [ ] 2. 기준정보 공통 칸 — `status_cd`(isActive 대체)·`del_yn` 논리 삭제·등록/수정 일시·사람·`row_version` 낙관적 락 (0038)
+- [ ] 2. 기준정보 공통 칸 (0038)
+  - [x] 2a. 등록·수정한 사람(`created_by`/`updated_by`, 자동 기록) + 동시 수정 막기(`row_version`, 수정 화면·팝업 전부)
+  - [ ] 2b. `status_cd`(사용/중지)가 `isActive` 대체
+  - [ ] 2c. `del_yn` 논리 삭제 + 코드 재사용(부분 고유 인덱스) + 목록 "삭제됨" 보기·[되살리기]
 - [ ] 3. 멀티테넌트 — 운영사(`tb_operator`) 여러 곳, 업무 표에 `operator_id`, 플랫폼 관리자(`/platform`), 운영사 등록 때 공통코드·단위·권한그룹 기본값 복사, 아이디 전체 고유 (0039)
 - [ ] 4. 운영사 정의서 반영 — 1차 칸 DB·API·화면 / 2차 칸 DB·API 기본값, 운영사 목록(플랫폼), 상태 변경 팝업(사유 필수), 공통코드·enum 등록, 담당 업무 → `CONTACT_ROLE`
 - [ ] 5. 문서 정리 (도메인 모델·PRD·가이드)

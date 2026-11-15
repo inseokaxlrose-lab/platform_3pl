@@ -49,6 +49,12 @@
 | `updated_at` / `updated_by` | TIMESTAMP / VARCHAR(50) | 수정 일시·수정자 아이디 |
 | `row_version` | INT | 낙관적 락: 저장 때 같으면 +1, 다르면 "다른 사람이 먼저 고쳤습니다" |
 
+- 대상(11개 표): 사용자·권한그룹·센터·창고·로케이션·화주사·운영사·공통코드 그룹·공통코드·배송권역·단위. 부모와 통째로 바뀌는 하위 표(담당자·담당 지역·이용 센터·소속 등)는 부모 이력으로 본다. 사용자는 계정을 지우지 않으므로 `del_yn` 없음.
+- **등록·수정자 자동 기록 (2a 적용)**: 화면·기능 코드에서 넣지 않는다. `createAction`이 로그인 사용자 아이디로 `runAsActor`를 감싸고(`src/lib/actor.ts`), `prisma.ts`의 확장이 등록·수정 때 `created_by`/`updated_by`를 채우고 수정 때마다 `row_version +1` 한다. 시드는 `seed`, 감싸지 않은 곳은 `system`.
+  - 주의: 안쪽 관계로 함께 만드는 줄(nested create)은 확장이 채우지 못한다 → 공통 칸이 있는 표는 바깥에서 직접 만든다.
+  - 화면 표시: `actorLabel(아이디)` → '이름 (아이디)' / '시스템'.
+- **동시 수정 막기 (2a 적용)**: 수정 화면·팝업은 불러올 때의 `rowVersion`을 들고 있다가 저장 때 보낸다(`useMasterForm`의 `version`, 결과의 새 버전으로 자동 갱신). 서버는 `assertRowVersion` + 수정 조건에 버전(`where: { id, rowVersion }`) + `withVersionGuard`(`src/lib/row-version.ts`). 사용 중지·일괄 처리는 검사 없이 버전만 올린다.
+
 ## 표·칸 대응표 (1단계 — 지금 25개 표, 197개 칸)
 
 > 운영사 관련(`tb_operator` 등)은 4단계에서 정의서대로 칸이 더 늘어난다. 2단계(공통 칸)·3단계(`operator_id`) 칸은 여기 없다.
