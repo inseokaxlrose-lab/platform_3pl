@@ -141,7 +141,12 @@ describe('최종 권한 계산', () => {
         groupCodes: ['system.users.read', 'portal.items.read'],
         grants: ['master.centers.read'],
       }),
-    ).toEqual(['platform.operators.create', 'platform.operators.read', 'platform.operators.switch'])
+    ).toEqual([
+      'platform.operators.create',
+      'platform.operators.read',
+      'platform.operators.switch',
+      'platform.operators.update',
+    ])
     expect(codesOf({ userType: 'PLATFORM', isActive: false })).toEqual([])
   })
 

@@ -78,7 +78,7 @@ beforeEach(async () => {
   await resetDatabase()
   icnId = (await createTestCenter('ICN')).id
   gmhId = (await createTestCenter('GMH')).id
-  await createTestCodeGroup('CONTACT_DUTY', [{ code: 'INBOUND' }, { code: 'SETTLEMENT' }])
+  await createTestCodeGroup('CONTACT_ROLE', [{ code: 'INBOUND' }, { code: 'SETTLEMENT' }])
   signIn()
 })
 
@@ -104,7 +104,7 @@ describe('화주사 등록·수정', () => {
     // 담당 업무 코드가 쓰이고 있으면 공통코드에서 지울 수 없다
     // (사용 수는 운영사마다 센다 → 테스트 운영사 출입증 안에서)
     const usage = await runInContext({ actor: 'system', operatorId: TEST_OPERATOR_ID }, () =>
-      countCodeUsage(prisma, 'CONTACT_DUTY', 'INBOUND'),
+      countCodeUsage(prisma, 'CONTACT_ROLE', 'INBOUND'),
     )
     expect(usage).toBe(1)
   })

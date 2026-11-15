@@ -89,7 +89,10 @@ describe('플랫폼 관리자', () => {
 
   it('정지된 운영사로도 전환할 수 있다 (플랫폼이 대신 확인), 없는 운영사·이상한 값은 무시', async () => {
     await loginAs('platform')
-    await prisma.operator.update({ where: { id: otherOperatorId }, data: { status: 'SUSPENDED' } })
+    await prisma.operator.update({
+      where: { id: otherOperatorId },
+      data: { status: 'SUSPENDED', statusReason: '테스트' },
+    })
     cookieJar.set(ACTING_OPERATOR_COOKIE, String(otherOperatorId))
     expect(await getActingOperator()).not.toBeNull()
 
@@ -112,7 +115,10 @@ describe('운영사 사용자', () => {
   it('운영사가 정지되면 이미 로그인해 있어도 로그인 안 된 것으로 본다', async () => {
     await loginAs('boss')
     expect(await getCurrentUser()).not.toBeNull()
-    await prisma.operator.update({ where: { id: TEST_OPERATOR_ID }, data: { status: 'SUSPENDED' } })
+    await prisma.operator.update({
+      where: { id: TEST_OPERATOR_ID },
+      data: { status: 'SUSPENDED', statusReason: '테스트' },
+    })
     expect(await getCurrentUser()).toBeNull()
     expect(await getCurrentScope()).toEqual({ kind: 'NONE' })
     await expect(requireUser('admin')).rejects.toThrow('redirect:/login')

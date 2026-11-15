@@ -6,9 +6,15 @@ import { prisma } from '@/lib/prisma'
 import type { UserTypeValue } from '@/lib/redirect'
 import { auth } from '@/lib/auth'
 import { getCurrentPermissions, getCurrentScope, getCurrentUser } from '@/lib/session'
-import { createTestUser } from '@/test/factories'
+import { createTestCodeGroup, createTestUser } from '@/test/factories'
 import { createTestOperator, resetDatabase, TEST_OPERATOR_ID } from '@/test/reset-database'
-import { createOperatorAction, listOperatorsAction, switchOperatorAction } from './actions'
+import {
+  changeOperatorStatusAction,
+  createOperatorAction,
+  listOperatorsAction,
+  switchOperatorAction,
+  updateOperatorAction,
+} from './actions'
 
 // 플랫폼 · 운영사 목록과 운영사 전환 (docs/decisions/0039)
 
@@ -31,6 +37,7 @@ vi.mock('next/headers', () => ({
 const PLATFORM_CODES: PermissionCode[] = [
   'platform.operators.read',
   'platform.operators.create',
+  'platform.operators.update',
   'platform.operators.switch',
 ]
 
@@ -49,8 +56,11 @@ let otherId = 0n
 beforeEach(async () => {
   await resetDatabase()
   cookieJar.clear()
-  otherId = (await createTestOperator('B물류')).id
-  await prisma.operator.update({ where: { id: otherId }, data: { status: 'SUSPENDED' } })
+  otherId = (await createTestOperator('B물류', 'BMUL')).id
+  await prisma.operator.update({
+    where: { id: otherId },
+    data: { status: 'SUSPENDED', statusReason: '테스트 정지' },
+  })
   await createTestUser('boss', { userType: 'OPERATOR' })
   signIn('PLATFORM', PLATFORM_CODES)
 })
@@ -62,9 +72,11 @@ afterAll(async () => {
 describe('운영사 목록', () => {
   it('모든 운영사를 최신 등록순으로, 사용자 수와 함께 · 상태로 거르기', async () => {
     const all = await listOperatorsAction(createDataGridState())
-    expect(all.ok && all.data.rows.map((r) => [r.name, r.status, r.userCount])).toEqual([
-      ['B물류', 'SUSPENDED', 0],
-      ['테스트운영사', 'ACTIVE', 1],
+    expect(
+      all.ok && all.data.rows.map((r) => [r.code, r.name, r.status, r.userCount, r.centerCount]),
+    ).toEqual([
+      ['BMUL', 'B물류', 'SUSPENDED', 0, 0],
+      ['TEST', '테스트운영사', 'ACTIVE', 1, 0],
     ])
     const suspended = await listOperatorsAction({
       ...createDataGridState(),
@@ -120,7 +132,8 @@ describe('운영사 등록 (3c)', () => {
       name: '나라물류(주)',
       businessNumber: '312-81-12349',
       ceoName: '김나라',
-      adminSuffix: 'Nara',
+      code: 'Nara',
+      type: '3PL',
       ...overrides,
     })
 
@@ -135,7 +148,7 @@ describe('운영사 등록 (3c)', () => {
     const result = await register()
     expect(result).toMatchObject({
       ok: true,
-      data: { name: '나라물류(주)', adminUsername: 'admin.nara' },
+      data: { code: 'NARA', name: '나라물류(주)', adminUsername: 'admin.nara' },
     })
     const id = BigInt(result.ok ? result.data.id : 0)
     expect(await prisma.operator.findUniqueOrThrow({ where: { id } })).toMatchObject({
@@ -167,21 +180,30 @@ describe('운영사 등록 (3c)', () => {
     expect(await prisma.unit.count({ where: { operatorId: id } })).toBeGreaterThan(0)
   })
 
-  it('관리자 아이디가 이미 있으면 거부하고 아무것도 만들지 않는다', async () => {
+  it('운영사코드·관리자 아이디가 이미 있으면 거부하고 아무것도 만들지 않는다', async () => {
     expect((await register()).ok).toBe(true)
     expect(await register({ name: '다른물류' })).toMatchObject({
       ok: false,
-      error: { code: 'CONFLICT', message: expect.stringContaining('admin.nara') },
+      error: { code: 'CONFLICT', message: expect.stringContaining('운영사코드') },
+    })
+    // 운영사코드는 다르지만 관리자 아이디(admin.{코드})가 이미 쓰이는 경우
+    await prisma.user.update({
+      where: { username: 'admin.nara' },
+      data: { username: 'admin.lime' },
+    })
+    expect(await register({ name: '다른물류', code: 'LIME' })).toMatchObject({
+      ok: false,
+      error: { code: 'CONFLICT', message: expect.stringContaining('admin.lime') },
     })
     expect(await prisma.operator.count({ where: { name: '다른물류' } })).toBe(0)
   })
 
   it('입력 규칙: 사업자번호 검증번호, 아이디 뒷자리 모양', async () => {
-    expect(await register({ businessNumber: '1234567890', adminSuffix: 'a b' })).toMatchObject({
+    expect(await register({ businessNumber: '1234567890', code: 'a b' })).toMatchObject({
       ok: false,
       error: {
         code: 'VALIDATION',
-        fieldErrors: { businessNumber: [expect.any(String)], adminSuffix: [expect.any(String)] },
+        fieldErrors: { businessNumber: [expect.any(String)], code: [expect.any(String)] },
       },
     })
   })
@@ -196,5 +218,91 @@ describe('운영사 등록 (3c)', () => {
     signIn('OPERATOR', PLATFORM_CODES)
     expect(await register()).toMatchObject({ ok: false, error: { code: 'FORBIDDEN' } })
     expect(await prisma.operator.count()).toBe(2)
+  })
+})
+
+describe('운영사 수정 · 상태 변경 (0040)', () => {
+  const versionOfOperator = async (id: bigint) =>
+    (await prisma.operator.findUniqueOrThrow({ where: { id } })).rowVersion
+  const edit = async (id: bigint, overrides: Record<string, unknown> = {}) =>
+    updateOperatorAction({
+      id: String(id),
+      rowVersion: await versionOfOperator(id),
+      name: 'B물류(주)',
+      nameEn: '',
+      shortName: '',
+      type: 'FULFILLMENT',
+      businessNumber: '312-81-12349',
+      bizEntity: 'CORP',
+      corpRegNo: '',
+      subBizNo: '',
+      taxType: 'SIMPLE',
+      ceoName: '',
+      businessType: '',
+      businessItem: '',
+      establishedOn: '',
+      phone: '',
+      fax: '',
+      email: '',
+      zipCode: '',
+      address: '',
+      addressDetail: '',
+      addressJibun: '',
+      remark: '',
+      contacts: [],
+      ...overrides,
+    })
+
+  it('플랫폼은 유형까지 고친다 (운영사코드는 그대로), 기록은 플랫폼 관리자', async () => {
+    expect(await edit(otherId)).toMatchObject({ ok: true })
+    expect(await prisma.operator.findUniqueOrThrow({ where: { id: otherId } })).toMatchObject({
+      code: 'BMUL',
+      name: 'B물류(주)',
+      type: 'FULFILLMENT',
+      taxType: 'SIMPLE',
+      updatedBy: 'platform',
+    })
+  })
+
+  it('담당 업무는 그 운영사의 공통코드로 검사한다 (다른 운영사의 코드는 안 된다)', async () => {
+    await createTestCodeGroup('CONTACT_ROLE', [{ code: 'INBOUND' }])
+    const contact = { duty: 'INBOUND', name: '김', phone: '', email: 'a@b.co', isPrimary: true }
+    // B물류에는 CONTACT_ROLE이 없다 → 테스트운영사의 INBOUND로는 저장할 수 없다
+    expect(await edit(otherId, { contacts: [contact] })).toMatchObject({
+      ok: false,
+      error: { code: 'VALIDATION', message: expect.stringContaining('INBOUND') },
+    })
+    expect(await edit(TEST_OPERATOR_ID, { contacts: [contact] })).toMatchObject({ ok: true })
+  })
+
+  it('상태 변경: 정지·해지는 사유 필수, 운영으로 되돌리면 사유를 비운다', async () => {
+    const change = async (status: string, reason = '') =>
+      changeOperatorStatusAction({
+        id: String(TEST_OPERATOR_ID),
+        rowVersion: await versionOfOperator(TEST_OPERATOR_ID),
+        status,
+        reason,
+      })
+    expect(await change('SUSPENDED')).toMatchObject({
+      ok: false,
+      error: { code: 'VALIDATION', fieldErrors: { reason: [expect.any(String)] } },
+    })
+    expect(await change('SUSPENDED', '연체')).toMatchObject({ ok: true })
+    expect(
+      await prisma.operator.findUniqueOrThrow({ where: { id: TEST_OPERATOR_ID } }),
+    ).toMatchObject({ status: 'SUSPENDED', statusReason: '연체' })
+    expect(await change('SUSPENDED', '또')).toMatchObject({
+      ok: false,
+      error: { message: '지금과 같은 상태입니다.' },
+    })
+    expect(await change('ACTIVE')).toMatchObject({ ok: true })
+    expect(
+      await prisma.operator.findUniqueOrThrow({ where: { id: TEST_OPERATOR_ID } }),
+    ).toMatchObject({ status: 'ACTIVE', statusReason: null })
+  })
+
+  it('플랫폼 관리자가 아니면 수정·상태 변경할 수 없다', async () => {
+    signIn('OPERATOR', PLATFORM_CODES)
+    expect(await edit(otherId)).toMatchObject({ ok: false, error: { code: 'FORBIDDEN' } })
   })
 })

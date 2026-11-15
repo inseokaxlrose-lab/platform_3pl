@@ -28,7 +28,17 @@ function signIn(codes: PermissionCode[]) {
 
 const input = (overrides: Partial<OperatorInput> = {}): OperatorInput => ({
   name: '예시물류(주)',
+  nameEn: 'Example Logistics',
+  shortName: '예시',
+  type: '3PL',
   businessNumber: '1234567891',
+  bizEntity: 'CORP',
+  corpRegNo: '110111-1111113',
+  subBizNo: '',
+  taxType: 'GENERAL',
+  establishedOn: '2020-03-02',
+  addressJibun: '서울 강남구 역삼동 1',
+  remark: '',
   ceoName: '홍대표',
   businessType: '서비스',
   businessItem: '물류대행',
@@ -65,13 +75,13 @@ const myOperator = () => getOperator(TEST_OPERATOR_ID)
 beforeEach(async () => {
   await resetDatabase()
   adminId = (await createTestUser('boss', { userType: 'OPERATOR' })).id
-  await createTestCodeGroup('CONTACT_DUTY', [
+  await createTestCodeGroup('CONTACT_ROLE', [
     { code: 'INBOUND' },
     { code: 'OUTBOUND' },
     { code: 'SETTLEMENT' },
     { code: 'OLD', isActive: false },
   ])
-  signIn(['master.company.read', 'master.company.update'])
+  signIn(['master.operator.read', 'master.operator.update'])
 })
 
 afterAll(async () => {
@@ -116,6 +126,22 @@ describe('운영사 정보 저장', () => {
     expect(company?.name).toBe('새이름물류')
     expect(company?.contacts.map((c) => c.name)).toEqual(['박출고'])
     expect(await prisma.operatorContact.count()).toBe(1)
+  })
+
+  it('1차 칸을 함께 저장한다 (법인등록번호·설립일·지번주소) · 유형은 바꿀 수 없다 (0040)', async () => {
+    expect(await save(input({ type: 'MIXED' }))).toMatchObject({ ok: true })
+    expect(await myOperator()).toMatchObject({
+      nameEn: 'Example Logistics',
+      shortName: '예시',
+      corpRegNo: '1101111111113',
+      establishedOn: new Date('2020-03-02T00:00:00Z'),
+      addressJibun: '서울 강남구 역삼동 1',
+      // 유형은 플랫폼만 정한다 (보내도 버려진다)
+      type: '3PL',
+    })
+    // 개인 사업자로 바꾸면 법인등록번호는 비운다
+    await save(input({ bizEntity: 'INDIVIDUAL' }))
+    expect((await myOperator())?.corpRegNo).toBeNull()
   })
 
   it('다른 운영사의 정보는 건드리지 않는다 (0039)', async () => {
@@ -176,7 +202,7 @@ describe('운영사 정보 저장', () => {
   })
 
   it('수정 권한이 없으면 거부한다 (조회 권한만으로는 안 됨)', async () => {
-    signIn(['master.company.read'])
+    signIn(['master.operator.read'])
     expect(await save(input())).toMatchObject({
       ok: false,
       error: { code: 'FORBIDDEN' },

@@ -112,7 +112,11 @@ describe('계정 만들기 + 로그인 (Better Auth)', () => {
       userType: 'OPERATOR',
     })
     for (const status of ['SUSPENDED', 'PENDING', 'TERMINATED']) {
-      await prisma.operator.update({ where: { id: TEST_OPERATOR_ID }, data: { status } })
+      // 정지·해지는 사유가 필요하다 (DB 검사 조건, 0040)
+      await prisma.operator.update({
+        where: { id: TEST_OPERATOR_ID },
+        data: { status, statusReason: '테스트' },
+      })
       await expect(signIn('op.user')).rejects.toMatchObject({ message: OPERATOR_DISABLED })
     }
     expect(await prisma.session.count()).toBe(0)
