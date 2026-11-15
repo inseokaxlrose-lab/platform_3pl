@@ -198,11 +198,16 @@ export async function setItemsActive(ids: bigint[], isActive: boolean) {
   return { count }
 }
 
-// 쓰인 적 있는 품목 id (재고·이력·ASN이 있음)
-// TODO(재고·입고 작업, ROADMAP M4·M5): 재고·ASN 표가 생기면 여기서 검사한다. 지금은 쓰일 곳이 없어 빈 목록
+// 쓰인 적 있는 품목 id (재고 줄이 있음 = 재고 이력이 있음, docs/decisions/0045)
+// TODO(입고 작업, ROADMAP M5): ASN 표가 생기면 ASN에 쓰인 품목도 더한다
 export async function findUsedItemIds(ids: bigint[]): Promise<bigint[]> {
-  void ids
-  return []
+  if (ids.length === 0) return []
+  const rows = await prisma.stock.findMany({
+    where: { itemId: { in: ids } },
+    distinct: ['itemId'],
+    select: { itemId: true },
+  })
+  return rows.map((r) => r.itemId)
 }
 
 // 지우기: 쓰인 적 없는 품목만, 논리 삭제 (되살릴 수 있다). 외부 코드는 지운다
