@@ -107,6 +107,7 @@ type VersionedModel =
   | 'permissionGroup'
   | 'user'
   | 'operator'
+  | 'item'
 
 export async function versionOf(model: VersionedModel, id: bigint | string): Promise<number> {
   const delegate = prisma[model] as unknown as {

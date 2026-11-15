@@ -88,11 +88,23 @@ export async function setUnitsActive(ids: bigint[], isActive: boolean) {
   return { count }
 }
 
-// 품목에서 쓰는 단위 id
-// TODO(품목 작업, ROADMAP M3 화주사 품목 관리): 품목·환산단위 표가 생기면 여기서 검사한다. 지금은 빈 목록
+// 품목에서 쓰는 단위 id: 지우지 않은 품목의 기본단위이거나 환산단위인 것 (0041)
+// (품목을 지워도 재고 기록이 생기면 그 품목의 단위는 계속 필요하다 → TODO(재고 작업, ROADMAP M4): 재고 표가 생기면 함께 검사)
 export async function findUsedUnitIds(ids: bigint[]): Promise<bigint[]> {
-  void ids
-  return []
+  if (ids.length === 0) return []
+  const [asBase, asPack] = await Promise.all([
+    prisma.item.findMany({
+      where: { baseUnitId: { in: ids } },
+      select: { baseUnitId: true },
+      distinct: ['baseUnitId'],
+    }),
+    prisma.itemUnit.findMany({
+      where: { unitId: { in: ids }, item: NOT_DELETED },
+      select: { unitId: true },
+      distinct: ['unitId'],
+    }),
+  ])
+  return [...new Set([...asBase.map((r) => r.baseUnitId), ...asPack.map((r) => r.unitId)])]
 }
 
 export async function deleteUnits(ids: bigint[]) {

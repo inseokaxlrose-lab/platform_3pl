@@ -379,6 +379,7 @@ model Shipper {
   users    User[]
   centers  ShipperCenter[]
   contacts ShipperContact[]
+  items    Item[]
 
   // 논리 삭제: 'Y'면 지운 것 (목록·조회에서 빠지고 되살릴 수 있다, 0038)
   delYn String @default("N") @map("del_yn") @db.Char(1)
@@ -576,6 +577,7 @@ model Operator {
   codeItems        CodeItem[]
   deliveryZones    DeliveryZone[]
   units            Unit[]
+  items            Item[]
 
   // 논리 삭제: 'Y'면 지운 것 (목록·조회에서 빠지고 되살릴 수 있다, 0038)
   delYn String @default("N") @map("del_yn") @db.Char(1)
@@ -802,10 +804,83 @@ model Unit {
   updatedBy  String   @default("system") @map("updated_by") @db.VarChar(50)
   rowVersion Int      @default(1) @map("row_version")
 
+  // 이 단위를 쓰는 품목 (기본단위 / 환산단위) — 쓰이고 있으면 지울 수 없다
+  baseItems Item[]     @relation("ItemBaseUnit")
+  packItems ItemUnit[] @relation("ItemPackUnit")
+
   // 논리 삭제: 'Y'면 지운 것 (목록·조회에서 빠지고 되살릴 수 있다, 0038)
   delYn String @default("N") @map("del_yn") @db.Char(1)
 
   // 코드는 삭제 안 된 것끼리만 겹치면 안 된다 (지운 코드는 다시 쓸 수 있다, 0038)
   @@unique([operatorId, code], where: raw("del_yn = 'N'"), map: "tb_unit_operator_id_unit_cd_key")
   @@map("tb_unit")
+}
+
+// ── 품목 (docs/decisions/0041, 0003 결정 2·3·6): 화주사가 맡긴 상품의 관리 단위
+// 코드 3층 (0025): systemCode IT00000001(자동·불변) / code(품목코드, 같은 화주사 안에서 중복 금지, 비우면 시스템 코드) / 외부 코드(ExternalCode ITEM)
+// 로트·유통기한 사용·라벨 단위는 비어 있으면 "화주사 기본값 따름" (화주사 기본값을 바꾸면 함께 바뀐다, 사용자 결정)
+model Item {
+  id         BigInt   @id @default(autoincrement()) @map("item_id")
+  // 운영사 (멀티테넌트: 같은 운영사 사람만 보고 고친다, docs/decisions/0039)
+  operatorId BigInt   @map("operator_id")
+  operator   Operator @relation(fields: [operatorId], references: [id], onDelete: Restrict)
+  shipperId  BigInt   @map("shipper_id")
+  shipper    Shipper  @relation(fields: [shipperId], references: [id], onDelete: Restrict)
+  systemCode String   @unique @map("sys_cd")
+  code       String   @map("item_cd") @db.VarChar(30)
+  name       String   @map("item_nm") @db.VarChar(200)
+  // 규격 (예: 500ml × 20, 선택)
+  spec       String?  @map("spec_nm") @db.VarChar(100)
+  // 바코드 (선택, 같은 화주사 안에서 중복 금지 — 나중에 스캐너 검수용)
+  barcode    String?  @map("barcode_cd") @db.VarChar(50)
+  // 기본단위: 재고를 세는 단위 (단위 표의 기본단위만). 재고는 항상 이 단위로 저장한다
+  baseUnitId BigInt   @map("base_unit_id")
+  baseUnit   Unit     @relation("ItemBaseUnit", fields: [baseUnitId], references: [id], onDelete: Restrict)
+
+  // 관리 옵션: null = 화주사 기본값 따름, 'Y'/'N' = 이 품목만 따로
+  useLot          String?    @map("lot_mgmt_yn") @db.Char(1)
+  useExpiry       String?    @map("expiry_mgmt_yn") @db.Char(1)
+  labelUnit       LabelUnit? @map("label_unit_cd")
+  // 유통기한 임박 기준 일수 (유통기한을 쓸 때만, 유통기한까지 이 일수 이하로 남으면 "임박")
+  expiryAlertDays Int?       @map("expiry_alert_day_cnt")
+
+  remark     String?  @db.VarChar(1000)
+  status     String   @default("ACTIVE") @map("status_cd") @db.VarChar(10)
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
+  // 등록·수정한 사람 아이디(username, 자동: 현재 작업자 / 시드 seed / 기존 데이터 system), 동시 수정 막기용 버전 (docs/db-conventions.md 공통 칸)
+  createdBy  String   @default("system") @map("created_by") @db.VarChar(50)
+  updatedBy  String   @default("system") @map("updated_by") @db.VarChar(50)
+  rowVersion Int      @default(1) @map("row_version")
+
+  // 환산단위 (BOX·CARTON·PLT… + 입수량)
+  units ItemUnit[]
+
+  // 논리 삭제: 'Y'면 지운 것 (목록·조회에서 빠지고 되살릴 수 있다, 0038)
+  delYn String @default("N") @map("del_yn") @db.Char(1)
+
+  // 품목코드·바코드는 같은 화주사의 삭제 안 된 것끼리만 겹치면 안 된다 (0038)
+  @@unique([shipperId, code], where: raw("del_yn = 'N'"), map: "tb_item_shipper_id_item_cd_key")
+  @@unique([shipperId, barcode], where: raw("del_yn = 'N' AND barcode_cd IS NOT NULL"), map: "tb_item_shipper_id_barcode_cd_key")
+  @@index([operatorId])
+  @@index([baseUnitId])
+  @@map("tb_item")
+}
+
+// 품목 환산단위: 기본단위를 묶은 단위와 입수량 (예: 생수 BOX = 24 EA, PLT = 1,440 EA)
+// 입수량은 기본단위 기준이고, 소수 자리는 기본단위의 소수 자리수까지 (KG면 2.5 가능). 품목의 이력으로 본다 (0038)
+model ItemUnit {
+  id        BigInt  @id @default(autoincrement()) @map("item_unit_id")
+  itemId    BigInt  @map("item_id")
+  item      Item    @relation(fields: [itemId], references: [id], onDelete: Cascade)
+  // 환산단위 (단위 표의 환산단위만)
+  unitId    BigInt  @map("unit_id")
+  unit      Unit    @relation("ItemPackUnit", fields: [unitId], references: [id], onDelete: Restrict)
+  // 입수량: 이 단위 1개에 든 기본단위 수
+  convQty   Decimal @map("conv_cnt") @db.Decimal(18, 3)
+  sortOrder Int     @default(0) @map("sort_seq")
+
+  @@unique([itemId, unitId])
+  @@index([unitId])
+  @@map("tb_item_unit")
 }
