@@ -10,7 +10,7 @@ import { commitAsnUpload, previewAsnUpload } from '@/lib/inbound/asn-upload'
 import { uploadRowsSchema } from '@/lib/excel/upload'
 import { getAsnItemOptions } from '@/lib/inbound/asn-queries'
 import { asnCreateSchema, asnSchema } from '@/lib/inbound/asn-schema'
-import { assertAsnsInScope, createAsn, deleteAsns, updateAsn } from '@/lib/inbound/asns'
+import { assertAsnsInScope, closeAsn, createAsn, deleteAsns, updateAsn } from '@/lib/inbound/asns'
 import { SHIPPER_SCOPE } from '@/lib/items/item-list'
 import { prisma } from '@/lib/prisma'
 import { rowVersionField } from '@/lib/row-version'
@@ -79,4 +79,14 @@ export const commitAsnUploadAction = createAction({
   permission: 'inbound.asn.create',
   input: uploadRowsSchema,
   handler: async ({ input, scope }) => commitAsnUpload(input, scope),
+})
+
+// 잔량 마감 (0052): 사유 필수, 권한 inbound.asn.close
+export const closeAsnAction = createAction({
+  permission: 'inbound.asn.close',
+  input: z.object({ id: idSchema, rowVersion: rowVersionField, reason: z.string().max(200) }),
+  handler: async ({ input, scope }) => {
+    await assertAsnsInScope([input.id], scope)
+    return closeAsn(input.id, input.rowVersion, input.reason)
+  },
 })

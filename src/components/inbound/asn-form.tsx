@@ -1,6 +1,6 @@
 'use client'
 
-import { Trash2Icon } from 'lucide-react'
+import { BanIcon, Trash2Icon } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { useEffect, useMemo, useState } from 'react'
 import { ConfirmDialog, StatusBadge } from '@/components/common'
@@ -77,6 +77,8 @@ export function AsnForm({
   updateAction,
   deleteAction,
   canDelete = false,
+  closeAction,
+  canClose = false,
 }: {
   header: MasterFormHeader
   options: AsnFormOptions
@@ -97,6 +99,13 @@ export function AsnForm({
   ) => Promise<ActionResult<SaveResult>>
   deleteAction?: (input: { ids: string[] }) => Promise<ActionResult<unknown>>
   canDelete?: boolean
+  // 잔량 마감 (운영사 화면만)
+  closeAction?: (input: {
+    id: string
+    rowVersion: number
+    reason: string
+  }) => Promise<ActionResult<unknown>>
+  canClose?: boolean
 }) {
   const router = useRouter()
   const editable = !asn || asn.status === 'PLANNED'
@@ -454,6 +463,31 @@ export function AsnForm({
             <span className="w-full text-muted-foreground">
               마감 사유: {asn.closeReason} ({asn.closedBy})
             </span>
+          )}
+          {canClose && closeAction && ['PLANNED', 'INSPECTING', 'PARTIAL'].includes(asn.status) && (
+            <ConfirmDialog
+              trigger={
+                <Button type="button" variant="outline" size="sm">
+                  <BanIcon />
+                  잔량 마감
+                </Button>
+              }
+              title="남은 수량을 마감할까요?"
+              description="더 도착하지 않을 잔량을 마감합니다. 마감하면 더 검수·확정할 수 없고, 이미 확정된 재고의 적치는 계속할 수 있습니다."
+              confirmLabel="잔량 마감"
+              destructive
+              reason={{ label: '마감 사유', placeholder: '예: 화주사 요청으로 잔량 취소' }}
+              onConfirm={async (reason) => {
+                unwrap(
+                  await closeAction({
+                    id: asn.id,
+                    rowVersion: asn.rowVersion,
+                    reason: reason ?? '',
+                  }),
+                )
+                router.refresh()
+              }}
+            />
           )}
           {editable && canDelete && deleteAction && (
             <ConfirmDialog

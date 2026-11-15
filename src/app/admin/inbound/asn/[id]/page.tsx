@@ -7,6 +7,7 @@ import { parseId } from '@/lib/id'
 import { getAsnForEdit, getAsnFormOptions, getAsnItemOptions } from '@/lib/inbound/asn-queries'
 import { getCurrentScope, hasPermission } from '@/lib/session'
 import {
+  closeAsnAction,
   createAsnAction,
   deleteAsnsAction,
   listAsnItemOptionsAction,
@@ -23,11 +24,12 @@ export default async function AsnPage({ params }: PageProps<'/admin/inbound/asn/
   const scope = await getCurrentScope()
   const asn = await getAsnForEdit(id, scope)
   if (!asn) notFound()
-  const [options, items, canUpdate, canDelete] = await Promise.all([
+  const [options, items, canUpdate, canDelete, canClose] = await Promise.all([
     getAsnFormOptions(scope),
     getAsnItemOptions(BigInt(asn.shipperId), scope),
     hasPermission('inbound.asn.update'),
     hasPermission('inbound.asn.delete'),
+    hasPermission('inbound.asn.close'),
   ])
 
   return (
@@ -47,6 +49,8 @@ export default async function AsnPage({ params }: PageProps<'/admin/inbound/asn/
       updateAction={updateAsnAction}
       deleteAction={deleteAsnsAction}
       canDelete={canDelete}
+      closeAction={closeAsnAction}
+      canClose={canClose}
     />
   )
 }
