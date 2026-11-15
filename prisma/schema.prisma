@@ -27,22 +27,22 @@ enum UserType {
 }
 
 model User {
-  id              String   @id
-  name            String
+  id              String   @id @map("user_id")
+  name            String   @map("user_nm")
   // 아이디 로그인을 쓰므로 이메일이 없는 사용자는 내부용 주소를 자동으로 채운다 (사용자 관리 작업에서)
   email           String
-  emailVerified   Boolean  @default(false)
+  emailVerified   Boolean  @default(false) @map("email_verified")
   image           String?
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
   // 로그인 아이디 (username 플러그인)
   username        String?
-  displayUsername String?
-  userType        UserType
+  displayUsername String?  @map("display_username")
+  userType        UserType @map("user_type_cd")
   // false면 로그인·사용 불가 (퇴사자 등). 기록 보존을 위해 계정을 지우지 않고 막는다
-  isActive        Boolean  @default(true)
-  // 화주사 사용자의 소속 화주사 (화주사 사용자만, DB 검사 조건으로 강제: user_shipper_matches_type)
-  shipperId       String?
+  isActive        Boolean  @default(true) @map("is_active")
+  // 화주사 사용자의 소속 화주사 (화주사 사용자만, DB 검사 조건으로 강제: tb_user_shipper_matches_type)
+  shipperId       String?  @map("shipper_id")
   shipper         Shipper? @relation(fields: [shipperId], references: [id], onDelete: Restrict)
 
   sessions            Session[]
@@ -61,56 +61,56 @@ model User {
   @@unique([email])
   @@unique([username])
   @@index([shipperId])
-  @@map("user")
+  @@map("tb_user")
 }
 
 model Session {
-  id        String   @id
-  expiresAt DateTime
+  id        String   @id @map("session_id")
+  expiresAt DateTime @map("expires_at")
   token     String
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  ipAddress String?
-  userAgent String?
-  userId    String
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+  ipAddress String?  @map("ip_address")
+  userAgent String?  @map("user_agent")
+  userId    String   @map("user_id")
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([token])
   @@index([userId])
-  @@map("session")
+  @@map("tb_session")
 }
 
 // 로그인 수단: 아이디·비밀번호 로그인의 비밀번호(암호화된 값)가 여기에 저장된다
 model Account {
-  id                    String    @id
-  accountId             String
-  providerId            String
-  userId                String
+  id                    String    @id @map("acct_id")
+  accountId             String    @map("provider_account_id")
+  providerId            String    @map("provider_id")
+  userId                String    @map("user_id")
   user                  User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  accessToken           String?
-  refreshToken          String?
-  idToken               String?
-  accessTokenExpiresAt  DateTime?
-  refreshTokenExpiresAt DateTime?
+  accessToken           String?   @map("access_token")
+  refreshToken          String?   @map("refresh_token")
+  idToken               String?   @map("id_token")
+  accessTokenExpiresAt  DateTime? @map("access_token_expires_at")
+  refreshTokenExpiresAt DateTime? @map("refresh_token_expires_at")
   scope                 String?
   password              String?
-  createdAt             DateTime  @default(now())
-  updatedAt             DateTime  @updatedAt
+  createdAt             DateTime  @default(now()) @map("created_at")
+  updatedAt             DateTime  @updatedAt @map("updated_at")
 
   @@index([userId])
-  @@map("account")
+  @@map("tb_account")
 }
 
 model Verification {
-  id         String   @id
+  id         String   @id @map("verification_id")
   identifier String
   value      String
-  expiresAt  DateTime
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
+  expiresAt  DateTime @map("expires_at")
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
 
   @@index([identifier])
-  @@map("verification")
+  @@map("tb_verification")
 }
 
 // ─────────────────────────────────────────────
@@ -127,42 +127,42 @@ enum AppArea {
 
 // 권한그룹: 권한 코드 묶음 (예: "센터 운영자", "화주 담당자")
 model PermissionGroup {
-  id          String   @id @default(cuid())
-  name        String   @unique
+  id          String   @id @default(cuid()) @map("perm_group_id")
+  name        String   @unique @map("perm_group_nm")
   // 이 그룹이 다루는 영역: 그 영역의 권한만 담고, 맞는 유형의 사용자에게만 배정한다 (등록 후 변경 불가)
-  area        AppArea  @default(ADMIN)
+  area        AppArea  @default(ADMIN) @map("app_area_cd")
   description String?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
 
   permissions PermissionGroupPermission[]
   users       UserPermissionGroup[]
 
-  @@map("permission_group")
+  @@map("tb_perm_group")
 }
 
 // 권한그룹에 들어 있는 권한 코드 (그룹을 지우면 함께 지워진다)
 model PermissionGroupPermission {
-  groupId        String
-  permissionCode String
+  groupId        String          @map("group_id")
+  permissionCode String          @map("perm_cd")
   group          PermissionGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
 
   @@id([groupId, permissionCode])
-  @@map("permission_group_permission")
+  @@map("tb_perm_group_perm")
 }
 
 // 사용자 ↔ 권한그룹 (한 사용자가 여러 그룹에 속할 수 있다)
 // 사용자가 남아 있는 그룹은 지울 수 없다 (Restrict): 실수로 여러 사람의 권한이 사라지는 것을 막는다
 model UserPermissionGroup {
-  userId    String
-  groupId   String
-  createdAt DateTime        @default(now())
+  userId    String          @map("user_id")
+  groupId   String          @map("group_id")
+  createdAt DateTime        @default(now()) @map("created_at")
   user      User            @relation(fields: [userId], references: [id], onDelete: Cascade)
   group     PermissionGroup @relation(fields: [groupId], references: [id], onDelete: Restrict)
 
   @@id([userId, groupId])
   @@index([groupId])
-  @@map("user_permission_group")
+  @@map("tb_user_perm_group")
 }
 
 enum PermissionEffect {
@@ -172,14 +172,14 @@ enum PermissionEffect {
 
 // 사용자별 권한 예외: 같은 사용자·같은 코드에는 하나만 (추가와 제외가 동시에 있을 수 없다)
 model UserPermissionOverride {
-  userId         String
-  permissionCode String
-  effect         PermissionEffect
-  createdAt      DateTime         @default(now())
+  userId         String           @map("user_id")
+  permissionCode String           @map("perm_cd")
+  effect         PermissionEffect @map("effect_cd")
+  createdAt      DateTime         @default(now()) @map("created_at")
   user           User             @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@id([userId, permissionCode])
-  @@map("user_permission_override")
+  @@map("tb_user_perm_override")
 }
 
 // ─────────────────────────────────────────────
@@ -190,31 +190,31 @@ model UserPermissionOverride {
 // 센터: 운영사의 물류센터 (docs/decisions/0026)
 // 코드 3층 (0025): systemCode(자동·불변) / code(사용자 코드, 전체에서 중복 금지) / 외부 코드(ExternalCode)
 model Center {
-  id            String   @id @default(cuid())
+  id            String   @id @default(cuid()) @map("center_id")
   // 시스템 코드: CT000001 (라벨·문서·이력에 쓰는 불변 코드)
-  systemCode    String   @unique
+  systemCode    String   @unique @map("sys_cd")
   // 사용자 코드: 화면 검색·표시용 (바꿀 수 있음)
-  code          String   @unique
-  name          String
+  code          String   @unique @map("center_cd")
+  name          String   @map("center_nm")
   // 전화번호는 하이픈 없이 숫자만 (0029)
-  phone         String?
-  fax           String?
-  managerName   String?
-  managerPhone  String?
-  zipCode       String?
-  address       String?
-  addressDetail String?
+  phone         String?  @map("tel_no")
+  fax           String?  @map("fax_no")
+  managerName   String?  @map("manager_nm")
+  managerPhone  String?  @map("manager_tel_no")
+  zipCode       String?  @map("zip_cd")
+  address       String?  @map("addr1")
+  addressDetail String?  @map("addr2")
   // false면 데이터 범위에서 빠진다 (소속 직원도 이 센터 데이터를 볼 수 없음)
-  isActive      Boolean  @default(true)
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  isActive      Boolean  @default(true) @map("is_active")
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
 
   users         UserCenter[]
   warehouses    Warehouse[]
   deliveryZones DeliveryZone[]
   shippers      ShipperCenter[]
 
-  @@map("center")
+  @@map("tb_center")
 }
 
 // 창고 보관 조건 (docs/decisions/0027): 냉장 물건을 상온 창고에 적치하는 실수를 나중에 경고하는 데 쓴다
@@ -236,46 +236,46 @@ enum WarehouseType {
 
 // 창고: 센터 안의 보관 구역 (관리 화면은 "센터별 창고 관리" 작업에서)
 model Warehouse {
-  id               String           @id @default(cuid())
-  centerId         String
+  id               String           @id @default(cuid()) @map("warehouse_id")
+  centerId         String           @map("center_id")
   // 시스템 코드: WH000001
-  systemCode       String           @unique
+  systemCode       String           @unique @map("sys_cd")
   // 사용자 코드: 같은 센터 안에서 중복 금지
-  code             String
-  name             String
-  type             WarehouseType    @default(GENERAL)
-  storageCondition StorageCondition @default(AMBIENT)
-  isActive         Boolean          @default(true)
-  createdAt        DateTime         @default(now())
-  updatedAt        DateTime         @updatedAt
+  code             String           @map("warehouse_cd")
+  name             String           @map("warehouse_nm")
+  type             WarehouseType    @default(GENERAL) @map("warehouse_type_cd")
+  storageCondition StorageCondition @default(AMBIENT) @map("temp_zone_cd")
+  isActive         Boolean          @default(true) @map("is_active")
+  createdAt        DateTime         @default(now()) @map("created_at")
+  updatedAt        DateTime         @updatedAt @map("updated_at")
   center           Center           @relation(fields: [centerId], references: [id], onDelete: Restrict)
   locations        Location[]
 
-  // 센터마다 입고대기 창고 1개: 마이그레이션 SQL의 부분 고유 인덱스 warehouse_one_inbound_staging_per_center
+  // 센터마다 입고대기 창고 1개: 마이그레이션 SQL의 부분 고유 인덱스 tb_warehouse_one_inbound_per_center
   @@unique([centerId, code])
   @@index([centerId])
-  @@map("warehouse")
+  @@map("tb_warehouse")
 }
 
 // 로케이션: 창고 안의 보관 위치. 코드 자체가 위치라 시스템 코드는 없다 (0025)
 // 코드는 등록 후 바꿀 수 없다 (재고·적치 기록이 이 주소를 가리킨다, 0028)
 model Location {
-  id          String    @id @default(cuid())
-  warehouseId String
+  id          String    @id @default(cuid()) @map("location_id")
+  warehouseId String    @map("warehouse_id")
   // 같은 창고 안에서 중복 금지 (예: A-01-01, DEFAULT)
-  code        String
+  code        String    @map("location_cd")
   // 일괄 생성으로 만들면 함께 저장: 구역(A) / 열(01) / 단(02) — 구역별 거르기·정렬용 (docs/decisions/0028)
-  zone        String?
-  aisle       String?
-  level       String?
-  isActive    Boolean   @default(true)
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
+  zone        String?   @map("zone_cd")
+  aisle       String?   @map("aisle_cd")
+  level       String?   @map("level_cd")
+  isActive    Boolean   @default(true) @map("is_active")
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
   warehouse   Warehouse @relation(fields: [warehouseId], references: [id], onDelete: Restrict)
 
   @@unique([warehouseId, code])
   @@index([warehouseId, zone])
-  @@map("location")
+  @@map("tb_location")
 }
 
 // 화주사: 운영사에 물건 보관·배송을 맡기는 회사
@@ -288,149 +288,149 @@ enum LabelUnit {
 // 화주사 (docs/decisions/0035)
 // 코드 3층 (0025): systemCode SH000001(자동·불변) / code(사용자 코드, 전체에서 중복 금지) / 외부 코드(ExternalCode)
 model Shipper {
-  id             String    @id @default(cuid())
-  systemCode     String    @unique
-  code           String    @unique
-  name           String
+  id             String    @id @default(cuid()) @map("shipper_id")
+  systemCode     String    @unique @map("sys_cd")
+  code           String    @unique @map("shipper_cd")
+  name           String    @map("shipper_nm")
   // 사업자등록번호·전화번호는 하이픈 없이 숫자만 (0029)
-  businessNumber String?
-  ceoName        String?
-  businessType   String?
-  businessItem   String?
-  phone          String?
-  fax            String?
+  businessNumber String?   @map("biz_reg_no")
+  ceoName        String?   @map("ceo_nm")
+  businessType   String?   @map("biz_condition")
+  businessItem   String?   @map("biz_item")
+  phone          String?   @map("tel_no")
+  fax            String?   @map("fax_no")
   email          String?
-  zipCode        String?
-  address        String?
-  addressDetail  String?
+  zipCode        String?   @map("zip_cd")
+  address        String?   @map("addr1")
+  addressDetail  String?   @map("addr2")
   // 품목 기본값: 품목에서 그대로 쓰거나 개별 지정한다 (0003 결정 2)
-  useLot         Boolean   @default(false)
-  useExpiry      Boolean   @default(false)
-  labelUnit      LabelUnit @default(PLT)
+  useLot         Boolean   @default(false) @map("lot_mgmt_yn")
+  useExpiry      Boolean   @default(false) @map("expiry_mgmt_yn")
+  labelUnit      LabelUnit @default(PLT) @map("label_unit_cd")
   // false면 데이터 범위에서 빠진다 (소속 사용자도 데이터를 볼 수 없음)
-  isActive       Boolean   @default(true)
-  createdAt      DateTime  @default(now())
-  updatedAt      DateTime  @updatedAt
+  isActive       Boolean   @default(true) @map("is_active")
+  createdAt      DateTime  @default(now()) @map("created_at")
+  updatedAt      DateTime  @updatedAt @map("updated_at")
 
   users    User[]
   centers  ShipperCenter[]
   contacts ShipperContact[]
 
-  @@map("shipper")
+  @@map("tb_shipper")
 }
 
 // 화주사의 이용 센터 (화주사 ↔ 센터, 1개 이상) — 센터 직원은 자기 센터를 이용하는 화주사만 본다
 model ShipperCenter {
-  shipperId String
-  centerId  String
+  shipperId String  @map("shipper_id")
+  centerId  String  @map("center_id")
   shipper   Shipper @relation(fields: [shipperId], references: [id], onDelete: Cascade)
   center    Center  @relation(fields: [centerId], references: [id], onDelete: Restrict)
 
   @@id([shipperId, centerId])
   @@index([centerId])
-  @@map("shipper_center")
+  @@map("tb_shipper_center")
 }
 
 // 화주사 담당자 (운영사 담당자와 같은 모양: 최대 5명, 대표 1명, 담당 업무는 공통코드 CONTACT_DUTY)
 model ShipperContact {
-  id        String  @id @default(cuid())
-  shipperId String
-  sortOrder Int
-  duty      String
-  name      String
-  phone     String?
+  id        String  @id @default(cuid()) @map("contact_id")
+  shipperId String  @map("shipper_id")
+  sortOrder Int     @map("sort_seq")
+  duty      String  @map("role_cd")
+  name      String  @map("contact_nm")
+  phone     String? @map("tel_no")
   email     String?
-  isPrimary Boolean @default(false)
+  isPrimary Boolean @default(false) @map("primary_yn")
   shipper   Shipper @relation(fields: [shipperId], references: [id], onDelete: Cascade)
 
   @@index([shipperId, sortOrder])
-  @@map("shipper_contact")
+  @@map("tb_shipper_contact")
 }
 
 // 센터 직원 ↔ 소속 센터 (한 직원이 여러 센터를 맡을 수 있다)
 // 직원이 소속된 센터는 지울 수 없다 (Restrict)
 model UserCenter {
-  userId    String
-  centerId  String
-  createdAt DateTime @default(now())
+  userId    String   @map("user_id")
+  centerId  String   @map("center_id")
+  createdAt DateTime @default(now()) @map("created_at")
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   center    Center   @relation(fields: [centerId], references: [id], onDelete: Restrict)
 
   @@id([userId, centerId])
   @@index([centerId])
-  @@map("user_center")
+  @@map("tb_user_center")
 }
 
 // 사용자별 목록 그리드 설정: 사용자 + 그리드 이름(DataGrid id) 하나에 한 줄 (docs/decisions/0021)
 // settings 모양은 src/components/data-grid/settings.ts의 gridSettingsSchema (읽을 때 검사, 깨지면 기본값)
 model UserGridSetting {
-  userId    String
-  gridId    String
+  userId    String   @map("user_id")
+  gridId    String   @map("grid_cd")
   settings  Json
-  updatedAt DateTime @updatedAt
+  updatedAt DateTime @updatedAt @map("updated_at")
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@id([userId, gridId])
-  @@map("user_grid_setting")
+  @@map("tb_user_grid_setting")
 }
 
 // 사용자별 사이드바 즐겨찾기 메뉴 (docs/decisions/0022)
 // 메뉴는 주소(href)로 구분한다 (메뉴 목록: src/config/navigation.ts). 추가한 순서(createdAt)대로 보여준다
 // 권한이 사라지거나 목록에서 없어진 메뉴는 화면에서만 숨기고 기록은 남긴다 (권한이 돌아오면 다시 보임)
 model UserFavoriteMenu {
-  userId    String
-  href      String
-  createdAt DateTime @default(now())
+  userId    String   @map("user_id")
+  href      String   @map("menu_href")
+  createdAt DateTime @default(now()) @map("created_at")
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@id([userId, href])
-  @@map("user_favorite_menu")
+  @@map("tb_user_favorite_menu")
 }
 
 // 운영사 정보 (docs/decisions/0024)
 // MVP는 운영사 1곳 → 고정 id('default') 한 줄. 여러 운영사 SaaS로 바뀌면 회사 단위 기준이 된다
 model Company {
-  id             String           @id @default("default")
-  name           String
+  id             String           @id @default("default") @map("operator_id")
+  name           String           @map("operator_nm")
   // 사업자등록번호·전화번호는 하이픈 없이 숫자만 (검증번호 확인 후, 0029)
-  businessNumber String
-  ceoName        String?
+  businessNumber String           @map("biz_reg_no")
+  ceoName        String?          @map("ceo_nm")
   // 업태 / 종목 (거래명세서·세금계산서용)
-  businessType   String?
-  businessItem   String?
-  phone          String?
-  fax            String?
+  businessType   String?          @map("biz_condition")
+  businessItem   String?          @map("biz_item")
+  phone          String?          @map("tel_no")
+  fax            String?          @map("fax_no")
   email          String?
   // 주소: 카카오 우편번호 서비스로 검색해 채우고, 상세주소만 직접 입력
-  zipCode        String?
-  address        String?
-  addressDetail  String?
-  createdAt      DateTime         @default(now())
-  updatedAt      DateTime         @updatedAt
+  zipCode        String?          @map("zip_cd")
+  address        String?          @map("addr1")
+  addressDetail  String?          @map("addr2")
+  createdAt      DateTime         @default(now()) @map("created_at")
+  updatedAt      DateTime         @updatedAt @map("updated_at")
   // 마지막으로 고친 사람
-  updatedById    String?
+  updatedById    String?          @map("updated_by_id")
   updatedBy      User?            @relation(fields: [updatedById], references: [id], onDelete: SetNull)
   contacts       CompanyContact[]
 
-  @@map("company")
+  @@map("tb_operator")
 }
 
 // 운영사 담당자 (최대 5명, 화면에서 정한 순서대로)
 model CompanyContact {
-  id        String  @id @default(cuid())
-  companyId String
-  sortOrder Int
+  id        String  @id @default(cuid()) @map("contact_id")
+  companyId String  @map("company_id")
+  sortOrder Int     @map("sort_seq")
   // 담당 업무: 공통코드 CONTACT_DUTY의 코드 (예: INBOUND, 0030)
-  duty      String
-  name      String
-  phone     String?
+  duty      String  @map("role_cd")
+  name      String  @map("contact_nm")
+  phone     String? @map("tel_no")
   email     String?
   // 대표 담당자 (담당자가 있으면 정확히 1명)
-  isPrimary Boolean @default(false)
+  isPrimary Boolean @default(false) @map("primary_yn")
   company   Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
 
   @@index([companyId, sortOrder])
-  @@map("company_contact")
+  @@map("tb_operator_contact")
 }
 
 // 외부 코드 매핑 (docs/decisions/0025): 우리 기준정보 ↔ SAP·ERP 등 외부 시스템 코드
@@ -438,19 +438,19 @@ model CompanyContact {
 // - 같은 연동 상대·같은 종류 안에서 외부 코드 중복 금지
 // - 한 대상은 연동 상대마다 외부 코드 1개
 model ExternalCode {
-  id         String             @id @default(cuid())
+  id         String             @id @default(cuid()) @map("ext_code_id")
   // 연동 상대 키 (src/config/external-systems.ts)
-  system     String
-  entityType ExternalEntityType
-  entityId   String
-  code       String
-  createdAt  DateTime           @default(now())
-  updatedAt  DateTime           @updatedAt
+  system     String             @map("ext_system_cd")
+  entityType ExternalEntityType @map("entity_type_cd")
+  entityId   String             @map("entity_id")
+  code       String             @map("ext_cd")
+  createdAt  DateTime           @default(now()) @map("created_at")
+  updatedAt  DateTime           @updatedAt @map("updated_at")
 
   @@unique([system, entityType, code])
   @@unique([system, entityType, entityId])
   @@index([entityType, entityId])
-  @@map("external_code")
+  @@map("tb_ext_code")
 }
 
 enum ExternalEntityType {
@@ -469,73 +469,73 @@ enum ExternalEntityType {
 // 업무 표에는 코드 글자(CodeItem.code)를 그대로 저장한다 (예: 담당자 업무 'INBOUND')
 
 model CodeGroup {
-  id          String     @id @default(cuid())
+  id          String     @id @default(cuid()) @map("group_id")
   // 그룹 코드: 영문 대문자·숫자·밑줄 (예: CONTACT_DUTY), 등록 후 변경 불가
-  code        String     @unique
-  name        String
+  code        String     @unique @map("group_cd")
+  name        String     @map("group_nm")
   description String?
-  sortOrder   Int        @default(0)
-  isActive    Boolean    @default(true)
+  sortOrder   Int        @default(0) @map("sort_seq")
+  isActive    Boolean    @default(true) @map("is_active")
   // 시스템 그룹: 프로그램이 직접 쓰는 그룹 (시드가 만들고, 삭제할 수 없다)
-  isSystem    Boolean    @default(false)
+  isSystem    Boolean    @default(false) @map("system_yn")
   items       CodeItem[]
-  createdAt   DateTime   @default(now())
-  updatedAt   DateTime   @updatedAt
+  createdAt   DateTime   @default(now()) @map("created_at")
+  updatedAt   DateTime   @updatedAt @map("updated_at")
 
-  @@map("code_group")
+  @@map("tb_code_group")
 }
 
 model CodeItem {
-  id          String    @id @default(cuid())
-  groupId     String
+  id          String    @id @default(cuid()) @map("code_item_id")
+  groupId     String    @map("group_id")
   // 코드: 그룹 안에서 중복 금지, 등록 후 변경 불가 (업무 표에 이 글자가 저장되므로)
-  code        String
-  name        String
+  code        String    @map("code_item_cd")
+  name        String    @map("code_item_nm")
   description String?
-  sortOrder   Int       @default(0)
+  sortOrder   Int       @default(0) @map("sort_seq")
   // 사용 중지: 새로 고를 때만 숨기고, 이미 저장된 값은 이름으로 계속 보여준다
-  isActive    Boolean   @default(true)
+  isActive    Boolean   @default(true) @map("is_active")
   group       CodeGroup @relation(fields: [groupId], references: [id], onDelete: Restrict)
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
 
   @@unique([groupId, code])
   @@index([groupId, sortOrder])
-  @@map("code_item")
+  @@map("tb_code_item")
 }
 
 // ── 배송권역 (docs/decisions/0033): 센터가 배송을 담당하는 지역 묶음
 // 코드 3층 (0025): systemCode DZ000001(자동·불변) / code(사용자 코드, 같은 센터 안 중복 금지) / 외부 코드(ExternalCode)
 model DeliveryZone {
-  id          String               @id @default(cuid())
-  centerId    String
-  systemCode  String               @unique
-  code        String
-  name        String
+  id          String               @id @default(cuid()) @map("zone_id")
+  centerId    String               @map("center_id")
+  systemCode  String               @unique @map("sys_cd")
+  code        String               @map("zone_cd")
+  name        String               @map("zone_nm")
   description String?
-  isActive    Boolean              @default(true)
-  createdAt   DateTime             @default(now())
-  updatedAt   DateTime             @updatedAt
+  isActive    Boolean              @default(true) @map("is_active")
+  createdAt   DateTime             @default(now()) @map("created_at")
+  updatedAt   DateTime             @updatedAt @map("updated_at")
   center      Center               @relation(fields: [centerId], references: [id], onDelete: Restrict)
   regions     DeliveryZoneRegion[]
 
   @@unique([centerId, code])
   @@index([centerId])
-  @@map("delivery_zone")
+  @@map("tb_delivery_zone")
 }
 
 // 배송권역의 담당 지역: 법정동코드 앞자리 (시·도 2자리 = 그 시·도 전체, 시·군·구 5자리)
 // 같은 센터 안에서는 한 지역이 권역 하나에만 (서울 전체 + 서울 종로구처럼 겹치는 것도 금지) — 저장할 때 검사
 // 센터끼리는 겹쳐도 된다 (출고 때 화주사 이용 센터 기준으로 고른다)
 model DeliveryZoneRegion {
-  id         String       @id @default(cuid())
-  zoneId     String
-  regionCode String
+  id         String       @id @default(cuid()) @map("zone_region_id")
+  zoneId     String       @map("zone_id")
+  regionCode String       @map("region_cd")
   zone       DeliveryZone @relation(fields: [zoneId], references: [id], onDelete: Cascade)
 
   @@unique([zoneId, regionCode])
   @@index([regionCode])
-  @@map("delivery_zone_region")
+  @@map("tb_delivery_zone_region")
 }
 
 // ── 단위 (docs/decisions/0034): 품목의 기본단위·환산단위로 고르는 목록
@@ -548,19 +548,19 @@ enum UnitKind {
 }
 
 model Unit {
-  id        String   @id @default(cuid())
+  id        String   @id @default(cuid()) @map("unit_id")
   // 등록 후 바꿀 수 없다 (품목·재고에 이 글자가 저장된다)
-  code      String   @unique
-  name      String
-  kind      UnitKind
+  code      String   @unique @map("unit_cd")
+  name      String   @map("unit_nm")
+  kind      UnitKind @map("unit_kind_cd")
   // 소수 자리수: 기본단위의 수량 입력·검사 기준 (EA 0, KG 3). 환산단위는 0
-  decimals  Int      @default(0)
-  sortOrder Int      @default(0)
-  isActive  Boolean  @default(true)
+  decimals  Int      @default(0) @map("decimal_cnt")
+  sortOrder Int      @default(0) @map("sort_seq")
+  isActive  Boolean  @default(true) @map("is_active")
   // 시스템 단위: 프로그램이 직접 쓰는 단위 (EA, 라벨 단위 BOX·PLT) — 삭제·사용 중지·종류 변경 불가
-  isSystem  Boolean  @default(false)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  isSystem  Boolean  @default(false) @map("system_yn")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
 
-  @@map("unit")
+  @@map("tb_unit")
 }
