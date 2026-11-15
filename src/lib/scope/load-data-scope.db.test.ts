@@ -1,7 +1,7 @@
 import { afterAll, beforeEach, describe, expect, it } from 'vitest'
 import { prisma } from '@/lib/prisma'
 import { createTestCenter, createTestShipper, createTestUser } from '@/test/factories'
-import { resetDatabase } from '@/test/reset-database'
+import { resetDatabase, TEST_OPERATOR_ID } from '@/test/reset-database'
 import { scopeFilter, ScopeFieldMissingError } from './data-scope'
 import { loadDataScope } from './load-data-scope'
 
@@ -46,14 +46,17 @@ describe('데이터 범위 (DB)', () => {
   })
 
   it('사용 중지된 센터는 소속이어도 보이지 않는다', async () => {
-    const gmp = await prisma.center.findUniqueOrThrow({ where: { code: 'GMP' } })
+    const gmp = await prisma.center.findUniqueOrThrow({
+      where: { operatorId_code: { operatorId: TEST_OPERATOR_ID, code: 'GMP' } },
+    })
     const worker = await createTestUser('gmp.worker', { centerIds: [gmp.id, icn] })
     expect(await visibleCenterCodes(worker.id)).toEqual(['ICN'])
   })
 
   it('소속 센터가 없는 센터 직원은 아무것도 보지 못한다', async () => {
     const orphan = await createTestUser('orphan')
-    expect(await loadDataScope(orphan.id)).toEqual({ kind: 'NONE' })
+    // 볼 수 있는 것은 없지만 운영사는 기억한다 (서버 액션 출입증용)
+    expect(await loadDataScope(orphan.id)).toEqual({ kind: 'NONE', operatorId: TEST_OPERATOR_ID })
     expect(await visibleCenterCodes(orphan.id)).toEqual([])
   })
 
@@ -64,7 +67,11 @@ describe('데이터 범위 (DB)', () => {
       shipperId: gana.id,
     })
 
-    expect(await loadDataScope(shipperUser.id)).toEqual({ kind: 'SHIPPER', shipperId: gana.id })
+    expect(await loadDataScope(shipperUser.id)).toEqual({
+      kind: 'SHIPPER',
+      operatorId: TEST_OPERATOR_ID,
+      shipperId: gana.id,
+    })
     await expect(visibleCenterCodes(shipperUser.id)).rejects.toThrow(ScopeFieldMissingError)
   })
 
@@ -84,7 +91,8 @@ describe('데이터 범위 (DB)', () => {
   it('사용 중지 계정·없는 사용자는 NONE', async () => {
     const op = await createTestUser('op2', { userType: 'OPERATOR' })
     await prisma.user.update({ where: { id: op.id }, data: { status: 'INACTIVE' } })
-    expect(await loadDataScope(op.id)).toEqual({ kind: 'NONE' })
+    expect(await loadDataScope(op.id)).toEqual({ kind: 'NONE', operatorId: TEST_OPERATOR_ID })
+    // 없는 사용자는 운영사도 모른다
     expect(await loadDataScope(999999n)).toEqual({ kind: 'NONE' })
   })
 })
