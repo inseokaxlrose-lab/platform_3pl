@@ -4,10 +4,11 @@ import { z } from 'zod'
 import { ActionError } from '@/lib/actions/action-error'
 import { createAction } from '@/lib/actions/create-action'
 import { listQuerySchema, toPrismaQuery } from '@/lib/grid/grid-query'
-import { dateRangeFilter, idFilter } from '@/lib/grid/list-filters'
+import { dateRangeFilter, idFilter, statusWhere } from '@/lib/grid/list-filters'
 import { USER_TYPES } from '@/lib/users/user-schema'
 import { overridesIssue } from '@/lib/permissions/override-state'
 import { prisma } from '@/lib/prisma'
+import { withIsActive } from '@/lib/status'
 import { assertRowVersion, withVersionGuard } from '@/lib/row-version'
 import type { CurrentUser } from '@/lib/session'
 import { affiliationIssues, internalEmail } from '@/lib/users/affiliation'
@@ -68,7 +69,7 @@ export const listUsersAction = createAction({
         username: 'username',
         name: 'name',
         userType: 'userType',
-        isActive: 'isActive',
+        isActive: 'status',
         createdAt: 'createdAt',
       },
       defaultOrderBy: { username: 'asc' },
@@ -81,8 +82,7 @@ export const listUsersAction = createAction({
       AND: [
         query.where,
         userType ? { userType } : {},
-        filters.status === 'ACTIVE' ? { isActive: true } : {},
-        filters.status === 'INACTIVE' ? { isActive: false } : {},
+        statusWhere(filters),
         idFilter(filters, 'group')
           ? { permissionGroups: { some: { groupId: idFilter(filters, 'group') } } }
           : {},
@@ -104,7 +104,7 @@ export const listUsersAction = createAction({
           name: true,
           email: true,
           userType: true,
-          isActive: true,
+          status: true,
           createdAt: true,
           shipper: { select: { name: true } },
           centers: { select: { center: { select: { name: true } } } },
@@ -114,7 +114,7 @@ export const listUsersAction = createAction({
       prisma.user.count({ where }),
     ])
     return {
-      rows: rows.map((row) => ({
+      rows: rows.map(withIsActive).map((row) => ({
         id: row.id,
         username: row.displayUsername ?? row.username ?? '',
         name: row.name,

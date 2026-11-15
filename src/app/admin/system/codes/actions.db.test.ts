@@ -182,7 +182,8 @@ describe('공통코드 코드', () => {
     ).toMatchObject({
       code: 'X',
       name: '엑스',
-      isActive: false,
+      // 사용 여부는 DB에 상태로
+      status: 'INACTIVE',
     })
     expect(await deleteCodeItemAction({ id: item.id })).toMatchObject({ ok: true })
   })

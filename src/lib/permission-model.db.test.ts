@@ -39,7 +39,7 @@ describe('권한 DB 모델', () => {
     })
 
     expect(loaded.userType).toBe('CENTER')
-    expect(loaded.isActive).toBe(true)
+    expect(loaded.status).toBe('ACTIVE')
     expect(
       loaded.permissionGroups[0].group.permissions.map((p) => p.permissionCode).sort(),
     ).toEqual(['inbound.asn.read', 'inbound.inspect'])

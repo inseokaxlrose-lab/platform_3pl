@@ -4,7 +4,7 @@ import { z } from 'zod'
 import { ActionError } from '@/lib/actions/action-error'
 import { createAction } from '@/lib/actions/create-action'
 import { listQuerySchema, toPrismaQuery } from '@/lib/grid/grid-query'
-import { dateRangeFilter, idFilter, ynFilter } from '@/lib/grid/list-filters'
+import { dateRangeFilter, idFilter, statusWhere, ynFilter } from '@/lib/grid/list-filters'
 import { prisma } from '@/lib/prisma'
 import { isYes } from '@/lib/yn'
 import { assertInScope, scopeFilter, type DataScope } from '@/lib/scope/data-scope'
@@ -12,6 +12,7 @@ import { LABEL_UNITS, shipperSchema } from '@/lib/shippers/shipper-schema'
 import { createShipper, updateShipper } from '@/lib/shippers/shippers'
 import { rowVersionField } from '@/lib/row-version'
 import { idSchema } from '@/lib/id'
+import { toStatus, withIsActive } from '@/lib/status'
 
 // 화주사 관리 서버 액션 (docs/decisions/0035)
 // 데이터 범위: 센터 직원은 자기 센터를 이용하는 화주사만 본다. 등록·수정·사용 중지는 운영사(전체 범위)만
@@ -38,7 +39,7 @@ export const listShippersAction = createAction({
       sortable: {
         code: 'code',
         name: 'name',
-        isActive: 'isActive',
+        isActive: 'status',
         createdAt: 'createdAt',
         updatedAt: 'updatedAt',
       },
@@ -57,8 +58,7 @@ export const listShippersAction = createAction({
         idFilter(filters, 'center')
           ? { centers: { some: { centerId: idFilter(filters, 'center') } } }
           : {},
-        filters.status === 'ACTIVE' ? { isActive: true } : {},
-        filters.status === 'INACTIVE' ? { isActive: false } : {},
+        statusWhere(filters),
         useLot !== undefined ? { useLot } : {},
         useExpiry !== undefined ? { useExpiry } : {},
         labelUnit ? { labelUnit } : {},
@@ -79,7 +79,7 @@ export const listShippersAction = createAction({
           useLot: true,
           useExpiry: true,
           labelUnit: true,
-          isActive: true,
+          status: true,
           createdAt: true,
           updatedAt: true,
           centers: { select: { center: { select: { name: true } } } },
@@ -89,7 +89,7 @@ export const listShippersAction = createAction({
       prisma.shipper.count({ where }),
     ])
     return {
-      rows: rows.map(({ centers, _count, ...row }) => ({
+      rows: rows.map(withIsActive).map(({ centers, _count, ...row }) => ({
         ...row,
         // 예/아니오 칸은 화면에서 true/false로
         useLot: isYes(row.useLot),
@@ -135,7 +135,7 @@ export const setShippersActiveAction = createAction({
     }
     const { count } = await prisma.shipper.updateMany({
       where: { id: { in: ids } },
-      data: { isActive: input.isActive },
+      data: { status: toStatus(input.isActive) },
     })
     return { count }
   },

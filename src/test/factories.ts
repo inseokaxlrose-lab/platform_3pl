@@ -1,5 +1,6 @@
 import { nextSystemCode } from '@/lib/master-code/system-code'
 import { prisma } from '@/lib/prisma'
+import { toStatus } from '@/lib/status'
 
 // DB 테스트용 데이터 만들기 도우미 (테스트 DB에서만 사용)
 
@@ -13,7 +14,7 @@ export async function createTestCenter(
       systemCode: await nextSystemCode('CENTER'),
       code,
       name: data.name ?? `${code} 센터`,
-      isActive: data.isActive,
+      status: toStatus(data.isActive ?? true),
     },
   })
 }
@@ -25,7 +26,7 @@ export function createTestShipper(code: string, data: { name?: string; isActive?
       code,
       systemCode: `SH-T-${code}`,
       name: data.name ?? `${code} 화주`,
-      isActive: data.isActive,
+      status: toStatus(data.isActive ?? true),
     },
   })
 }
@@ -72,7 +73,7 @@ export function createTestCodeGroup(
         create: items.map((item, index) => ({
           code: item.code,
           name: item.name ?? item.code,
-          isActive: item.isActive ?? true,
+          status: toStatus(item.isActive ?? true),
           sortOrder: index,
         })),
       },

@@ -75,7 +75,7 @@ describe('loadUserPermissions (DB)', () => {
     const user = await createTestUser('leaver')
     const group = await createGroup('재고 조회자', ['stock.inventory.read'])
     await prisma.userPermissionGroup.create({ data: { userId: user.id, groupId: group.id } })
-    await prisma.user.update({ where: { id: user.id }, data: { isActive: false } })
+    await prisma.user.update({ where: { id: user.id }, data: { status: 'INACTIVE' } })
 
     expect((await loadUserPermissions(user.id)).codes.size).toBe(0)
   })

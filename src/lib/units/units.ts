@@ -5,6 +5,7 @@ import { assertRowVersion, withVersionGuard } from '@/lib/row-version'
 import { prisma } from '@/lib/prisma'
 import { isYes } from '@/lib/yn'
 import type { UnitCreateData, UnitUpdateData } from './unit-schema'
+import { toStatus, withStatus } from '@/lib/status'
 
 // 단위 저장 (docs/decisions/0034). 권한 검사는 서버 액션에서 한다
 // - 코드는 등록 후 바꿀 수 없다
@@ -16,7 +17,7 @@ export async function createUnit({ externalCodes, ...data }: UnitCreateData) {
     throw new ActionError('CONFLICT', `이미 있는 단위 코드입니다: ${data.code}`)
   }
   return prisma.$transaction(async (tx) => {
-    const unit = await tx.unit.create({ data, select: { id: true, code: true } })
+    const unit = await tx.unit.create({ data: withStatus(data), select: { id: true, code: true } })
     await saveExternalCodes(tx, 'UNIT', unit.id, externalCodes)
     return unit
   })
@@ -40,7 +41,11 @@ export async function updateUnit({ id, rowVersion, externalCodes, ...data }: Uni
   }
   return prisma.$transaction(async (tx) => {
     const saved = await withVersionGuard(() =>
-      tx.unit.update({ where: { id, rowVersion }, data, select: { rowVersion: true } }),
+      tx.unit.update({
+        where: { id, rowVersion },
+        data: withStatus(data),
+        select: { rowVersion: true },
+      }),
     )
     await saveExternalCodes(tx, 'UNIT', id, externalCodes)
     return { id, rowVersion: saved.rowVersion }
@@ -72,7 +77,7 @@ export async function setUnitsActive(ids: bigint[], isActive: boolean) {
   if (!isActive) assertNoSystem(units, '사용 중지')
   const { count } = await prisma.unit.updateMany({
     where: { id: { in: units.map((u) => u.id) } },
-    data: { isActive },
+    data: { status: toStatus(isActive) },
   })
   return { count }
 }

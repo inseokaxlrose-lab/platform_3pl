@@ -83,7 +83,7 @@ describe('데이터 범위 (DB)', () => {
 
   it('사용 중지 계정·없는 사용자는 NONE', async () => {
     const op = await createTestUser('op2', { userType: 'OPERATOR' })
-    await prisma.user.update({ where: { id: op.id }, data: { isActive: false } })
+    await prisma.user.update({ where: { id: op.id }, data: { status: 'INACTIVE' } })
     expect(await loadDataScope(op.id)).toEqual({ kind: 'NONE' })
     expect(await loadDataScope(999999n)).toEqual({ kind: 'NONE' })
   })

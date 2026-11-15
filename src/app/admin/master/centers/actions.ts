@@ -6,12 +6,19 @@ import { createAction } from '@/lib/actions/create-action'
 import { centerSchema } from '@/lib/centers/center-schema'
 import { createCenter, updateCenter } from '@/lib/centers/centers'
 import { listQuerySchema, toPrismaQuery } from '@/lib/grid/grid-query'
-import { codesFilter, dateRangeFilter, digitsFilter, textFilter } from '@/lib/grid/list-filters'
+import {
+  codesFilter,
+  dateRangeFilter,
+  digitsFilter,
+  statusWhere,
+  textFilter,
+} from '@/lib/grid/list-filters'
 import { STORAGE_CONDITIONS } from '@/lib/warehouses/warehouse-labels'
 import { prisma } from '@/lib/prisma'
 import { assertInScope, scopeFilter, type DataScope } from '@/lib/scope/data-scope'
 import { rowVersionField } from '@/lib/row-version'
 import { idSchema } from '@/lib/id'
+import { toStatus, withIsActive } from '@/lib/status'
 
 // 센터 관리 서버 액션 (docs/decisions/0026)
 // 데이터 범위: 센터 직원은 소속 센터만 보고 고칠 수 있다. 등록·사용 중지는 전체 범위(운영사)만
@@ -41,7 +48,7 @@ export const listCentersAction = createAction({
         systemCode: 'systemCode',
         name: 'name',
         managerName: 'managerName',
-        isActive: 'isActive',
+        isActive: 'status',
         createdAt: 'createdAt',
         updatedAt: 'updatedAt',
       },
@@ -56,8 +63,7 @@ export const listCentersAction = createAction({
       AND: [
         query.where,
         scopeFilter(scope, CENTER_SCOPE),
-        filters.status === 'ACTIVE' ? { isActive: true } : {},
-        filters.status === 'INACTIVE' ? { isActive: false } : {},
+        statusWhere(filters),
         digitsFilter(filters, 'phone') ? { phone: digitsFilter(filters, 'phone') } : {},
         textFilter(filters, 'manager') ? { managerName: textFilter(filters, 'manager') } : {},
         dateRangeFilter(filters, 'createdAt')
@@ -82,7 +88,7 @@ export const listCentersAction = createAction({
           managerName: true,
           managerPhone: true,
           address: true,
-          isActive: true,
+          status: true,
           createdAt: true,
           updatedAt: true,
           _count: { select: { warehouses: true } },
@@ -91,7 +97,9 @@ export const listCentersAction = createAction({
       prisma.center.count({ where }),
     ])
     return {
-      rows: rows.map(({ _count, ...row }) => ({ ...row, warehouseCount: _count.warehouses })),
+      rows: rows
+        .map(withIsActive)
+        .map(({ _count, ...row }) => ({ ...row, warehouseCount: _count.warehouses })),
       rowCount,
     }
   },
@@ -124,7 +132,10 @@ export const setCenterActiveAction = createAction({
     requireAllScope(scope, '센터 사용 중지')
     const center = await prisma.center.findUnique({ where: { id: input.id }, select: { id: true } })
     if (!center) throw new ActionError('NOT_FOUND', '센터를 찾을 수 없습니다.')
-    await prisma.center.update({ where: { id: input.id }, data: { isActive: input.isActive } })
+    await prisma.center.update({
+      where: { id: input.id },
+      data: { status: toStatus(input.isActive) },
+    })
     return { id: input.id, isActive: input.isActive }
   },
 })
@@ -141,7 +152,7 @@ export const setCentersActiveAction = createAction({
       throw new ActionError('NOT_FOUND', '찾을 수 없는 센터가 섞여 있습니다.')
     const { count } = await prisma.center.updateMany({
       where: { id: { in: ids } },
-      data: { isActive: input.isActive },
+      data: { status: toStatus(input.isActive) },
     })
     return { count }
   },

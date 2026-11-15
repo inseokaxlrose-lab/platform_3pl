@@ -113,7 +113,7 @@ describe('한 칸 등록', () => {
       ok: false,
       error: { code: 'CONFLICT', message: expect.stringContaining('입고대기') },
     })
-    await prisma.warehouse.update({ where: { id: icnWarehouseId }, data: { isActive: false } })
+    await prisma.warehouse.update({ where: { id: icnWarehouseId }, data: { status: 'INACTIVE' } })
     expect(
       await createLocationAction({ warehouseId: String(icnWarehouseId), code: 'S-01' }),
     ).toMatchObject({
@@ -193,7 +193,7 @@ describe('사용 중지 · 삭제 (여러 개)', () => {
       data: { updated: 6 },
     })
     expect(
-      await prisma.location.count({ where: { warehouseId: icnWarehouseId, isActive: false } }),
+      await prisma.location.count({ where: { warehouseId: icnWarehouseId, status: 'INACTIVE' } }),
     ).toBe(6)
 
     expect(await deleteLocationsAction({ ids: ids.map(String) })).toEqual({
@@ -218,7 +218,7 @@ describe('사용 중지 · 삭제 (여러 개)', () => {
       ok: false,
       error: { code: 'CONFLICT' },
     })
-    expect(await prisma.location.count({ where: { isActive: false } })).toBe(0)
+    expect(await prisma.location.count({ where: { status: 'INACTIVE' } })).toBe(0)
     expect(await prisma.location.count({ where: { id: { in: ids.map(BigInt) } } })).toBe(2)
   })
 })

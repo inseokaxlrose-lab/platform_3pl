@@ -4,7 +4,7 @@ import { z } from 'zod'
 import { ActionError } from '@/lib/actions/action-error'
 import { createAction } from '@/lib/actions/create-action'
 import { listQuerySchema, toPrismaQuery } from '@/lib/grid/grid-query'
-import { codesFilter, dateRangeFilter, idFilter } from '@/lib/grid/list-filters'
+import { codesFilter, dateRangeFilter, idFilter, statusWhere } from '@/lib/grid/list-filters'
 import { STORAGE_CONDITIONS, WAREHOUSE_TYPE_LABELS } from '@/lib/warehouses/warehouse-labels'
 import { prisma } from '@/lib/prisma'
 import { assertInScope, scopeFilter } from '@/lib/scope/data-scope'
@@ -12,6 +12,7 @@ import { createWarehouseSchema, updateWarehouseSchema } from '@/lib/warehouses/w
 import { createWarehouse, setWarehouseActive, updateWarehouse } from '@/lib/warehouses/warehouses'
 import { rowVersionField } from '@/lib/row-version'
 import { idSchema } from '@/lib/id'
+import { isActiveStatus, toStatus, withIsActive } from '@/lib/status'
 
 // 창고 관리 서버 액션 (docs/decisions/0027)
 // 데이터 범위: 센터 직원은 소속 센터의 창고만 보고 다룬다 (창고 추가도 자기 센터 안에서만)
@@ -45,7 +46,7 @@ export const listWarehousesAction = createAction({
         name: 'name',
         type: 'type',
         storageCondition: 'storageCondition',
-        isActive: 'isActive',
+        isActive: 'status',
         createdAt: 'createdAt',
         updatedAt: 'updatedAt',
       },
@@ -64,8 +65,7 @@ export const listWarehousesAction = createAction({
         idFilter(filters, 'center') ? { centerId: idFilter(filters, 'center') } : {},
         type ? { type: type as keyof typeof WAREHOUSE_TYPE_LABELS } : {},
         storage?.length ? { storageCondition: { in: storage } } : {},
-        filters.status === 'ACTIVE' ? { isActive: true } : {},
-        filters.status === 'INACTIVE' ? { isActive: false } : {},
+        statusWhere(filters),
         createdAt ? { createdAt } : {},
       ],
     }
@@ -83,7 +83,7 @@ export const listWarehousesAction = createAction({
           name: true,
           type: true,
           storageCondition: true,
-          isActive: true,
+          status: true,
           createdAt: true,
           updatedAt: true,
           center: { select: { code: true, name: true } },
@@ -93,7 +93,7 @@ export const listWarehousesAction = createAction({
       prisma.warehouse.count({ where }),
     ])
     return {
-      rows: rows.map(({ _count, center, ...row }) => ({
+      rows: rows.map(withIsActive).map(({ _count, center, ...row }) => ({
         ...row,
         center: `${center.name} (${center.code})`,
         locationCount: _count.locations,
@@ -110,10 +110,10 @@ export const createWarehouseAction = createAction({
     assertInScope(scope, { centerId }, WAREHOUSE_SCOPE)
     const center = await prisma.center.findUnique({
       where: { id: centerId },
-      select: { isActive: true },
+      select: { status: true },
     })
     if (!center) throw new ActionError('NOT_FOUND', '센터를 찾을 수 없습니다.')
-    if (!center.isActive) {
+    if (!isActiveStatus(center.status)) {
       throw new ActionError('CONFLICT', '사용 중지된 센터에는 창고를 추가할 수 없습니다.')
     }
     return createWarehouse(centerId, data)
@@ -162,7 +162,7 @@ export const setWarehousesActiveAction = createAction({
     }
     const { count } = await prisma.warehouse.updateMany({
       where: { id: { in: ids } },
-      data: { isActive: input.isActive },
+      data: { status: toStatus(input.isActive) },
     })
     return { count }
   },

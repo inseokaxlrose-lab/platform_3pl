@@ -18,6 +18,7 @@ import {
 } from '@/lib/common-code/code-schema'
 import { dataGridStateSchema, toPrismaQuery } from '@/lib/grid/grid-query'
 import { prisma } from '@/lib/prisma'
+import { withIsActive } from '@/lib/status'
 import { isYes } from '@/lib/yn'
 import { idSchema } from '@/lib/id'
 
@@ -32,7 +33,7 @@ export const listCodeGroupsAction = createAction({
   handler: async ({ input }) => {
     const query = toPrismaQuery(input, {
       searchFields: ['code', 'name'],
-      sortable: { code: 'code', name: 'name', sortOrder: 'sortOrder', isActive: 'isActive' },
+      sortable: { code: 'code', name: 'name', sortOrder: 'sortOrder', isActive: 'status' },
       defaultOrderBy: { code: 'asc' },
     })
     const [rows, rowCount] = await prisma.$transaction([
@@ -45,7 +46,7 @@ export const listCodeGroupsAction = createAction({
           name: true,
           description: true,
           sortOrder: true,
-          isActive: true,
+          status: true,
           rowVersion: true,
           isSystem: true,
           _count: { select: { items: true } },
@@ -55,7 +56,7 @@ export const listCodeGroupsAction = createAction({
     ])
     return {
       // 예/아니오 칸은 화면에서 true/false로
-      rows: rows.map(({ _count, ...row }) => ({
+      rows: rows.map(withIsActive).map(({ _count, ...row }) => ({
         ...row,
         isSystem: isYes(row.isSystem),
         itemCount: _count.items,
@@ -71,7 +72,7 @@ export const listCodeItemsAction = createAction({
   handler: async ({ input: { groupId, ...state } }) => {
     const query = toPrismaQuery(state, {
       searchFields: ['code', 'name'],
-      sortable: { code: 'code', name: 'name', sortOrder: 'sortOrder', isActive: 'isActive' },
+      sortable: { code: 'code', name: 'name', sortOrder: 'sortOrder', isActive: 'status' },
       defaultOrderBy: { code: 'asc' },
     })
     const where = { AND: [query.where, { groupId }] }
@@ -86,14 +87,14 @@ export const listCodeItemsAction = createAction({
           name: true,
           description: true,
           sortOrder: true,
-          isActive: true,
+          status: true,
           rowVersion: true,
           updatedAt: true,
         },
       }),
       prisma.codeItem.count({ where }),
     ])
-    return { rows, rowCount }
+    return { rows: rows.map(withIsActive), rowCount }
   },
 })
 

@@ -1,5 +1,6 @@
 import { digitsOnly } from '@/lib/format'
 import { parseId } from '@/lib/id'
+import { STATUS, type Status } from '@/lib/status'
 import type { Yn } from '@/lib/yn'
 
 // 목록 검색 조건 해석 (서버 공용 순수 함수)
@@ -32,6 +33,13 @@ export function codesFilter(filters: Filters, key: string) {
     .map((code) => code.trim())
     .filter(Boolean)
   return codes.length > 0 ? { in: codes } : undefined
+}
+
+// 상태 (기준정보 공통 status_cd): 'ACTIVE'·'INACTIVE'만 조건으로, 그 밖(전체) → 조건 없음
+// where의 AND 목록에 그대로 넣는다: AND: [query.where, statusWhere(filters), …]
+export function statusWhere(filters: Filters): { status?: Status } {
+  const value = filters.status
+  return value === STATUS.ACTIVE || value === STATUS.INACTIVE ? { status: value } : {}
 }
 
 // 예/아니오 칸(_yn, DB에 'Y'/'N'): 'Y'·'N'만 조건으로, 그 밖 → 조건 없음

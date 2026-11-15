@@ -71,7 +71,7 @@ async function seedSuperAdmin(groupId: bigint) {
     throw new Error(`'${username}' 계정이 운영사 유형이 아니라 슈퍼 계정으로 쓸 수 없습니다.`)
   }
 
-  await prisma.user.update({ where: { id: user.id }, data: { isActive: true } })
+  await prisma.user.update({ where: { id: user.id }, data: { status: 'ACTIVE' } })
   await linkGroup(user.id, groupId)
 }
 

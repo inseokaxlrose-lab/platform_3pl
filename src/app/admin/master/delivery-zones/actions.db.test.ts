@@ -215,7 +215,7 @@ describe('목록 · 범위 · 일괄 처리', () => {
   })
 
   it('사용 중지된 센터에는 권역을 추가할 수 없다', async () => {
-    await prisma.center.update({ where: { id: gmhId }, data: { isActive: false } })
+    await prisma.center.update({ where: { id: gmhId }, data: { status: 'INACTIVE' } })
     expect(await createDeliveryZoneAction(input({ centerId: String(gmhId) }))).toMatchObject({
       ok: false,
       error: { code: 'CONFLICT' },

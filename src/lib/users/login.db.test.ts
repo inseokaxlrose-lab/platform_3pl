@@ -92,7 +92,7 @@ describe('계정 만들기 + 로그인 (Better Auth)', () => {
       userType: 'CENTER',
       centerIds: [centerId],
     })
-    await prisma.user.update({ where: { id: user.id }, data: { isActive: false } })
+    await prisma.user.update({ where: { id: user.id }, data: { status: 'INACTIVE' } })
 
     await expect(signIn('leaver')).rejects.toMatchObject({ message: ACCOUNT_DISABLED })
     expect(await prisma.session.count()).toBe(0)

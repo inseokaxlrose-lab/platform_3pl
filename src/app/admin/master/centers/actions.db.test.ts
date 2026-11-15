@@ -209,12 +209,12 @@ describe('센터 수정', () => {
     const center = await create()
     await setCenterActiveAction({ id: center.id, isActive: false })
     expect(
-      (await prisma.center.findUniqueOrThrow({ where: { id: BigInt(center.id) } })).isActive,
-    ).toBe(false)
+      (await prisma.center.findUniqueOrThrow({ where: { id: BigInt(center.id) } })).status,
+    ).toBe('INACTIVE')
     await setCenterActiveAction({ id: center.id, isActive: true })
     expect(
-      (await prisma.center.findUniqueOrThrow({ where: { id: BigInt(center.id) } })).isActive,
-    ).toBe(true)
+      (await prisma.center.findUniqueOrThrow({ where: { id: BigInt(center.id) } })).status,
+    ).toBe('ACTIVE')
   })
 })
 
@@ -297,7 +297,7 @@ describe('목록 검색 조건 · 일괄 처리 · 엑셀', () => {
       phone: '055-999-0000',
       managerName: '박센터',
     })
-    await prisma.center.update({ where: { id: BigInt(gmh.id) }, data: { isActive: false } })
+    await prisma.center.update({ where: { id: BigInt(gmh.id) }, data: { status: 'INACTIVE' } })
     await prisma.warehouse.create({
       data: {
         centerId: BigInt(icn.id),

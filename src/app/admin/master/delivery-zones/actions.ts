@@ -10,11 +10,12 @@ import {
   updateDeliveryZone,
 } from '@/lib/delivery-zones/delivery-zones'
 import { listQuerySchema, toPrismaQuery } from '@/lib/grid/grid-query'
-import { dateRangeFilter, idFilter } from '@/lib/grid/list-filters'
+import { dateRangeFilter, idFilter, statusWhere } from '@/lib/grid/list-filters'
 import { prisma } from '@/lib/prisma'
 import { assertInScope, scopeFilter, type DataScope } from '@/lib/scope/data-scope'
 import { rowVersionField } from '@/lib/row-version'
 import { idSchema } from '@/lib/id'
+import { toStatus, withIsActive } from '@/lib/status'
 
 // 배송권역 서버 액션 (docs/decisions/0033)
 // 데이터 범위: 센터 직원은 소속 센터의 권역만 보고 다룬다
@@ -50,7 +51,7 @@ export const listDeliveryZonesAction = createAction({
         code: 'code',
         name: 'name',
         center: 'center.code',
-        isActive: 'isActive',
+        isActive: 'status',
         createdAt: 'createdAt',
         updatedAt: 'updatedAt',
       },
@@ -64,8 +65,7 @@ export const listDeliveryZonesAction = createAction({
         query.where,
         scopeFilter(scope, ZONE_SCOPE),
         idFilter(filters, 'center') ? { centerId: idFilter(filters, 'center') } : {},
-        filters.status === 'ACTIVE' ? { isActive: true } : {},
-        filters.status === 'INACTIVE' ? { isActive: false } : {},
+        statusWhere(filters),
         sido ? { regions: { some: { regionCode: { startsWith: sido } } } } : {},
         createdAt ? { createdAt } : {},
       ],
@@ -82,7 +82,7 @@ export const listDeliveryZonesAction = createAction({
           systemCode: true,
           code: true,
           name: true,
-          isActive: true,
+          status: true,
           createdAt: true,
           updatedAt: true,
           center: { select: { code: true, name: true } },
@@ -92,7 +92,7 @@ export const listDeliveryZonesAction = createAction({
       prisma.deliveryZone.count({ where }),
     ])
     return {
-      rows: rows.map(({ center, regions, ...row }) => ({
+      rows: rows.map(withIsActive).map(({ center, regions, ...row }) => ({
         ...row,
         center: `${center.name} (${center.code})`,
         regionCodes: regions.map((r) => r.regionCode),
@@ -130,7 +130,7 @@ export const setDeliveryZonesActiveAction = createAction({
     const ids = await assertZonesInScope(input.ids, scope)
     const { count } = await prisma.deliveryZone.updateMany({
       where: { id: { in: ids } },
-      data: { isActive: input.isActive },
+      data: { status: toStatus(input.isActive) },
     })
     return { count }
   },

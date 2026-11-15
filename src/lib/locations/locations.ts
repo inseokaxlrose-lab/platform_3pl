@@ -3,13 +3,14 @@ import { ActionError } from '@/lib/actions/action-error'
 import { DEFAULT_LOCATION_CODE } from '@/lib/centers/center-defaults'
 import { prisma } from '@/lib/prisma'
 import { expandLocationRange, type GeneratedLocation, type LocationRange } from './location-range'
+import { isActiveStatus, toStatus } from '@/lib/status'
 
 // 로케이션 저장 (docs/decisions/0028). 권한·데이터 범위 검사는 서버 액션에서 한다
 // - 코드는 등록 후 바꿀 수 없다 (재고·적치 기록이 이 주소를 가리킨다)
 // - 입고대기 창고에는 추가할 수 없고(기본 로케이션 DEFAULT 하나만), DEFAULT는 사용 중지·삭제할 수 없다
 // - 삭제는 한 번도 쓰이지 않은 로케이션만
 
-export type TargetWarehouse = { id: bigint; centerId: bigint; type: string; isActive: boolean }
+export type TargetWarehouse = { id: bigint; centerId: bigint; type: string; status: string }
 
 // 로케이션을 추가할 수 있는 창고인지
 function assertCanAddTo(warehouse: TargetWarehouse) {
@@ -19,7 +20,7 @@ function assertCanAddTo(warehouse: TargetWarehouse) {
       '입고대기 창고에는 로케이션을 추가할 수 없습니다. (기본 로케이션 하나만 씁니다)',
     )
   }
-  if (!warehouse.isActive) {
+  if (!isActiveStatus(warehouse.status)) {
     throw new ActionError('CONFLICT', '사용 중지된 창고에는 로케이션을 추가할 수 없습니다.')
   }
 }
@@ -107,7 +108,7 @@ export async function setLocationsActive(
   if (!isActive) assertNoneProtected(locations, '사용 중지')
   const { count } = await prisma.location.updateMany({
     where: { id: { in: locations.map((l) => l.id) } },
-    data: { isActive },
+    data: { status: toStatus(isActive) },
   })
   return { updated: count }
 }

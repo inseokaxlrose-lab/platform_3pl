@@ -15,7 +15,7 @@ datasource db {
 // ─────────────────────────────────────────────
 // 인증 (Better Auth)
 // user / session / account / verification 은 Better Auth가 사용하는 표다.
-// `npx auth generate`로 만든 뒤 우리 정보(userType, isActive, 권한 연결)를 더했다.
+// `npx auth generate`로 만든 뒤 우리 정보(userType, status, 권한 연결)를 더했다.
 // Better Auth 필드 이름·구조는 바꾸지 않는다.
 // ─────────────────────────────────────────────
 
@@ -44,7 +44,7 @@ model User {
   displayUsername String?  @map("display_username")
   userType        UserType @map("user_type_cd")
   // false면 로그인·사용 불가 (퇴사자 등). 기록 보존을 위해 계정을 지우지 않고 막는다
-  isActive        Boolean  @default(true) @map("is_active")
+  status          String   @default("ACTIVE") @map("status_cd") @db.VarChar(10)
   // 화주사 사용자의 소속 화주사 (화주사 사용자만, DB 검사 조건으로 강제: tb_user_shipper_matches_type)
   shipperId       BigInt?  @map("shipper_id")
   shipper         Shipper? @relation(fields: [shipperId], references: [id], onDelete: Restrict)
@@ -212,7 +212,7 @@ model Center {
   address       String?  @map("addr1")
   addressDetail String?  @map("addr2")
   // false면 데이터 범위에서 빠진다 (소속 직원도 이 센터 데이터를 볼 수 없음)
-  isActive      Boolean  @default(true) @map("is_active")
+  status        String   @default("ACTIVE") @map("status_cd") @db.VarChar(10)
   createdAt     DateTime @default(now()) @map("created_at")
   updatedAt     DateTime @updatedAt @map("updated_at")
   // 등록·수정한 사람 아이디(username, 자동: 현재 작업자 / 시드 seed / 기존 데이터 system), 동시 수정 막기용 버전 (docs/db-conventions.md 공통 칸)
@@ -256,7 +256,7 @@ model Warehouse {
   name             String           @map("warehouse_nm")
   type             WarehouseType    @default(GENERAL) @map("warehouse_type_cd")
   storageCondition StorageCondition @default(AMBIENT) @map("temp_zone_cd")
-  isActive         Boolean          @default(true) @map("is_active")
+  status           String           @default("ACTIVE") @map("status_cd") @db.VarChar(10)
   createdAt        DateTime         @default(now()) @map("created_at")
   updatedAt        DateTime         @updatedAt @map("updated_at")
   // 등록·수정한 사람 아이디(username, 자동: 현재 작업자 / 시드 seed / 기존 데이터 system), 동시 수정 막기용 버전 (docs/db-conventions.md 공통 칸)
@@ -283,7 +283,7 @@ model Location {
   zone        String?   @map("zone_cd")
   aisle       String?   @map("aisle_cd")
   level       String?   @map("level_cd")
-  isActive    Boolean   @default(true) @map("is_active")
+  status      String    @default("ACTIVE") @map("status_cd") @db.VarChar(10)
   createdAt   DateTime  @default(now()) @map("created_at")
   updatedAt   DateTime  @updatedAt @map("updated_at")
   // 등록·수정한 사람 아이디(username, 자동: 현재 작업자 / 시드 seed / 기존 데이터 system), 동시 수정 막기용 버전 (docs/db-conventions.md 공통 칸)
@@ -327,7 +327,7 @@ model Shipper {
   useExpiry      String    @default("N") @map("expiry_mgmt_yn") @db.Char(1)
   labelUnit      LabelUnit @default(PLT) @map("label_unit_cd")
   // false면 데이터 범위에서 빠진다 (소속 사용자도 데이터를 볼 수 없음)
-  isActive       Boolean   @default(true) @map("is_active")
+  status         String    @default("ACTIVE") @map("status_cd") @db.VarChar(10)
   createdAt      DateTime  @default(now()) @map("created_at")
   updatedAt      DateTime  @updatedAt @map("updated_at")
   // 등록·수정한 사람 아이디(username, 자동: 현재 작업자 / 시드 seed / 기존 데이터 system), 동시 수정 막기용 버전 (docs/db-conventions.md 공통 칸)
@@ -499,7 +499,7 @@ model CodeGroup {
   name        String     @map("group_nm")
   description String?
   sortOrder   Int        @default(0) @map("sort_seq")
-  isActive    Boolean    @default(true) @map("is_active")
+  status      String     @default("ACTIVE") @map("status_cd") @db.VarChar(10)
   // 시스템 그룹: 프로그램이 직접 쓰는 그룹 (시드가 만들고, 삭제할 수 없다)
   isSystem    String     @default("N") @map("system_yn") @db.Char(1)
   items       CodeItem[]
@@ -522,7 +522,7 @@ model CodeItem {
   description String?
   sortOrder   Int       @default(0) @map("sort_seq")
   // 사용 중지: 새로 고를 때만 숨기고, 이미 저장된 값은 이름으로 계속 보여준다
-  isActive    Boolean   @default(true) @map("is_active")
+  status      String    @default("ACTIVE") @map("status_cd") @db.VarChar(10)
   group       CodeGroup @relation(fields: [groupId], references: [id], onDelete: Restrict)
   createdAt   DateTime  @default(now()) @map("created_at")
   updatedAt   DateTime  @updatedAt @map("updated_at")
@@ -545,7 +545,7 @@ model DeliveryZone {
   code        String               @map("zone_cd")
   name        String               @map("zone_nm")
   description String?
-  isActive    Boolean              @default(true) @map("is_active")
+  status      String               @default("ACTIVE") @map("status_cd") @db.VarChar(10)
   createdAt   DateTime             @default(now()) @map("created_at")
   updatedAt   DateTime             @updatedAt @map("updated_at")
   // 등록·수정한 사람 아이디(username, 자동: 현재 작업자 / 시드 seed / 기존 데이터 system), 동시 수정 막기용 버전 (docs/db-conventions.md 공통 칸)
@@ -592,7 +592,7 @@ model Unit {
   // 소수 자리수: 기본단위의 수량 입력·검사 기준 (EA 0, KG 3). 환산단위는 0
   decimals   Int      @default(0) @map("decimal_cnt")
   sortOrder  Int      @default(0) @map("sort_seq")
-  isActive   Boolean  @default(true) @map("is_active")
+  status     String   @default("ACTIVE") @map("status_cd") @db.VarChar(10)
   // 시스템 단위: 프로그램이 직접 쓰는 단위 (EA, 라벨 단위 BOX·PLT) — 삭제·사용 중지·종류 변경 불가
   isSystem   String   @default("N") @map("system_yn") @db.Char(1)
   createdAt  DateTime @default(now()) @map("created_at")

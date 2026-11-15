@@ -143,7 +143,7 @@ describe('운영사 정보 저장', () => {
 
     // 저장한 뒤 코드를 사용 중지해도, 그 담당자를 그대로 두고 다시 저장할 수 있다
     await save(input({ contacts: [{ ...contact, duty: 'OUTBOUND' }] }))
-    await prisma.codeItem.updateMany({ where: { code: 'OUTBOUND' }, data: { isActive: false } })
+    await prisma.codeItem.updateMany({ where: { code: 'OUTBOUND' }, data: { status: 'INACTIVE' } })
     expect(
       await save(input({ name: '바뀜', contacts: [{ ...contact, duty: 'OUTBOUND' }] })),
     ).toMatchObject({ ok: true })

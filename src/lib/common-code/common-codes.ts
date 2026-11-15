@@ -1,6 +1,7 @@
 import 'server-only'
 import { ActionError } from '@/lib/actions/action-error'
 import { prisma, type Db } from '@/lib/prisma'
+import { isActiveStatus, withIsActive } from '@/lib/status'
 import type { CodeOptions } from './code-options'
 
 // 공통코드 읽기·검사 (docs/decisions/0030)
@@ -9,16 +10,17 @@ import type { CodeOptions } from './code-options'
 // 코드 수가 수백 개 수준이라 화면 틀(AppShell)이 요청마다 한 번에 읽는다
 export async function loadCodeOptions(): Promise<CodeOptions> {
   const groups = await prisma.codeGroup.findMany({
-    where: { isActive: true },
+    where: { status: 'ACTIVE' },
     select: {
       code: true,
       items: {
-        select: { code: true, name: true, isActive: true },
+        select: { code: true, name: true, status: true },
         orderBy: [{ sortOrder: 'asc' }, { code: 'asc' }],
       },
     },
   })
-  return Object.fromEntries(groups.map((group) => [group.code, group.items]))
+  // 화면에는 사용 여부(true/false)로
+  return Object.fromEntries(groups.map((group) => [group.code, group.items.map(withIsActive)]))
 }
 
 // 저장 전 검사: 값들이 모두 그 그룹의 "사용 중인" 코드인지
@@ -33,11 +35,15 @@ export async function assertCodeValues(
   if (wanted.length === 0) return
   const items = await db.codeItem.findMany({
     where: { group: { code: groupCode }, code: { in: wanted } },
-    select: { code: true, isActive: true, group: { select: { isActive: true } } },
+    select: { code: true, status: true, group: { select: { status: true } } },
   })
   const usable = new Set(
     items
-      .filter((item) => (item.isActive && item.group.isActive) || keep.includes(item.code))
+      .filter(
+        (item) =>
+          (isActiveStatus(item.status) && isActiveStatus(item.group.status)) ||
+          keep.includes(item.code),
+      )
       .map((item) => item.code),
   )
   const invalid = wanted.filter((value) => !usable.has(value))
