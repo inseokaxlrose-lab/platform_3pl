@@ -66,20 +66,25 @@ export function MasterFormPage({
   const guard = useDirtyGuard(form.dirty && !readOnly)
 
   // 지금 보는 섹션: 화면 위쪽 1/3 안에 들어온 섹션
+  // 섹션 배열은 그릴 때마다 새로 만들어지므로 id 목록 글자로 비교한다 (매번 다시 관찰하지 않게)
+  const sectionKey = sections.map((s) => s.id).join(',')
   useEffect(() => {
-    const elements = sections
-      .map((s) => document.getElementById(sectionDomId(s.id)))
+    const elements = sectionKey
+      .split(',')
+      .map((id) => document.getElementById(sectionDomId(id)))
       .filter((el): el is HTMLElement => el !== null)
     const observer = new IntersectionObserver(
       (entries) => {
         const visible = entries.filter((e) => e.isIntersecting)
-        if (visible.length > 0) setActiveId(visible[0].target.getAttribute('data-section-id')!)
+        if (visible.length === 0) return
+        const id = visible[0].target.getAttribute('data-section-id')!
+        setActiveId((current) => (current === id ? current : id))
       },
       { rootMargin: '0px 0px -66% 0px' },
     )
     elements.forEach((el) => observer.observe(el))
     return () => observer.disconnect()
-  }, [sections])
+  }, [sectionKey])
 
   // 오류가 있는 섹션 (목차에 빨간 점), 저장을 누를 때마다 첫 오류 칸으로 이동
   useEffect(() => {
