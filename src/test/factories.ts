@@ -1,4 +1,3 @@
-import { randomUUID } from 'node:crypto'
 import { nextSystemCode } from '@/lib/master-code/system-code'
 import { prisma } from '@/lib/prisma'
 
@@ -33,9 +32,9 @@ export function createTestShipper(code: string, data: { name?: string; isActive?
 
 type TestUserOptions = {
   userType?: 'OPERATOR' | 'CENTER' | 'SHIPPER'
-  centerIds?: string[]
+  centerIds?: bigint[]
   // 화주사 사용자인데 지정하지 않으면 화주사를 새로 만들어 연결한다
-  shipperId?: string
+  shipperId?: bigint
 }
 
 // 표 구조 확인용 사용자 (로그인까지 필요하면 createUserAccount 사용)
@@ -48,7 +47,6 @@ export async function createTestUser(username: string, options: TestUserOptions 
 
   return prisma.user.create({
     data: {
-      id: randomUUID(),
       name: username,
       email: `${username}@users.local`,
       username,

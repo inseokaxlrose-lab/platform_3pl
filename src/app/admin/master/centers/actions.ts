@@ -10,6 +10,7 @@ import { codesFilter, dateRangeFilter, digitsFilter, textFilter } from '@/lib/gr
 import { STORAGE_CONDITIONS } from '@/lib/warehouses/warehouse-labels'
 import { prisma } from '@/lib/prisma'
 import { assertInScope, scopeFilter, type DataScope } from '@/lib/scope/data-scope'
+import { idSchema } from '@/lib/id'
 
 // 센터 관리 서버 액션 (docs/decisions/0026)
 // 데이터 범위: 센터 직원은 소속 센터만 보고 고칠 수 있다. 등록·사용 중지는 전체 범위(운영사)만
@@ -106,7 +107,7 @@ export const createCenterAction = createAction({
 
 export const updateCenterAction = createAction({
   permission: 'master.centers.update',
-  input: centerSchema.extend({ id: z.string().min(1) }),
+  input: centerSchema.extend({ id: idSchema }),
   handler: async ({ input: { id, ...data }, scope }) => {
     assertInScope(scope, { id }, CENTER_SCOPE)
     return updateCenter(id, data)
@@ -116,7 +117,7 @@ export const updateCenterAction = createAction({
 // 사용 중지 / 다시 사용 (삭제 없음): 사용 중지하면 소속 직원의 데이터 범위에서 빠진다
 export const setCenterActiveAction = createAction({
   permission: 'master.centers.update',
-  input: z.object({ id: z.string().min(1), isActive: z.boolean() }),
+  input: z.object({ id: idSchema, isActive: z.boolean() }),
   handler: async ({ input, scope }) => {
     requireAllScope(scope, '센터 사용 중지')
     const center = await prisma.center.findUnique({ where: { id: input.id }, select: { id: true } })
@@ -129,7 +130,7 @@ export const setCenterActiveAction = createAction({
 // 여러 센터 한꺼번에 사용 중지 / 다시 사용 (목록의 일괄 처리). 하나라도 없으면 전체 거부
 export const setCentersActiveAction = createAction({
   permission: 'master.centers.update',
-  input: z.object({ ids: z.array(z.string().min(1)).min(1).max(500), isActive: z.boolean() }),
+  input: z.object({ ids: z.array(idSchema).min(1).max(500), isActive: z.boolean() }),
   handler: async ({ input, scope }) => {
     requireAllScope(scope, '센터 사용 중지')
     const ids = [...new Set(input.ids)]

@@ -14,7 +14,7 @@ type Db = Prisma.TransactionClient
 // 화주사 저장 (docs/decisions/0035). 권한·데이터 범위 검사는 서버 액션에서 한다
 
 // 사용자 코드: 시스템 코드 모양 금지(자기 것 제외), 전체에서 중복 금지
-async function assertShipperCode(db: Db, code: string, ownSystemCode: string, exceptId?: string) {
+async function assertShipperCode(db: Db, code: string, ownSystemCode: string, exceptId?: bigint) {
   if (code !== ownSystemCode && looksLikeSystemCode('SHIPPER', code)) {
     throw new ActionError(
       'VALIDATION',
@@ -28,7 +28,7 @@ async function assertShipperCode(db: Db, code: string, ownSystemCode: string, ex
 }
 
 // 이용 센터: 모두 있어야 하고, 새로 붙이는 센터는 사용 중이어야 한다 (이미 연결된 센터는 그대로 둘 수 있다)
-async function assertCenters(db: Db, centerIds: string[], keep: string[] = []) {
+async function assertCenters(db: Db, centerIds: bigint[], keep: bigint[] = []) {
   const centers = await db.center.findMany({
     where: { id: { in: centerIds } },
     select: { id: true, code: true, isActive: true },
@@ -55,7 +55,7 @@ function fieldsOf(data: ShipperData) {
   return fields
 }
 
-const contactRows = (shipperId: string, contacts: ShipperData['contacts']) =>
+const contactRows = (shipperId: bigint, contacts: ShipperData['contacts']) =>
   contacts.map((contact, index) => ({ ...contact, shipperId, sortOrder: index }))
 
 // 등록 (한 트랜잭션: 시스템 코드 → 화주사 → 이용 센터 → 담당자 → 외부 코드)
@@ -88,7 +88,7 @@ export async function createShipper(data: ShipperData) {
 
 // 수정: 시스템 코드는 바뀌지 않는다. 이용 센터·담당자는 통째로 바꾼다
 // TODO(재고 작업, ROADMAP M4): 이용 센터를 뺄 때 그 센터에 이 화주사 재고가 있으면 막는다
-export async function updateShipper(id: string, data: ShipperData) {
+export async function updateShipper(id: bigint, data: ShipperData) {
   return prisma.$transaction(async (tx) => {
     const current = await tx.shipper.findUnique({
       where: { id },

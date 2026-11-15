@@ -29,7 +29,7 @@ const ALL_CODES: PermissionCode[] = [
 
 function signIn(scope: DataScope = { kind: 'ALL' }, codes = ALL_CODES) {
   vi.mocked(getCurrentUser).mockResolvedValue({
-    id: 'u1',
+    id: 1n,
     name: '관리자',
     username: 'boss',
     userType: scope.kind === 'ALL' ? 'OPERATOR' : 'CENTER',
@@ -74,7 +74,7 @@ describe('센터 등록', () => {
     expect(center.systemCode).toMatch(/^CT\d{6}$/)
     expect(center.code).toBe(center.systemCode)
     const warehouses = await prisma.warehouse.findMany({
-      where: { centerId: center.id },
+      where: { centerId: BigInt(center.id) },
       include: { locations: true },
     })
     expect(warehouses.map((w) => [w.code, w.type, w.locations.map((l) => l.code)])).toEqual([
@@ -84,7 +84,9 @@ describe('센터 등록', () => {
 
   it('전화번호는 하이픈 없이 숫자만 저장 (docs/decisions/0029)', async () => {
     const center = await create()
-    expect(await prisma.center.findUniqueOrThrow({ where: { id: center.id } })).toMatchObject({
+    expect(
+      await prisma.center.findUniqueOrThrow({ where: { id: BigInt(center.id) } }),
+    ).toMatchObject({
       phone: '0311234567',
       fax: null,
       managerPhone: '01011112222',
@@ -94,7 +96,7 @@ describe('센터 등록', () => {
   it('사용자 코드는 대문자로 저장, 외부 코드도 함께 저장', async () => {
     const center = await create({ code: 'icn-1', externalCodes: { SAP: '1000', ERP: '' } })
     expect(center.code).toBe('ICN-1')
-    expect(await getExternalCodes('CENTER', center.id)).toEqual({ SAP: '1000', ERP: '' })
+    expect(await getExternalCodes('CENTER', BigInt(center.id))).toEqual({ SAP: '1000', ERP: '' })
   })
 
   it('코드 규칙: 중복 거부, 시스템 코드 모양 거부, 형식 오류는 칸별 오류', async () => {
@@ -145,12 +147,12 @@ describe('센터 수정', () => {
         ...input({ code: 'ICN2', name: '이천2센터', externalCodes: { SAP: '', ERP: 'E-ICN' } }),
       }),
     ).toMatchObject({ ok: true })
-    let saved = await prisma.center.findUniqueOrThrow({ where: { id: center.id } })
+    let saved = await prisma.center.findUniqueOrThrow({ where: { id: BigInt(center.id) } })
     expect(saved).toMatchObject({ code: 'ICN2', name: '이천2센터', systemCode: center.systemCode })
-    expect(await getExternalCodes('CENTER', center.id)).toEqual({ SAP: '', ERP: 'E-ICN' })
+    expect(await getExternalCodes('CENTER', BigInt(center.id))).toEqual({ SAP: '', ERP: 'E-ICN' })
 
     await updateCenterAction({ id: center.id, ...input({ code: '' }) })
-    saved = await prisma.center.findUniqueOrThrow({ where: { id: center.id } })
+    saved = await prisma.center.findUniqueOrThrow({ where: { id: BigInt(center.id) } })
     expect(saved.code).toBe(center.systemCode)
   })
 
@@ -166,13 +168,13 @@ describe('센터 수정', () => {
   it('사용 중지 / 다시 사용', async () => {
     const center = await create()
     await setCenterActiveAction({ id: center.id, isActive: false })
-    expect((await prisma.center.findUniqueOrThrow({ where: { id: center.id } })).isActive).toBe(
-      false,
-    )
+    expect(
+      (await prisma.center.findUniqueOrThrow({ where: { id: BigInt(center.id) } })).isActive,
+    ).toBe(false)
     await setCenterActiveAction({ id: center.id, isActive: true })
-    expect((await prisma.center.findUniqueOrThrow({ where: { id: center.id } })).isActive).toBe(
-      true,
-    )
+    expect(
+      (await prisma.center.findUniqueOrThrow({ where: { id: BigInt(center.id) } })).isActive,
+    ).toBe(true)
   })
 })
 
@@ -190,7 +192,7 @@ describe('목록 · 데이터 범위 · 권한', () => {
   it('센터 직원: 소속 센터만 보이고, 다른 센터는 고칠 수 없다 (존재도 알려주지 않음)', async () => {
     const icn = await create({ code: 'ICN' })
     const gmh = await create({ code: 'GMH', name: '김해센터' })
-    signIn({ kind: 'CENTERS', centerIds: [icn.id] })
+    signIn({ kind: 'CENTERS', centerIds: [BigInt(icn.id)] })
 
     const result = await listCentersAction(createDataGridState())
     expect(result.ok && result.data.rows.map((r) => r.code)).toEqual(['ICN'])
@@ -206,7 +208,7 @@ describe('목록 · 데이터 범위 · 권한', () => {
 
   it('센터 직원은 권한 코드가 있어도 등록·사용 중지는 못 한다 (운영사만)', async () => {
     const icn = await create({ code: 'ICN' })
-    signIn({ kind: 'CENTERS', centerIds: [icn.id] })
+    signIn({ kind: 'CENTERS', centerIds: [BigInt(icn.id)] })
 
     expect(await createCenterAction(input({ code: 'NEW' }))).toMatchObject({
       ok: false,
@@ -243,10 +245,10 @@ describe('목록 검색 조건 · 일괄 처리 · 엑셀', () => {
       phone: '055-999-0000',
       managerName: '박센터',
     })
-    await prisma.center.update({ where: { id: gmh.id }, data: { isActive: false } })
+    await prisma.center.update({ where: { id: BigInt(gmh.id) }, data: { isActive: false } })
     await prisma.warehouse.create({
       data: {
-        centerId: icn.id,
+        centerId: BigInt(icn.id),
         systemCode: 'WH-T1',
         code: 'COLD',
         name: '냉동',
@@ -273,13 +275,13 @@ describe('목록 검색 조건 · 일괄 처리 · 엑셀', () => {
     })
     expect(await codes({ status: 'INACTIVE' })).toEqual(['AAA', 'BBB'])
 
-    expect(await setCentersActiveAction({ ids: [a.id, 'nope'], isActive: true })).toMatchObject({
+    expect(await setCentersActiveAction({ ids: [a.id, '999999'], isActive: true })).toMatchObject({
       ok: false,
       error: { code: 'NOT_FOUND' },
     })
     expect(await codes({ status: 'ACTIVE' })).toEqual([])
 
-    signIn({ kind: 'CENTERS', centerIds: [a.id] })
+    signIn({ kind: 'CENTERS', centerIds: [BigInt(a.id)] })
     expect(await setCentersActiveAction({ ids: [a.id], isActive: true })).toMatchObject({
       ok: false,
       error: { code: 'FORBIDDEN' },

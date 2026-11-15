@@ -10,7 +10,7 @@ import type { CenterData } from './center-schema'
 // 센터 저장 (docs/decisions/0026). 권한·데이터 범위 검사는 서버 액션에서 한다
 
 // 사용자 코드 검사: 시스템 코드 모양 금지(자기 것 제외), 다른 센터와 중복 금지
-async function assertUserCode(code: string, ownSystemCode: string, exceptId?: string) {
+async function assertUserCode(code: string, ownSystemCode: string, exceptId?: bigint) {
   if (code !== ownSystemCode && looksLikeSystemCode('CENTER', code)) {
     throw new ActionError(
       'VALIDATION',
@@ -54,7 +54,7 @@ export async function createCenter(data: CenterData) {
 }
 
 // 수정: 시스템 코드는 바뀌지 않는다. 사용자 코드를 비우면 시스템 코드로
-export async function updateCenter(id: string, data: CenterData) {
+export async function updateCenter(id: bigint, data: CenterData) {
   const current = await prisma.center.findUnique({ where: { id }, select: { systemCode: true } })
   if (!current) throw new ActionError('NOT_FOUND', '센터를 찾을 수 없습니다.')
   const code = data.code || current.systemCode

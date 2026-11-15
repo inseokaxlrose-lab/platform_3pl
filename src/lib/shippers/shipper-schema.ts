@@ -10,6 +10,7 @@ import {
   requiredText,
   userCodeField,
 } from '@/lib/validation/common-fields'
+import { idSchema } from '@/lib/id'
 
 // 화주사 입력 규칙 — 화면·서버 공용 (docs/decisions/0035)
 
@@ -30,7 +31,7 @@ export const shipperSchema = z.object({
   ...addressShape,
   // 이용 센터: 1곳 이상 (입고 받을 센터가 있어야 한다)
   centerIds: z
-    .array(z.string().min(1))
+    .array(idSchema)
     .min(1, '이용 센터를 1곳 이상 골라 주세요.')
     .max(50)
     .transform((ids) => [...new Set(ids)]),

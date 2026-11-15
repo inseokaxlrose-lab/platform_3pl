@@ -9,6 +9,7 @@ import 'dotenv/config'
 import { ensureCenterDefaults } from '../src/lib/centers/center-defaults'
 import { nextSystemCode } from '../src/lib/master-code/system-code'
 import { prisma } from '../src/lib/prisma'
+import { COMPANY_ID } from '../src/lib/company/company'
 import { createUserAccount } from '../src/lib/users/create-user-account'
 import { SEED_CODE_GROUPS } from './seed-codes'
 import { SAMPLE_ACCOUNTS, SEED_GROUPS, SUPER_GROUP_NAME } from './seed-roles'
@@ -17,7 +18,7 @@ import { SEED_UNITS } from './seed-units'
 // 권한그룹을 만들고, 권한 목록을 정의와 똑같이 맞춘다 (새 메뉴 추가 시 시드만 다시 실행)
 // 돌려주는 값: 그룹 이름 → id
 async function seedGroups() {
-  const ids = new Map<string, string>()
+  const ids = new Map<string, bigint>()
   for (const definition of SEED_GROUPS) {
     const group = await prisma.permissionGroup.upsert({
       where: { name: definition.name },
@@ -37,7 +38,7 @@ async function seedGroups() {
   return ids
 }
 
-async function linkGroup(userId: string, groupId: string) {
+async function linkGroup(userId: bigint, groupId: bigint) {
   await prisma.userPermissionGroup.upsert({
     where: { userId_groupId: { userId, groupId } },
     create: { userId, groupId },
@@ -45,7 +46,7 @@ async function linkGroup(userId: string, groupId: string) {
   })
 }
 
-async function seedSuperAdmin(groupId: string) {
+async function seedSuperAdmin(groupId: bigint) {
   const username = (process.env.SEED_ADMIN_USERNAME ?? 'admin').toLowerCase()
   const password = process.env.SEED_ADMIN_PASSWORD
   if (!password) {
@@ -73,7 +74,7 @@ async function seedSuperAdmin(groupId: string) {
 }
 
 // 역할별 견본 계정: 없을 때만 만든다
-async function seedSampleAccounts(groupIds: Map<string, string>) {
+async function seedSampleAccounts(groupIds: Map<string, bigint>) {
   if (process.env.NODE_ENV === 'production') {
     console.log('견본 계정: 운영 환경이라 건너뜀')
     return
@@ -166,14 +167,14 @@ async function seedSampleOrganizations() {
 
 // 예시 운영사 정보: 없을 때만 만든다 (화면에서 입력한 실제 정보를 덮어쓰지 않기 위해)
 async function seedSampleCompany() {
-  const exists = await prisma.company.findUnique({ where: { id: 'default' } })
+  const exists = await prisma.company.findUnique({ where: { id: COMPANY_ID } })
   if (exists) {
     console.log(`운영사 정보 이미 있음: ${exists.name} (그대로 둠)`)
     return
   }
   await prisma.company.create({
     data: {
-      id: 'default',
+      id: COMPANY_ID,
       name: '예시물류(주)',
       businessNumber: '2208112341',
       ceoName: '홍길동',

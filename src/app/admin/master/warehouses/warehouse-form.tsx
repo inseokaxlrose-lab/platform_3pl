@@ -77,6 +77,8 @@ export function WarehouseForm(props: WarehouseFormProps) {
         : createWarehouseAction({ centerId, ...data }),
     afterSave: (saved) => ({
       ...saved,
+      // 검사를 거친 값은 키가 bigint라 화면 값(글자)으로 되돌린다
+      centerId: String(saved.centerId),
       externalCodes: { ...EMPTY_EXTERNAL_CODES, ...saved.externalCodes },
     }),
     onSuccess: editing

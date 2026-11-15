@@ -18,6 +18,8 @@ import {
 } from '@/lib/locations/locations'
 import { prisma } from '@/lib/prisma'
 import { assertInScope, scopeFilter, type DataScope } from '@/lib/scope/data-scope'
+import { idField, idSchema } from '@/lib/id'
+import { idFilter } from '@/lib/grid/list-filters'
 
 // 로케이션 관리 서버 액션 (docs/decisions/0028)
 // 데이터 범위: 센터 직원은 소속 센터 창고의 로케이션만
@@ -25,7 +27,7 @@ import { assertInScope, scopeFilter, type DataScope } from '@/lib/scope/data-sco
 const LOCATION_SCOPE = { center: 'warehouse.centerId' }
 
 // 범위 안의 창고 (밖이면 "찾을 수 없음")
-async function findWarehouseInScope(warehouseId: string, scope: DataScope) {
+async function findWarehouseInScope(warehouseId: bigint, scope: DataScope) {
   const warehouse = await prisma.warehouse.findUnique({
     where: { id: warehouseId },
     select: { id: true, centerId: true, type: true, isActive: true },
@@ -35,7 +37,7 @@ async function findWarehouseInScope(warehouseId: string, scope: DataScope) {
 }
 
 // 고른 로케이션이 모두 범위 안에 있어야 한다 (하나라도 밖이면 전체 거부)
-async function findLocationsInScope(ids: string[], scope: DataScope) {
+async function findLocationsInScope(ids: bigint[], scope: DataScope) {
   const unique = [...new Set(ids)]
   const locations = await prisma.location.findMany({
     where: { AND: [{ id: { in: unique } }, scopeFilter(scope, LOCATION_SCOPE)] },
@@ -47,10 +49,7 @@ async function findLocationsInScope(ids: string[], scope: DataScope) {
   return locations
 }
 
-const idsSchema = z
-  .array(z.string().min(1))
-  .min(1, '로케이션을 골라 주세요.')
-  .max(MAX_BULK_LOCATIONS)
+const idsSchema = z.array(idSchema).min(1, '로케이션을 골라 주세요.').max(MAX_BULK_LOCATIONS)
 
 // 목록 (검색 조건: 로케이션 목록 화면의 searchFields와 같은 키 — center·warehouse·zone·status)
 // 엑셀 전체는 엑셀 권한 필요
@@ -80,8 +79,8 @@ export const listLocationsAction = createAction({
       AND: [
         query.where,
         scopeFilter(scope, LOCATION_SCOPE),
-        filters.center ? { warehouse: { centerId: filters.center } } : {},
-        filters.warehouse ? { warehouseId: filters.warehouse } : {},
+        idFilter(filters, 'center') ? { warehouse: { centerId: idFilter(filters, 'center') } } : {},
+        idFilter(filters, 'warehouse') ? { warehouseId: idFilter(filters, 'warehouse') } : {},
         filters.zone ? { zone: filters.zone } : {},
         filters.status === 'ACTIVE' ? { isActive: true } : {},
         filters.status === 'INACTIVE' ? { isActive: false } : {},
@@ -136,7 +135,7 @@ export const listLocationsAction = createAction({
 export const createLocationAction = createAction({
   permission: 'master.locations.create',
   input: z.object({
-    warehouseId: z.string().min(1, '창고를 골라 주세요.'),
+    warehouseId: idField('창고를 골라 주세요.'),
     code: locationCodeField,
   }),
   handler: async ({ input, scope }) => {
@@ -146,7 +145,7 @@ export const createLocationAction = createAction({
 })
 
 const bulkInput = z.object({
-  warehouseId: z.string().min(1, '창고를 골라 주세요.'),
+  warehouseId: idField('창고를 골라 주세요.'),
   range: locationRangeSchema,
 })
 

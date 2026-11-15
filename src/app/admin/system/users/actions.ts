@@ -4,7 +4,7 @@ import { z } from 'zod'
 import { ActionError } from '@/lib/actions/action-error'
 import { createAction } from '@/lib/actions/create-action'
 import { listQuerySchema, toPrismaQuery } from '@/lib/grid/grid-query'
-import { dateRangeFilter } from '@/lib/grid/list-filters'
+import { dateRangeFilter, idFilter } from '@/lib/grid/list-filters'
 import { USER_TYPES } from '@/lib/users/user-schema'
 import { overridesIssue } from '@/lib/permissions/override-state'
 import { prisma } from '@/lib/prisma'
@@ -13,6 +13,7 @@ import { affiliationIssues, internalEmail } from '@/lib/users/affiliation'
 import { createUserAccount } from '@/lib/users/create-user-account'
 import { createUserSchema, passwordSchema, updateUserSchema } from '@/lib/users/user-schema'
 import { resetUserPassword, setUserActive } from '@/lib/users/manage-user'
+import { idSchema } from '@/lib/id'
 
 // 사용자 관리 서버 액션 (docs/decisions/0018-user-admin.md)
 // 시스템 메뉴는 운영사만 쓸 수 있다 (권한 계산에서 이미 막지만 서버에서 한 번 더 확인)
@@ -26,7 +27,7 @@ function requireOperator(user: CurrentUser) {
 }
 
 // 권한그룹은 사용자 유형에 맞는 영역만 (운영사·센터 → 운영사 화면 그룹, 화주사 → 포털 그룹)
-async function assertGroupsMatch(groupIds: string[], userType: UserType) {
+async function assertGroupsMatch(groupIds: bigint[], userType: UserType) {
   if (groupIds.length === 0) return
   const area = userType === 'SHIPPER' ? 'PORTAL' : 'ADMIN'
   const groups = await prisma.permissionGroup.findMany({
@@ -38,12 +39,12 @@ async function assertGroupsMatch(groupIds: string[], userType: UserType) {
   }
 }
 
-function assertAffiliation(userType: UserType, centerIds: string[], shipperId?: string) {
+function assertAffiliation(userType: UserType, centerIds: bigint[], shipperId?: bigint) {
   const issue = affiliationIssues(userType, centerIds, shipperId)[0]
   if (issue) throw new ActionError('VALIDATION', issue.message)
 }
 
-async function assertEmailFree(email: string, exceptUserId?: string) {
+async function assertEmailFree(email: string, exceptUserId?: bigint) {
   const owner = await prisma.user.findUnique({ where: { email }, select: { id: true } })
   if (owner && owner.id !== exceptUserId) {
     throw new ActionError('CONFLICT', '이미 사용 중인 이메일입니다.')
@@ -81,9 +82,13 @@ export const listUsersAction = createAction({
         userType ? { userType } : {},
         filters.status === 'ACTIVE' ? { isActive: true } : {},
         filters.status === 'INACTIVE' ? { isActive: false } : {},
-        filters.group ? { permissionGroups: { some: { groupId: filters.group } } } : {},
-        filters.center ? { centers: { some: { centerId: filters.center } } } : {},
-        filters.shipper ? { shipperId: filters.shipper } : {},
+        idFilter(filters, 'group')
+          ? { permissionGroups: { some: { groupId: idFilter(filters, 'group') } } }
+          : {},
+        idFilter(filters, 'center')
+          ? { centers: { some: { centerId: idFilter(filters, 'center') } } }
+          : {},
+        idFilter(filters, 'shipper') ? { shipperId: idFilter(filters, 'shipper') } : {},
         createdAt ? { createdAt } : {},
       ],
     }
@@ -168,7 +173,7 @@ export const updateUserAction = createAction({
 
     assertAffiliation(target.userType, input.centerIds, input.shipperId)
     await assertGroupsMatch(input.permissionGroupIds, target.userType)
-    const email = input.email?.toLowerCase() ?? internalEmail(target.username ?? input.id)
+    const email = input.email?.toLowerCase() ?? internalEmail(target.username ?? String(input.id))
     await assertEmailFree(email, input.id)
 
     await prisma.$transaction([
@@ -194,7 +199,7 @@ export const updateUserAction = createAction({
 
 export const setUserActiveAction = createAction({
   permission: 'system.users.update',
-  input: z.object({ id: z.string().min(1), isActive: z.boolean() }),
+  input: z.object({ id: idSchema, isActive: z.boolean() }),
   handler: async ({ user, input }) => {
     requireOperator(user)
     if (input.id === user.id && !input.isActive) {
@@ -212,7 +217,7 @@ export const setUserActiveAction = createAction({
 // 자기 자신이 섞여 있으면 사용 중지를 거부, 없는 사용자가 섞이면 전체 거부
 export const setUsersActiveAction = createAction({
   permission: 'system.users.update',
-  input: z.object({ ids: z.array(z.string().min(1)).min(1).max(200), isActive: z.boolean() }),
+  input: z.object({ ids: z.array(idSchema).min(1).max(200), isActive: z.boolean() }),
   handler: async ({ user, input }) => {
     requireOperator(user)
     const ids = [...new Set(input.ids)]
@@ -231,7 +236,7 @@ export const setUsersActiveAction = createAction({
 export const resetUserPasswordAction = createAction({
   permission: 'system.users.update',
   input: z
-    .object({ id: z.string().min(1), password: passwordSchema, passwordConfirm: z.string() })
+    .object({ id: idSchema, password: passwordSchema, passwordConfirm: z.string() })
     .refine((data) => data.password === data.passwordConfirm, {
       path: ['passwordConfirm'],
       message: '비밀번호가 서로 다릅니다.',
@@ -251,7 +256,7 @@ export const resetUserPasswordAction = createAction({
 export const updateUserOverridesAction = createAction({
   permission: 'system.users.update',
   input: z.object({
-    id: z.string().min(1),
+    id: idSchema,
     grants: z.array(z.string().min(1)).max(500),
     denies: z.array(z.string().min(1)).max(500),
   }),

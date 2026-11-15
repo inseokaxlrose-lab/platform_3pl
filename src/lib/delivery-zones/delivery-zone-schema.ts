@@ -2,6 +2,7 @@ import { z } from 'zod'
 import { externalCodesSchema } from '@/lib/master-code/external-codes-schema'
 import { optionalText, requiredText, userCodeField } from '@/lib/validation/common-fields'
 import { isRegionCode, overlapsWithin, regionLabel } from './regions'
+import { idField } from '@/lib/id'
 
 // 배송권역 입력 규칙 — 화면·서버 공용 (docs/decisions/0033)
 
@@ -9,7 +10,7 @@ export const MAX_ZONE_REGIONS = 300
 
 export const deliveryZoneSchema = z.object({
   // 등록 후 바꿀 수 없다 (수정에서는 무시)
-  centerId: z.string().min(1, '센터를 골라 주세요.'),
+  centerId: idField('센터를 골라 주세요.'),
   // 사용자 코드: 같은 센터 안에서 중복 금지, 비우면 시스템 코드
   code: userCodeField('권역 코드'),
   name: requiredText('권역명을 입력해 주세요.', 50),

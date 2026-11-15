@@ -3,8 +3,8 @@ import { assertCodeValues } from '@/lib/common-code/common-codes'
 import { prisma } from '@/lib/prisma'
 import { CONTACT_DUTY_GROUP, type CompanyData } from './company-schema'
 
-// 운영사 1곳 기준 고정 id (docs/decisions/0024)
-export const COMPANY_ID = 'default'
+// 운영사 1곳 기준 고정 키 1 (docs/decisions/0024). M2.5 3단계(멀티테넌트)에서 여러 운영사로 바뀐다
+export const COMPANY_ID = 1n
 
 // 운영사 정보 (아직 등록 전이면 null)
 export async function getCompany() {
@@ -21,7 +21,7 @@ export type Company = NonNullable<Awaited<ReturnType<typeof getCompany>>>
 
 // 저장: 처음이면 만들고, 있으면 고친다. 담당자는 화면 순서대로 통째로 바꾼다 (한 트랜잭션)
 // 담당 업무는 사용 중인 공통코드만. 이미 저장돼 있던 코드는 그 사이 사용 중지됐어도 그대로 둘 수 있다 (0030)
-export async function saveCompany(data: CompanyData, updatedById: string) {
+export async function saveCompany(data: CompanyData, updatedById: bigint) {
   const { contacts, ...fields } = data
   await prisma.$transaction(async (tx) => {
     const saved = await tx.companyContact.findMany({

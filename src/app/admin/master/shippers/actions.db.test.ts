@@ -31,7 +31,7 @@ const CODES: PermissionCode[] = [
 
 function signIn(scope: DataScope = { kind: 'ALL' }, codes = CODES) {
   vi.mocked(getCurrentUser).mockResolvedValue({
-    id: 'u1',
+    id: 1n,
     name: '관리자',
     username: 'boss',
     userType: scope.kind === 'ALL' ? 'OPERATOR' : 'CENTER',
@@ -40,8 +40,8 @@ function signIn(scope: DataScope = { kind: 'ALL' }, codes = CODES) {
   vi.mocked(getCurrentScope).mockResolvedValue(scope)
 }
 
-let icnId = ''
-let gmhId = ''
+let icnId = 0n
+let gmhId = 0n
 
 const input = (overrides: Partial<ShipperInput> = {}): ShipperInput => ({
   code: '',
@@ -56,7 +56,7 @@ const input = (overrides: Partial<ShipperInput> = {}): ShipperInput => ({
   zipCode: '',
   address: '',
   addressDetail: '',
-  centerIds: [icnId],
+  centerIds: [String(icnId)],
   useLot: true,
   useExpiry: true,
   labelUnit: 'PLT',
@@ -91,7 +91,7 @@ describe('화주사 등록·수정', () => {
     expect(shipper.systemCode).toMatch(/^SH\d{6}$/)
     expect(shipper.code).toBe(shipper.systemCode)
     const saved = await prisma.shipper.findUniqueOrThrow({
-      where: { id: shipper.id },
+      where: { id: BigInt(shipper.id) },
       include: { centers: true, contacts: true },
     })
     expect(saved).toMatchObject({ businessNumber: '1234567891', phone: '021234567', useLot: true })
@@ -99,7 +99,7 @@ describe('화주사 등록·수정', () => {
     expect(saved.contacts).toEqual([
       expect.objectContaining({ duty: 'INBOUND', phone: '01011112222', isPrimary: true }),
     ])
-    expect(await getExternalCodes('SHIPPER', shipper.id)).toEqual({ SAP: 'V100', ERP: '' })
+    expect(await getExternalCodes('SHIPPER', BigInt(shipper.id))).toEqual({ SAP: 'V100', ERP: '' })
     // 담당 업무 코드가 쓰이고 있으면 공통코드에서 지울 수 없다
     expect(await countCodeUsage(prisma, 'CONTACT_DUTY', 'INBOUND')).toBe(1)
   })
@@ -140,28 +140,30 @@ describe('화주사 등록·수정', () => {
       error: { message: expect.stringContaining('시스템 코드 모양') },
     })
     await prisma.center.update({ where: { id: gmhId }, data: { isActive: false } })
-    expect(await createShipperAction(input({ code: 'NEW', centerIds: [gmhId] }))).toMatchObject({
+    expect(
+      await createShipperAction(input({ code: 'NEW', centerIds: [String(gmhId)] })),
+    ).toMatchObject({
       ok: false,
       error: { code: 'CONFLICT' },
     })
   })
 
   it('수정: 이용 센터·담당자를 통째로 바꾼다 (이미 연결된 사용 중지 센터는 그대로 둘 수 있다)', async () => {
-    const shipper = await create({ code: 'GANA', centerIds: [icnId, gmhId] })
+    const shipper = await create({ code: 'GANA', centerIds: [String(icnId), String(gmhId)] })
     await prisma.center.update({ where: { id: gmhId }, data: { isActive: false } })
     const result = await updateShipperAction({
       id: shipper.id,
       ...input({
         code: 'GANA',
         name: '가나푸드',
-        centerIds: [gmhId],
+        centerIds: [String(gmhId)],
         contacts: [],
         useLot: false,
       }),
     })
     expect(result).toMatchObject({ ok: true })
     const saved = await prisma.shipper.findUniqueOrThrow({
-      where: { id: shipper.id },
+      where: { id: BigInt(shipper.id) },
       include: { centers: true, contacts: true },
     })
     expect(saved).toMatchObject({ name: '가나푸드', useLot: false })
@@ -176,7 +178,7 @@ describe('목록 · 데이터 범위', () => {
     await create({
       code: 'DARA',
       name: '다라전자',
-      centerIds: [icnId, gmhId],
+      centerIds: [String(icnId), String(gmhId)],
       useLot: false,
       useExpiry: false,
       labelUnit: 'BOX',
@@ -185,7 +187,7 @@ describe('목록 · 데이터 범위', () => {
       const r = await listShippersAction({ ...createDataGridState(), filters })
       return r.ok ? r.data.rows.map((s) => s.code).sort() : r.error
     }
-    expect(await codes({ center: gmhId })).toEqual(['DARA'])
+    expect(await codes({ center: String(gmhId) })).toEqual(['DARA'])
     expect(await codes({ lot: 'Y' })).toEqual(['GANA'])
     expect(await codes({ expiry: 'N' })).toEqual(['DARA'])
     expect(await codes({ labelUnit: 'BOX' })).toEqual(['DARA'])
@@ -196,14 +198,18 @@ describe('목록 · 데이터 범위', () => {
   })
 
   it('센터 직원: 자기 센터를 이용하는 화주사만 보고, 등록·수정·사용 중지는 못 한다', async () => {
-    const gana = await create({ code: 'GANA', centerIds: [icnId] })
-    const dara = await create({ code: 'DARA', centerIds: [gmhId] })
+    const gana = await create({ code: 'GANA', centerIds: [String(icnId)] })
+    const dara = await create({ code: 'DARA', centerIds: [String(gmhId)] })
     signIn({ kind: 'CENTERS', centerIds: [gmhId] })
 
     const list = await listShippersAction(createDataGridState())
     expect(list.ok && list.data.rows.map((s) => s.code)).toEqual(['DARA'])
-    expect(await getShipperForEdit(gana.id, { kind: 'CENTERS', centerIds: [gmhId] })).toBeNull()
-    expect(await getShipperForEdit(dara.id, { kind: 'CENTERS', centerIds: [gmhId] })).not.toBeNull()
+    expect(
+      await getShipperForEdit(BigInt(gana.id), { kind: 'CENTERS', centerIds: [gmhId] }),
+    ).toBeNull()
+    expect(
+      await getShipperForEdit(BigInt(dara.id), { kind: 'CENTERS', centerIds: [gmhId] }),
+    ).not.toBeNull()
 
     expect(await createShipperAction(input({ code: 'NEW' }))).toMatchObject({
       ok: false,

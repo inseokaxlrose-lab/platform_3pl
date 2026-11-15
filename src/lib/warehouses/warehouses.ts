@@ -11,10 +11,10 @@ import type { WarehouseUpdateData } from './warehouse-schema'
 
 // 사용자 코드 검사: 시스템 코드 모양 금지(자기 것 제외), 같은 센터 안 중복 금지
 async function assertWarehouseCode(
-  centerId: string,
+  centerId: bigint,
   code: string,
   ownSystemCode: string,
-  exceptId?: string,
+  exceptId?: bigint,
 ) {
   if (code !== ownSystemCode && looksLikeSystemCode('WAREHOUSE', code)) {
     throw new ActionError(
@@ -32,7 +32,7 @@ async function assertWarehouseCode(
 }
 
 // 등록: 사용자가 만드는 창고는 항상 일반 유형 (한 트랜잭션: 시스템 코드 → 창고 → 외부 코드)
-export async function createWarehouse(centerId: string, data: WarehouseUpdateData) {
+export async function createWarehouse(centerId: bigint, data: WarehouseUpdateData) {
   return prisma.$transaction(async (tx) => {
     const systemCode = await nextSystemCode('WAREHOUSE', tx)
     const code = data.code || systemCode
@@ -54,7 +54,7 @@ export async function createWarehouse(centerId: string, data: WarehouseUpdateDat
 }
 
 // 수정: 센터·유형·시스템 코드는 바뀌지 않는다. 입고대기 창고는 코드도 고정
-export async function updateWarehouse(id: string, data: WarehouseUpdateData) {
+export async function updateWarehouse(id: bigint, data: WarehouseUpdateData) {
   const current = await prisma.warehouse.findUnique({
     where: { id },
     select: { centerId: true, systemCode: true, code: true, type: true },
@@ -85,7 +85,7 @@ export async function updateWarehouse(id: string, data: WarehouseUpdateData) {
 }
 
 // 사용 중지 / 다시 사용: 입고대기 창고는 늘 사용 중이어야 한다 (입고 확정이 들어갈 곳)
-export async function setWarehouseActive(id: string, isActive: boolean) {
+export async function setWarehouseActive(id: bigint, isActive: boolean) {
   const current = await prisma.warehouse.findUnique({ where: { id }, select: { type: true } })
   if (!current) throw new ActionError('NOT_FOUND', '창고를 찾을 수 없습니다.')
   if (current.type === 'INBOUND_STAGING' && !isActive) {

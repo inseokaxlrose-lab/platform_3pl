@@ -42,7 +42,7 @@ export async function updateUnit({ id, externalCodes, ...data }: UnitUpdateData)
 }
 
 // 고른 단위 (하나라도 없으면 전체 거부)
-async function findUnits(ids: string[]) {
+async function findUnits(ids: bigint[]) {
   const unique = [...new Set(ids)]
   const units = await prisma.unit.findMany({
     where: { id: { in: unique } },
@@ -61,7 +61,7 @@ function assertNoSystem(units: { code: string; isSystem: boolean }[], what: stri
   }
 }
 
-export async function setUnitsActive(ids: string[], isActive: boolean) {
+export async function setUnitsActive(ids: bigint[], isActive: boolean) {
   const units = await findUnits(ids)
   if (!isActive) assertNoSystem(units, '사용 중지')
   const { count } = await prisma.unit.updateMany({
@@ -73,12 +73,12 @@ export async function setUnitsActive(ids: string[], isActive: boolean) {
 
 // 품목에서 쓰는 단위 id
 // TODO(품목 작업, ROADMAP M3 화주사 품목 관리): 품목·환산단위 표가 생기면 여기서 검사한다. 지금은 빈 목록
-export async function findUsedUnitIds(ids: string[]): Promise<string[]> {
+export async function findUsedUnitIds(ids: bigint[]): Promise<bigint[]> {
   void ids
   return []
 }
 
-export async function deleteUnits(ids: string[]) {
+export async function deleteUnits(ids: bigint[]) {
   const units = await findUnits(ids)
   assertNoSystem(units, '삭제')
   if ((await findUsedUnitIds(units.map((u) => u.id))).length > 0) {

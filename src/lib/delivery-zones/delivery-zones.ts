@@ -15,10 +15,10 @@ type Db = Prisma.TransactionClient
 // 사용자 코드: 시스템 코드 모양 금지(자기 것 제외), 같은 센터 안 중복 금지
 async function assertZoneCode(
   db: Db,
-  centerId: string,
+  centerId: bigint,
   code: string,
   ownSystemCode: string,
-  exceptId?: string,
+  exceptId?: bigint,
 ) {
   if (code !== ownSystemCode && looksLikeSystemCode('DELIVERY_ZONE', code)) {
     throw new ActionError(
@@ -39,9 +39,9 @@ async function assertZoneCode(
 // 사용 중지 권역도 포함: 다시 사용할 때 겹치지 않게
 async function assertRegionsFree(
   db: Db,
-  centerId: string,
+  centerId: bigint,
   regionCodes: string[],
-  exceptZoneId?: string,
+  exceptZoneId?: bigint,
 ) {
   const taken = await db.deliveryZoneRegion.findMany({
     where: { zone: { centerId, ...(exceptZoneId ? { id: { not: exceptZoneId } } : {}) } },
@@ -95,7 +95,7 @@ export async function createDeliveryZone(data: DeliveryZoneData) {
 }
 
 // 수정: 센터·시스템 코드는 바뀌지 않는다. 담당 지역은 통째로 바꾼다
-export async function updateDeliveryZone(id: string, data: DeliveryZoneData) {
+export async function updateDeliveryZone(id: bigint, data: DeliveryZoneData) {
   return prisma.$transaction(async (tx) => {
     const current = await tx.deliveryZone.findUnique({
       where: { id },
@@ -120,14 +120,14 @@ export async function updateDeliveryZone(id: string, data: DeliveryZoneData) {
 
 // 쓰인 적 있는 권역 id
 // TODO(출고 작업, MVP 이후 출고 관리): 배송요청·출고 표가 생기면 여기서 검사한다. 지금은 쓰일 곳이 없어 빈 목록
-export async function findUsedZoneIds(db: Db, ids: string[]): Promise<string[]> {
+export async function findUsedZoneIds(db: Db, ids: bigint[]): Promise<bigint[]> {
   void db // 출고 표가 생기면 이 트랜잭션으로 검사한다
   void ids
   return []
 }
 
 // 삭제: 쓰인 적 없는 권역만 (쓰인 권역은 사용 중지). 담당 지역·외부 코드도 함께 지운다
-export async function deleteDeliveryZones(ids: string[]) {
+export async function deleteDeliveryZones(ids: bigint[]) {
   return prisma.$transaction(async (tx) => {
     const used = await findUsedZoneIds(tx, ids)
     if (used.length > 0) {

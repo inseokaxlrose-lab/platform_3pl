@@ -9,7 +9,7 @@ import { expandLocationRange, type GeneratedLocation, type LocationRange } from 
 // - 입고대기 창고에는 추가할 수 없고(기본 로케이션 DEFAULT 하나만), DEFAULT는 사용 중지·삭제할 수 없다
 // - 삭제는 한 번도 쓰이지 않은 로케이션만
 
-export type TargetWarehouse = { id: string; centerId: string; type: string; isActive: boolean }
+export type TargetWarehouse = { id: bigint; centerId: bigint; type: string; isActive: boolean }
 
 // 로케이션을 추가할 수 있는 창고인지
 function assertCanAddTo(warehouse: TargetWarehouse) {
@@ -39,7 +39,7 @@ export async function createLocation(warehouse: TargetWarehouse, code: string) {
 }
 
 // 일괄 생성 계산: 범위의 코드 중 이미 있는 것은 건너뛴다
-async function planBulk(warehouseId: string, range: LocationRange) {
+async function planBulk(warehouseId: bigint, range: LocationRange) {
   const all = expandLocationRange(range)
   const existing = await prisma.location.findMany({
     where: { warehouseId, code: { in: all.map((l) => l.code) } },
@@ -95,13 +95,13 @@ function assertNoneProtected(locations: LocationWithWarehouse[], what: string) {
 
 // 쓰인 적 있는 로케이션 id (재고·이력이 있음)
 // TODO(재고 작업, ROADMAP M4 재고 기반): 재고·재고 이력 표가 생기면 여기서 검사한다. 지금은 쓰일 곳이 없어 빈 목록
-export async function findUsedLocationIds(ids: string[]): Promise<string[]> {
+export async function findUsedLocationIds(ids: bigint[]): Promise<bigint[]> {
   void ids // 재고 표가 생기면 이 id들로 검사한다
   return []
 }
 
 export async function setLocationsActive(
-  locations: (LocationWithWarehouse & { id: string })[],
+  locations: (LocationWithWarehouse & { id: bigint })[],
   isActive: boolean,
 ) {
   if (!isActive) assertNoneProtected(locations, '사용 중지')
@@ -112,7 +112,7 @@ export async function setLocationsActive(
   return { updated: count }
 }
 
-export async function deleteLocations(locations: (LocationWithWarehouse & { id: string })[]) {
+export async function deleteLocations(locations: (LocationWithWarehouse & { id: bigint })[]) {
   assertNoneProtected(locations, '삭제')
   const ids = locations.map((l) => l.id)
   const used = new Set(await findUsedLocationIds(ids))

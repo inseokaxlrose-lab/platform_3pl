@@ -13,8 +13,8 @@ function signIn(username: string, password = PASSWORD) {
 }
 
 // 테스트마다 새로 만드는 소속 센터·화주사
-let centerId = ''
-let shipperId = ''
+let centerId = 0n
+let shipperId = 0n
 
 beforeEach(async () => {
   await resetDatabase()

@@ -12,14 +12,14 @@ vi.mock('@/lib/session', () => ({
   getCurrentScope: vi.fn(async () => ({ kind: 'ALL' })),
 }))
 
-let aliceId = ''
-let bobId = ''
+let aliceId = 0n
+let bobId = 0n
 
-function signInAs(id: string) {
+function signInAs(id: bigint) {
   vi.mocked(getCurrentUser).mockResolvedValue({
     id,
     name: '사용자',
-    username: id,
+    username: String(id),
     userType: 'OPERATOR',
   })
   // 메뉴 권한이 하나도 없어도 개인 설정은 저장할 수 있어야 한다

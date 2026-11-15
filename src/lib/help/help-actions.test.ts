@@ -35,7 +35,7 @@ vi.mock('./load-help', async (importOriginal) => {
 
 function signedIn(codes: PermissionCode[]) {
   vi.mocked(getCurrentUser).mockResolvedValue({
-    id: 'u1',
+    id: 1n,
     name: '관리자',
     username: 'boss',
     userType: 'OPERATOR',

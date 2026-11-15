@@ -3,7 +3,7 @@ import { ALL_PERMISSION_CODES, isPermissionCode } from '@/config/permissions'
 import { prisma } from '@/lib/prisma'
 
 // 수정 화면용: 권한그룹 한 건 (화면에서 hasPermission으로 확인한 뒤 호출)
-export async function getPermissionGroup(id: string) {
+export async function getPermissionGroup(id: bigint) {
   const group = await prisma.permissionGroup.findUnique({
     where: { id },
     select: {
@@ -24,7 +24,8 @@ export async function getPermissionGroup(id: string) {
   }
   const codes = group.permissions.map((p) => p.permissionCode).sort((a, b) => order(a) - order(b))
   return {
-    id: group.id,
+    // 화면으로 보낼 값이라 키는 글자로
+    id: String(group.id),
     name: group.name,
     area: group.area,
     description: group.description ?? '',

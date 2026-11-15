@@ -10,7 +10,7 @@ export const DEFAULT_LOCATION_CODE = 'DEFAULT'
 
 // 없으면 만들고 있으면 그대로 (여러 번 불러도 안전): 센터 등록·시드가 같이 쓴다
 // 센터 등록과 같은 트랜잭션(db)에서 부르면, 센터와 기본 구성이 함께 만들어지거나 함께 취소된다
-export async function ensureCenterDefaults(db: Db, centerId: string) {
+export async function ensureCenterDefaults(db: Db, centerId: bigint) {
   let warehouse = await db.warehouse.findFirst({
     where: { centerId, type: 'INBOUND_STAGING' },
     select: { id: true },

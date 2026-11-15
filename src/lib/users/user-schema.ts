@@ -1,5 +1,6 @@
 import { z } from 'zod'
 import { affiliationIssues } from './affiliation'
+import { idSchema } from '@/lib/id'
 
 // 사용자 입력 규칙 — 화면·서버 공용 (docs/decisions/0018)
 
@@ -26,17 +27,17 @@ export const emailSchema = z
 
 // 소속·권한그룹 (센터 직원 → 센터, 화주사 사용자 → 화주사)
 export const affiliationShape = {
-  centerIds: z.array(z.string().min(1)).max(50).default([]),
+  centerIds: z.array(idSchema).max(50).default([]),
   shipperId: z
-    .string()
+    .union([z.literal(''), idSchema])
     .optional()
     .transform((value) => value || undefined),
-  permissionGroupIds: z.array(z.string().min(1)).max(50).default([]),
+  permissionGroupIds: z.array(idSchema).max(50).default([]),
 }
 
 // 유형별 소속 규칙을 칸 오류로 (centerIds / shipperId)
 function checkAffiliation(
-  data: { userType: UserTypeValue; centerIds: string[]; shipperId?: string },
+  data: { userType: UserTypeValue; centerIds: bigint[]; shipperId?: bigint },
   ctx: z.RefinementCtx,
 ) {
   for (const issue of affiliationIssues(data.userType, data.centerIds, data.shipperId)) {
@@ -63,7 +64,7 @@ export const createUserSchema = z
 
 // 수정 (서버): 아이디·유형은 바꿀 수 없다. 소속 규칙은 서버가 저장된 유형으로 확인한다
 export const updateUserSchema = z.object({
-  id: z.string().min(1),
+  id: idSchema,
   name: nameSchema,
   email: emailSchema,
   ...affiliationShape,

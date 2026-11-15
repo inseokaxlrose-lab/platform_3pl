@@ -7,6 +7,7 @@ import { listQuerySchema, toPrismaQuery } from '@/lib/grid/grid-query'
 import { normalizeGroupCodes, toPermissionArea } from '@/lib/permissions/normalize-group-codes'
 import { ROLE_AREAS, roleSchema, updateRoleSchema } from '@/lib/permissions/role-schema'
 import { prisma } from '@/lib/prisma'
+import { idSchema } from '@/lib/id'
 
 // 권한그룹 관리 서버 액션 (docs/decisions/0017-permission-group-admin.md)
 // 권한그룹은 운영사 전체 설정이라 데이터 범위(센터·화주사)를 적용하지 않는다
@@ -113,7 +114,7 @@ export const updatePermissionGroupAction = createAction({
 
 export const deletePermissionGroupAction = createAction({
   permission: 'system.roles.delete',
-  input: z.object({ id: z.string().min(1) }),
+  input: z.object({ id: idSchema }),
   handler: async ({ input }) => {
     const group = await prisma.permissionGroup.findUnique({
       where: { id: input.id },

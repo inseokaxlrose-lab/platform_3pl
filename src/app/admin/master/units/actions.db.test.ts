@@ -29,7 +29,7 @@ const CODES: PermissionCode[] = [
 
 function signIn(codes = CODES) {
   vi.mocked(getCurrentUser).mockResolvedValue({
-    id: 'u1',
+    id: 1n,
     name: '관리자',
     username: 'boss',
     userType: 'OPERATOR',
@@ -68,13 +68,15 @@ describe('단위 등록·수정', () => {
   it('코드는 대문자로, 중복 거부, 환산단위는 소수 자리수 0, 외부 코드 함께 저장', async () => {
     const kg = await create({ externalCodes: { SAP: 'KGM', ERP: '' } })
     expect(kg.code).toBe('KG')
-    expect(await getExternalCodes('UNIT', kg.id)).toEqual({ SAP: 'KGM', ERP: '' })
+    expect(await getExternalCodes('UNIT', BigInt(kg.id))).toEqual({ SAP: 'KGM', ERP: '' })
     expect(await createUnitAction(input({ code: 'KG' }))).toMatchObject({
       ok: false,
       error: { code: 'CONFLICT' },
     })
     const box = await create({ code: 'BOX', name: '박스', kind: 'PACK', decimals: 2 })
-    expect((await prisma.unit.findUniqueOrThrow({ where: { id: box.id } })).decimals).toBe(0)
+    expect((await prisma.unit.findUniqueOrThrow({ where: { id: BigInt(box.id) } })).decimals).toBe(
+      0,
+    )
     expect(await createUnitAction(input({ code: '1A', decimals: 9 }))).toMatchObject({
       ok: false,
       error: { fieldErrors: { code: [expect.any(String)], decimals: [expect.any(String)] } },
@@ -84,7 +86,7 @@ describe('단위 등록·수정', () => {
   it('수정: 코드는 그대로, 시스템 단위는 종류 변경·사용 중지 불가', async () => {
     const kg = await create()
     await updateUnitAction({ id: kg.id, ...input({ code: 'XX', name: '킬로', decimals: 2 }) })
-    expect(await prisma.unit.findUniqueOrThrow({ where: { id: kg.id } })).toMatchObject({
+    expect(await prisma.unit.findUniqueOrThrow({ where: { id: BigInt(kg.id) } })).toMatchObject({
       code: 'KG',
       name: '킬로',
       decimals: 2,
@@ -94,10 +96,16 @@ describe('단위 등록·수정', () => {
       data: { code: 'EA', name: '개', kind: 'BASE', isSystem: true },
     })
     expect(
-      await updateUnitAction({ id: ea.id, ...input({ name: '개', kind: 'PACK', decimals: 0 }) }),
+      await updateUnitAction({
+        id: String(ea.id),
+        ...input({ name: '개', kind: 'PACK', decimals: 0 }),
+      }),
     ).toMatchObject({ ok: false, error: { message: expect.stringContaining('종류') } })
     expect(
-      await updateUnitAction({ id: ea.id, ...input({ name: '개', decimals: 0, isActive: false }) }),
+      await updateUnitAction({
+        id: String(ea.id),
+        ...input({ name: '개', decimals: 0, isActive: false }),
+      }),
     ).toMatchObject({ ok: false, error: { message: expect.stringContaining('사용 중지') } })
   })
 })
@@ -121,11 +129,13 @@ describe('목록 · 일괄 처리 · 권한', () => {
     const plt = await prisma.unit.create({
       data: { code: 'PLT', name: '팔레트', kind: 'PACK', isSystem: true },
     })
-    expect(await setUnitsActiveAction({ ids: [kg.id, plt.id], isActive: false })).toMatchObject({
+    expect(
+      await setUnitsActiveAction({ ids: [kg.id, String(plt.id)], isActive: false }),
+    ).toMatchObject({
       ok: false,
       error: { code: 'CONFLICT', message: expect.stringContaining('PLT') },
     })
-    expect(await deleteUnitsAction({ ids: [plt.id] })).toMatchObject({ ok: false })
+    expect(await deleteUnitsAction({ ids: [String(plt.id)] })).toMatchObject({ ok: false })
     expect(await setUnitsActiveAction({ ids: [kg.id], isActive: false })).toEqual({
       ok: true,
       data: { count: 1 },
