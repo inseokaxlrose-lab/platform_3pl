@@ -297,9 +297,7 @@ export function WarehouseForm(props: WarehouseFormProps) {
           <div className="flex gap-2">
             {can('master.locations.read') && (
               <Button asChild type="button" variant="outline" size="sm">
-                <Link href={`/admin/master/locations?warehouseId=${editing.id}`}>
-                  로케이션 관리
-                </Link>
+                <Link href={`/admin/master/locations?warehouse=${editing.id}`}>로케이션 관리</Link>
               </Button>
             )}
             {!isStaging && editing.isActive && can('master.locations.create') && (

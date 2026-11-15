@@ -3,7 +3,7 @@
 import { z } from 'zod'
 import { ActionError } from '@/lib/actions/action-error'
 import { createAction } from '@/lib/actions/create-action'
-import { dataGridStateSchema, toPrismaQuery } from '@/lib/grid/grid-query'
+import { listQuerySchema, toPrismaQuery } from '@/lib/grid/grid-query'
 import {
   locationCodeField,
   locationRangeSchema,
@@ -52,15 +52,17 @@ const idsSchema = z
   .min(1, '로케이션을 골라 주세요.')
   .max(MAX_BULK_LOCATIONS)
 
+// 목록 (검색 조건: 로케이션 목록 화면의 searchFields와 같은 키 — center·warehouse·zone·status)
+// 엑셀 전체는 엑셀 권한 필요
 export const listLocationsAction = createAction({
   permission: 'master.locations.read',
-  input: dataGridStateSchema.extend({
-    centerId: z.string().optional(),
-    warehouseId: z.string().optional(),
-    zone: z.string().optional(),
-  }),
-  handler: async ({ input: { centerId, warehouseId, zone, ...state }, scope }) => {
-    const query = toPrismaQuery(state, {
+  input: listQuerySchema,
+  handler: async ({ input, scope, permissions }) => {
+    if (input.exportAll && !permissions.has('master.locations.export')) {
+      throw new ActionError('FORBIDDEN', '엑셀 내려받기 권한이 없습니다.')
+    }
+    const { filters } = input
+    const query = toPrismaQuery(input, {
       searchFields: ['code'],
       sortable: {
         center: 'warehouse.center.code',
@@ -78,17 +80,19 @@ export const listLocationsAction = createAction({
       AND: [
         query.where,
         scopeFilter(scope, LOCATION_SCOPE),
-        centerId ? { warehouse: { centerId } } : {},
-        warehouseId ? { warehouseId } : {},
-        zone ? { zone } : {},
+        filters.center ? { warehouse: { centerId: filters.center } } : {},
+        filters.warehouse ? { warehouseId: filters.warehouse } : {},
+        filters.zone ? { zone: filters.zone } : {},
+        filters.status === 'ACTIVE' ? { isActive: true } : {},
+        filters.status === 'INACTIVE' ? { isActive: false } : {},
       ],
     }
-    const [rows, rowCount, zones] = await prisma.$transaction([
+    const [rows, rowCount] = await prisma.$transaction([
       prisma.location.findMany({
         ...query,
         // 사용자가 정렬을 고르지 않으면 센터 → 창고 → 코드 순서 (0을 채운 코드라 글자 순서 = 위치 순서)
         orderBy:
-          state.sorting.length > 0
+          input.sorting.length > 0
             ? query.orderBy
             : [
                 { warehouse: { center: { code: 'asc' } } },
@@ -115,15 +119,6 @@ export const listLocationsAction = createAction({
         },
       }),
       prisma.location.count({ where }),
-      // 구역 고르기 목록: 창고를 골랐을 때만 그 창고의 구역
-      prisma.location.findMany({
-        where: warehouseId
-          ? { AND: [{ warehouseId }, scopeFilter(scope, LOCATION_SCOPE), { zone: { not: null } }] }
-          : { id: { in: [] } },
-        distinct: ['zone'],
-        select: { zone: true },
-        orderBy: { zone: 'asc' },
-      }),
     ])
     return {
       rows: rows.map(({ warehouse, ...row }) => ({
@@ -134,7 +129,6 @@ export const listLocationsAction = createAction({
         protected: warehouse.type === 'INBOUND_STAGING',
       })),
       rowCount,
-      zones: zones.map((z) => z.zone!).filter(Boolean),
     }
   },
 })

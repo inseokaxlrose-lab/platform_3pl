@@ -272,7 +272,7 @@ export function BulkLocationForm({
       )}
       <div className="flex justify-end gap-2">
         <Button asChild type="button" variant="outline">
-          <Link href={`/admin/master/locations${warehouseId ? `?warehouseId=${warehouseId}` : ''}`}>
+          <Link href={`/admin/master/locations${warehouseId ? `?warehouse=${warehouseId}` : ''}`}>
             목록으로
           </Link>
         </Button>

@@ -17,6 +17,7 @@ const WAREHOUSES: WarehouseOption[] = [
     centerId: 'c1',
     centerLabel: '이천센터 (ICN)',
     addable: true,
+    zones: [],
   },
   {
     id: 'w2',
@@ -24,6 +25,7 @@ const WAREHOUSES: WarehouseOption[] = [
     centerId: 'c1',
     centerLabel: '이천센터 (ICN)',
     addable: false,
+    zones: [],
   },
 ]
 

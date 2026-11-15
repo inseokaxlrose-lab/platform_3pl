@@ -16,6 +16,7 @@ import {
   previewBulkLocationsAction,
   setLocationsActiveAction,
 } from './actions'
+import { getWarehouseOptions } from './queries'
 
 vi.mock('@/lib/session', () => ({
   getCurrentUser: vi.fn(),
@@ -216,8 +217,7 @@ describe('목록 · 데이터 범위 · 권한', () => {
 
     const result = await listLocationsAction({
       ...createDataGridState({ pageSize: 50 }),
-      warehouseId: icnWarehouseId,
-      zone: 'B',
+      filters: { warehouse: icnWarehouseId, zone: 'B' },
     })
     expect(result.ok && result.data.rows.map((r) => r.code)).toEqual([
       'B-01-01',
@@ -227,7 +227,15 @@ describe('목록 · 데이터 범위 · 권한', () => {
       'B-02-02',
       'B-02-03',
     ])
-    expect(result.ok && result.data.zones).toEqual(['A', 'B'])
+    // 구역 선택지: 창고마다 그 창고의 구역
+    const options = await getWarehouseOptions({ kind: 'ALL' })
+    expect(options.find((w) => w.id === icnWarehouseId)?.zones).toEqual(['A', 'B'])
+    // 상태 거르기
+    const inactive = await listLocationsAction({
+      ...createDataGridState(),
+      filters: { warehouse: icnWarehouseId, status: 'INACTIVE' },
+    })
+    expect(inactive.ok && inactive.data.rowCount).toBe(0)
 
     const all = await listLocationsAction(createDataGridState({ pageSize: 50 }))
     expect(all.ok && all.data.rows.filter((r) => r.protected).map((r) => r.code)).toEqual([
@@ -269,6 +277,15 @@ describe('목록 · 데이터 범위 · 권한', () => {
       error: { code: 'FORBIDDEN' },
     })
     expect(await deleteLocationsAction({ ids: ['x'] })).toMatchObject({
+      ok: false,
+      error: { code: 'FORBIDDEN' },
+    })
+  })
+})
+
+describe('엑셀', () => {
+  it('엑셀 전체 읽기는 엑셀 권한이 필요하다', async () => {
+    expect(await listLocationsAction({ ...createDataGridState(), exportAll: true })).toMatchObject({
       ok: false,
       error: { code: 'FORBIDDEN' },
     })
