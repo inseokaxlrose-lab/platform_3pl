@@ -151,7 +151,7 @@ export const PERMISSION_MENUS = {
     label: '운영사',
     group: '플랫폼',
     area: 'platform',
-    actions: ['read', 'switch'],
+    actions: ['read', 'create', 'switch'],
   },
 } as const satisfies Record<string, PermissionMenuDefinition>
 

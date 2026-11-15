@@ -1,8 +1,9 @@
 import { describe, expect, it } from 'vitest'
-import { computePermissions } from '../src/lib/permissions/compute-permissions'
-import { SAMPLE_ACCOUNTS, SEED_GROUPS } from './seed-roles'
+import { computePermissions } from '@/lib/permissions/compute-permissions'
+import { SAMPLE_ACCOUNTS } from '../../../prisma/seed-samples'
+import { DEFAULT_GROUPS } from './roles'
 
-const groupOf = (name: string) => SEED_GROUPS.find((g) => g.name === name)!
+const groupOf = (name: string) => DEFAULT_GROUPS.find((g) => g.name === name)!
 
 describe('시드 역할별 권한 정의', () => {
   it('견본 계정마다 시드가 관리하는 그룹이 있고, 그룹 영역이 사용자 유형과 맞다', () => {

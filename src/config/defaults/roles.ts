@@ -1,14 +1,12 @@
-// 개발용 역할별 권한그룹·견본 계정 정의 (prisma/seed.ts가 사용, docs/decisions/0020)
-// PRD "사용자와 역할"의 4가지 역할. 실제 운영에서는 권한그룹 관리 화면에서 회사에 맞게 바꾼다
+// 운영사 기본 권한그룹 (docs/decisions/0020, 0039) — 운영사를 만들 때 그 운영사에 복사한다
+// PRD "사용자와 역할"의 4가지 역할. 운영사는 권한그룹 관리 화면에서 회사에 맞게 바꾼다
 import {
   ALL_PERMISSION_CODES,
   PERMISSION_MENUS,
   type PermissionAction,
   type PermissionCode,
   type PermissionMenu,
-} from '../src/config/permissions'
-
-type UserType = 'OPERATOR' | 'CENTER' | 'SHIPPER'
+} from '@/config/permissions'
 
 const menuOf = (code: PermissionCode) => code.slice(0, code.lastIndexOf('.')) as PermissionMenu
 
@@ -28,15 +26,15 @@ export const ADMIN_AREA_CODES = ALL_PERMISSION_CODES.filter(
 
 export const SUPER_GROUP_NAME = '슈퍼 관리자'
 
-type SeedGroup = {
+type DefaultGroup = {
   name: string
   area: 'ADMIN' | 'PORTAL'
   description: string
   codes: readonly PermissionCode[]
 }
 
-// 시드가 관리하는 권한그룹: 시드를 실행할 때마다 권한 목록을 이 정의와 똑같이 맞춘다
-export const SEED_GROUPS: readonly SeedGroup[] = [
+// 기본 권한그룹: 개발 시드는 실행할 때마다 권한 목록을 이 정의와 똑같이 맞춘다 (운영 등록은 처음 한 번 복사)
+export const DEFAULT_GROUPS: readonly DefaultGroup[] = [
   {
     name: SUPER_GROUP_NAME,
     area: 'ADMIN',
@@ -88,41 +86,5 @@ export const SEED_GROUPS: readonly SeedGroup[] = [
     area: 'PORTAL',
     description: '화주사 담당자: 품목·ASN 등록, 자기 재고 조회 (시드가 관리)',
     codes: [...menu('portal.items'), ...menu('portal.asn'), ...menu('portal.stock')],
-  },
-]
-
-type SampleAccount = {
-  username: string
-  name: string
-  userType: UserType
-  group: string
-  // 소속: 예시 센터·화주사 코드
-  centerCodes?: string[]
-  shipperCode?: string
-}
-
-// 역할별 견본 계정 (비밀번호는 .env의 SEED_SAMPLE_PASSWORD)
-export const SAMPLE_ACCOUNTS: readonly SampleAccount[] = [
-  { username: 'ops.admin', name: '운영 관리자', userType: 'OPERATOR', group: SUPER_GROUP_NAME },
-  {
-    username: 'center.manager',
-    name: '이천 운영자',
-    userType: 'CENTER',
-    group: '센터 운영자',
-    centerCodes: ['ICN'],
-  },
-  {
-    username: 'center.worker',
-    name: '이천 작업자',
-    userType: 'CENTER',
-    group: '센터 작업자',
-    centerCodes: ['ICN'],
-  },
-  {
-    username: 'shipper.user',
-    name: '가나식품 담당자',
-    userType: 'SHIPPER',
-    group: '화주사 사용자',
-    shipperCode: 'GANA',
   },
 ]

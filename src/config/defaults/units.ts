@@ -1,8 +1,8 @@
-// 시드가 만드는 기본 단위 (docs/decisions/0034)
+// 운영사 기본 단위 (docs/decisions/0034, 0039) — 운영사를 만들 때 그 운영사에 복사한다
 // 운영에서도 항상 만든다 (견본 데이터 아님). "없으면 만들기"만 해서 화면에서 고친 이름·순서는 그대로
 // isSystem: 프로그램이 직접 쓰는 단위 (EA = 기본, BOX·PLT = 라벨 단위) — 삭제·사용 중지 불가
 
-type SeedUnit = {
+type DefaultUnit = {
   code: string
   name: string
   kind: 'BASE' | 'PACK'
@@ -10,7 +10,7 @@ type SeedUnit = {
   isSystem?: boolean
 }
 
-export const SEED_UNITS: readonly SeedUnit[] = [
+export const DEFAULT_UNITS: readonly DefaultUnit[] = [
   { code: 'EA', name: '개', kind: 'BASE', decimals: 0, isSystem: true },
   { code: 'SET', name: '세트', kind: 'BASE', decimals: 0 },
   { code: 'KG', name: '킬로그램', kind: 'BASE', decimals: 3 },

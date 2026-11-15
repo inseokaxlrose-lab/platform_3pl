@@ -1,15 +1,16 @@
-// 시드가 만드는 공통코드 (docs/decisions/0030)
+// 운영사 기본 공통코드 (docs/decisions/0030, 0039)
+// 운영사를 만들 때(플랫폼 등록·시드) 그 운영사에 복사한다 (src/lib/operator/provision.ts)
 // 시스템 그룹: 프로그램이 쓰는 그룹이라 운영에서도 항상 만든다 (견본 데이터 아님)
-// 시드는 "없으면 만들기"만 한다 → 관리 화면에서 고친 이름·순서·사용 여부를 되돌리지 않는다
+// "없으면 만들기"만 한다 → 관리 화면에서 고친 이름·순서·사용 여부를 되돌리지 않는다
 
-type SeedCodeGroup = {
+type DefaultCodeGroup = {
   code: string
   name: string
   description: string
   items: readonly { code: string; name: string }[]
 }
 
-export const SEED_CODE_GROUPS: readonly SeedCodeGroup[] = [
+export const DEFAULT_CODE_GROUPS: readonly DefaultCodeGroup[] = [
   {
     code: 'CONTACT_DUTY',
     name: '담당 업무',

@@ -5,9 +5,12 @@ import { createAction } from '@/lib/actions/create-action'
 import { listQuerySchema, toPrismaQuery } from '@/lib/grid/grid-query'
 import { dateRangeFilter } from '@/lib/grid/list-filters'
 import { idSchema } from '@/lib/id'
+import { operatorRegisterSchema } from '@/lib/operator/operator-schema'
 import { OPERATOR_STATUSES } from '@/lib/operator/operator-status'
+import { registerOperator } from '@/lib/operator/register-operator'
 import { setActingOperatorCookie } from '@/lib/platform/acting-operator-cookie'
 import { prisma } from '@/lib/prisma'
+import { passwordSchema } from '@/lib/users/user-schema'
 import { z } from 'zod'
 
 // 플랫폼 · 운영사 (docs/decisions/0039)
@@ -71,5 +74,25 @@ export const switchOperatorAction = createAction({
     if (!operator) throw new ActionError('NOT_FOUND', '운영사를 찾을 수 없습니다.')
     await setActingOperatorCookie(operator.id)
     return operator
+  },
+})
+
+// 운영사 등록: 운영사 + 기본값 + 관리자 계정(admin.○○)을 한 번에 (0039 3c)
+// 관리자의 처음 비밀번호는 서버 설정(.env SEED_ADMIN_PASSWORD) — 화면으로 보내지 않는다
+export const createOperatorAction = createAction({
+  permission: 'platform.operators.create',
+  input: operatorRegisterSchema,
+  handler: async ({ user, input }) => {
+    if (user.userType !== 'PLATFORM') {
+      throw new ActionError('FORBIDDEN', '플랫폼 관리자만 운영사를 등록할 수 있습니다.')
+    }
+    const password = passwordSchema.safeParse(process.env.SEED_ADMIN_PASSWORD ?? '')
+    if (!password.success) {
+      throw new ActionError(
+        'VALIDATION',
+        '관리자 처음 비밀번호가 서버에 설정되지 않았습니다. (.env의 SEED_ADMIN_PASSWORD)',
+      )
+    }
+    return registerOperator(input, password.data)
   },
 })

@@ -1,13 +1,14 @@
-import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { createDataGridState } from '@/components/data-grid/state'
 import type { PermissionCode } from '@/config/permissions'
 import { exitActingOperatorAction } from '@/lib/platform/acting-actions'
 import { prisma } from '@/lib/prisma'
 import type { UserTypeValue } from '@/lib/redirect'
-import { getCurrentPermissions, getCurrentUser } from '@/lib/session'
+import { auth } from '@/lib/auth'
+import { getCurrentPermissions, getCurrentScope, getCurrentUser } from '@/lib/session'
 import { createTestUser } from '@/test/factories'
 import { createTestOperator, resetDatabase, TEST_OPERATOR_ID } from '@/test/reset-database'
-import { listOperatorsAction, switchOperatorAction } from './actions'
+import { createOperatorAction, listOperatorsAction, switchOperatorAction } from './actions'
 
 // 플랫폼 · 운영사 목록과 운영사 전환 (docs/decisions/0039)
 
@@ -27,7 +28,11 @@ vi.mock('next/headers', () => ({
   })),
 }))
 
-const PLATFORM_CODES: PermissionCode[] = ['platform.operators.read', 'platform.operators.switch']
+const PLATFORM_CODES: PermissionCode[] = [
+  'platform.operators.read',
+  'platform.operators.create',
+  'platform.operators.switch',
+]
 
 function signIn(userType: UserTypeValue, codes: PermissionCode[]) {
   vi.mocked(getCurrentUser).mockResolvedValue({
@@ -104,5 +109,92 @@ describe('운영사 전환', () => {
       error: { code: 'FORBIDDEN' },
     })
     expect(cookieJar.size).toBe(0)
+  })
+})
+
+describe('운영사 등록 (3c)', () => {
+  // 관리자 처음 비밀번호(서버 설정) — 테스트 전용 값
+  const PASSWORD = 'first-password-1234'
+  const register = (overrides: Record<string, string> = {}) =>
+    createOperatorAction({
+      name: '나라물류(주)',
+      businessNumber: '312-81-12349',
+      ceoName: '김나라',
+      adminSuffix: 'Nara',
+      ...overrides,
+    })
+
+  beforeEach(() => {
+    vi.stubEnv('SEED_ADMIN_PASSWORD', PASSWORD)
+  })
+  afterEach(() => {
+    vi.unstubAllEnvs()
+  })
+
+  it('운영사 + 기본값 + 관리자 admin.○○(슈퍼 관리자)를 한 번에, 그 아이디로 로그인된다', async () => {
+    const result = await register()
+    expect(result).toMatchObject({
+      ok: true,
+      data: { name: '나라물류(주)', adminUsername: 'admin.nara' },
+    })
+    const id = BigInt(result.ok ? result.data.id : 0)
+    expect(await prisma.operator.findUniqueOrThrow({ where: { id } })).toMatchObject({
+      businessNumber: '3128112349',
+      status: 'ACTIVE',
+      createdBy: 'platform',
+    })
+    expect(await prisma.unit.count({ where: { operatorId: id } })).toBeGreaterThan(0)
+    const admin = await prisma.user.findUniqueOrThrow({
+      where: { username: 'admin.nara' },
+      include: { permissionGroups: { include: { group: true } } },
+    })
+    expect(admin).toMatchObject({ operatorId: id, userType: 'OPERATOR' })
+    expect(admin.permissionGroups.map((g) => [g.group.name, g.group.operatorId])).toEqual([
+      ['슈퍼 관리자', id],
+    ])
+    expect(
+      (await auth.api.signInUsername({ body: { username: 'admin.nara', password: PASSWORD } }))
+        ?.user,
+    ).toBeDefined()
+  })
+
+  it('운영사로 작업 중이어도 새 운영사의 데이터로 만든다 (작업 중인 운영사와 섞이지 않는다)', async () => {
+    vi.mocked(getCurrentScope).mockResolvedValueOnce({ kind: 'ALL', operatorId: TEST_OPERATOR_ID })
+    const result = await register()
+    expect(result.ok).toBe(true)
+    const id = BigInt(result.ok ? result.data.id : 0)
+    expect(await prisma.unit.count({ where: { operatorId: TEST_OPERATOR_ID } })).toBe(0)
+    expect(await prisma.unit.count({ where: { operatorId: id } })).toBeGreaterThan(0)
+  })
+
+  it('관리자 아이디가 이미 있으면 거부하고 아무것도 만들지 않는다', async () => {
+    expect((await register()).ok).toBe(true)
+    expect(await register({ name: '다른물류' })).toMatchObject({
+      ok: false,
+      error: { code: 'CONFLICT', message: expect.stringContaining('admin.nara') },
+    })
+    expect(await prisma.operator.count({ where: { name: '다른물류' } })).toBe(0)
+  })
+
+  it('입력 규칙: 사업자번호 검증번호, 아이디 뒷자리 모양', async () => {
+    expect(await register({ businessNumber: '1234567890', adminSuffix: 'a b' })).toMatchObject({
+      ok: false,
+      error: {
+        code: 'VALIDATION',
+        fieldErrors: { businessNumber: [expect.any(String)], adminSuffix: [expect.any(String)] },
+      },
+    })
+  })
+
+  it('처음 비밀번호 설정이 없으면 거부, 플랫폼 관리자가 아니면 거부', async () => {
+    vi.stubEnv('SEED_ADMIN_PASSWORD', '')
+    expect(await register()).toMatchObject({
+      ok: false,
+      error: { code: 'VALIDATION', message: expect.stringContaining('SEED_ADMIN_PASSWORD') },
+    })
+    vi.stubEnv('SEED_ADMIN_PASSWORD', PASSWORD)
+    signIn('OPERATOR', PLATFORM_CODES)
+    expect(await register()).toMatchObject({ ok: false, error: { code: 'FORBIDDEN' } })
+    expect(await prisma.operator.count()).toBe(2)
   })
 })

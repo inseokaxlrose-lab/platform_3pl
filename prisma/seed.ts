@@ -1,10 +1,11 @@
 // 개발용 시드: npm run db:seed (여러 번 실행해도 안전)
 // - 예시 운영사 (아직 없을 때만, 사업자번호는 검증번호 규칙으로 만든 가상 번호) — 아래 데이터는 모두 이 운영사 것 (0039)
-// - 역할별 권한그룹 4개: 실행할 때마다 prisma/seed-roles.ts 정의와 똑같이 맞춘다
+// - 운영사 기본값(공통코드·단위·권한그룹 4개, src/config/defaults): 권한그룹 권한은 실행할 때마다 정의와 똑같이 맞춘다
 // - 예시 센터·화주사 (코드 기준으로 없을 때만 만든다) + 센터마다 입고대기 창고·기본 로케이션
 // - 슈퍼 계정: .env의 SEED_ADMIN_USERNAME / SEED_ADMIN_PASSWORD (비밀번호는 코드에 두지 않는다)
 // - 플랫폼 관리자: .env의 SEED_PLATFORM_USERNAME / SEED_PLATFORM_PASSWORD (비어 있으면 건너뛴다, 0039)
 // - 역할별 견본 계정 4개: .env의 SEED_SAMPLE_PASSWORD (비어 있거나 운영 환경이면 건너뛴다)
+// - 두 번째 견본 운영사 나라물류(주) + 관리자 admin.nara(처음 비밀번호 SEED_ADMIN_PASSWORD) + 센터 ICN (운영 환경이면 건너뛴다)
 // 이미 있는 계정은 비밀번호·소속을 덮어쓰지 않는다 (화면에서 바꾼 값을 지키기 위해)
 import 'dotenv/config'
 import { ensureCenterDefaults } from '../src/lib/centers/center-defaults'
@@ -13,37 +14,10 @@ import { prisma } from '../src/lib/prisma'
 import { acrossOperators, runAsActor, runInContext } from '../src/lib/actor'
 import { toYn } from '../src/lib/yn'
 import { createUserAccount } from '../src/lib/users/create-user-account'
-import { SEED_CODE_GROUPS } from './seed-codes'
-import { SAMPLE_ACCOUNTS, SEED_GROUPS, SUPER_GROUP_NAME } from './seed-roles'
-import { SEED_UNITS } from './seed-units'
-
-// 권한그룹을 만들고, 권한 목록을 정의와 똑같이 맞춘다 (새 메뉴 추가 시 시드만 다시 실행)
-// 돌려주는 값: 그룹 이름 → id
-async function seedGroups(operatorId: bigint) {
-  const ids = new Map<string, bigint>()
-  for (const definition of SEED_GROUPS) {
-    const group = await prisma.permissionGroup.upsert({
-      where: { operatorId_name: { operatorId, name: definition.name } },
-      create: {
-        operatorId,
-        name: definition.name,
-        area: definition.area,
-        description: definition.description,
-      },
-      update: { area: definition.area, description: definition.description },
-    })
-    const codes = [...new Set(definition.codes)]
-    await prisma.$transaction([
-      prisma.permissionGroupPermission.deleteMany({ where: { groupId: group.id } }),
-      prisma.permissionGroupPermission.createMany({
-        data: codes.map((permissionCode) => ({ groupId: group.id, permissionCode })),
-      }),
-    ])
-    ids.set(definition.name, group.id)
-    console.log(`권한그룹 '${definition.name}': 권한 ${codes.length}개`)
-  }
-  return ids
-}
+import { SUPER_GROUP_NAME } from '../src/config/defaults/roles'
+import { provisionOperator } from '../src/lib/operator/provision'
+import { registerOperator } from '../src/lib/operator/register-operator'
+import { SAMPLE_ACCOUNTS } from './seed-samples'
 
 async function linkGroup(userId: bigint, groupId: bigint) {
   await prisma.userPermissionGroup.upsert({
@@ -239,50 +213,61 @@ async function seedSampleOperator(): Promise<bigint> {
   return created.id
 }
 
-// 공통코드 시스템 그룹 (0030): 없으면 만들고, 이미 있으면 시스템 표시만 맞춘다 (고친 이름·순서는 그대로)
-async function seedCommonCodes(operatorId: bigint) {
-  for (const { items, ...group } of SEED_CODE_GROUPS) {
-    const saved = await prisma.codeGroup.upsert({
-      where: { operatorId_code: { operatorId, code: group.code } },
-      create: { ...group, operatorId, isSystem: 'Y' },
-      update: { isSystem: 'Y' },
-    })
-    for (const [index, item] of items.entries()) {
-      await prisma.codeItem.upsert({
-        where: { groupId_code: { groupId: saved.id, code: item.code } },
-        create: { ...item, operatorId, groupId: saved.id, sortOrder: (index + 1) * 10 },
-        update: {},
-      })
-    }
-  }
-  console.log(`공통코드: 시스템 그룹 ${SEED_CODE_GROUPS.length}개 확인`)
+// 운영사 기본값 (공통코드·단위·권한그룹): 개발 시드는 권한그룹 권한을 정의와 똑같이 다시 맞춘다
+async function seedOperatorDefaults(operatorId: bigint, label: string) {
+  const groupIds = await provisionOperator(prisma, operatorId, { syncGroupPermissions: true })
+  console.log(`${label}: 기본 공통코드·단위·권한그룹 ${groupIds.size}개 확인`)
+  return groupIds
 }
 
-// 기본 단위 (0034): 없으면 만들고, 이미 있으면 시스템 표시만 맞춘다
-async function seedUnits(operatorId: bigint) {
-  for (const [index, unit] of SEED_UNITS.entries()) {
-    // 예/아니오 칸은 DB에 'Y'/'N'으로
-    const isSystem = toYn(unit.isSystem ?? false)
-    await prisma.unit.upsert({
-      where: { operatorId_code: { operatorId, code: unit.code } },
-      create: { ...unit, operatorId, isSystem, sortOrder: (index + 1) * 10 },
-      update: { isSystem },
-    })
+// 두 번째 견본 운영사 (0039 3c): 운영사 격리를 화면에서 확인하는 용도 (운영 환경이면 건너뛴다)
+// 플랫폼의 운영사 등록과 같은 함수로 만든다 → 관리자 admin.nara (처음 비밀번호 SEED_ADMIN_PASSWORD)
+const SECOND_OPERATOR = {
+  name: '나라물류(주)',
+  businessNumber: '3128112349',
+  ceoName: '김나라',
+  adminSuffix: 'nara',
+}
+
+async function seedSecondOperator() {
+  if (process.env.NODE_ENV === 'production') {
+    console.log('두 번째 견본 운영사: 운영 환경이라 건너뜀')
+    return
   }
-  console.log(`단위: 기본 ${SEED_UNITS.length}개 확인`)
+  const found = await prisma.operator.findFirst({ where: { name: SECOND_OPERATOR.name } })
+  const operatorId = found
+    ? found.id
+    : (await registerOperator(SECOND_OPERATOR, process.env.SEED_ADMIN_PASSWORD ?? '')).id
+  console.log(`두 번째 견본 운영사 ${found ? '이미 있음' : '생성'}: ${SECOND_OPERATOR.name}`)
+  await runInContext({ actor: 'seed', operatorId }, async () => {
+    await seedOperatorDefaults(operatorId, SECOND_OPERATOR.name)
+    // 예시 운영사와 같은 센터 코드 ICN (운영사마다 따로 쓸 수 있다)
+    const center =
+      (await prisma.center.findUnique({
+        where: { operatorId_code: { operatorId, code: 'ICN' } },
+      })) ??
+      (await prisma.center.create({
+        data: {
+          operatorId,
+          code: 'ICN',
+          name: '나라 인천센터',
+          systemCode: await nextSystemCode('CENTER'),
+        },
+      }))
+    await ensureCenterDefaults(prisma, center.id)
+  })
 }
 
 async function main() {
   const operatorId = await seedSampleOperator()
   // 이 아래는 모두 예시 운영사의 데이터 (운영사 출입증: 읽기·쓰기가 이 운영사로 걸러지고 채워진다)
   await runInContext({ actor: 'seed', operatorId }, async () => {
-    await seedCommonCodes(operatorId)
-    await seedUnits(operatorId)
+    const groupIds = await seedOperatorDefaults(operatorId, '예시 운영사')
     await seedSampleOrganizations(operatorId)
-    const groupIds = await seedGroups(operatorId)
     await seedSuperAdmin(operatorId, groupIds.get(SUPER_GROUP_NAME)!)
     await seedSampleAccounts(operatorId, groupIds)
   })
+  await seedSecondOperator()
   // 플랫폼 관리자는 운영사 밖 (출입증 없이)
   await runAsActor('seed', seedPlatformAdmin)
 }

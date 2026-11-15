@@ -2,7 +2,7 @@ import 'server-only'
 import { z } from 'zod'
 import { passwordSchema, usernameSchema } from './user-schema'
 import { auth } from '@/lib/auth'
-import { prisma } from '@/lib/prisma'
+import { prisma, type Tx } from '@/lib/prisma'
 import { affiliationIssues, internalEmail } from './affiliation'
 
 // 아이디 규칙: 영문·숫자·점·밑줄·하이픈 3~30자 (Better Auth username 플러그인 설정과 같게)
@@ -43,8 +43,9 @@ const createUserAccountSchema = z
 export type CreateUserAccountInput = z.input<typeof createUserAccountSchema>
 
 // 계정 만들기: 사용자 + 암호화된 비밀번호를 한 트랜잭션으로 저장한다
-// 회원가입을 꺼 두었으므로, 사용자 관리 화면·시드에서 이 함수로만 계정을 만든다
-export async function createUserAccount(input: CreateUserAccountInput) {
+// 회원가입을 꺼 두었으므로, 사용자 관리 화면·시드·운영사 등록에서 이 함수로만 계정을 만든다
+// tx: 바깥 트랜잭션 안에서 만들 때 (운영사 등록 + 관리자 계정을 함께 만들거나 함께 취소)
+export async function createUserAccount(input: CreateUserAccountInput, tx?: Tx) {
   const data = createUserAccountSchema.parse(input)
   // Better Auth와 같은 규칙: 아이디는 소문자로 저장해 대소문자를 구분하지 않는다
   const username = data.username.toLowerCase()
@@ -53,8 +54,8 @@ export async function createUserAccount(input: CreateUserAccountInput) {
   const context = await auth.$context
   const passwordHash = await context.password.hash(data.password)
 
-  return prisma.$transaction(async (tx) => {
-    const user = await tx.user.create({
+  const save = async (db: Tx) => {
+    const user = await db.user.create({
       data: {
         operatorId: data.operatorId,
         name: data.name,
@@ -71,7 +72,7 @@ export async function createUserAccount(input: CreateUserAccountInput) {
     })
     // 아이디·비밀번호 로그인 수단 (Better Auth 형식: providerId 'credential', accountId = 사용자 키 글자)
     // 키는 DB가 자동으로 매긴다 (generateId: 'serial')
-    await tx.account.create({
+    await db.account.create({
       data: {
         userId: user.id,
         accountId: String(user.id),
@@ -80,5 +81,6 @@ export async function createUserAccount(input: CreateUserAccountInput) {
       },
     })
     return user
-  })
+  }
+  return tx ? save(tx) : prisma.$transaction(save)
 }

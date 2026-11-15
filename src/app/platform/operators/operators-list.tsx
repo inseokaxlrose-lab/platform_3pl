@@ -83,8 +83,8 @@ function SwitchButton({ row }: { row: Row }) {
   )
 }
 
-// 플랫폼 · 운영사 목록 (0039): 운영사 등록·상태 변경은 이후 단계(3c·4단계)에서
-export function OperatorsList() {
+// 플랫폼 · 운영사 목록 (0039): 상태 변경은 4단계에서
+export function OperatorsList({ actions }: { actions?: React.ReactNode }) {
   const { can } = usePermission()
   const list = useListQuery<Row>({
     gridId: 'platform-operators',
@@ -126,6 +126,7 @@ export function OperatorsList() {
     <MasterListPage
       title="운영사"
       description="플랫폼을 쓰는 운영사입니다. [이 운영사로 작업]을 누르면 그 운영사의 화면으로 들어가 대신 작업할 수 있습니다."
+      actions={actions}
       gridId="platform-operators"
       searchFields={SEARCH_FIELDS}
       list={list}
