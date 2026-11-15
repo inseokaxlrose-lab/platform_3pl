@@ -82,8 +82,9 @@ describe('운영사 정보 저장', () => {
     expect(
       company?.contacts.map((c) => [c.sortOrder, c.duty, c.name, c.phone, c.isPrimary]),
     ).toEqual([
-      [0, 'INBOUND', '김입고', '01011112222', true],
-      [1, 'SETTLEMENT', '이정산', null, false],
+      // 대표 여부는 DB에 'Y'/'N'으로
+      [0, 'INBOUND', '김입고', '01011112222', 'Y'],
+      [1, 'SETTLEMENT', '이정산', null, 'N'],
     ])
   })
 

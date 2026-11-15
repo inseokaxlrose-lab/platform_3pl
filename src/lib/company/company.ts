@@ -1,6 +1,7 @@
 import 'server-only'
 import { assertCodeValues } from '@/lib/common-code/common-codes'
 import { prisma } from '@/lib/prisma'
+import { toYn } from '@/lib/yn'
 import { CONTACT_DUTY_GROUP, type CompanyData } from './company-schema'
 
 // 운영사 1곳 기준 고정 키 1 (docs/decisions/0024). M2.5 3단계(멀티테넌트)에서 여러 운영사로 바뀐다
@@ -43,6 +44,7 @@ export async function saveCompany(data: CompanyData, updatedById: bigint) {
     await tx.companyContact.createMany({
       data: contacts.map((contact, index) => ({
         ...contact,
+        isPrimary: toYn(contact.isPrimary),
         companyId: COMPANY_ID,
         sortOrder: index,
       })),

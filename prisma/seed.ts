@@ -10,6 +10,7 @@ import { ensureCenterDefaults } from '../src/lib/centers/center-defaults'
 import { nextSystemCode } from '../src/lib/master-code/system-code'
 import { prisma } from '../src/lib/prisma'
 import { COMPANY_ID } from '../src/lib/company/company'
+import { toYn } from '../src/lib/yn'
 import { createUserAccount } from '../src/lib/users/create-user-account'
 import { SEED_CODE_GROUPS } from './seed-codes'
 import { SAMPLE_ACCOUNTS, SEED_GROUPS, SUPER_GROUP_NAME } from './seed-roles'
@@ -146,6 +147,8 @@ async function seedSampleOrganizations() {
       await prisma.shipper.create({
         data: {
           ...shipper,
+          useLot: toYn(shipper.useLot),
+          useExpiry: toYn(shipper.useExpiry),
           systemCode: await nextSystemCode('SHIPPER'),
           centers: { create: centers.map((c) => ({ centerId: c.id })) },
         },
@@ -155,8 +158,8 @@ async function seedSampleOrganizations() {
       await prisma.shipper.update({
         where: { id: found.id },
         data: {
-          useLot: shipper.useLot,
-          useExpiry: shipper.useExpiry,
+          useLot: toYn(shipper.useLot),
+          useExpiry: toYn(shipper.useExpiry),
           centers: { create: centers.map((c) => ({ centerId: c.id })) },
         },
       })
@@ -192,8 +195,8 @@ async function seedCommonCodes() {
   for (const { items, ...group } of SEED_CODE_GROUPS) {
     const saved = await prisma.codeGroup.upsert({
       where: { code: group.code },
-      create: { ...group, isSystem: true },
-      update: { isSystem: true },
+      create: { ...group, isSystem: 'Y' },
+      update: { isSystem: 'Y' },
     })
     for (const [index, item] of items.entries()) {
       await prisma.codeItem.upsert({
@@ -209,7 +212,8 @@ async function seedCommonCodes() {
 // 기본 단위 (0034): 없으면 만들고, 이미 있으면 시스템 표시만 맞춘다
 async function seedUnits() {
   for (const [index, unit] of SEED_UNITS.entries()) {
-    const isSystem = unit.isSystem ?? false
+    // 예/아니오 칸은 DB에 'Y'/'N'으로
+    const isSystem = toYn(unit.isSystem ?? false)
     await prisma.unit.upsert({
       where: { code: unit.code },
       create: { ...unit, isSystem, sortOrder: (index + 1) * 10 },

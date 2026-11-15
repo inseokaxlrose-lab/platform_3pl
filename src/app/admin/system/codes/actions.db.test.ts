@@ -112,7 +112,7 @@ describe('공통코드 그룹', () => {
     })
 
     const system = await prisma.codeGroup.create({
-      data: { code: 'SYS', name: '시스템', isSystem: true },
+      data: { code: 'SYS', name: '시스템', isSystem: 'Y' },
     })
     expect(await deleteCodeGroupAction({ id: String(system.id) })).toMatchObject({ ok: false })
     expect(

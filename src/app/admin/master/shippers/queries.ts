@@ -3,6 +3,7 @@ import { toContactInput } from '@/lib/contacts/contact-schema'
 import { getExternalCodes } from '@/lib/master-code/external-codes'
 import { textIds } from '@/lib/id'
 import { prisma } from '@/lib/prisma'
+import { isYes } from '@/lib/yn'
 import { isInScope, type DataScope } from '@/lib/scope/data-scope'
 import type { ShipperInput } from '@/lib/shippers/shipper-schema'
 
@@ -38,8 +39,8 @@ export async function getShipperForEdit(id: bigint, scope: DataScope) {
     address: text(shipper.address),
     addressDetail: text(shipper.addressDetail),
     centerIds: shipper.centers.map((c) => String(c.centerId)),
-    useLot: shipper.useLot,
-    useExpiry: shipper.useExpiry,
+    useLot: isYes(shipper.useLot),
+    useExpiry: isYes(shipper.useExpiry),
     labelUnit: shipper.labelUnit,
     contacts: shipper.contacts.map(toContactInput),
     externalCodes: await getExternalCodes('SHIPPER', id),

@@ -4,6 +4,7 @@ import { AccessDenied } from '@/components/permission'
 import { getCompany, type Company } from '@/lib/company/company'
 import type { CompanyInput } from '@/lib/company/company-schema'
 import { hasPermission } from '@/lib/session'
+import { isYes } from '@/lib/yn'
 import { CompanyForm } from './company-form'
 
 export const metadata: Metadata = { title: '운영사' }
@@ -28,7 +29,7 @@ function toInput(company: Company | null): CompanyInput {
       name: c.name,
       phone: text(c.phone),
       email: text(c.email),
-      isPrimary: c.isPrimary,
+      isPrimary: isYes(c.isPrimary),
     })),
   }
 }

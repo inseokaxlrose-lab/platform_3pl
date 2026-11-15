@@ -2,6 +2,7 @@ import 'server-only'
 import { ActionError } from '@/lib/actions/action-error'
 import { deleteExternalCodes, saveExternalCodes } from '@/lib/master-code/external-codes'
 import { prisma } from '@/lib/prisma'
+import { isYes } from '@/lib/yn'
 import type { UnitCreateData, UnitUpdateData } from './unit-schema'
 
 // 단위 저장 (docs/decisions/0034). 권한 검사는 서버 액션에서 한다
@@ -26,7 +27,7 @@ export async function updateUnit({ id, externalCodes, ...data }: UnitUpdateData)
     select: { code: true, kind: true, isSystem: true },
   })
   if (!current) throw new ActionError('NOT_FOUND', '단위를 찾을 수 없습니다.')
-  if (current.isSystem) {
+  if (isYes(current.isSystem)) {
     if (data.kind !== current.kind) {
       throw new ActionError('VALIDATION', `시스템 단위(${current.code})의 종류는 바꿀 수 없습니다.`)
     }
@@ -54,8 +55,8 @@ async function findUnits(ids: bigint[]) {
   return units
 }
 
-function assertNoSystem(units: { code: string; isSystem: boolean }[], what: string) {
-  const system = units.filter((u) => u.isSystem).map((u) => u.code)
+function assertNoSystem(units: { code: string; isSystem: string }[], what: string) {
+  const system = units.filter((u) => isYes(u.isSystem)).map((u) => u.code)
   if (system.length > 0) {
     throw new ActionError('CONFLICT', `시스템 단위는 ${what}할 수 없습니다: ${system.join(', ')}`)
   }

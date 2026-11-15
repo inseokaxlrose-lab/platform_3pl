@@ -5,6 +5,7 @@ import { createAction } from '@/lib/actions/create-action'
 import { listQuerySchema, toPrismaQuery } from '@/lib/grid/grid-query'
 import { getExternalCodes } from '@/lib/master-code/external-codes'
 import { prisma } from '@/lib/prisma'
+import { isYes } from '@/lib/yn'
 import { UNIT_KINDS } from '@/lib/units/unit-labels'
 import { unitCreateSchema, unitUpdateSchema } from '@/lib/units/unit-schema'
 import { createUnit, deleteUnits, setUnitsActive, updateUnit } from '@/lib/units/units'
@@ -68,7 +69,12 @@ export const listUnitsAction = createAction({
     ])
     // 외부 코드도 목록에 (수정 팝업을 채우고 숨김 컬럼으로 보여준다)
     const withCodes = await Promise.all(
-      rows.map(async (row) => ({ ...row, externalCodes: await getExternalCodes('UNIT', row.id) })),
+      rows.map(async (row) => ({
+        ...row,
+        // 예/아니오 칸은 화면에서 true/false로
+        isSystem: isYes(row.isSystem),
+        externalCodes: await getExternalCodes('UNIT', row.id),
+      })),
     )
     return { rows: withCodes, rowCount }
   },

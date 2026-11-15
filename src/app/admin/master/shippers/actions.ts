@@ -6,6 +6,7 @@ import { createAction } from '@/lib/actions/create-action'
 import { listQuerySchema, toPrismaQuery } from '@/lib/grid/grid-query'
 import { dateRangeFilter, idFilter, ynFilter } from '@/lib/grid/list-filters'
 import { prisma } from '@/lib/prisma'
+import { isYes } from '@/lib/yn'
 import { assertInScope, scopeFilter, type DataScope } from '@/lib/scope/data-scope'
 import { LABEL_UNITS, shipperSchema } from '@/lib/shippers/shipper-schema'
 import { createShipper, updateShipper } from '@/lib/shippers/shippers'
@@ -89,6 +90,9 @@ export const listShippersAction = createAction({
     return {
       rows: rows.map(({ centers, _count, ...row }) => ({
         ...row,
+        // 예/아니오 칸은 화면에서 true/false로
+        useLot: isYes(row.useLot),
+        useExpiry: isYes(row.useExpiry),
         centers: centers.map((c) => c.center.name).join(', ') || null,
         userCount: _count.users,
       })),
