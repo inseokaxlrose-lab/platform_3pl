@@ -17,7 +17,7 @@ import {
   setItemsActiveAction,
   updateItemAction,
 } from './actions'
-import { getItemForEdit } from './queries'
+import { getItemForEdit } from '@/lib/items/item-queries'
 
 // 품목 (docs/decisions/0041)
 
