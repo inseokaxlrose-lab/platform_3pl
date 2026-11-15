@@ -135,7 +135,7 @@ const adminNavigation: NavArea = {
           title: 'ASN 등록',
           href: '/admin/inbound/asn/new',
           icon: FilePlusIcon,
-          ready: false,
+          ready: true,
           permission: 'inbound.asn.create',
         },
         {
@@ -263,7 +263,7 @@ const portalNavigation: NavArea = {
           title: 'ASN 등록',
           href: '/portal/asn/new',
           icon: FilePlusIcon,
-          ready: false,
+          ready: true,
           permission: 'portal.asn.create',
         },
         {
