@@ -3,11 +3,11 @@
 import { KeyRoundIcon, PowerIcon } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { useState, useTransition } from 'react'
-import { ConfirmDialog, FormRow, StatusBadge } from '@/components/common'
+import { ConfirmDialog, StatusBadge } from '@/components/common'
+import { Field, FormGrid } from '@/components/master-form'
 import { Can } from '@/components/permission'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
 import { unwrap } from '@/lib/actions'
 import { resetUserPasswordAction, setUserActiveAction } from './actions'
 
@@ -78,9 +78,8 @@ export function AccountPanel({
 
         <form onSubmit={resetPassword} className="grid gap-4 border-t pt-4">
           {/* 새 비밀번호·확인은 한 줄에 2칸 */}
-          <FormRow>
-            <div className="grid gap-2">
-              <Label htmlFor="reset-password">새 비밀번호</Label>
+          <FormGrid>
+            <Field label="새 비밀번호" span={6} htmlFor="reset-password">
               <Input
                 id="reset-password"
                 type="password"
@@ -90,9 +89,8 @@ export function AccountPanel({
                 placeholder="8자 이상"
                 disabled={pending}
               />
-            </div>
-            <div className="grid gap-2">
-              <Label htmlFor="reset-password-confirm">새 비밀번호 확인</Label>
+            </Field>
+            <Field label="새 비밀번호 확인" span={6} htmlFor="reset-password-confirm">
               <Input
                 id="reset-password-confirm"
                 type="password"
@@ -101,8 +99,8 @@ export function AccountPanel({
                 autoComplete="new-password"
                 disabled={pending}
               />
-            </div>
-          </FormRow>
+            </Field>
+          </FormGrid>
           <Button
             type="submit"
             variant="outline"

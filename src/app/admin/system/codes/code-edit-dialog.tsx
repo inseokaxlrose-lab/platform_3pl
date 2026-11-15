@@ -2,7 +2,8 @@
 
 import { Trash2Icon } from 'lucide-react'
 import { useState, useTransition } from 'react'
-import { ConfirmDialog, FormField, FormRow } from '@/components/common'
+import { ConfirmDialog } from '@/components/common'
+import { Field, FormGrid } from '@/components/master-form'
 import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
 import {
@@ -113,8 +114,8 @@ export function CodeEditDialog({
             </DialogDescription>
           </DialogHeader>
 
-          <FormRow>
-            <FormField label={codeLabel} required error={errors.code} htmlFor={id('code')}>
+          <FormGrid>
+            <Field span={6} label={codeLabel} required error={errors.code} htmlFor={id('code')}>
               {mode === 'create' ? (
                 <Input
                   id={id('code')}
@@ -128,8 +129,8 @@ export function CodeEditDialog({
               ) : (
                 <Input id={id('code')} value={value.code} readOnly disabled />
               )}
-            </FormField>
-            <FormField label="정렬 순서" error={errors.sortOrder} htmlFor={id('sortOrder')}>
+            </Field>
+            <Field span={6} label="정렬 순서" error={errors.sortOrder} htmlFor={id('sortOrder')}>
               <Input
                 id={id('sortOrder')}
                 type="number"
@@ -140,9 +141,9 @@ export function CodeEditDialog({
                 disabled={pending}
                 aria-invalid={Boolean(errors.sortOrder)}
               />
-            </FormField>
-          </FormRow>
-          <FormField label="이름" required error={errors.name} htmlFor={id('name')}>
+            </Field>
+          </FormGrid>
+          <Field span={12} label="이름" required error={errors.name} htmlFor={id('name')}>
             <Input
               id={id('name')}
               value={value.name}
@@ -150,15 +151,15 @@ export function CodeEditDialog({
               disabled={pending}
               aria-invalid={Boolean(errors.name)}
             />
-          </FormField>
-          <FormField label="설명" error={errors.description} htmlFor={id('description')}>
+          </Field>
+          <Field span={12} label="설명" error={errors.description} htmlFor={id('description')}>
             <Input
               id={id('description')}
               value={value.description}
               onChange={(e) => set({ description: e.target.value })}
               disabled={pending}
             />
-          </FormField>
+          </Field>
           <div className="flex items-center gap-2">
             <Checkbox
               id={id('isActive')}

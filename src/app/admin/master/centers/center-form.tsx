@@ -12,6 +12,7 @@ import {
   useMasterForm,
   type FieldSpan,
   type MasterFormSection,
+  type MasterFormHeader,
 } from '@/components/master-form'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -54,6 +55,8 @@ function toFormValues(data: CenterData): CenterInput {
 }
 
 type CenterFormProps = {
+  // 페이지 헤더 (제목·설명·meta·보조 버튼)
+  header: MasterFormHeader
   // 없으면 등록
   center?: CenterForEdit
   // 수정(또는 등록) 권한이 없으면 읽기 전용
@@ -69,6 +72,7 @@ type CenterFormProps = {
 // 센터 등록·수정 (docs/decisions/0026, 입력 화면 틀 0031)
 // 등록하면 수정 화면으로 이동, 수정은 그 자리에서 저장. 상태·창고는 따로 처리하는 섹션
 export function CenterForm({
+  header,
   center,
   readOnly,
   canToggleActive = false,
@@ -99,12 +103,13 @@ export function CenterForm({
     key: 'code' | 'name' | 'managerName',
     label: string,
     span: FieldSpan,
-    options: { required?: boolean; placeholder?: string } = {},
+    options: { required?: boolean; placeholder?: string; newRow?: boolean } = {},
   ) => (
     <Field
       label={label}
       span={span}
       required={options.required}
+      newRow={options.newRow}
       error={errors[key]}
       htmlFor={id(key)}
     >
@@ -158,8 +163,7 @@ export function CenterForm({
         <FormGrid>
           {phone('phone', '대표 전화', '031-123-4567')}
           {phone('fax', '팩스')}
-          <div className="hidden md:col-span-4 md:block" />
-          {text('managerName', '센터장', 4)}
+          {text('managerName', '센터장', 4, { newRow: true })}
           {phone('managerPhone', '센터장 연락처', '010-1234-5678')}
           <Field label="주소" span={12} htmlFor={id('address-address')}>
             <AddressInput
@@ -304,5 +308,5 @@ export function CenterForm({
     }
   }
 
-  return <MasterFormPage form={form} readOnly={readOnly} sections={sections} />
+  return <MasterFormPage header={header} form={form} readOnly={readOnly} sections={sections} />
 }

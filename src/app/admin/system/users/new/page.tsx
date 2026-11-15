@@ -1,5 +1,4 @@
 import type { Metadata } from 'next'
-import { PageHeader } from '@/components/common'
 import { BackToListButton } from '@/components/master-list'
 import { AccessDenied } from '@/components/permission'
 import { hasPermission } from '@/lib/session'
@@ -14,13 +13,13 @@ export default async function NewUserPage() {
   const options = await getUserFormOptions()
 
   return (
-    <div className="mx-auto w-full max-w-5xl space-y-6">
-      <PageHeader
-        title="사용자 등록"
-        description="유형을 먼저 고르면 그에 맞는 소속·권한그룹을 선택할 수 있습니다."
-        actions={<BackToListButton listPath="/admin/system/users" />}
-      />
-      <UserForm options={options} />
-    </div>
+    <UserForm
+      header={{
+        title: '사용자 등록',
+        description: '유형을 먼저 고르면 그에 맞는 소속·권한그룹을 선택할 수 있습니다.',
+        actions: <BackToListButton listPath="/admin/system/users" />,
+      }}
+      options={options}
+    />
   )
 }

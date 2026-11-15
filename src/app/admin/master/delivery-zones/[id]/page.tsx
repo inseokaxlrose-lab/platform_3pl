@@ -1,6 +1,5 @@
 import type { Metadata } from 'next'
 import { notFound } from 'next/navigation'
-import { PageHeader } from '@/components/common'
 import { BackToListButton } from '@/components/master-list'
 import { AccessDenied } from '@/components/permission'
 import { getCurrentScope, hasPermission } from '@/lib/session'
@@ -25,18 +24,16 @@ export default async function EditDeliveryZonePage({
   if (!zone) notFound()
 
   return (
-    <div className="mx-auto w-full max-w-5xl space-y-6">
-      <PageHeader
-        title={`${zone.input.name} (${zone.input.code})`}
-        description={`${zone.center.name} (${zone.center.code})`}
-        actions={<BackToListButton listPath="/admin/master/delivery-zones" />}
-      />
-      <DeliveryZoneForm
-        zone={zone}
-        taken={taken}
-        readOnly={!canUpdate}
-        canToggleActive={canUpdate}
-      />
-    </div>
+    <DeliveryZoneForm
+      header={{
+        title: `${zone.input.name} (${zone.input.code})`,
+        description: `${zone.center.name} (${zone.center.code})`,
+        actions: <BackToListButton listPath="/admin/master/delivery-zones" />,
+      }}
+      zone={zone}
+      taken={taken}
+      readOnly={!canUpdate}
+      canToggleActive={canUpdate}
+    />
   )
 }

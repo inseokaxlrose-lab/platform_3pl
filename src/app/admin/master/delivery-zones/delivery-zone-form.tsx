@@ -9,6 +9,7 @@ import {
   MasterFormPage,
   useMasterForm,
   type MasterFormSection,
+  type MasterFormHeader,
 } from '@/components/master-form'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -37,6 +38,8 @@ import { RegionPicker } from './region-picker'
 type CenterOption = { id: string; code: string; name: string }
 
 type DeliveryZoneFormProps = {
+  // 페이지 헤더 (제목·설명·meta·보조 버튼)
+  header: MasterFormHeader
   // 없으면 등록
   zone?: DeliveryZoneForEdit
   // 등록: 고를 수 있는 센터, 미리 고른 센터
@@ -54,6 +57,7 @@ const LIST_HREF = '/admin/master/delivery-zones'
 // 배송권역 등록·수정 (docs/decisions/0033, 입력 화면 틀 0031)
 // 등록하면 수정 화면으로, 수정은 그 자리에서 저장. 상태는 따로 처리하는 섹션
 export function DeliveryZoneForm({
+  header,
   zone,
   centers = [],
   initialCenterId,
@@ -133,8 +137,7 @@ export function DeliveryZoneForm({
               </Select>
             )}
           </Field>
-          <div className="hidden md:col-span-6 md:block" />
-          <Field label="권역명" span={8} required error={errors.name} htmlFor="zone-name">
+          <Field label="권역명" span={8} required newRow error={errors.name} htmlFor="zone-name">
             <Input
               id="zone-name"
               value={value.name}
@@ -258,5 +261,5 @@ export function DeliveryZoneForm({
     })
   }
 
-  return <MasterFormPage form={form} readOnly={readOnly} sections={sections} />
+  return <MasterFormPage header={header} form={form} readOnly={readOnly} sections={sections} />
 }

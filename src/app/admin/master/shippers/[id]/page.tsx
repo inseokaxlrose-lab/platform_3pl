@@ -1,6 +1,5 @@
 import type { Metadata } from 'next'
 import { notFound } from 'next/navigation'
-import { PageHeader } from '@/components/common'
 import { BackToListButton } from '@/components/master-list'
 import { AccessDenied } from '@/components/permission'
 import { getCurrentScope, hasPermission } from '@/lib/session'
@@ -27,18 +26,16 @@ export default async function EditShipperPage({
   const editable = canUpdate && scope.kind === 'ALL'
 
   return (
-    <div className="mx-auto w-full max-w-5xl space-y-6">
-      <PageHeader
-        title={`${shipper.input.name} (${shipper.input.code})`}
-        actions={<BackToListButton listPath="/admin/master/shippers" />}
-      />
-      <ShipperForm
-        shipper={shipper}
-        centers={centers}
-        readOnly={!editable}
-        canToggleActive={editable}
-        userAccess={{ canView: canViewUsers, canAdd: canAddUser }}
-      />
-    </div>
+    <ShipperForm
+      header={{
+        title: `${shipper.input.name} (${shipper.input.code})`,
+        actions: <BackToListButton listPath="/admin/master/shippers" />,
+      }}
+      shipper={shipper}
+      centers={centers}
+      readOnly={!editable}
+      canToggleActive={editable}
+      userAccess={{ canView: canViewUsers, canAdd: canAddUser }}
+    />
   )
 }

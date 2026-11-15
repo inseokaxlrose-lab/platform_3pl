@@ -1,7 +1,6 @@
 'use client'
 
 import { useState, useTransition } from 'react'
-import { FormField, FormRow } from '@/components/common'
 import { NumberInput, YnToggle } from '@/components/inputs'
 import { Button } from '@/components/ui/button'
 import {
@@ -25,6 +24,7 @@ import { EMPTY_EXTERNAL_CODES, type ExternalCodes } from '@/lib/master-code/exte
 import { UNIT_KIND_LABELS, UNIT_KINDS, type UnitKindValue } from '@/lib/units/unit-labels'
 import type { UnitCreateInput } from '@/lib/units/unit-schema'
 import { createUnitAction, updateUnitAction } from './actions'
+import { Field, FormGrid } from '@/components/master-form'
 
 // 수정할 단위 (목록 행)
 export type UnitRow = {
@@ -128,8 +128,8 @@ export function UnitDialog({
             </DialogDescription>
           </DialogHeader>
 
-          <FormRow>
-            <FormField label="코드" required error={errors.code} htmlFor={id('code')}>
+          <FormGrid>
+            <Field span={6} label="코드" required error={errors.code} htmlFor={id('code')}>
               <Input
                 id={id('code')}
                 value={value.code}
@@ -140,8 +140,8 @@ export function UnitDialog({
                 className="uppercase"
                 aria-invalid={Boolean(errors.code)}
               />
-            </FormField>
-            <FormField label="이름" required error={errors.name} htmlFor={id('name')}>
+            </Field>
+            <Field span={6} label="이름" required error={errors.name} htmlFor={id('name')}>
               <Input
                 id={id('name')}
                 value={value.name}
@@ -150,10 +150,10 @@ export function UnitDialog({
                 placeholder="예: 개, 킬로그램"
                 aria-invalid={Boolean(errors.name)}
               />
-            </FormField>
-          </FormRow>
-          <FormRow>
-            <FormField label="종류" required error={errors.kind} htmlFor={id('kind')}>
+            </Field>
+          </FormGrid>
+          <FormGrid>
+            <Field span={6} label="종류" required error={errors.kind} htmlFor={id('kind')}>
               <Select
                 value={value.kind}
                 onValueChange={(kind) => set({ kind: kind as UnitKindValue })}
@@ -170,8 +170,8 @@ export function UnitDialog({
                   ))}
                 </SelectContent>
               </Select>
-            </FormField>
-            <FormField label="소수 자리수" error={errors.decimals} htmlFor={id('decimals')}>
+            </Field>
+            <Field span={6} label="소수 자리수" error={errors.decimals} htmlFor={id('decimals')}>
               <NumberInput
                 id={id('decimals')}
                 value={value.kind === 'PACK' ? 0 : value.decimals}
@@ -182,15 +182,16 @@ export function UnitDialog({
                 disabled={disabled || value.kind === 'PACK'}
                 aria-invalid={Boolean(errors.decimals)}
               />
-            </FormField>
-          </FormRow>
+            </Field>
+          </FormGrid>
           <p className="-mt-2 text-xs text-muted-foreground">
             기본단위: 재고를 세는 단위 (EA 0자리, KG 3자리처럼 수량 입력의 소수 자리수) · 환산단위:
             기본단위를 묶은 단위 (입수량은 품목에서 정함)
           </p>
-          <FormRow>
+          <FormGrid>
             {EXTERNAL_SYSTEM_KEYS.map((system) => (
-              <FormField
+              <Field
+                span={6}
                 key={system}
                 label={`${EXTERNAL_SYSTEMS[system].label} 코드`}
                 error={errors[`externalCodes.${system}`]}
@@ -211,11 +212,11 @@ export function UnitDialog({
                   disabled={disabled}
                   placeholder="연동하지 않으면 비워 두세요"
                 />
-              </FormField>
+              </Field>
             ))}
-          </FormRow>
-          <FormRow>
-            <FormField label="정렬 순서" error={errors.sortOrder} htmlFor={id('sortOrder')}>
+          </FormGrid>
+          <FormGrid>
+            <Field span={6} label="정렬 순서" error={errors.sortOrder} htmlFor={id('sortOrder')}>
               <NumberInput
                 id={id('sortOrder')}
                 value={value.sortOrder}
@@ -224,16 +225,16 @@ export function UnitDialog({
                 max={9999}
                 disabled={disabled}
               />
-            </FormField>
-            <FormField label="사용" htmlFor={id('isActive')}>
+            </Field>
+            <Field span={6} label="사용" htmlFor={id('isActive')}>
               <YnToggle
                 id={id('isActive')}
                 value={value.isActive}
                 onChange={(isActive) => set({ isActive })}
                 disabled={disabled || locked}
               />
-            </FormField>
-          </FormRow>
+            </Field>
+          </FormGrid>
 
           {message && (
             <p role="alert" className="text-sm text-destructive">

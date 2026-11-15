@@ -181,6 +181,10 @@ function FormSample() {
   const { value, set, errors, pending } = form
   return (
     <MasterFormPage
+      header={{
+        title: '견본 입력 화면',
+        description: '헤더의 [취소]·[저장]은 스크롤해도 보입니다.',
+      }}
       form={form}
       sections={[
         {
@@ -248,6 +252,7 @@ function FormSample() {
               primary={{ key: 'isPrimary', label: '대표' }}
               errors={errors}
               addLabel="담당자 추가"
+              countUnit="명"
               disabled={pending}
             />
           ),

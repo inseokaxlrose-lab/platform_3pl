@@ -1,6 +1,5 @@
 import type { Metadata } from 'next'
 import { notFound } from 'next/navigation'
-import { PageHeader } from '@/components/common'
 import { BackToListButton } from '@/components/master-list'
 import { AccessDenied } from '@/components/permission'
 import { getCurrentScope, hasPermission } from '@/lib/session'
@@ -22,13 +21,15 @@ export default async function EditWarehousePage({
   if (!warehouse) notFound()
 
   return (
-    <div className="mx-auto w-full max-w-5xl space-y-6">
-      <PageHeader
-        actions={<BackToListButton listPath="/admin/master/warehouses" />}
-        title={`${warehouse.input.name} (${warehouse.input.code})`}
-        description={`${warehouse.center.name} (${warehouse.center.code})`}
-      />
-      <WarehouseForm mode="edit" warehouse={warehouse} readOnly={!canUpdate} />
-    </div>
+    <WarehouseForm
+      header={{
+        actions: <BackToListButton listPath="/admin/master/warehouses" />,
+        title: `${warehouse.input.name} (${warehouse.input.code})`,
+        description: `${warehouse.center.name} (${warehouse.center.code})`,
+      }}
+      mode="edit"
+      warehouse={warehouse}
+      readOnly={!canUpdate}
+    />
   )
 }

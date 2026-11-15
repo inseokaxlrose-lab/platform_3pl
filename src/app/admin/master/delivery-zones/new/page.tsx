@@ -1,5 +1,4 @@
 import type { Metadata } from 'next'
-import { PageHeader } from '@/components/common'
 import { BackToListButton } from '@/components/master-list'
 import { AccessDenied } from '@/components/permission'
 import { getCurrentScope, hasPermission } from '@/lib/session'
@@ -24,18 +23,16 @@ export default async function NewDeliveryZonePage({
     typeof centerId === 'string' && centers.some((c) => c.id === centerId) ? centerId : undefined
 
   return (
-    <div className="mx-auto w-full max-w-5xl space-y-6">
-      <PageHeader
-        title="배송권역 등록"
-        description="권역 코드를 비우면 자동으로 부여되는 시스템 코드를 그대로 씁니다."
-        actions={<BackToListButton listPath="/admin/master/delivery-zones" />}
-      />
-      <DeliveryZoneForm
-        centers={centers}
-        initialCenterId={initialCenterId ?? (centers.length === 1 ? centers[0].id : undefined)}
-        taken={taken}
-        readOnly={false}
-      />
-    </div>
+    <DeliveryZoneForm
+      header={{
+        title: '배송권역 등록',
+        description: '권역 코드를 비우면 자동으로 부여되는 시스템 코드를 그대로 씁니다.',
+        actions: <BackToListButton listPath="/admin/master/delivery-zones" />,
+      }}
+      centers={centers}
+      initialCenterId={initialCenterId ?? (centers.length === 1 ? centers[0].id : undefined)}
+      taken={taken}
+      readOnly={false}
+    />
   )
 }

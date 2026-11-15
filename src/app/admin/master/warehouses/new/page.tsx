@@ -1,5 +1,4 @@
 import type { Metadata } from 'next'
-import { PageHeader } from '@/components/common'
 import { BackToListButton } from '@/components/master-list'
 import { AccessDenied } from '@/components/permission'
 import { getCurrentScope, hasPermission } from '@/lib/session'
@@ -20,13 +19,15 @@ export default async function NewWarehousePage({
     typeof centerId === 'string' && centers.some((c) => c.id === centerId) ? centerId : undefined
 
   return (
-    <div className="mx-auto w-full max-w-5xl space-y-6">
-      <PageHeader
-        actions={<BackToListButton listPath="/admin/master/warehouses" />}
-        title="창고 등록"
-        description="창고 코드를 비우면 자동으로 부여되는 시스템 코드를 그대로 씁니다."
-      />
-      <WarehouseForm mode="create" centers={centers} initialCenterId={initialCenterId} />
-    </div>
+    <WarehouseForm
+      header={{
+        actions: <BackToListButton listPath="/admin/master/warehouses" />,
+        title: '창고 등록',
+        description: '창고 코드를 비우면 자동으로 부여되는 시스템 코드를 그대로 씁니다.',
+      }}
+      mode="create"
+      centers={centers}
+      initialCenterId={initialCenterId}
+    />
   )
 }

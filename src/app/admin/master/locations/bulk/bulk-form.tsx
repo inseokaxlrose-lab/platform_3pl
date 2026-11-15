@@ -4,7 +4,8 @@ import { EyeIcon, LayersIcon } from 'lucide-react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useState, useTransition } from 'react'
-import { FormField, FormRow, FormSection } from '@/components/common'
+import { FormSection } from '@/components/common'
+import { Field, FormGrid } from '@/components/master-form'
 import { formatNumber } from '@/components/data-grid'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -143,7 +144,7 @@ export function BulkLocationForm({
     : null
 
   const numberInput = (key: keyof RangeForm, label: string) => (
-    <FormField label={label} error={errors[key]} htmlFor={`bulk-${key}`}>
+    <Field span={6} label={label} error={errors[key]} htmlFor={`bulk-${key}`}>
       <Input
         id={`bulk-${key}`}
         value={form[key]}
@@ -152,14 +153,14 @@ export function BulkLocationForm({
         disabled={pending}
         aria-invalid={Boolean(errors[key])}
       />
-    </FormField>
+    </Field>
   )
 
   // 도구 화면: 입력이 적어 좁은 폭 한 단 (기준정보 입력 틀은 쓰지 않음 — 저장이 아니라 미리보기→생성)
   return (
     <div className="max-w-2xl space-y-6">
       <FormSection title="창고">
-        <FormField label="창고" required error={errors.warehouseId} htmlFor="bulk-warehouse">
+        <Field span={12} label="창고" required error={errors.warehouseId} htmlFor="bulk-warehouse">
           <Select
             value={warehouseId}
             onValueChange={(id) => {
@@ -183,15 +184,15 @@ export function BulkLocationForm({
           <p className="text-xs text-muted-foreground">
             입고대기 창고·사용 중지된 창고에는 만들 수 없습니다.
           </p>
-        </FormField>
+        </Field>
       </FormSection>
 
       <FormSection
         title="범위"
         description={`구역(영문 한 글자) × 열 × 단. 한 번에 ${formatNumber(MAX_BULK_LOCATIONS)}개까지 만들 수 있습니다.`}
       >
-        <FormRow>
-          <FormField label="구역 시작" error={errors.zoneFrom} htmlFor="bulk-zoneFrom">
+        <FormGrid>
+          <Field span={6} label="구역 시작" error={errors.zoneFrom} htmlFor="bulk-zoneFrom">
             <Input
               id="bulk-zoneFrom"
               value={form.zoneFrom}
@@ -199,8 +200,8 @@ export function BulkLocationForm({
               onChange={(e) => set({ zoneFrom: e.target.value })}
               disabled={pending}
             />
-          </FormField>
-          <FormField label="구역 끝" error={errors.zoneTo} htmlFor="bulk-zoneTo">
+          </Field>
+          <Field span={6} label="구역 끝" error={errors.zoneTo} htmlFor="bulk-zoneTo">
             <Input
               id="bulk-zoneTo"
               value={form.zoneTo}
@@ -208,21 +209,21 @@ export function BulkLocationForm({
               onChange={(e) => set({ zoneTo: e.target.value })}
               disabled={pending}
             />
-          </FormField>
-        </FormRow>
-        <FormRow>
+          </Field>
+        </FormGrid>
+        <FormGrid>
           {numberInput('aisleFrom', '열 시작')}
           {numberInput('aisleTo', '열 끝')}
-        </FormRow>
-        <FormRow>
+        </FormGrid>
+        <FormGrid>
           {numberInput('levelFrom', '단 시작')}
           {numberInput('levelTo', '단 끝')}
-        </FormRow>
-        <FormRow>
+        </FormGrid>
+        <FormGrid>
           {numberInput('aisleDigits', '열 자릿수')}
           {numberInput('levelDigits', '단 자릿수')}
-        </FormRow>
-        <FormField label="구분자" htmlFor="bulk-separator">
+        </FormGrid>
+        <Field span={12} label="구분자" htmlFor="bulk-separator">
           <Select
             value={form.separator === '' ? 'none' : '-'}
             onValueChange={(v) => set({ separator: v === 'none' ? '' : '-' })}
@@ -236,7 +237,7 @@ export function BulkLocationForm({
               <SelectItem value="none">없음 (A0102)</SelectItem>
             </SelectContent>
           </Select>
-        </FormField>
+        </Field>
         <p className="text-sm text-muted-foreground">
           {estimate === null
             ? '범위를 확인해 주세요.'

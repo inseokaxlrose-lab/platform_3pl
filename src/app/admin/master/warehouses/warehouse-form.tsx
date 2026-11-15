@@ -10,6 +10,7 @@ import {
   MasterFormPage,
   useMasterForm,
   type MasterFormSection,
+  type MasterFormHeader,
 } from '@/components/master-form'
 import { usePermission } from '@/components/permission'
 import { Button } from '@/components/ui/button'
@@ -32,7 +33,7 @@ import { createWarehouseSchema, type WarehouseCreateInput } from '@/lib/warehous
 import { createWarehouseAction, setWarehouseActiveAction, updateWarehouseAction } from './actions'
 import type { CenterOption, WarehouseForEdit } from './queries'
 
-type WarehouseFormProps =
+type WarehouseFormProps = { header: MasterFormHeader } & (
   | {
       // 등록: 고를 수 있는 센터 + 미리 고른 센터
       mode: 'create'
@@ -44,6 +45,7 @@ type WarehouseFormProps =
       warehouse: WarehouseForEdit
       readOnly: boolean
     }
+)
 
 type StorageCondition = WarehouseCreateInput['storageCondition']
 
@@ -129,8 +131,14 @@ export function WarehouseForm(props: WarehouseFormProps) {
               </Select>
             )}
           </Field>
-          <div className="hidden md:col-span-6 md:block" />
-          <Field label="창고명" span={8} required error={errors.name} htmlFor="warehouse-name">
+          <Field
+            label="창고명"
+            span={8}
+            required
+            newRow
+            error={errors.name}
+            htmlFor="warehouse-name"
+          >
             <Input
               id="warehouse-name"
               value={value.name}
@@ -331,5 +339,7 @@ export function WarehouseForm(props: WarehouseFormProps) {
     )
   }
 
-  return <MasterFormPage form={form} readOnly={readOnly} sections={sections} />
+  return (
+    <MasterFormPage header={props.header} form={form} readOnly={readOnly} sections={sections} />
+  )
 }

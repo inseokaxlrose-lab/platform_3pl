@@ -10,6 +10,7 @@ import {
   MasterFormPage,
   useMasterForm,
   type MasterFormSection,
+  type MasterFormHeader,
 } from '@/components/master-form'
 import { usePermission } from '@/components/permission'
 import { Input } from '@/components/ui/input'
@@ -31,6 +32,8 @@ import { USER_TYPE_LABELS, type UserTypeKey } from './labels'
 import type { UserForEdit, UserFormOptions } from './queries'
 
 type UserFormProps = {
+  // 페이지 헤더 (제목·설명·meta·보조 버튼)
+  header: MasterFormHeader
   options: UserFormOptions
   // 없으면 등록, 있으면 수정
   user?: UserForEdit
@@ -50,7 +53,7 @@ function SectionError({ message }: { message?: string }) {
 
 // 사용자 등록·수정 (docs/decisions/0018, 입력 화면 틀 0031)
 // 유형·아이디는 등록할 때만 정한다. 등록하면 수정 화면으로 이동
-export function UserForm({ options, user, extraSections = [] }: UserFormProps) {
+export function UserForm({ options, user, extraSections = [], header }: UserFormProps) {
   const router = useRouter()
   const { can } = usePermission()
   const isNew = !user
@@ -272,6 +275,11 @@ export function UserForm({ options, user, extraSections = [] }: UserFormProps) {
   })
 
   return (
-    <MasterFormPage form={form} readOnly={readOnly} sections={[...sections, ...extraSections]} />
+    <MasterFormPage
+      header={header}
+      form={form}
+      readOnly={readOnly}
+      sections={[...sections, ...extraSections]}
+    />
   )
 }

@@ -9,6 +9,7 @@ import {
   MasterFormPage,
   useMasterForm,
   type MasterFormSection,
+  type MasterFormHeader,
 } from '@/components/master-form'
 import { usePermission } from '@/components/permission'
 import { PermissionMatrix } from '@/components/permission/permission-matrix'
@@ -34,6 +35,8 @@ import {
 import { AREA_LABELS } from './area-labels'
 
 type RoleFormProps = {
+  // 페이지 헤더 (제목·설명·meta·보조 버튼)
+  header: MasterFormHeader
   // 없으면 등록, 있으면 수정
   group?: {
     id: string
@@ -50,7 +53,7 @@ const LIST_HREF = '/admin/system/roles'
 
 // 권한그룹 등록·수정 (docs/decisions/0017, 입력 화면 틀 0031)
 // 권한 체크 표는 넓은 섹션 하나, 삭제는 따로 처리하는 섹션. 등록하면 수정 화면으로 이동
-export function RoleForm({ group }: RoleFormProps) {
+export function RoleForm({ group, header }: RoleFormProps) {
   const router = useRouter()
   const { can } = usePermission()
   const isNew = !group
@@ -194,5 +197,5 @@ export function RoleForm({ group }: RoleFormProps) {
     })
   }
 
-  return <MasterFormPage form={form} readOnly={readOnly} sections={sections} />
+  return <MasterFormPage header={header} form={form} readOnly={readOnly} sections={sections} />
 }

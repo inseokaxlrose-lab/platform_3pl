@@ -11,7 +11,10 @@ vi.mock('./actions', () => ({
 }))
 const push = vi.fn()
 const refresh = vi.fn()
-vi.mock('next/navigation', () => ({ useRouter: () => ({ push, refresh }) }))
+vi.mock('next/navigation', () => ({
+  useRouter: () => ({ push, refresh }),
+  usePathname: () => '/admin/test',
+}))
 
 beforeAll(() => {
   globalThis.IntersectionObserver = class {
@@ -54,7 +57,7 @@ describe('CenterForm', () => {
       ok: true,
       data: { id: 'new-id', systemCode: 'CT000009', code: 'CT000009' },
     } as never)
-    render(<CenterForm readOnly={false} />)
+    render(<CenterForm header={{ title: '센터 등록' }} readOnly={false} />)
     fireEvent.change(field('센터명'), { target: { value: '김해센터' } })
     fireEvent.change(field('대표 전화'), { target: { value: '0551234567' } })
     expect(field('대표 전화')).toHaveProperty('value', '055-123-4567')
@@ -70,7 +73,9 @@ describe('CenterForm', () => {
 
   it('수정: 그 자리에서 저장하고, 상태·창고는 폼 밖의 따로 처리하는 섹션', async () => {
     vi.mocked(updateCenterAction).mockResolvedValue({ ok: true, data: { id: 'c1' } } as never)
-    render(<CenterForm center={CENTER} readOnly={false} canToggleActive />)
+    render(
+      <CenterForm header={{ title: '센터' }} center={CENTER} readOnly={false} canToggleActive />,
+    )
     expect(field('대표 전화')).toHaveProperty('value', '031-123-4567')
     const status = screen.getByRole('region', { name: '상태' })
     expect(status.closest('form')).toBeNull()

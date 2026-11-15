@@ -20,6 +20,7 @@ import {
   useMasterForm,
   type FieldSpan,
   type MasterFormSection,
+  type MasterFormHeader,
 } from '@/components/master-form'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -64,6 +65,8 @@ const EMPTY: ShipperInput = {
 }
 
 type ShipperFormProps = {
+  // 페이지 헤더 (제목·설명·meta·보조 버튼)
+  header: MasterFormHeader
   // 없으면 등록
   shipper?: ShipperForEdit
   centers: CenterChoice[]
@@ -80,6 +83,7 @@ type TextKey = 'name' | 'code' | 'ceoName' | 'businessType' | 'businessItem'
 // 화주사 등록·수정 (docs/decisions/0035, 입력 화면 틀 0031)
 // 등록하면 수정 화면으로, 수정은 그 자리에서 저장. 상태·소속 사용자는 따로 처리하는 섹션
 export function ShipperForm({
+  header,
   shipper,
   centers,
   readOnly,
@@ -138,16 +142,9 @@ export function ShipperForm({
       title: '기본 정보',
       content: (
         <FormGrid>
+          {/* 줄 1: 이름·코드 / 줄 2: 사업자번호·대표자·시스템 코드 / 줄 3: 업태·종목 */}
           {text('name', '화주사명', 8, true)}
           {text('code', '화주사 코드', 4, false, '비우면 시스템 코드 사용')}
-          <Field label="시스템 코드" span={4} htmlFor={id('system-code')}>
-            <Input
-              id={id('system-code')}
-              value={shipper?.systemCode ?? '저장하면 자동으로 부여됩니다'}
-              disabled
-              readOnly
-            />
-          </Field>
           <Field
             label="사업자등록번호"
             span={4}
@@ -161,6 +158,14 @@ export function ShipperForm({
             />
           </Field>
           {text('ceoName', '대표자', 4)}
+          <Field label="시스템 코드" span={4} htmlFor={id('system-code')}>
+            <Input
+              id={id('system-code')}
+              value={shipper?.systemCode ?? '저장하면 자동으로 부여됩니다'}
+              disabled
+              readOnly
+            />
+          </Field>
           {text('businessType', '업태', 4)}
           {text('businessItem', '종목', 4)}
         </FormGrid>
@@ -290,7 +295,7 @@ export function ShipperForm({
     },
     {
       id: 'contacts',
-      title: `담당자 (${value.contacts.length}/${MAX_CONTACTS})`,
+      title: '담당자',
       description: '연락처와 이메일 중 하나는 필수, 담당자가 있으면 대표 1명을 정합니다.',
       content: (
         <EditableSubTable
@@ -314,6 +319,7 @@ export function ShipperForm({
           primary={{ key: 'isPrimary', label: '대표' }}
           errors={errors}
           addLabel="담당자 추가"
+          countUnit="명"
           emptyText="등록된 담당자가 없습니다."
           disabled={disabled}
         />
@@ -425,5 +431,5 @@ export function ShipperForm({
     }
   }
 
-  return <MasterFormPage form={form} readOnly={readOnly} sections={sections} />
+  return <MasterFormPage header={header} form={form} readOnly={readOnly} sections={sections} />
 }

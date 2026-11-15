@@ -8,6 +8,7 @@ import {
   MasterFormPage,
   useMasterForm,
   type FieldSpan,
+  type MasterFormHeader,
 } from '@/components/master-form'
 import { Input } from '@/components/ui/input'
 import {
@@ -43,9 +44,12 @@ type TextKey = 'name' | 'ceoName' | 'businessType' | 'businessItem'
 
 // 운영사 정보 (docs/decisions/0024, 0031): 공통 입력 화면 틀 + 운영사 칸 정의만 둔다
 export function CompanyForm({
+  header,
   initial,
   readOnly,
 }: {
+  // 페이지 헤더 (제목·설명·meta·보조 버튼)
+  header: MasterFormHeader
   initial: CompanyInput
   // 수정 권한이 없으면 읽기 전용
   readOnly: boolean
@@ -74,6 +78,7 @@ export function CompanyForm({
 
   return (
     <MasterFormPage
+      header={header}
       form={form}
       readOnly={readOnly}
       sections={[
@@ -152,7 +157,7 @@ export function CompanyForm({
         },
         {
           id: 'contacts',
-          title: `담당자 (${value.contacts.length}/${MAX_COMPANY_CONTACTS})`,
+          title: '담당자',
           description: '연락처와 이메일 중 하나는 필수, 담당자가 있으면 대표 1명을 정합니다.',
           content: (
             <EditableSubTable
@@ -176,6 +181,7 @@ export function CompanyForm({
               primary={{ key: 'isPrimary', label: '대표' }}
               errors={errors}
               addLabel="담당자 추가"
+              countUnit="명"
               emptyText="등록된 담당자가 없습니다."
               disabled={disabled}
             />

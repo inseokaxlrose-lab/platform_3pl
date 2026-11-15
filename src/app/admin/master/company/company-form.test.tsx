@@ -6,7 +6,10 @@ import { saveCompanyAction } from './actions'
 import { CompanyForm } from './company-form'
 
 vi.mock('./actions', () => ({ saveCompanyAction: vi.fn() }))
-vi.mock('next/navigation', () => ({ useRouter: () => ({ refresh: vi.fn(), push: vi.fn() }) }))
+vi.mock('next/navigation', () => ({
+  useRouter: () => ({ refresh: vi.fn(), push: vi.fn() }),
+  usePathname: () => '/admin/test',
+}))
 
 beforeAll(() => {
   globalThis.IntersectionObserver = class {
@@ -41,7 +44,7 @@ const CODES = {
 const renderForm = (initial: CompanyInput = EMPTY, readOnly = false) =>
   render(
     <CommonCodeProvider options={CODES}>
-      <CompanyForm initial={initial} readOnly={readOnly} />
+      <CompanyForm header={{ title: '운영사' }} initial={initial} readOnly={readOnly} />
     </CommonCodeProvider>,
   )
 
@@ -78,7 +81,7 @@ describe('CompanyForm', () => {
     for (let i = 0; i < 5; i++) addContact()
 
     expect(screen.getByRole('button', { name: '담당자 추가' })).toHaveProperty('disabled', true)
-    expect(screen.getAllByText('담당자 (5/5)').length).toBeGreaterThan(0)
+    expect(screen.getByText('5 / 5명 (최대)')).toBeTruthy()
     expect(
       screen.getAllByRole('radio', { name: '대표' }).map((r) => (r as HTMLInputElement).checked),
     ).toEqual([true, false, false, false, false])

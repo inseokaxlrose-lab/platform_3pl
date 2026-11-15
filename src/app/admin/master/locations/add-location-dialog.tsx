@@ -2,7 +2,7 @@
 
 import { PlusIcon } from 'lucide-react'
 import { useState, useTransition } from 'react'
-import { FormField } from '@/components/common'
+import { Field } from '@/components/master-form'
 import { Button } from '@/components/ui/button'
 import {
   Dialog,
@@ -74,7 +74,7 @@ export function AddLocationDialog({
                 코드는 등록 후 바꿀 수 없습니다. 여러 칸은 [일괄 생성]을 쓰세요.
               </DialogDescription>
             </DialogHeader>
-            <FormField label="창고" required htmlFor="add-location-warehouse">
+            <Field span={12} label="창고" required htmlFor="add-location-warehouse">
               <Select value={warehouseId} onValueChange={setWarehouseId} disabled={pending}>
                 <SelectTrigger id="add-location-warehouse" className="w-full">
                   <SelectValue placeholder="창고 선택" />
@@ -87,8 +87,8 @@ export function AddLocationDialog({
                   ))}
                 </SelectContent>
               </Select>
-            </FormField>
-            <FormField label="로케이션 코드" required htmlFor="add-location-code">
+            </Field>
+            <Field span={12} label="로케이션 코드" required htmlFor="add-location-code">
               <Input
                 id="add-location-code"
                 value={code}
@@ -96,7 +96,7 @@ export function AddLocationDialog({
                 placeholder="예: A-01-01"
                 disabled={pending}
               />
-            </FormField>
+            </Field>
             {error && (
               <p role="alert" className="text-sm text-destructive">
                 {error}

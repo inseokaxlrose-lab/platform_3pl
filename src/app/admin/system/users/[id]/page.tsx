@@ -1,6 +1,5 @@
 import type { Metadata } from 'next'
 import { notFound } from 'next/navigation'
-import { PageHeader } from '@/components/common'
 import { BackToListButton } from '@/components/master-list'
 import { AccessDenied } from '@/components/permission'
 import { getCurrentUser, hasPermission } from '@/lib/session'
@@ -27,40 +26,34 @@ export default async function EditUserPage({ params }: PageProps<'/admin/system/
   if (!user || !overrides) notFound()
 
   return (
-    <div className="mx-auto w-full max-w-5xl space-y-6">
-      <PageHeader
-        title={`${user.name} (${user.username})`}
-        actions={<BackToListButton listPath="/admin/system/users" />}
-      />
-      <UserForm
-        options={options}
-        user={user}
-        extraSections={[
-          {
-            id: 'overrides',
-            title: '개별 권한',
-            standalone: true,
-            content: (
-              <OverridePanel
-                user={user}
-                overrides={overrides}
-                isSelf={currentUser?.id === user.id}
-              />
-            ),
-          },
-          ...(canUpdate
-            ? [
-                {
-                  id: 'account',
-                  title: '계정 관리',
-                  standalone: true,
-                  description: '사용 중지·비밀번호 초기화는 바로 처리되고, 기존 로그인을 끊습니다.',
-                  content: <AccountPanel user={user} />,
-                },
-              ]
-            : []),
-        ]}
-      />
-    </div>
+    <UserForm
+      header={{
+        title: `${user.name} (${user.username})`,
+        actions: <BackToListButton listPath="/admin/system/users" />,
+      }}
+      options={options}
+      user={user}
+      extraSections={[
+        {
+          id: 'overrides',
+          title: '개별 권한',
+          standalone: true,
+          content: (
+            <OverridePanel user={user} overrides={overrides} isSelf={currentUser?.id === user.id} />
+          ),
+        },
+        ...(canUpdate
+          ? [
+              {
+                id: 'account',
+                title: '계정 관리',
+                standalone: true,
+                description: '사용 중지·비밀번호 초기화는 바로 처리되고, 기존 로그인을 끊습니다.',
+                content: <AccountPanel user={user} />,
+              },
+            ]
+          : []),
+      ]}
+    />
   )
 }

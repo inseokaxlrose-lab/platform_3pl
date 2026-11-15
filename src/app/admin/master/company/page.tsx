@@ -1,5 +1,4 @@
 import type { Metadata } from 'next'
-import { PageHeader } from '@/components/common'
 import { formatDate } from '@/components/data-grid'
 import { AccessDenied } from '@/components/permission'
 import { getCompany, type Company } from '@/lib/company/company'
@@ -47,20 +46,19 @@ export default async function CompanyPage() {
     : null
 
   return (
-    // 제목도 본문과 같은 제한 폭으로 가운데 (MasterFormPage와 줄 맞춤)
-    <div className="mx-auto w-full max-w-5xl space-y-6">
-      <PageHeader
-        title="운영사"
-        description={
-          company
-            ? (updated ?? '이 시스템을 운영하는 회사의 정보입니다.')
-            : canUpdate
-              ? '아직 등록된 정보가 없습니다. 입력 후 저장하세요.'
-              : '아직 등록된 정보가 없습니다.'
-        }
-        className="mb-0"
-      />
-      <CompanyForm initial={toInput(company)} readOnly={!canUpdate} />
-    </div>
+    <CompanyForm
+      header={{
+        title: '운영사',
+        description: company
+          ? '이 시스템을 운영하는 회사의 정보입니다.'
+          : canUpdate
+            ? '아직 등록된 정보가 없습니다. 입력 후 저장하세요.'
+            : '아직 등록된 정보가 없습니다.',
+        // 설명 다음 줄: 마지막으로 고친 사람·시각
+        meta: updated,
+      }}
+      initial={toInput(company)}
+      readOnly={!canUpdate}
+    />
   )
 }
