@@ -209,8 +209,9 @@ model Center {
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 
-  users      UserCenter[]
-  warehouses Warehouse[]
+  users         UserCenter[]
+  warehouses    Warehouse[]
+  deliveryZones DeliveryZone[]
 
   @@map("center")
 }
@@ -447,4 +448,38 @@ model CodeItem {
   @@unique([groupId, code])
   @@index([groupId, sortOrder])
   @@map("code_item")
+}
+
+// ── 배송권역 (docs/decisions/0033): 센터가 배송을 담당하는 지역 묶음
+// 코드 3층 (0025): systemCode DZ000001(자동·불변) / code(사용자 코드, 같은 센터 안 중복 금지) / 외부 코드(ExternalCode)
+model DeliveryZone {
+  id          String               @id @default(cuid())
+  centerId    String
+  systemCode  String               @unique
+  code        String
+  name        String
+  description String?
+  isActive    Boolean              @default(true)
+  createdAt   DateTime             @default(now())
+  updatedAt   DateTime             @updatedAt
+  center      Center               @relation(fields: [centerId], references: [id], onDelete: Restrict)
+  regions     DeliveryZoneRegion[]
+
+  @@unique([centerId, code])
+  @@index([centerId])
+  @@map("delivery_zone")
+}
+
+// 배송권역의 담당 지역: 법정동코드 앞자리 (시·도 2자리 = 그 시·도 전체, 시·군·구 5자리)
+// 같은 센터 안에서는 한 지역이 권역 하나에만 (서울 전체 + 서울 종로구처럼 겹치는 것도 금지) — 저장할 때 검사
+// 센터끼리는 겹쳐도 된다 (출고 때 화주사 이용 센터 기준으로 고른다)
+model DeliveryZoneRegion {
+  id         String       @id @default(cuid())
+  zoneId     String
+  regionCode String
+  zone       DeliveryZone @relation(fields: [zoneId], references: [id], onDelete: Cascade)
+
+  @@unique([zoneId, regionCode])
+  @@index([regionCode])
+  @@map("delivery_zone_region")
 }

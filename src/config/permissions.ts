@@ -55,7 +55,12 @@ export const PERMISSION_MENUS = {
     area: 'admin',
     actions: [...CRUD, 'export'],
   },
-  'master.delivery-zones': { label: '배송권역', group: '기준정보', area: 'admin', actions: CRUD },
+  'master.delivery-zones': {
+    label: '배송권역',
+    group: '기준정보',
+    area: 'admin',
+    actions: [...CRUD, 'export'],
+  },
   'master.units': { label: '단위', group: '기준정보', area: 'admin', actions: CRUD },
   'master.shippers': { label: '화주사', group: '기준정보', area: 'admin', actions: CRUD },
   'master.items': {
