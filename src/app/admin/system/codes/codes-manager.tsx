@@ -7,6 +7,7 @@ import { ACTIVE_STATUS, EmptyState, StatusBadge } from '@/components/common'
 import { DataGrid, type DataGridColumn, useDataGridState } from '@/components/data-grid'
 import { usePermission } from '@/components/permission'
 import { Button } from '@/components/ui/button'
+import { DeletedCodesDialog } from './deleted-codes-dialog'
 import {
   createCodeGroupAction,
   createCodeItemAction,
@@ -196,6 +197,8 @@ export function CodesManager() {
           searchPlaceholder="그룹 코드·이름 검색"
           toolbarActions={
             <>
+              {/* 지운 그룹·코드 보기와 되살리기 (삭제 권한) */}
+              {can('system.codes.delete') && <DeletedCodesDialog onRestored={reload} />}
               {can('system.codes.update') && (
                 <Button
                   type="button"
@@ -349,7 +352,7 @@ export function CodesManager() {
           }
           deleteDescription={
             dialog.kind === 'group'
-              ? '코드가 하나도 없는 그룹만 지울 수 있습니다. 되돌릴 수 없습니다.'
+              ? '코드가 하나도 없는 그룹만 지울 수 있습니다. [지운 항목]에서 되살릴 수 있습니다.'
               : '업무 데이터에서 쓰지 않는 코드만 지울 수 있습니다. 쓰는 코드는 사용 중지하세요.'
           }
           onDone={reload}

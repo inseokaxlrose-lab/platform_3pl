@@ -7,15 +7,16 @@ import { deliveryZoneSchema } from '@/lib/delivery-zones/delivery-zone-schema'
 import {
   createDeliveryZone,
   deleteDeliveryZones,
+  restoreDeliveryZones,
   updateDeliveryZone,
 } from '@/lib/delivery-zones/delivery-zones'
 import { listQuerySchema, toPrismaQuery } from '@/lib/grid/grid-query'
-import { dateRangeFilter, idFilter, statusWhere } from '@/lib/grid/list-filters'
+import { dateRangeFilter, deletedWhere, idFilter, statusWhere } from '@/lib/grid/list-filters'
 import { prisma } from '@/lib/prisma'
 import { assertInScope, scopeFilter, type DataScope } from '@/lib/scope/data-scope'
 import { rowVersionField } from '@/lib/row-version'
 import { idSchema } from '@/lib/id'
-import { toStatus, withIsActive } from '@/lib/status'
+import { DELETED_ONLY, toStatus, withIsActive } from '@/lib/status'
 
 // 배송권역 서버 액션 (docs/decisions/0033)
 // 데이터 범위: 센터 직원은 소속 센터의 권역만 보고 다룬다
@@ -66,6 +67,8 @@ export const listDeliveryZonesAction = createAction({
         scopeFilter(scope, ZONE_SCOPE),
         idFilter(filters, 'center') ? { centerId: idFilter(filters, 'center') } : {},
         statusWhere(filters),
+        // '삭제됨'을 고르면 지운 것만 (아니면 prisma.ts가 지운 것을 뺀다)
+        deletedWhere(filters),
         sido ? { regions: { some: { regionCode: { startsWith: sido } } } } : {},
         createdAt ? { createdAt } : {},
       ],
@@ -143,5 +146,21 @@ export const deleteDeliveryZonesAction = createAction({
   handler: async ({ input, scope }) => {
     const ids = await assertZonesInScope(input.ids, scope)
     return deleteDeliveryZones(ids)
+  },
+})
+
+// 되살리기: 지운 권역 (삭제 권한, 데이터 범위 안만). 같은 코드·담당 지역이 다시 쓰이고 있으면 거부
+export const restoreDeliveryZonesAction = createAction({
+  permission: 'master.delivery-zones.delete',
+  input: z.object({ ids: idsSchema }),
+  handler: async ({ input, scope }) => {
+    const ids = [...new Set(input.ids)]
+    const inScope = await prisma.deliveryZone.count({
+      where: { AND: [{ id: { in: ids } }, DELETED_ONLY, scopeFilter(scope, ZONE_SCOPE)] },
+    })
+    if (inScope !== ids.length) {
+      throw new ActionError('NOT_FOUND', '찾을 수 없는 배송권역이 섞여 있습니다.')
+    }
+    return restoreDeliveryZones(ids)
   },
 })

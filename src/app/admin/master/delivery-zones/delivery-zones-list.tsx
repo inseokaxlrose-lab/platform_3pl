@@ -3,7 +3,14 @@
 import { PlayIcon, PowerIcon, Trash2Icon } from 'lucide-react'
 import { ACTIVE_STATUS, ConfirmDialog } from '@/components/common'
 import type { DataGridColumn } from '@/components/data-grid'
-import { MasterListPage, useListQuery, type SearchFieldDef } from '@/components/master-list'
+import {
+  DELETED_STATUS_OPTION,
+  isDeletedView,
+  MasterListPage,
+  RestoreButton,
+  type SearchFieldDef,
+  useListQuery,
+} from '@/components/master-list'
 import { Button } from '@/components/ui/button'
 import { SIDO_LIST } from '@/config/korea-regions'
 import { unwrap } from '@/lib/actions'
@@ -11,6 +18,7 @@ import { summarizeRegions } from '@/lib/delivery-zones/regions'
 import {
   deleteDeliveryZonesAction,
   listDeliveryZonesAction,
+  restoreDeliveryZonesAction,
   setDeliveryZonesActiveAction,
 } from './actions'
 
@@ -108,6 +116,8 @@ export function DeliveryZonesList({
       options: [
         { value: 'ACTIVE', label: '사용' },
         { value: 'INACTIVE', label: '사용 중지' },
+        // 지운 권역 보기 → [되살리기]
+        DELETED_STATUS_OPTION,
       ],
     },
     {
@@ -150,7 +160,7 @@ export function DeliveryZonesList({
         title={`배송권역 ${ids.length}개를 ${label}할까요?`}
         description={
           kind === 'delete'
-            ? '출고에 쓰인 적 없는 권역만 지워집니다. 담당 지역도 함께 지워지고 되돌릴 수 없습니다.'
+            ? '출고에 쓰인 적 없는 권역만 지워집니다. 담당 지역은 비게 되고, 상태 거르기의 "삭제됨"에서 되살릴 수 있습니다.'
             : undefined
         }
         confirmLabel={label}
@@ -174,17 +184,32 @@ export function DeliveryZonesList({
       list={list}
       columns={COLUMNS}
       getRowId={(row) => row.id}
-      rowHref={(row) => `/admin/master/delivery-zones/${row.id}`}
+      // "삭제됨" 보기에서는 수정 화면으로 가지 않는다 (지운 권역은 열 수 없음)
+      rowHref={
+        isDeletedView(list.values) ? undefined : (row) => `/admin/master/delivery-zones/${row.id}`
+      }
       bulkActions={
-        can.update || can.delete
-          ? ({ ids, done }) => (
-              <>
-                {can.update && bulk(ids, done, 'deactivate')}
-                {can.update && bulk(ids, done, 'activate')}
-                {can.delete && bulk(ids, done, 'delete')}
-              </>
-            )
-          : undefined
+        // "삭제됨" 보기에서는 [되살리기]만 (삭제 권한)
+        isDeletedView(list.values)
+          ? can.delete
+            ? ({ ids, done }) => (
+                <RestoreButton
+                  ids={ids}
+                  noun="배송권역"
+                  restore={(restoreIds) => restoreDeliveryZonesAction({ ids: restoreIds })}
+                  done={done}
+                />
+              )
+            : undefined
+          : can.update || can.delete
+            ? ({ ids, done }) => (
+                <>
+                  {can.update && bulk(ids, done, 'deactivate')}
+                  {can.update && bulk(ids, done, 'activate')}
+                  {can.delete && bulk(ids, done, 'delete')}
+                </>
+              )
+            : undefined
       }
       excelName={can.export ? '배송권역' : undefined}
       emptyTitle="등록된 배송권역이 없습니다"

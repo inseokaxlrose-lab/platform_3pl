@@ -3,7 +3,7 @@ import type { DeliveryZoneInput } from '@/lib/delivery-zones/delivery-zone-schem
 import { getExternalCodes } from '@/lib/master-code/external-codes'
 import { textIds } from '@/lib/id'
 import { prisma } from '@/lib/prisma'
-import { isActiveStatus } from '@/lib/status'
+import { NOT_DELETED, isActiveStatus } from '@/lib/status'
 import { isInScope, scopeFilter, type DataScope } from '@/lib/scope/data-scope'
 
 // 센터별로 이미 담당 중인 지역 (담당 지역 고르기에서 "다른 권역이 사용 중"으로 흐리게)
@@ -16,9 +16,11 @@ export async function getTakenRegions(
 ): Promise<TakenRegions> {
   const regions = await prisma.deliveryZoneRegion.findMany({
     where: {
+      // 지운 권역의 담당 지역은 비어 있는 것으로 본다
       zone: {
         AND: [
           scopeFilter(scope, { center: 'centerId' }),
+          NOT_DELETED,
           exceptZoneId ? { id: { not: exceptZoneId } } : {},
         ],
       },

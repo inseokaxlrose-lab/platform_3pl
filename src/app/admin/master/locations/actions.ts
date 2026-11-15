@@ -14,13 +14,14 @@ import {
   createLocation,
   deleteLocations,
   previewBulkLocations,
+  restoreLocations,
   setLocationsActive,
 } from '@/lib/locations/locations'
 import { prisma } from '@/lib/prisma'
-import { withIsActive } from '@/lib/status'
+import { DELETED_ONLY, withIsActive } from '@/lib/status'
 import { assertInScope, scopeFilter, type DataScope } from '@/lib/scope/data-scope'
 import { idField, idSchema } from '@/lib/id'
-import { idFilter, statusWhere } from '@/lib/grid/list-filters'
+import { deletedWhere, idFilter, statusWhere } from '@/lib/grid/list-filters'
 
 // 로케이션 관리 서버 액션 (docs/decisions/0028)
 // 데이터 범위: 센터 직원은 소속 센터 창고의 로케이션만
@@ -84,6 +85,8 @@ export const listLocationsAction = createAction({
         idFilter(filters, 'warehouse') ? { warehouseId: idFilter(filters, 'warehouse') } : {},
         filters.zone ? { zone: filters.zone } : {},
         statusWhere(filters),
+        // '삭제됨'을 고르면 지운 것만 (아니면 prisma.ts가 지운 것을 뺀다)
+        deletedWhere(filters),
       ],
     }
     const [rows, rowCount] = await prisma.$transaction([
@@ -183,5 +186,21 @@ export const deleteLocationsAction = createAction({
   handler: async ({ input, scope }) => {
     const locations = await findLocationsInScope(input.ids, scope)
     return deleteLocations(locations)
+  },
+})
+
+// 되살리기: 지운 로케이션 (삭제 권한, 데이터 범위 안만). 같은 코드가 다시 생겼으면 거부
+export const restoreLocationsAction = createAction({
+  permission: 'master.locations.delete',
+  input: z.object({ ids: idsSchema }),
+  handler: async ({ input, scope }) => {
+    const ids = [...new Set(input.ids)]
+    const inScope = await prisma.location.count({
+      where: { AND: [{ id: { in: ids } }, DELETED_ONLY, scopeFilter(scope, LOCATION_SCOPE)] },
+    })
+    if (inScope !== ids.length) {
+      throw new ActionError('NOT_FOUND', '찾을 수 없는 로케이션이 섞여 있습니다.')
+    }
+    return restoreLocations(ids)
   },
 })

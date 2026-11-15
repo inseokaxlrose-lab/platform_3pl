@@ -178,7 +178,7 @@ export function RoleForm({ group, header }: RoleFormProps) {
       description:
         group.userCount > 0
           ? `사용자 ${group.userCount}명이 이 그룹을 사용 중이라 삭제할 수 없습니다. 먼저 사용자에게서 그룹을 빼 주세요.`
-          : '이 권한그룹을 지웁니다. 되돌릴 수 없습니다.',
+          : '이 권한그룹을 지웁니다. 목록의 "삭제됨"에서 되살릴 수 있습니다.',
       content: (
         <ConfirmDialog
           trigger={
@@ -188,7 +188,7 @@ export function RoleForm({ group, header }: RoleFormProps) {
             </Button>
           }
           title="권한그룹을 삭제할까요?"
-          description={`'${group.name}' 그룹을 삭제합니다. 되돌릴 수 없습니다.`}
+          description={`'${group.name}' 그룹을 삭제합니다. 목록의 "삭제됨"에서 되살릴 수 있습니다.`}
           confirmLabel="삭제"
           destructive
           onConfirm={async () => {

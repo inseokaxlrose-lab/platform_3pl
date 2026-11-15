@@ -1,8 +1,16 @@
 'use client'
 
+import { usePermission } from '@/components/permission'
 import type { DataGridColumn } from '@/components/data-grid'
-import { MasterListPage, useListQuery, type SearchFieldDef } from '@/components/master-list'
-import { listPermissionGroupsAction } from './actions'
+import {
+  DELETED_STATUS_OPTION,
+  isDeletedView,
+  MasterListPage,
+  RestoreButton,
+  type SearchFieldDef,
+  useListQuery,
+} from '@/components/master-list'
+import { listPermissionGroupsAction, restorePermissionGroupAction } from './actions'
 import { AREA_LABELS, AREA_STATUS } from './area-labels'
 
 type Row = {
@@ -28,6 +36,8 @@ const SEARCH_FIELDS: SearchFieldDef[] = [
       { value: 'PORTAL', label: AREA_LABELS.PORTAL },
     ],
   },
+  // 지운 권한그룹 보기 → [되살리기] (권한그룹은 사용/중지가 없어 "삭제됨"만)
+  { key: 'status', label: '상태', type: 'segment', span: 4, options: [DELETED_STATUS_OPTION] },
 ]
 
 const COLUMNS: DataGridColumn<Row>[] = [
@@ -53,8 +63,9 @@ const COLUMNS: DataGridColumn<Row>[] = [
   },
 ]
 
-// 권한그룹 목록 (docs/decisions/0017): 건수가 적어 일괄 처리·엑셀은 두지 않는다
+// 권한그룹 목록 (docs/decisions/0017): 건수가 적어 일괄 처리·엑셀은 두지 않는다 ("삭제됨" 보기의 [되살리기]만)
 export function RolesList({ actions }: { actions?: React.ReactNode }) {
+  const { can } = usePermission()
   const list = useListQuery<Row>({
     gridId: 'system-roles',
     fields: SEARCH_FIELDS,
@@ -70,7 +81,27 @@ export function RolesList({ actions }: { actions?: React.ReactNode }) {
       list={list}
       columns={COLUMNS}
       getRowId={(row) => row.id}
-      rowHref={(row) => `/admin/system/roles/${row.id}`}
+      // "삭제됨" 보기: 수정 화면 대신 골라서 [되살리기] (삭제 권한)
+      rowHref={isDeletedView(list.values) ? undefined : (row) => `/admin/system/roles/${row.id}`}
+      bulkActions={
+        isDeletedView(list.values) && can('system.roles.delete')
+          ? ({ ids, done }) => (
+              <RestoreButton
+                ids={ids}
+                noun="권한그룹"
+                restore={async (restoreIds) => {
+                  // 한 건씩 되살린다 (하나라도 실패하면 그 이유를 보여 준다)
+                  for (const id of restoreIds) {
+                    const result = await restorePermissionGroupAction({ id })
+                    if (!result.ok) return result
+                  }
+                  return { ok: true, data: null }
+                }}
+                done={done}
+              />
+            )
+          : undefined
+      }
       emptyTitle="등록된 권한그룹이 없습니다"
     />
   )

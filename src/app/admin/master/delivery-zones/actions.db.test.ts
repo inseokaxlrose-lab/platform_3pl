@@ -12,6 +12,7 @@ import {
   createDeliveryZoneAction,
   deleteDeliveryZonesAction,
   listDeliveryZonesAction,
+  restoreDeliveryZonesAction,
   setDeliveryZonesActiveAction,
   updateDeliveryZoneAction,
 } from './actions'
@@ -201,14 +202,18 @@ describe('목록 · 범위 · 일괄 처리', () => {
     ])
   })
 
-  it('삭제하면 담당 지역·외부 코드도 함께 지운다, 엑셀 전체는 엑셀 권한 필요', async () => {
+  it('삭제는 논리 삭제: 목록에서 빠지고, 외부 코드는 지우고, 담당 지역은 비게 된다 / 엑셀 전체는 엑셀 권한 필요', async () => {
     const zone = await create({ externalCodes: { SAP: 'Z1', ERP: '' } })
     expect(await deleteDeliveryZonesAction({ ids: [zone.id] })).toEqual({
       ok: true,
       data: { count: 1 },
     })
-    expect(await prisma.deliveryZoneRegion.count()).toBe(0)
+    // 줄은 남고 del_yn만 'Y' (되살릴 수 있다), 보통 조회에서는 안 보인다
+    expect(await prisma.deliveryZone.count()).toBe(0)
+    expect(await prisma.deliveryZone.count({ where: { delYn: 'Y' } })).toBe(1)
     expect(await prisma.externalCode.count()).toBe(0)
+    // 지운 권역의 담당 지역은 다른 권역이 쓸 수 있다
+    expect(await create({ code: 'Z-NEW' })).toMatchObject({ code: 'Z-NEW' })
     expect(
       await listDeliveryZonesAction({ ...createDataGridState(), exportAll: true }),
     ).toMatchObject({ ok: false, error: { code: 'FORBIDDEN' } })
@@ -220,5 +225,27 @@ describe('목록 · 범위 · 일괄 처리', () => {
       ok: false,
       error: { code: 'CONFLICT' },
     })
+  })
+})
+
+describe('되살리기 (0038)', () => {
+  it('지운 권역의 담당 지역을 다른 권역이 맡았으면 되살리지 않는다', async () => {
+    const old = await create({ code: 'Z1', regionCodes: ['11'] })
+    await deleteDeliveryZonesAction({ ids: [old.id] })
+    const taker = await create({ code: 'Z2', regionCodes: ['11'] })
+
+    expect(await restoreDeliveryZonesAction({ ids: [old.id] })).toMatchObject({
+      ok: false,
+      error: { code: 'CONFLICT' },
+    })
+    // 맡은 권역을 지우면 되살릴 수 있다 (담당 지역도 그대로)
+    await deleteDeliveryZonesAction({ ids: [taker.id] })
+    expect(await restoreDeliveryZonesAction({ ids: [old.id] })).toMatchObject({ ok: true })
+    expect(
+      await prisma.deliveryZoneRegion.findMany({
+        where: { zoneId: BigInt(old.id) },
+        select: { regionCode: true },
+      }),
+    ).toEqual([{ regionCode: '11' }])
   })
 })

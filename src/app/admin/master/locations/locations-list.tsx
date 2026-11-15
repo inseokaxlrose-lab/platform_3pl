@@ -4,10 +4,22 @@ import { LayersIcon, PlayIcon, PowerIcon, Trash2Icon } from 'lucide-react'
 import Link from 'next/link'
 import { ACTIVE_STATUS, ConfirmDialog } from '@/components/common'
 import type { DataGridColumn } from '@/components/data-grid'
-import { MasterListPage, useListQuery, type SearchFieldDef } from '@/components/master-list'
+import {
+  DELETED_STATUS_OPTION,
+  isDeletedView,
+  MasterListPage,
+  RestoreButton,
+  type SearchFieldDef,
+  useListQuery,
+} from '@/components/master-list'
 import { Button } from '@/components/ui/button'
 import { unwrap } from '@/lib/actions'
-import { deleteLocationsAction, listLocationsAction, setLocationsActiveAction } from './actions'
+import {
+  deleteLocationsAction,
+  listLocationsAction,
+  restoreLocationsAction,
+  setLocationsActiveAction,
+} from './actions'
 import { AddLocationDialog } from './add-location-dialog'
 import type { WarehouseOption } from './queries'
 
@@ -116,6 +128,8 @@ export function LocationsList({
       options: [
         { value: 'ACTIVE', label: '사용' },
         { value: 'INACTIVE', label: '사용 중지' },
+        // 지운 로케이션 보기 → [되살리기]
+        DELETED_STATUS_OPTION,
       ],
     },
   ]
@@ -151,7 +165,8 @@ export function LocationsList({
           {
             deactivate: '사용 중지한 로케이션에는 새로 적치할 수 없습니다. 기록은 남습니다.',
             activate: undefined,
-            delete: '한 번도 쓰이지 않은 로케이션만 삭제됩니다. 되돌릴 수 없습니다.',
+            delete:
+              '한 번도 쓰이지 않은 로케이션만 삭제됩니다. 상태 거르기의 "삭제됨"에서 되살릴 수 있습니다.',
           }[kind]
         }
         confirmLabel={label}
@@ -194,15 +209,27 @@ export function LocationsList({
       columns={COLUMNS}
       getRowId={(row) => row.id}
       bulkActions={
-        can.update || can.delete
-          ? ({ ids, done }) => (
-              <>
-                {can.update && bulk(ids, done, 'deactivate')}
-                {can.update && bulk(ids, done, 'activate')}
-                {can.delete && bulk(ids, done, 'delete')}
-              </>
-            )
-          : undefined
+        // "삭제됨" 보기에서는 [되살리기]만 (삭제 권한)
+        isDeletedView(list.values)
+          ? can.delete
+            ? ({ ids, done }) => (
+                <RestoreButton
+                  ids={ids}
+                  noun="로케이션"
+                  restore={(restoreIds) => restoreLocationsAction({ ids: restoreIds })}
+                  done={done}
+                />
+              )
+            : undefined
+          : can.update || can.delete
+            ? ({ ids, done }) => (
+                <>
+                  {can.update && bulk(ids, done, 'deactivate')}
+                  {can.update && bulk(ids, done, 'activate')}
+                  {can.delete && bulk(ids, done, 'delete')}
+                </>
+              )
+            : undefined
       }
       excelName={can.export ? '로케이션' : undefined}
       emptyTitle="등록된 로케이션이 없습니다"
