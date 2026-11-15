@@ -200,13 +200,14 @@ async function seedSampleOperator(): Promise<bigint> {
   }
   const created = await prisma.operator.create({
     data: {
+      code: 'DEMO',
       name: '예시물류(주)',
       businessNumber: '2208112341',
       ceoName: '홍길동',
       businessType: '서비스',
       businessItem: '물류대행',
       phone: '021234567',
-      contacts: { create: [{ sortOrder: 0, duty: '입고 문의', name: '김입고' }] },
+      contacts: { create: [{ sortOrder: 0, duty: 'INBOUND', name: '김입고', isPrimary: 'Y' }] },
     },
   })
   console.log(`예시 운영사 생성: ${created.name}`)
@@ -223,10 +224,11 @@ async function seedOperatorDefaults(operatorId: bigint, label: string) {
 // 두 번째 견본 운영사 (0039 3c): 운영사 격리를 화면에서 확인하는 용도 (운영 환경이면 건너뛴다)
 // 플랫폼의 운영사 등록과 같은 함수로 만든다 → 관리자 admin.nara (처음 비밀번호 SEED_ADMIN_PASSWORD)
 const SECOND_OPERATOR = {
+  code: 'NARA',
   name: '나라물류(주)',
   businessNumber: '3128112349',
   ceoName: '김나라',
-  adminSuffix: 'nara',
+  type: '3PL',
 }
 
 async function seedSecondOperator() {
@@ -234,7 +236,7 @@ async function seedSecondOperator() {
     console.log('두 번째 견본 운영사: 운영 환경이라 건너뜀')
     return
   }
-  const found = await prisma.operator.findFirst({ where: { name: SECOND_OPERATOR.name } })
+  const found = await prisma.operator.findFirst({ where: { code: SECOND_OPERATOR.code } })
   const operatorId = found
     ? found.id
     : (await registerOperator(SECOND_OPERATOR, process.env.SEED_ADMIN_PASSWORD ?? '')).id

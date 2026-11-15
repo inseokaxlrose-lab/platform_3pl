@@ -15,10 +15,11 @@ export async function resetDatabase() {
     const tables = rows.map((row) => `"public"."${row.tablename}"`).join(', ')
     await prisma.$executeRawUnsafe(`TRUNCATE TABLE ${tables} RESTART IDENTITY CASCADE`)
   }
-  await createTestOperator('테스트운영사')
+  await createTestOperator('테스트운영사', 'TEST')
 }
 
-// 운영사 (두 운영사 격리 테스트용으로 더 만들 수 있다)
-export function createTestOperator(name: string) {
-  return prisma.operator.create({ data: { name, businessNumber: '2208112341' } })
+// 운영사 (두 운영사 격리 테스트용으로 더 만들 수 있다). 운영사코드를 주지 않으면 T1, T2… 로 붙인다
+let operatorSeq = 0
+export function createTestOperator(name: string, code = `T${++operatorSeq}`) {
+  return prisma.operator.create({ data: { code, name, businessNumber: '2208112341' } })
 }
