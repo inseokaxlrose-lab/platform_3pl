@@ -53,6 +53,10 @@
 - **등록·수정자 자동 기록 (2a 적용)**: 화면·기능 코드에서 넣지 않는다. `createAction`이 로그인 사용자 아이디로 `runAsActor`를 감싸고(`src/lib/actor.ts`), `prisma.ts`의 확장이 등록·수정 때 `created_by`/`updated_by`를 채우고 수정 때마다 `row_version +1` 한다. 시드는 `seed`, 감싸지 않은 곳은 `system`.
   - 주의: 안쪽 관계로 함께 만드는 줄(nested create)은 확장이 채우지 못한다 → 공통 칸이 있는 표는 바깥에서 직접 만든다.
   - 화면 표시: `actorLabel(아이디)` → '이름 (아이디)' / '시스템'.
+- **상태 `status_cd` (2b 적용)**: `is_active`를 대체, `'ACTIVE'`/`'INACTIVE'` + 검사 조건 (9개 표: 사용자·센터·창고·로케이션·화주사·공통코드 그룹·공통코드·배송권역·단위). 코드는 `src/lib/status.ts`.
+  - 화면·입력 규칙은 지금처럼 사용 여부 `isActive`(true/false). DB에 쓸 때 `toStatus`/`withStatus`, 읽을 때 `isActiveStatus`/`withIsActive`, 조건은 `ACTIVE_ONLY`, 목록 검색은 `statusWhere(filters)`.
+  - 주의: 타입 검사가 못 보는 곳 — 목록 정렬 매핑(`sortable: { isActive: 'status' }`), 조건 목록 안의 객체, 입력값을 통째로 저장하는 `data`(반드시 `withStatus`).
+  - Better Auth 사용자 추가 칸도 `status` (`ACTIVE`만 로그인).
 - **동시 수정 막기 (2a 적용)**: 수정 화면·팝업은 불러올 때의 `rowVersion`을 들고 있다가 저장 때 보낸다(`useMasterForm`의 `version`, 결과의 새 버전으로 자동 갱신). 서버는 `assertRowVersion` + 수정 조건에 버전(`where: { id, rowVersion }`) + `withVersionGuard`(`src/lib/row-version.ts`). 사용 중지·일괄 처리는 검사 없이 버전만 올린다.
 
 ## 표·칸 대응표 (1단계 — 지금 25개 표, 197개 칸)
