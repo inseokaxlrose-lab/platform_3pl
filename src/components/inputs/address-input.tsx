@@ -22,7 +22,9 @@ type AddressInputProps = {
   disabled?: boolean
   errors?: Partial<Record<keyof AddressValue, string>>
   // 입력칸 id 앞부분 (한 화면에 주소가 여러 개일 때 구분). 기본주소 칸 id = `${idPrefix}-address`
-  idPrefix?: string
+  idPrefix?: string // 주소 검색으로 고르면 지번주소를 알려 준다 (지번주소를 따로 저장하는 화면만, 예: 운영사 addr_jibun)
+  // 직접 입력으로 주소를 바꾸면 빈 글자를 알려 준다 (검색 결과와 어긋나지 않게)
+  onJibunAddress?: (jibunAddress: string) => void
 }
 
 // 주소 입력 (권장 span 12): [우편번호][주소 검색] 한 줄 → 기본주소 → 상세주소 (docs/decisions/0024)
@@ -34,6 +36,7 @@ export function AddressInput({
   disabled,
   errors = {},
   idPrefix = 'address',
+  onJibunAddress,
 }: AddressInputProps) {
   const [open, setOpen] = useState(false)
   const [manual, setManual] = useState(false)
@@ -74,7 +77,10 @@ export function AddressInput({
         disabled={disabled}
         placeholder={manual ? '주소를 직접 입력하세요' : '[주소 검색]으로 입력합니다'}
         aria-invalid={Boolean(errors.address)}
-        onChange={(e) => set({ address: e.target.value })}
+        onChange={(e) => {
+          set({ address: e.target.value })
+          onJibunAddress?.('')
+        }}
       />
       <Input
         ref={detailInput}
@@ -109,8 +115,9 @@ export function AddressInput({
           </DialogHeader>
           {open && (
             <PostcodeEmbed
-              onSelect={(found) => {
+              onSelect={({ jibunAddress, ...found }) => {
                 set({ ...found, addressDetail: value.addressDetail })
+                onJibunAddress?.(jibunAddress)
                 selected.current = true
                 setOpen(false)
               }}
@@ -134,7 +141,7 @@ function PostcodeEmbed({
   onSelect,
   onError,
 }: {
-  onSelect: (value: { zipCode: string; address: string }) => void
+  onSelect: (value: { zipCode: string; address: string; jibunAddress: string }) => void
   onError: () => void
 }) {
   const box = useRef<HTMLDivElement>(null)

@@ -52,3 +52,9 @@ export function requireOperatorId(): bigint {
 export async function acrossOperators<T>(fn: () => T | PromiseLike<T>): Promise<T> {
   return runInContext({ actor: currentActor() }, fn)
 }
+
+// 정해진 운영사의 출입증으로 실행 (작업자는 그대로)
+// 플랫폼이 특정 운영사의 데이터를 다룰 때 — 그 운영사의 공통코드로 검사하고, 작업 중인 다른 운영사와 섞이지 않게
+export async function asOperator<T>(operatorId: bigint, fn: () => T | PromiseLike<T>): Promise<T> {
+  return runInContext({ actor: currentActor(), operatorId }, fn)
+}
