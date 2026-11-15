@@ -1,0 +1,144 @@
+import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest'
+import { createDataGridState } from '@/components/data-grid/state'
+import type { PermissionCode } from '@/config/permissions'
+import { getExternalCodes } from '@/lib/master-code/external-codes'
+import { prisma } from '@/lib/prisma'
+import { getCurrentPermissions, getCurrentScope, getCurrentUser } from '@/lib/session'
+import type { UnitCreateInput } from '@/lib/units/unit-schema'
+import { resetDatabase } from '@/test/reset-database'
+import {
+  createUnitAction,
+  deleteUnitsAction,
+  listUnitsAction,
+  setUnitsActiveAction,
+  updateUnitAction,
+} from './actions'
+
+vi.mock('@/lib/session', () => ({
+  getCurrentUser: vi.fn(),
+  getCurrentPermissions: vi.fn(),
+  getCurrentScope: vi.fn(async () => ({ kind: 'ALL' })),
+}))
+
+const CODES: PermissionCode[] = [
+  'master.units.read',
+  'master.units.create',
+  'master.units.update',
+  'master.units.delete',
+]
+
+function signIn(codes = CODES) {
+  vi.mocked(getCurrentUser).mockResolvedValue({
+    id: 'u1',
+    name: '관리자',
+    username: 'boss',
+    userType: 'OPERATOR',
+  })
+  vi.mocked(getCurrentPermissions).mockResolvedValue(new Set(codes))
+  vi.mocked(getCurrentScope).mockResolvedValue({ kind: 'ALL' })
+}
+
+const input = (overrides: Partial<UnitCreateInput> = {}): UnitCreateInput => ({
+  code: 'kg',
+  name: '킬로그램',
+  kind: 'BASE',
+  decimals: 3,
+  sortOrder: 10,
+  isActive: true,
+  externalCodes: { SAP: '', ERP: '' },
+  ...overrides,
+})
+
+async function create(overrides: Partial<UnitCreateInput> = {}) {
+  const result = await createUnitAction(input(overrides))
+  if (!result.ok) throw new Error(result.error.message)
+  return result.data
+}
+
+beforeEach(async () => {
+  await resetDatabase()
+  signIn()
+})
+
+afterAll(async () => {
+  await prisma.$disconnect()
+})
+
+describe('단위 등록·수정', () => {
+  it('코드는 대문자로, 중복 거부, 환산단위는 소수 자리수 0, 외부 코드 함께 저장', async () => {
+    const kg = await create({ externalCodes: { SAP: 'KGM', ERP: '' } })
+    expect(kg.code).toBe('KG')
+    expect(await getExternalCodes('UNIT', kg.id)).toEqual({ SAP: 'KGM', ERP: '' })
+    expect(await createUnitAction(input({ code: 'KG' }))).toMatchObject({
+      ok: false,
+      error: { code: 'CONFLICT' },
+    })
+    const box = await create({ code: 'BOX', name: '박스', kind: 'PACK', decimals: 2 })
+    expect((await prisma.unit.findUniqueOrThrow({ where: { id: box.id } })).decimals).toBe(0)
+    expect(await createUnitAction(input({ code: '1A', decimals: 9 }))).toMatchObject({
+      ok: false,
+      error: { fieldErrors: { code: [expect.any(String)], decimals: [expect.any(String)] } },
+    })
+  })
+
+  it('수정: 코드는 그대로, 시스템 단위는 종류 변경·사용 중지 불가', async () => {
+    const kg = await create()
+    await updateUnitAction({ id: kg.id, ...input({ code: 'XX', name: '킬로', decimals: 2 }) })
+    expect(await prisma.unit.findUniqueOrThrow({ where: { id: kg.id } })).toMatchObject({
+      code: 'KG',
+      name: '킬로',
+      decimals: 2,
+    })
+
+    const ea = await prisma.unit.create({
+      data: { code: 'EA', name: '개', kind: 'BASE', isSystem: true },
+    })
+    expect(
+      await updateUnitAction({ id: ea.id, ...input({ name: '개', kind: 'PACK', decimals: 0 }) }),
+    ).toMatchObject({ ok: false, error: { message: expect.stringContaining('종류') } })
+    expect(
+      await updateUnitAction({ id: ea.id, ...input({ name: '개', decimals: 0, isActive: false }) }),
+    ).toMatchObject({ ok: false, error: { message: expect.stringContaining('사용 중지') } })
+  })
+})
+
+describe('목록 · 일괄 처리 · 권한', () => {
+  it('종류·상태로 거르고, 기본 정렬은 기본단위 → 환산단위, 외부 코드를 함께 준다', async () => {
+    await create({ code: 'BOX', name: '박스', kind: 'PACK', sortOrder: 1 })
+    await create({ code: 'KG', sortOrder: 5, externalCodes: { SAP: 'KGM', ERP: '' } })
+    await create({ code: 'EA', name: '개', decimals: 0, sortOrder: 1 })
+
+    const all = await listUnitsAction(createDataGridState())
+    expect(all.ok && all.data.rows.map((u) => u.code)).toEqual(['EA', 'KG', 'BOX'])
+    expect(all.ok && all.data.rows[1].externalCodes).toEqual({ SAP: 'KGM', ERP: '' })
+
+    const pack = await listUnitsAction({ ...createDataGridState(), filters: { kind: 'PACK' } })
+    expect(pack.ok && pack.data.rows.map((u) => u.code)).toEqual(['BOX'])
+  })
+
+  it('일괄 사용 중지·삭제: 시스템 단위가 섞이면 전체 거부, 삭제하면 외부 코드도 지운다', async () => {
+    const kg = await create({ externalCodes: { SAP: 'KGM', ERP: '' } })
+    const plt = await prisma.unit.create({
+      data: { code: 'PLT', name: '팔레트', kind: 'PACK', isSystem: true },
+    })
+    expect(await setUnitsActiveAction({ ids: [kg.id, plt.id], isActive: false })).toMatchObject({
+      ok: false,
+      error: { code: 'CONFLICT', message: expect.stringContaining('PLT') },
+    })
+    expect(await deleteUnitsAction({ ids: [plt.id] })).toMatchObject({ ok: false })
+    expect(await setUnitsActiveAction({ ids: [kg.id], isActive: false })).toEqual({
+      ok: true,
+      data: { count: 1 },
+    })
+    expect(await deleteUnitsAction({ ids: [kg.id] })).toEqual({ ok: true, data: { count: 1 } })
+    expect(await prisma.externalCode.count()).toBe(0)
+  })
+
+  it('권한이 없으면 거부', async () => {
+    signIn(['master.units.read'])
+    expect(await createUnitAction(input())).toMatchObject({
+      ok: false,
+      error: { code: 'FORBIDDEN' },
+    })
+  })
+})

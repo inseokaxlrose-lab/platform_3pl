@@ -483,3 +483,30 @@ model DeliveryZoneRegion {
   @@index([regionCode])
   @@map("delivery_zone_region")
 }
+
+// ── 단위 (docs/decisions/0034): 품목의 기본단위·환산단위로 고르는 목록
+// 시스템 코드 없이 표준 코드(EA·KG·BOX…)를 그대로 쓴다 (0025). 외부 코드는 ExternalCode(UNIT)
+enum UnitKind {
+  // 기본단위: 재고를 세는 단위 (재고는 항상 이 단위로 저장)
+  BASE
+  // 환산단위: 기본단위를 묶은 단위 (품목마다 입수량을 정한다)
+  PACK
+}
+
+model Unit {
+  id        String   @id @default(cuid())
+  // 등록 후 바꿀 수 없다 (품목·재고에 이 글자가 저장된다)
+  code      String   @unique
+  name      String
+  kind      UnitKind
+  // 소수 자리수: 기본단위의 수량 입력·검사 기준 (EA 0, KG 3). 환산단위는 0
+  decimals  Int      @default(0)
+  sortOrder Int      @default(0)
+  isActive  Boolean  @default(true)
+  // 시스템 단위: 프로그램이 직접 쓰는 단위 (EA, 라벨 단위 BOX·PLT) — 삭제·사용 중지·종류 변경 불가
+  isSystem  Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("unit")
+}

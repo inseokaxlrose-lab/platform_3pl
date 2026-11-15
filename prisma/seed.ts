@@ -12,6 +12,7 @@ import { prisma } from '../src/lib/prisma'
 import { createUserAccount } from '../src/lib/users/create-user-account'
 import { SEED_CODE_GROUPS } from './seed-codes'
 import { SAMPLE_ACCOUNTS, SEED_GROUPS, SUPER_GROUP_NAME } from './seed-roles'
+import { SEED_UNITS } from './seed-units'
 
 // 권한그룹을 만들고, 권한 목록을 정의와 똑같이 맞춘다 (새 메뉴 추가 시 시드만 다시 실행)
 // 돌려주는 값: 그룹 이름 → id
@@ -177,8 +178,22 @@ async function seedCommonCodes() {
   console.log(`공통코드: 시스템 그룹 ${SEED_CODE_GROUPS.length}개 확인`)
 }
 
+// 기본 단위 (0034): 없으면 만들고, 이미 있으면 시스템 표시만 맞춘다
+async function seedUnits() {
+  for (const [index, unit] of SEED_UNITS.entries()) {
+    const isSystem = unit.isSystem ?? false
+    await prisma.unit.upsert({
+      where: { code: unit.code },
+      create: { ...unit, isSystem, sortOrder: (index + 1) * 10 },
+      update: { isSystem },
+    })
+  }
+  console.log(`단위: 기본 ${SEED_UNITS.length}개 확인`)
+}
+
 async function main() {
   await seedCommonCodes()
+  await seedUnits()
   await seedSampleOrganizations()
   await seedSampleCompany()
   const groupIds = await seedGroups()
