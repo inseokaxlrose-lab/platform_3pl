@@ -3,20 +3,13 @@
 import { z } from 'zod'
 import { ActionError } from '@/lib/actions/action-error'
 import { createAction } from '@/lib/actions/create-action'
-import { dataGridStateSchema, toPrismaQuery } from '@/lib/grid/grid-query'
+import { listQuerySchema, toPrismaQuery } from '@/lib/grid/grid-query'
 import { normalizeGroupCodes, toPermissionArea } from '@/lib/permissions/normalize-group-codes'
+import { ROLE_AREAS, roleSchema, updateRoleSchema } from '@/lib/permissions/role-schema'
 import { prisma } from '@/lib/prisma'
 
 // 권한그룹 관리 서버 액션 (docs/decisions/0017-permission-group-admin.md)
 // 권한그룹은 운영사 전체 설정이라 데이터 범위(센터·화주사)를 적용하지 않는다
-
-const nameSchema = z
-  .string()
-  .trim()
-  .min(1, '이름을 입력해 주세요.')
-  .max(50, '50자 이하로 입력해 주세요.')
-const descriptionSchema = z.string().trim().max(200, '200자 이하로 입력해 주세요.').optional()
-const codesSchema = z.array(z.string().max(100)).max(500)
 
 // 이름 중복(DB 고유 조건) → 사용자 안내
 function isUniqueViolation(error: unknown) {
@@ -25,16 +18,22 @@ function isUniqueViolation(error: unknown) {
 
 export const listPermissionGroupsAction = createAction({
   permission: 'system.roles.read',
-  input: dataGridStateSchema,
+  input: listQuerySchema,
   handler: async ({ input }) => {
     const query = toPrismaQuery(input, {
       searchFields: ['name', 'description'],
       sortable: { name: 'name', area: 'area', updatedAt: 'updatedAt' },
       defaultOrderBy: { name: 'asc' },
     })
+    // 검색 조건: 영역 (권한그룹 목록 화면의 searchFields와 같은 키)
+    const area = (ROLE_AREAS as readonly string[]).includes(input.filters.area ?? '')
+      ? (input.filters.area as (typeof ROLE_AREAS)[number])
+      : undefined
+    const where = { AND: [query.where, area ? { area } : {}] }
     const [rows, rowCount] = await prisma.$transaction([
       prisma.permissionGroup.findMany({
         ...query,
+        where,
         select: {
           id: true,
           name: true,
@@ -44,7 +43,7 @@ export const listPermissionGroupsAction = createAction({
           _count: { select: { permissions: true, users: true } },
         },
       }),
-      prisma.permissionGroup.count({ where: query.where }),
+      prisma.permissionGroup.count({ where }),
     ])
     return {
       rows: rows.map(({ _count, ...row }) => ({
@@ -59,12 +58,7 @@ export const listPermissionGroupsAction = createAction({
 
 export const createPermissionGroupAction = createAction({
   permission: 'system.roles.create',
-  input: z.object({
-    name: nameSchema,
-    area: z.enum(['ADMIN', 'PORTAL']),
-    description: descriptionSchema,
-    permissionCodes: codesSchema,
-  }),
+  input: roleSchema,
   handler: async ({ input }) => {
     const { codes } = normalizeGroupCodes(input.permissionCodes, toPermissionArea(input.area))
     try {
@@ -88,12 +82,7 @@ export const createPermissionGroupAction = createAction({
 // 영역(area)은 등록 후 바꿀 수 없다: 바꾸면 체크한 권한이 모두 의미 없어진다
 export const updatePermissionGroupAction = createAction({
   permission: 'system.roles.update',
-  input: z.object({
-    id: z.string().min(1),
-    name: nameSchema,
-    description: descriptionSchema,
-    permissionCodes: codesSchema,
-  }),
+  input: updateRoleSchema,
   handler: async ({ input }) => {
     const group = await prisma.permissionGroup.findUnique({
       where: { id: input.id },

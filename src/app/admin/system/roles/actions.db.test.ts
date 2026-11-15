@@ -162,3 +162,16 @@ describe('권한그룹 서버 액션', () => {
     expect(await prisma.permissionGroup.count()).toBe(0)
   })
 })
+
+describe('권한그룹 목록 검색 조건', () => {
+  it('영역으로 거른다 (모르는 값은 조건 없음)', async () => {
+    await createPermissionGroupAction({ name: '운영 그룹', area: 'ADMIN', permissionCodes: [] })
+    await createPermissionGroupAction({ name: '포털 그룹', area: 'PORTAL', permissionCodes: [] })
+    const names = async (filters: Record<string, string>) => {
+      const result = await listPermissionGroupsAction({ ...createDataGridState(), filters })
+      return result.ok ? result.data.rows.map((r) => r.name).sort() : result.error
+    }
+    expect(await names({ area: 'PORTAL' })).toEqual(['포털 그룹'])
+    expect(await names({ area: 'NOPE' })).toEqual(['운영 그룹', '포털 그룹'])
+  })
+})
