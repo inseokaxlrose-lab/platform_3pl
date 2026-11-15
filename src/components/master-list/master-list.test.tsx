@@ -150,6 +150,13 @@ describe('useListQuery', () => {
     expect(result.current.rows).toEqual([{ id: 'new' }])
   })
 
+  it('서버 액션이 실패해도 로딩을 끝내고 오류 문구를 보여준다', async () => {
+    const fetch = vi.fn(() => Promise.reject(new Error('boom')))
+    const { result } = renderHook(() => useListQuery<Row>({ gridId: 't', fields: FIELDS, fetch }))
+    await waitFor(() => expect(result.current.loading).toBe(false))
+    expect(result.current.error).toContain('서버와 통신하지 못했습니다')
+  })
+
   it('autoSearch=false면 [조회] 전에는 읽지 않는다', () => {
     const fetch = vi.fn(async () => ok([]))
     const { result } = renderHook(() =>

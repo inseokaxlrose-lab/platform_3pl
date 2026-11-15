@@ -108,17 +108,24 @@ export function useListQuery<TRow>({
     if (!searched || inFlight.current === requestKey) return
     const id = ++latest.current
     inFlight.current = requestKey
-    fetchRef.current({ ...grid, filters }).then((response) => {
-      if (id !== latest.current) return // 늦게 온 이전 응답은 버린다
-      inFlight.current = null
-      if (response.ok) {
-        setResult(response.data)
-        setError(null)
-      } else {
-        setError(response.error.message)
-      }
-      setLoading(false)
-    })
+    fetchRef
+      .current({ ...grid, filters })
+      // 서버 액션 자체가 실패(네트워크·서버 오류)해도 "불러오지 못함"으로 끝낸다 (로딩이 멈추지 않게)
+      .catch(() => ({
+        ok: false as const,
+        error: { message: '서버와 통신하지 못했습니다. 잠시 후 다시 시도해 주세요.' },
+      }))
+      .then((response) => {
+        if (id !== latest.current) return // 늦게 온 이전 응답은 버린다
+        inFlight.current = null
+        if (response.ok) {
+          setResult(response.data)
+          setError(null)
+        } else {
+          setError(response.error.message)
+        }
+        setLoading(false)
+      })
   }, [requestKey, searched, grid, filters])
 
   // ── 목록 주소 기억 + 스크롤 위치 기억·복원
