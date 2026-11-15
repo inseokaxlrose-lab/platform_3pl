@@ -65,10 +65,10 @@ const adminNavigation: NavArea = {
       items: [
         {
           title: '운영사',
-          href: '/admin/master/company',
+          href: '/admin/master/operator',
           icon: BuildingIcon,
           ready: true,
-          permission: 'master.company.read',
+          permission: 'master.operator.read',
         },
         {
           title: '센터',

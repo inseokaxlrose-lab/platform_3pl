@@ -12,16 +12,30 @@ import {
 } from '@/components/master-form'
 import { Input } from '@/components/ui/input'
 import {
-  OPERATOR_ADMIN_PREFIX,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
+import { OPERATOR_TYPE } from '@/config/operator-codes'
+import {
+  adminUsernameOf,
   operatorRegisterSchema,
   type OperatorRegisterInput,
 } from '@/lib/operator/operator-schema'
 import { createOperatorAction } from '../actions'
 
-const EMPTY: OperatorRegisterInput = { name: '', businessNumber: '', ceoName: '', adminSuffix: '' }
+const EMPTY: OperatorRegisterInput = {
+  code: '',
+  name: '',
+  businessNumber: '',
+  ceoName: '',
+  type: '3PL',
+}
 
-// 운영사 등록 폼 (0039 3c): 기본 정보 + 관리자 아이디 뒷자리
-// 정의서의 나머지 칸(운영사 코드·유형 등)은 M2.5 4단계에서 더한다
+// 운영사 등록 폼 (0039 3c, 0040): 운영사코드·회사명·유형·사업자등록번호·대표자
+// 나머지 칸은 기본값으로 들어가고, 등록 후 편집 화면에서 채운다. 관리자는 admin.{운영사코드 소문자}
 export function OperatorRegisterForm({ header }: { header: MasterFormHeader }) {
   const router = useRouter()
   const form = useMasterForm({
@@ -30,7 +44,8 @@ export function OperatorRegisterForm({ header }: { header: MasterFormHeader }) {
     save: (value: OperatorRegisterInput) => createOperatorAction(value),
     // 등록 화면이라 저장 후 값은 쓰지 않는다 (바로 목록으로)
     afterSave: () => EMPTY,
-    onSuccess: () => router.push('/platform/operators'),
+    // 등록하면 편집 화면으로 (나머지 칸을 이어서 채운다)
+    onSuccess: (created) => router.push(`/platform/operators/${(created as { id: string }).id}`),
   })
   const { value, set, errors } = form
   const disabled = form.pending
@@ -40,8 +55,8 @@ export function OperatorRegisterForm({ header }: { header: MasterFormHeader }) {
     disabled,
     'aria-invalid': Boolean(errors[key]),
   })
-  // 관리자 아이디 미리보기 (서버도 같은 규칙: 소문자로)
-  const adminUsername = `${OPERATOR_ADMIN_PREFIX}${value.adminSuffix.trim().toLowerCase() || '○○'}`
+  // 관리자 아이디 미리보기 (서버도 같은 규칙)
+  const adminUsername = adminUsernameOf(value.code.trim() || '○○')
 
   const sections: MasterFormSection[] = [
     {
@@ -49,6 +64,21 @@ export function OperatorRegisterForm({ header }: { header: MasterFormHeader }) {
       title: '기본 정보',
       content: (
         <FormGrid>
+          <Field
+            label="운영사코드"
+            span={4}
+            required
+            error={errors.code}
+            htmlFor={id('code')}
+            hint="영문·숫자 2~20자, 등록 후 바꿀 수 없습니다"
+          >
+            <Input
+              {...props('code')}
+              value={value.code}
+              placeholder="예: NARA"
+              onChange={(e) => set({ code: e.target.value.toUpperCase() })}
+            />
+          </Field>
           <Field label="회사명" span={8} required error={errors.name} htmlFor={id('name')}>
             <Input
               {...props('name')}
@@ -70,6 +100,20 @@ export function OperatorRegisterForm({ header }: { header: MasterFormHeader }) {
               onChange={(businessNumber) => set({ businessNumber })}
             />
           </Field>
+          <Field label="운영사 유형" span={4} required error={errors.type} htmlFor={id('type')}>
+            <Select value={value.type} onValueChange={(type) => set({ type })} disabled={disabled}>
+              <SelectTrigger id={id('type')} className="w-full">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {OPERATOR_TYPE.options.map((option) => (
+                  <SelectItem key={option.value} value={option.value}>
+                    {option.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </Field>
           <Field label="대표자" span={4} error={errors.ceoName} htmlFor={id('ceoName')}>
             <Input
               {...props('ceoName')}
@@ -84,23 +128,11 @@ export function OperatorRegisterForm({ header }: { header: MasterFormHeader }) {
       id: 'admin',
       title: '관리자 계정',
       description:
-        '이 운영사의 첫 관리자입니다. 처음 비밀번호는 모든 운영사가 같은 값(서버 설정)이니, 처음 로그인한 뒤 바꾸도록 안내하세요.',
+        '이 운영사의 첫 관리자입니다. 아이디는 운영사코드로 정해지고, 처음 비밀번호는 모든 운영사가 같은 값(서버 설정)이니 처음 로그인한 뒤 바꾸도록 안내하세요.',
       content: (
         <FormGrid>
-          <Field
-            label="관리자 아이디 뒷자리"
-            span={4}
-            required
-            error={errors.adminSuffix}
-            htmlFor={id('adminSuffix')}
-            hint={`관리자 아이디: ${adminUsername}`}
-          >
-            <Input
-              {...props('adminSuffix')}
-              value={value.adminSuffix}
-              placeholder="예: nara"
-              onChange={(e) => set({ adminSuffix: e.target.value })}
-            />
+          <Field label="관리자 아이디" span={4} htmlFor={id('adminUsername')}>
+            <Input id={id('adminUsername')} value={adminUsername} disabled readOnly />
           </Field>
         </FormGrid>
       ),

@@ -32,7 +32,7 @@ const CRUD = ['read', 'create', 'update', 'delete'] as const
 
 export const PERMISSION_MENUS = {
   // ── 운영사 화면 · 기준정보
-  'master.company': {
+  'master.operator': {
     label: '운영사',
     group: '기준정보',
     area: 'admin',
@@ -151,7 +151,7 @@ export const PERMISSION_MENUS = {
     label: '운영사',
     group: '플랫폼',
     area: 'platform',
-    actions: ['read', 'create', 'switch'],
+    actions: ['read', 'create', 'update', 'switch'],
   },
 } as const satisfies Record<string, PermissionMenuDefinition>
 

@@ -5,50 +5,60 @@ import { useRouter } from 'next/navigation'
 import { useState, useTransition } from 'react'
 import type { DataGridColumn, StatusFormat } from '@/components/data-grid'
 import { MasterListPage, type SearchFieldDef, useListQuery } from '@/components/master-list'
+import { OPERATOR_STATUS_FORMAT } from '@/components/operator'
 import { usePermission } from '@/components/permission'
 import { Button } from '@/components/ui/button'
-import {
-  OPERATOR_STATUS_LABELS,
-  OPERATOR_STATUSES,
-  type OperatorStatus,
-} from '@/lib/operator/operator-status'
+import { OPERATOR_STATUS, OPERATOR_TYPE } from '@/config/operator-codes'
 import { listOperatorsAction, switchOperatorAction } from './actions'
 
 type Row = {
   id: string
+  code: string
   name: string
   businessNumber: string
+  ceoName: string | null
+  phone: string | null
   status: string
+  type: string
+  plan: string
+  contractEndOn: Date | null
+  centerCount: number
+  shipperCount: number
   userCount: number
   createdAt: Date
+  updatedAt: Date
 }
 
-// 상태 배지 색: 운영 = 초록, 대기 = 파랑, 정지 = 주황, 해지 = 빨강
-const TONES: Record<OperatorStatus, StatusFormat[string]['tone']> = {
-  PENDING: 'info',
-  ACTIVE: 'success',
-  SUSPENDED: 'warning',
-  TERMINATED: 'danger',
-}
-const STATUS_FORMAT: StatusFormat = Object.fromEntries(
-  OPERATOR_STATUSES.map((s) => [s, { label: OPERATOR_STATUS_LABELS[s], tone: TONES[s] }]),
+// 운영사 유형·요금제 서식 (상수 코드 → 이름)
+const TYPE_FORMAT: StatusFormat = Object.fromEntries(
+  OPERATOR_TYPE.options.map((o) => [o.value, { label: o.label, tone: 'neutral' as const }]),
 )
 
-// 검색 조건 (키는 서버 listOperatorsAction의 filters와 같게)
+// 검색 조건 (정의서 4장, 키는 서버 listOperatorsAction의 filters와 같게)
+// 요금제·계약종료일·보세창고 조건은 2차 칸이라 2차 화면을 열 때 더한다
 const SEARCH_FIELDS: SearchFieldDef[] = [
   {
     key: 'keyword',
     label: '검색어',
     type: 'keyword',
     span: 4,
-    placeholder: '운영사명·사업자등록번호',
+    placeholder: '운영사코드·운영사명',
   },
+  { key: 'businessNumber', label: '사업자등록번호', type: 'bizNo', span: 3 },
   {
     key: 'status',
-    label: '상태',
-    type: 'segment',
-    span: 6,
-    options: OPERATOR_STATUSES.map((s) => ({ value: s, label: OPERATOR_STATUS_LABELS[s] })),
+    label: '운영 상태',
+    type: 'multi',
+    span: 3,
+    options: OPERATOR_STATUS.options,
+  },
+  {
+    key: 'type',
+    label: '운영사 유형',
+    type: 'multi',
+    span: 3,
+    detail: true,
+    options: OPERATOR_TYPE.options,
   },
   { key: 'createdAt', label: '등록일', type: 'dateRange', span: 6, detail: true },
 ]
@@ -93,6 +103,15 @@ export function OperatorsList({ actions }: { actions?: React.ReactNode }) {
   })
   const columns: DataGridColumn<Row>[] = [
     {
+      id: 'code',
+      header: '운영사코드',
+      accessor: 'code',
+      sortable: true,
+      hideable: false,
+      pinned: true,
+      href: (row) => `/platform/operators/${row.id}`,
+    },
+    {
       id: 'name',
       header: '운영사명',
       accessor: 'name',
@@ -101,15 +120,41 @@ export function OperatorsList({ actions }: { actions?: React.ReactNode }) {
       pinned: true,
     },
     { id: 'businessNumber', header: '사업자등록번호', accessor: 'businessNumber', format: 'bizNo' },
+    { id: 'ceoName', header: '대표자', accessor: 'ceoName' },
+    { id: 'phone', header: '대표전화', accessor: 'phone', format: 'phone' },
     {
       id: 'status',
-      header: '상태',
+      header: '운영 상태',
       accessor: 'status',
       sortable: true,
-      format: { status: STATUS_FORMAT },
+      format: { status: OPERATOR_STATUS_FORMAT },
     },
-    { id: 'userCount', header: '사용자 수', accessor: 'userCount', format: 'number' },
+    {
+      id: 'type',
+      header: '운영사 유형',
+      accessor: 'type',
+      sortable: true,
+      format: { status: TYPE_FORMAT },
+    },
+    { id: 'plan', header: '요금제', accessor: 'plan', sortable: true },
+    {
+      id: 'contractEndOn',
+      header: '계약종료일',
+      accessor: 'contractEndOn',
+      format: 'date',
+      sortable: true,
+    },
+    { id: 'centerCount', header: '센터 수', accessor: 'centerCount', format: 'number' },
+    { id: 'shipperCount', header: '화주 수', accessor: 'shipperCount', format: 'number' },
     { id: 'createdAt', header: '등록일', accessor: 'createdAt', format: 'date', sortable: true },
+    {
+      id: 'updatedAt',
+      header: '수정일',
+      accessor: 'updatedAt',
+      format: 'datetime',
+      sortable: true,
+      defaultHidden: true,
+    },
     ...(can('platform.operators.switch')
       ? [
           {
@@ -128,6 +173,7 @@ export function OperatorsList({ actions }: { actions?: React.ReactNode }) {
       description="플랫폼을 쓰는 운영사입니다. [이 운영사로 작업]을 누르면 그 운영사의 화면으로 들어가 대신 작업할 수 있습니다."
       actions={actions}
       gridId="platform-operators"
+      rowHref={(row) => `/platform/operators/${row.id}`}
       searchFields={SEARCH_FIELDS}
       list={list}
       columns={columns}
