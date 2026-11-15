@@ -19,6 +19,7 @@ export const AUDITED_MODELS: ReadonlySet<string> = new Set([
   'CodeItem',
   'DeliveryZone',
   'Unit',
+  'Item',
 ])
 
 // 논리 삭제(del_yn)가 있는 표 (사용자는 계정을 지우지 않으므로 없음)
@@ -33,6 +34,7 @@ export const SOFT_DELETE_MODELS: ReadonlySet<string> = new Set([
   'CodeItem',
   'DeliveryZone',
   'Unit',
+  'Item',
 ])
 
 // 운영사 데이터가 들어가는 표 (operator_id가 있는 표, docs/decisions/0039)
@@ -49,6 +51,7 @@ export const TENANT_MODELS: ReadonlySet<string> = new Set([
   'CodeItem',
   'DeliveryZone',
   'Unit',
+  'Item',
 ])
 
 type Data = Record<string, unknown>
