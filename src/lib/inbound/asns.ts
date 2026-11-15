@@ -46,88 +46,104 @@ async function assertCenter(db: Db, shipperId: bigint, centerId: bigint, scope: 
   }
 }
 
-// 라인 → 저장할 값: 품목은 그 화주사의 사용 중인 품목, 단위는 기본단위 또는 품목의 환산단위
+// ASN 라인에 쓸 품목 정보 (단위·환산·관리 옵션)
+export const ASN_ITEM_SELECT = {
+  id: true,
+  code: true,
+  status: true,
+  useLot: true,
+  useExpiry: true,
+  labelUnit: true,
+  baseUnit: { select: { code: true, decimals: true } },
+  units: { select: { convQty: true, unit: { select: { code: true, decimals: true } } } },
+  shipper: { select: { useLot: true, useExpiry: true, labelUnit: true } },
+} as const
+
+export type AsnLineItem = {
+  id: bigint
+  code: string
+  status: string
+  useLot: string | null
+  useExpiry: string | null
+  labelUnit: 'PLT' | 'BOX' | null
+  baseUnit: { code: string; decimals: number }
+  units: { convQty: { toString(): string }; unit: { code: string; decimals: number } }[]
+  shipper: { useLot: string; useExpiry: string; labelUnit: 'PLT' | 'BOX' }
+}
+
+type AsnLineValue = AsnData['lines'][number]
+
+// 라인 하나 → 저장할 값 (문제가 있으면 그 문구로 ActionError — 줄 번호는 부르는 쪽이 붙인다)
+// 품목은 그 화주사의 사용 중인 품목, 단위는 기본단위 또는 품목의 환산단위
 // 기본단위로 바꾼 수량이 기본단위 소수 자리를 넘으면 거부 (예: EA 정수인데 BOX 0.3 × 24 = 7.2)
+export function resolveAsnLine(item: AsnLineItem | undefined, line: AsnLineValue) {
+  const fail = (message: string): never => {
+    throw new ActionError('VALIDATION', message)
+  }
+  if (!item) return fail('이 화주사의 품목이 아닙니다.')
+  if (!isActiveStatus(item.status)) fail(`사용 중지된 품목입니다 (${item.code}).`)
+
+  // 입력 단위 → 입수량
+  const isBase = line.unit === item.baseUnit.code
+  const pack = item.units.find((u) => u.unit.code === line.unit)
+  if (!isBase && !pack) fail(`${item.code}에 없는 단위입니다 (${line.unit}).`)
+  const unitDecimals = isBase ? item.baseUnit.decimals : pack!.unit.decimals
+  if (!checkQtyDecimals(line.qty, unitDecimals)) {
+    fail(
+      unitDecimals === 0
+        ? `${line.unit} 수량은 정수만 넣을 수 있습니다.`
+        : `${line.unit} 수량은 소수 ${unitDecimals}자리까지입니다.`,
+    )
+  }
+  const expectedQty = isBase ? line.qty : toBaseQty(line.qty, pack!.convQty.toString())
+  if (!checkQtyDecimals(expectedQty, item.baseUnit.decimals)) {
+    fail(`기본단위로 바꾸면 ${expectedQty} ${item.baseUnit.code}라 소수 자리가 맞지 않습니다.`)
+  }
+
+  // 로트·유통기한: 관리하지 않는 품목은 비워야 한다 (관리 품목은 ASN에서는 선택 — 실제 값은 검수에서)
+  const options = effectiveItemOptions(
+    {
+      useLot: item.useLot as 'Y' | 'N' | null,
+      useExpiry: item.useExpiry as 'Y' | 'N' | null,
+      labelUnit: item.labelUnit,
+    },
+    {
+      useLot: isYes(item.shipper.useLot),
+      useExpiry: isYes(item.shipper.useExpiry),
+      labelUnit: item.shipper.labelUnit,
+    },
+  )
+  if (!options.useLot && line.lotNo) fail(`로트를 관리하지 않는 품목입니다 (${item.code}).`)
+  if (!options.useExpiry && line.expiryOn) {
+    fail(`유통기한을 관리하지 않는 품목입니다 (${item.code}).`)
+  }
+
+  return {
+    itemId: item.id,
+    expectedQty,
+    entryUnit: isBase ? null : line.unit,
+    entryQty: isBase ? null : line.qty,
+    lotNo: line.lotNo,
+    expiryOn: line.expiryOn ? new Date(`${line.expiryOn}T00:00:00.000Z`) : null,
+    remark: line.remark,
+  }
+}
+
+// 라인 전체 → 저장할 값 (오류 문구 앞에 "N번째 줄")
 async function lineRows(db: Db, shipperId: bigint, lines: AsnData['lines']) {
   const items = await db.item.findMany({
     where: { id: { in: [...new Set(lines.map((l) => l.itemId))] }, shipperId },
-    select: {
-      id: true,
-      code: true,
-      status: true,
-      useLot: true,
-      useExpiry: true,
-      labelUnit: true,
-      baseUnit: { select: { code: true, decimals: true } },
-      units: { select: { convQty: true, unit: { select: { code: true, decimals: true } } } },
-      shipper: { select: { useLot: true, useExpiry: true, labelUnit: true } },
-    },
+    select: ASN_ITEM_SELECT,
   })
   const byId = new Map(items.map((item) => [item.id, item]))
-
   return lines.map((line, index) => {
-    const at = `${index + 1}번째 줄`
-    const item = byId.get(line.itemId)
-    if (!item) throw new ActionError('VALIDATION', `${at}: 이 화주사의 품목이 아닙니다.`)
-    if (!isActiveStatus(item.status)) {
-      throw new ActionError('VALIDATION', `${at}: 사용 중지된 품목입니다 (${item.code}).`)
-    }
-
-    // 입력 단위 → 입수량
-    const isBase = line.unit === item.baseUnit.code
-    const pack = item.units.find((u) => u.unit.code === line.unit)
-    if (!isBase && !pack) {
-      throw new ActionError('VALIDATION', `${at}: ${item.code}에 없는 단위입니다 (${line.unit}).`)
-    }
-    const unitDecimals = isBase ? item.baseUnit.decimals : pack!.unit.decimals
-    if (!checkQtyDecimals(line.qty, unitDecimals)) {
-      throw new ActionError(
-        'VALIDATION',
-        unitDecimals === 0
-          ? `${at}: ${line.unit} 수량은 정수만 넣을 수 있습니다.`
-          : `${at}: ${line.unit} 수량은 소수 ${unitDecimals}자리까지입니다.`,
-      )
-    }
-    const expectedQty = isBase ? line.qty : toBaseQty(line.qty, pack!.convQty.toString())
-    if (!checkQtyDecimals(expectedQty, item.baseUnit.decimals)) {
-      throw new ActionError(
-        'VALIDATION',
-        `${at}: 기본단위로 바꾸면 ${expectedQty} ${item.baseUnit.code}라 소수 자리가 맞지 않습니다.`,
-      )
-    }
-
-    // 로트·유통기한: 관리하지 않는 품목은 비워야 한다 (관리 품목은 ASN에서는 선택 — 실제 값은 검수에서)
-    const options = effectiveItemOptions(
-      {
-        useLot: item.useLot as 'Y' | 'N' | null,
-        useExpiry: item.useExpiry as 'Y' | 'N' | null,
-        labelUnit: item.labelUnit,
-      },
-      {
-        useLot: isYes(item.shipper.useLot),
-        useExpiry: isYes(item.shipper.useExpiry),
-        labelUnit: item.shipper.labelUnit,
-      },
-    )
-    if (!options.useLot && line.lotNo) {
-      throw new ActionError('VALIDATION', `${at}: 로트를 관리하지 않는 품목입니다 (${item.code}).`)
-    }
-    if (!options.useExpiry && line.expiryOn) {
-      throw new ActionError(
-        'VALIDATION',
-        `${at}: 유통기한을 관리하지 않는 품목입니다 (${item.code}).`,
-      )
-    }
-
-    return {
-      lineNo: index + 1,
-      itemId: item.id,
-      expectedQty,
-      entryUnit: isBase ? null : line.unit,
-      entryQty: isBase ? null : line.qty,
-      lotNo: line.lotNo,
-      expiryOn: line.expiryOn ? new Date(`${line.expiryOn}T00:00:00.000Z`) : null,
-      remark: line.remark,
+    try {
+      return { lineNo: index + 1, ...resolveAsnLine(byId.get(line.itemId), line) }
+    } catch (error) {
+      if (error instanceof ActionError) {
+        throw new ActionError(error.code, `${index + 1}번째 줄: ${error.message}`)
+      }
+      throw error
     }
   })
 }
@@ -136,33 +152,41 @@ const toDate = (value: string) => new Date(`${value}T00:00:00.000Z`)
 
 // 등록: 화주사는 사용 중이고 범위 안이어야 한다 (서버 액션이 범위를 먼저 검사)
 export async function createAsn(data: AsnCreateData, channel: AsnChannelValue, scope: DataScope) {
+  return prisma.$transaction((tx) => createAsnInTx(tx, data, channel, scope))
+}
+
+// 등록 (부르는 쪽의 트랜잭션 안에서 — 엑셀 업로드는 여러 ASN을 한 트랜잭션으로 전부 아니면 하나도 안)
+export async function createAsnInTx(
+  tx: Db,
+  data: AsnCreateData,
+  channel: AsnChannelValue,
+  scope: DataScope,
+) {
   const operatorId = requireOperatorId()
-  return prisma.$transaction(async (tx) => {
-    const shipper = await tx.shipper.findFirst({
-      where: { id: data.shipperId, ...ACTIVE_ONLY },
-      select: { id: true },
-    })
-    if (!shipper) throw new ActionError('VALIDATION', '사용 중인 화주사를 골라 주세요.')
-    await assertCenter(tx, data.shipperId, data.centerId, scope)
-    const lines = await lineRows(tx, data.shipperId, data.lines)
-    const asn = await tx.asn.create({
-      data: {
-        operatorId,
-        centerId: data.centerId,
-        shipperId: data.shipperId,
-        asnNo: await nextDocumentNumber('ASN', tx),
-        channel,
-        expectedOn: toDate(data.expectedOn),
-        shipperRefNo: data.shipperRefNo,
-        remark: data.remark,
-      },
-      select: { id: true, asnNo: true, rowVersion: true },
-    })
-    await tx.asnLine.createMany({
-      data: lines.map((line) => ({ ...line, operatorId, asnId: asn.id })),
-    })
-    return asn
+  const shipper = await tx.shipper.findFirst({
+    where: { id: data.shipperId, ...ACTIVE_ONLY },
+    select: { id: true },
   })
+  if (!shipper) throw new ActionError('VALIDATION', '사용 중인 화주사를 골라 주세요.')
+  await assertCenter(tx, data.shipperId, data.centerId, scope)
+  const lines = await lineRows(tx, data.shipperId, data.lines)
+  const asn = await tx.asn.create({
+    data: {
+      operatorId,
+      centerId: data.centerId,
+      shipperId: data.shipperId,
+      asnNo: await nextDocumentNumber('ASN', tx),
+      channel,
+      expectedOn: toDate(data.expectedOn),
+      shipperRefNo: data.shipperRefNo,
+      remark: data.remark,
+    },
+    select: { id: true, asnNo: true, rowVersion: true },
+  })
+  await tx.asnLine.createMany({
+    data: lines.map((line) => ({ ...line, operatorId, asnId: asn.id })),
+  })
+  return asn
 }
 
 // 수정: 예정(PLANNED) 상태에서만, 라인은 통째로 바꾼다
