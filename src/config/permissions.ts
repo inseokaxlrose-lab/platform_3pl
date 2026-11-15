@@ -62,7 +62,12 @@ export const PERMISSION_MENUS = {
     actions: [...CRUD, 'export'],
   },
   'master.units': { label: '단위', group: '기준정보', area: 'admin', actions: CRUD },
-  'master.shippers': { label: '화주사', group: '기준정보', area: 'admin', actions: CRUD },
+  'master.shippers': {
+    label: '화주사',
+    group: '기준정보',
+    area: 'admin',
+    actions: [...CRUD, 'export'],
+  },
   'master.items': {
     label: '품목',
     group: '기준정보',

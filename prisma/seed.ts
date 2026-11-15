@@ -114,9 +114,10 @@ const SAMPLE_CENTERS = [
   { code: 'ICN', name: '이천센터' },
   { code: 'GMH', name: '김해센터' },
 ]
+// 견본 화주사 (0035): 로트·유통기한을 쓰는 식품 화주사 / 안 쓰는 전자 화주사 — M3 완료 기준 확인용
 const SAMPLE_SHIPPERS = [
-  { code: 'GANA', name: '가나식품' },
-  { code: 'DARA', name: '다라전자' },
+  { code: 'GANA', name: '가나식품', useLot: true, useExpiry: true, centerCodes: ['ICN'] },
+  { code: 'DARA', name: '다라전자', useLot: false, useExpiry: false, centerCodes: ['ICN', 'GMH'] },
 ]
 
 // 예시 조직: 이미 있으면 건드리지 않는다 (화면에서 바꾼 이름을 덮어쓰지 않기 위해)
@@ -131,8 +132,34 @@ async function seedSampleOrganizations() {
     // 입고대기 창고 + 기본 로케이션 (이미 있으면 그대로)
     await ensureCenterDefaults(prisma, found.id)
   }
-  for (const shipper of SAMPLE_SHIPPERS) {
-    await prisma.shipper.upsert({ where: { code: shipper.code }, create: shipper, update: {} })
+  for (const { centerCodes, ...shipper } of SAMPLE_SHIPPERS) {
+    const centers = await prisma.center.findMany({
+      where: { code: { in: centerCodes } },
+      select: { id: true },
+    })
+    const found = await prisma.shipper.findUnique({
+      where: { code: shipper.code },
+      select: { id: true, _count: { select: { centers: true } } },
+    })
+    if (!found) {
+      await prisma.shipper.create({
+        data: {
+          ...shipper,
+          systemCode: await nextSystemCode('SHIPPER'),
+          centers: { create: centers.map((c) => ({ centerId: c.id })) },
+        },
+      })
+    } else if (found._count.centers === 0) {
+      // 이용 센터가 아직 없는 예전 견본(화주사 정보 관리 전에 만든 것)만 기본값·이용 센터를 채운다
+      await prisma.shipper.update({
+        where: { id: found.id },
+        data: {
+          useLot: shipper.useLot,
+          useExpiry: shipper.useExpiry,
+          centers: { create: centers.map((c) => ({ centerId: c.id })) },
+        },
+      })
+    }
   }
   console.log(`예시 센터 ${SAMPLE_CENTERS.length}곳 · 화주사 ${SAMPLE_SHIPPERS.length}곳 확인`)
 }

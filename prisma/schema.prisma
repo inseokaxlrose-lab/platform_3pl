@@ -212,6 +212,7 @@ model Center {
   users         UserCenter[]
   warehouses    Warehouse[]
   deliveryZones DeliveryZone[]
+  shippers      ShipperCenter[]
 
   @@map("center")
 }
@@ -278,18 +279,72 @@ model Location {
 }
 
 // 화주사: 운영사에 물건 보관·배송을 맡기는 회사
-model Shipper {
-  id        String   @id @default(cuid())
-  code      String   @unique
-  name      String
-  // false면 데이터 범위에서 빠진다 (소속 사용자도 데이터를 볼 수 없음)
-  isActive  Boolean  @default(true)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+// 라벨 단위: 입고 라벨을 붙이는 단위 (0003 결정 7)
+enum LabelUnit {
+  PLT
+  BOX
+}
 
-  users User[]
+// 화주사 (docs/decisions/0035)
+// 코드 3층 (0025): systemCode SH000001(자동·불변) / code(사용자 코드, 전체에서 중복 금지) / 외부 코드(ExternalCode)
+model Shipper {
+  id             String    @id @default(cuid())
+  systemCode     String    @unique
+  code           String    @unique
+  name           String
+  // 사업자등록번호·전화번호는 하이픈 없이 숫자만 (0029)
+  businessNumber String?
+  ceoName        String?
+  businessType   String?
+  businessItem   String?
+  phone          String?
+  fax            String?
+  email          String?
+  zipCode        String?
+  address        String?
+  addressDetail  String?
+  // 품목 기본값: 품목에서 그대로 쓰거나 개별 지정한다 (0003 결정 2)
+  useLot         Boolean   @default(false)
+  useExpiry      Boolean   @default(false)
+  labelUnit      LabelUnit @default(PLT)
+  // false면 데이터 범위에서 빠진다 (소속 사용자도 데이터를 볼 수 없음)
+  isActive       Boolean   @default(true)
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  users    User[]
+  centers  ShipperCenter[]
+  contacts ShipperContact[]
 
   @@map("shipper")
+}
+
+// 화주사의 이용 센터 (화주사 ↔ 센터, 1개 이상) — 센터 직원은 자기 센터를 이용하는 화주사만 본다
+model ShipperCenter {
+  shipperId String
+  centerId  String
+  shipper   Shipper @relation(fields: [shipperId], references: [id], onDelete: Cascade)
+  center    Center  @relation(fields: [centerId], references: [id], onDelete: Restrict)
+
+  @@id([shipperId, centerId])
+  @@index([centerId])
+  @@map("shipper_center")
+}
+
+// 화주사 담당자 (운영사 담당자와 같은 모양: 최대 5명, 대표 1명, 담당 업무는 공통코드 CONTACT_DUTY)
+model ShipperContact {
+  id        String  @id @default(cuid())
+  shipperId String
+  sortOrder Int
+  duty      String
+  name      String
+  phone     String?
+  email     String?
+  isPrimary Boolean @default(false)
+  shipper   Shipper @relation(fields: [shipperId], references: [id], onDelete: Cascade)
+
+  @@index([shipperId, sortOrder])
+  @@map("shipper_contact")
 }
 
 // 센터 직원 ↔ 소속 센터 (한 직원이 여러 센터를 맡을 수 있다)
@@ -337,8 +392,7 @@ model UserFavoriteMenu {
 model Company {
   id             String           @id @default("default")
   name           String
-  // 000-00-00000 모양으로 저장 (검증번호 확인 후)
-  // 사업자등록번호·전화번호는 하이픈 없이 숫자만 (0029)
+  // 사업자등록번호·전화번호는 하이픈 없이 숫자만 (검증번호 확인 후, 0029)
   businessNumber String
   ceoName        String?
   // 업태 / 종목 (거래명세서·세금계산서용)

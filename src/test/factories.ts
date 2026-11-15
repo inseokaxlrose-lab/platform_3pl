@@ -21,7 +21,13 @@ export async function createTestCenter(
 
 export function createTestShipper(code: string, data: { name?: string; isActive?: boolean } = {}) {
   return prisma.shipper.create({
-    data: { code, name: data.name ?? `${code} 화주`, isActive: data.isActive },
+    // 시스템 코드: 테스트에서는 시퀀스 대신 코드로 만든 고유 값
+    data: {
+      code,
+      systemCode: `SH-T-${code}`,
+      name: data.name ?? `${code} 화주`,
+      isActive: data.isActive,
+    },
   })
 }
 
