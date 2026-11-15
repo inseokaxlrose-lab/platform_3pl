@@ -3,6 +3,7 @@ import type { z } from 'zod'
 import { ActionError } from '@/lib/actions/action-error'
 import { prisma } from '@/lib/prisma'
 import { assertRowVersion, withVersionGuard } from '@/lib/row-version'
+import { withStatus } from '@/lib/status'
 import { isYes } from '@/lib/yn'
 import type {
   codeGroupCreateSchema,
@@ -25,7 +26,7 @@ type ItemUpdate = z.output<typeof codeItemUpdateSchema>
 export async function createCodeGroup(data: GroupCreate) {
   const exists = await prisma.codeGroup.findUnique({ where: { code: data.code } })
   if (exists) throw new ActionError('CONFLICT', `이미 있는 그룹 코드입니다: ${data.code}`)
-  return prisma.codeGroup.create({ data, select: { id: true, code: true } })
+  return prisma.codeGroup.create({ data: withStatus(data), select: { id: true, code: true } })
 }
 
 // rowVersion: 팝업을 열 때의 버전 (그 사이 다른 사람이 저장했으면 충돌)
@@ -42,7 +43,7 @@ export async function updateCodeGroup({ id, rowVersion, ...data }: GroupUpdate) 
   return withVersionGuard(() =>
     prisma.codeGroup.update({
       where: { id, rowVersion },
-      data,
+      data: withStatus(data),
       select: { id: true, rowVersion: true },
     }),
   )
@@ -75,7 +76,7 @@ export async function createCodeItem(data: ItemCreate) {
   if (exists) {
     throw new ActionError('CONFLICT', `이 그룹에 이미 있는 코드입니다: ${data.code}`)
   }
-  return prisma.codeItem.create({ data, select: { id: true, code: true } })
+  return prisma.codeItem.create({ data: withStatus(data), select: { id: true, code: true } })
 }
 
 // rowVersion: 팝업을 열 때의 버전 (그 사이 다른 사람이 저장했으면 충돌)
@@ -85,7 +86,7 @@ export async function updateCodeItem({ id, rowVersion, ...data }: ItemUpdate) {
   return withVersionGuard(() =>
     prisma.codeItem.update({
       where: { id, rowVersion },
-      data,
+      data: withStatus(data),
       select: { id: true, rowVersion: true },
     }),
   )

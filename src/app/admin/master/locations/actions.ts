@@ -17,9 +17,10 @@ import {
   setLocationsActive,
 } from '@/lib/locations/locations'
 import { prisma } from '@/lib/prisma'
+import { withIsActive } from '@/lib/status'
 import { assertInScope, scopeFilter, type DataScope } from '@/lib/scope/data-scope'
 import { idField, idSchema } from '@/lib/id'
-import { idFilter } from '@/lib/grid/list-filters'
+import { idFilter, statusWhere } from '@/lib/grid/list-filters'
 
 // 로케이션 관리 서버 액션 (docs/decisions/0028)
 // 데이터 범위: 센터 직원은 소속 센터 창고의 로케이션만
@@ -30,7 +31,7 @@ const LOCATION_SCOPE = { center: 'warehouse.centerId' }
 async function findWarehouseInScope(warehouseId: bigint, scope: DataScope) {
   const warehouse = await prisma.warehouse.findUnique({
     where: { id: warehouseId },
-    select: { id: true, centerId: true, type: true, isActive: true },
+    select: { id: true, centerId: true, type: true, status: true },
   })
   assertInScope(scope, warehouse, { center: 'centerId' })
   return warehouse!
@@ -70,7 +71,7 @@ export const listLocationsAction = createAction({
         zone: 'zone',
         aisle: 'aisle',
         level: 'level',
-        isActive: 'isActive',
+        isActive: 'status',
         createdAt: 'createdAt',
       },
       defaultOrderBy: { code: 'asc' },
@@ -82,8 +83,7 @@ export const listLocationsAction = createAction({
         idFilter(filters, 'center') ? { warehouse: { centerId: idFilter(filters, 'center') } } : {},
         idFilter(filters, 'warehouse') ? { warehouseId: idFilter(filters, 'warehouse') } : {},
         filters.zone ? { zone: filters.zone } : {},
-        filters.status === 'ACTIVE' ? { isActive: true } : {},
-        filters.status === 'INACTIVE' ? { isActive: false } : {},
+        statusWhere(filters),
       ],
     }
     const [rows, rowCount] = await prisma.$transaction([
@@ -105,7 +105,7 @@ export const listLocationsAction = createAction({
           zone: true,
           aisle: true,
           level: true,
-          isActive: true,
+          status: true,
           createdAt: true,
           warehouse: {
             select: {
@@ -120,7 +120,7 @@ export const listLocationsAction = createAction({
       prisma.location.count({ where }),
     ])
     return {
-      rows: rows.map(({ warehouse, ...row }) => ({
+      rows: rows.map(withIsActive).map(({ warehouse, ...row }) => ({
         ...row,
         center: `${warehouse.center.name} (${warehouse.center.code})`,
         warehouse: `${warehouse.name} (${warehouse.code})`,

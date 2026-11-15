@@ -139,7 +139,7 @@ describe('화주사 등록·수정', () => {
       ok: false,
       error: { message: expect.stringContaining('시스템 코드 모양') },
     })
-    await prisma.center.update({ where: { id: gmhId }, data: { isActive: false } })
+    await prisma.center.update({ where: { id: gmhId }, data: { status: 'INACTIVE' } })
     expect(
       await createShipperAction(input({ code: 'NEW', centerIds: [String(gmhId)] })),
     ).toMatchObject({
@@ -150,7 +150,7 @@ describe('화주사 등록·수정', () => {
 
   it('수정: 이용 센터·담당자를 통째로 바꾼다 (이미 연결된 사용 중지 센터는 그대로 둘 수 있다)', async () => {
     const shipper = await create({ code: 'GANA', centerIds: [String(icnId), String(gmhId)] })
-    await prisma.center.update({ where: { id: gmhId }, data: { isActive: false } })
+    await prisma.center.update({ where: { id: gmhId }, data: { status: 'INACTIVE' } })
     const result = await updateShipperAction({
       id: shipper.id,
       rowVersion: await versionOf('shipper', shipper.id),

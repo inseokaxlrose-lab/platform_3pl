@@ -8,6 +8,7 @@ import { loadUserPermissions } from '@/lib/permissions/load-user-permissions'
 import { areaOf, homeOf, type Area, type UserTypeValue } from '@/lib/redirect'
 import type { DataScope } from '@/lib/scope/data-scope'
 import { loadDataScope } from '@/lib/scope/load-data-scope'
+import { isActiveStatus } from '@/lib/status'
 
 export type CurrentUser = {
   // 내부 키 (Better Auth는 글자로 주므로 bigint로 바꾼다)
@@ -21,7 +22,7 @@ export type CurrentUser = {
 // 세션이 없거나 사용 중지된 계정이면 null → 로그인 상태가 아닌 것으로 본다
 export const getCurrentUser = cache(async (): Promise<CurrentUser | null> => {
   const session = await auth.api.getSession({ headers: await headers() })
-  if (!session || !session.user.isActive) return null
+  if (!session || !isActiveStatus(session.user.status)) return null
   const user = session.user
   return {
     id: BigInt(user.id),

@@ -112,7 +112,7 @@ describe('창고 등록', () => {
       ok: false,
       error: { code: 'VALIDATION' },
     })
-    await prisma.center.update({ where: { id: gmhId }, data: { isActive: false } })
+    await prisma.center.update({ where: { id: gmhId }, data: { status: 'INACTIVE' } })
     expect(await createWarehouseAction(input({ centerId: String(gmhId) }))).toMatchObject({
       ok: false,
       error: { code: 'CONFLICT', message: expect.stringContaining('사용 중지된 센터') },
@@ -185,8 +185,8 @@ describe('창고 수정 · 입고대기 보호', () => {
     const created = await create()
     await setWarehouseActiveAction({ id: created.id, isActive: false })
     expect(
-      (await prisma.warehouse.findUniqueOrThrow({ where: { id: BigInt(created.id) } })).isActive,
-    ).toBe(false)
+      (await prisma.warehouse.findUniqueOrThrow({ where: { id: BigInt(created.id) } })).status,
+    ).toBe('INACTIVE')
   })
 })
 

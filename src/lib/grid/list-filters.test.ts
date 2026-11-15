@@ -5,6 +5,7 @@ import {
   digitsFilter,
   numberRangeFilter,
   textFilter,
+  statusWhere,
   ynFilter,
 } from './list-filters'
 
@@ -37,5 +38,12 @@ describe('목록 검색 조건 해석', () => {
     expect(numberRangeFilter({ n: '10~100' }, 'n')).toEqual({ gte: 10, lte: 100 })
     expect(numberRangeFilter({ n: '~5' }, 'n')).toEqual({ lte: 5 })
     expect(numberRangeFilter({ n: 'a~' }, 'n')).toBeUndefined()
+  })
+
+  it('상태: ACTIVE·INACTIVE만 조건, 전체·모르는 값은 조건 없음', () => {
+    expect(statusWhere({ status: 'ACTIVE' })).toEqual({ status: 'ACTIVE' })
+    expect(statusWhere({ status: 'INACTIVE' })).toEqual({ status: 'INACTIVE' })
+    expect(statusWhere({ status: 'all' })).toEqual({})
+    expect(statusWhere({})).toEqual({})
   })
 })

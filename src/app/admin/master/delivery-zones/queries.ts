@@ -3,6 +3,7 @@ import type { DeliveryZoneInput } from '@/lib/delivery-zones/delivery-zone-schem
 import { getExternalCodes } from '@/lib/master-code/external-codes'
 import { textIds } from '@/lib/id'
 import { prisma } from '@/lib/prisma'
+import { isActiveStatus } from '@/lib/status'
 import { isInScope, scopeFilter, type DataScope } from '@/lib/scope/data-scope'
 
 // 센터별로 이미 담당 중인 지역 (담당 지역 고르기에서 "다른 권역이 사용 중"으로 흐리게)
@@ -57,7 +58,7 @@ export async function getDeliveryZoneForEdit(id: bigint, scope: DataScope) {
     systemCode: zone.systemCode,
     // 동시 수정 막기: 저장할 때 이 버전을 함께 보낸다
     rowVersion: zone.rowVersion,
-    isActive: zone.isActive,
+    isActive: isActiveStatus(zone.status),
     center: zone.center,
     input,
   })

@@ -1,6 +1,7 @@
 import 'server-only'
 import { textIds } from '@/lib/id'
 import { prisma } from '@/lib/prisma'
+import { ACTIVE_ONLY, isActiveStatus } from '@/lib/status'
 import { scopeFilter, type DataScope } from '@/lib/scope/data-scope'
 
 // 고를 수 있는 창고: 데이터 범위 안 + 사용 중인 센터의 창고 (센터 → 창고 → 구역 순서로 고르기)
@@ -17,13 +18,13 @@ export async function getWarehouseOptions(scope: DataScope) {
   const zonesOf = (warehouseId: bigint) =>
     zoneRows.filter((z) => z.warehouseId === warehouseId).map((z) => z.zone!)
   const warehouses = await prisma.warehouse.findMany({
-    where: { AND: [scopeFilter(scope, { center: 'centerId' }), { center: { isActive: true } }] },
+    where: { AND: [scopeFilter(scope, { center: 'centerId' }), { center: ACTIVE_ONLY }] },
     select: {
       id: true,
       code: true,
       name: true,
       type: true,
-      isActive: true,
+      status: true,
       center: { select: { id: true, code: true, name: true } },
     },
     orderBy: [{ center: { code: 'asc' } }, { code: 'asc' }],
@@ -35,7 +36,7 @@ export async function getWarehouseOptions(scope: DataScope) {
       label: `${w.name} (${w.code})`,
       centerId: w.center.id,
       centerLabel: `${w.center.name} (${w.center.code})`,
-      addable: w.type === 'GENERAL' && w.isActive,
+      addable: w.type === 'GENERAL' && isActiveStatus(w.status),
       zones: zonesOf(w.id),
     })),
   )

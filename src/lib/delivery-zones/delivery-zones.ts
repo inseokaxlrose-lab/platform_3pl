@@ -5,6 +5,7 @@ import { deleteExternalCodes, saveExternalCodes } from '@/lib/master-code/extern
 import { nextSystemCode } from '@/lib/master-code/system-code'
 import { assertRowVersion, withVersionGuard } from '@/lib/row-version'
 import { prisma, type Db } from '@/lib/prisma'
+import { isActiveStatus } from '@/lib/status'
 import type { DeliveryZoneData } from './delivery-zone-schema'
 import { regionLabel, regionsOverlap } from './regions'
 
@@ -66,10 +67,10 @@ export async function createDeliveryZone(data: DeliveryZoneData) {
   return prisma.$transaction(async (tx) => {
     const center = await tx.center.findUnique({
       where: { id: data.centerId },
-      select: { isActive: true },
+      select: { status: true },
     })
     if (!center) throw new ActionError('NOT_FOUND', '센터를 찾을 수 없습니다.')
-    if (!center.isActive) {
+    if (!isActiveStatus(center.status)) {
       throw new ActionError('CONFLICT', '사용 중지된 센터에는 배송권역을 추가할 수 없습니다.')
     }
     const systemCode = await nextSystemCode('DELIVERY_ZONE', tx)

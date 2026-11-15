@@ -7,6 +7,7 @@ import { saveExternalCodes } from '@/lib/master-code/external-codes'
 import { nextSystemCode } from '@/lib/master-code/system-code'
 import { assertRowVersion, withVersionGuard } from '@/lib/row-version'
 import { prisma, type Db } from '@/lib/prisma'
+import { isActiveStatus } from '@/lib/status'
 import { toYn } from '@/lib/yn'
 import type { ShipperData } from './shipper-schema'
 
@@ -30,12 +31,12 @@ async function assertShipperCode(db: Db, code: string, ownSystemCode: string, ex
 async function assertCenters(db: Db, centerIds: bigint[], keep: bigint[] = []) {
   const centers = await db.center.findMany({
     where: { id: { in: centerIds } },
-    select: { id: true, code: true, isActive: true },
+    select: { id: true, code: true, status: true },
   })
   if (centers.length !== centerIds.length) {
     throw new ActionError('NOT_FOUND', '찾을 수 없는 센터가 섞여 있습니다.')
   }
-  const inactive = centers.filter((c) => !c.isActive && !keep.includes(c.id))
+  const inactive = centers.filter((c) => !isActiveStatus(c.status) && !keep.includes(c.id))
   if (inactive.length > 0) {
     throw new ActionError(
       'CONFLICT',

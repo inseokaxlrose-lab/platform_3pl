@@ -1,5 +1,6 @@
 import 'server-only'
 import { prisma } from '@/lib/prisma'
+import { isActiveStatus } from '@/lib/status'
 import { computePermissions, type PermissionResult } from './compute-permissions'
 
 // 사용자의 최종 권한: DB에서 그룹 권한·사용자 추가/제외를 한 번에 읽어 계산한다
@@ -9,7 +10,7 @@ export async function loadUserPermissions(userId: bigint): Promise<PermissionRes
     where: { id: userId },
     select: {
       userType: true,
-      isActive: true,
+      status: true,
       permissionGroups: {
         select: { group: { select: { permissions: { select: { permissionCode: true } } } } },
       },
@@ -20,7 +21,7 @@ export async function loadUserPermissions(userId: bigint): Promise<PermissionRes
 
   return computePermissions({
     userType: user.userType,
-    isActive: user.isActive,
+    isActive: isActiveStatus(user.status),
     groupCodes: user.permissionGroups.flatMap(({ group }) =>
       group.permissions.map((p) => p.permissionCode),
     ),

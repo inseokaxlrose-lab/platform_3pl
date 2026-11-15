@@ -2,17 +2,18 @@ import 'server-only'
 import { isPermissionCode } from '@/config/permissions'
 import { textIds } from '@/lib/id'
 import { prisma } from '@/lib/prisma'
+import { isActiveStatus } from '@/lib/status'
 
 // 등록·수정 화면의 선택지: 사용 중인 센터·화주사, 권한그룹(영역 포함)
 export async function getUserFormOptions() {
   const [centers, shippers, groups] = await Promise.all([
     prisma.center.findMany({
-      where: { isActive: true },
+      where: { status: 'ACTIVE' },
       select: { id: true, code: true, name: true },
       orderBy: { code: 'asc' },
     }),
     prisma.shipper.findMany({
-      where: { isActive: true },
+      where: { status: 'ACTIVE' },
       select: { id: true, code: true, name: true },
       orderBy: { code: 'asc' },
     }),
@@ -38,7 +39,7 @@ export async function getUserForEdit(id: bigint) {
       name: true,
       email: true,
       userType: true,
-      isActive: true,
+      status: true,
       shipperId: true,
       rowVersion: true,
       centers: { select: { centerId: true } },
@@ -54,7 +55,7 @@ export async function getUserForEdit(id: bigint) {
     // 내부용 주소는 화면에 보여주지 않는다
     email: user.email.endsWith('@users.local') ? '' : user.email,
     userType: user.userType,
-    isActive: user.isActive,
+    isActive: isActiveStatus(user.status),
     // 동시 수정 막기: 저장할 때 이 버전을 함께 보낸다
     rowVersion: user.rowVersion,
     shipperId: user.shipperId === null ? '' : String(user.shipperId),

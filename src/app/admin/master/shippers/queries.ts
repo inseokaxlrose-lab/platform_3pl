@@ -3,6 +3,7 @@ import { toContactInput } from '@/lib/contacts/contact-schema'
 import { getExternalCodes } from '@/lib/master-code/external-codes'
 import { textIds } from '@/lib/id'
 import { prisma } from '@/lib/prisma'
+import { isActiveStatus, withIsActive } from '@/lib/status'
 import { isYes } from '@/lib/yn'
 import { isInScope, type DataScope } from '@/lib/scope/data-scope'
 import type { ShipperInput } from '@/lib/shippers/shipper-schema'
@@ -16,7 +17,7 @@ export async function getShipperForEdit(id: bigint, scope: DataScope) {
       centers: { select: { centerId: true } },
       contacts: { orderBy: { sortOrder: 'asc' } },
       users: {
-        select: { id: true, name: true, username: true, displayUsername: true, isActive: true },
+        select: { id: true, name: true, username: true, displayUsername: true, status: true },
         orderBy: { name: 'asc' },
       },
     },
@@ -51,13 +52,13 @@ export async function getShipperForEdit(id: bigint, scope: DataScope) {
     systemCode: shipper.systemCode,
     // 동시 수정 막기: 저장할 때 이 버전을 함께 보낸다
     rowVersion: shipper.rowVersion,
-    isActive: shipper.isActive,
+    isActive: isActiveStatus(shipper.status),
     input,
     users: shipper.users.map((u) => ({
       id: u.id,
       name: u.name,
       username: u.displayUsername ?? u.username ?? '',
-      isActive: u.isActive,
+      isActive: isActiveStatus(u.status),
     })),
   })
 }
@@ -67,10 +68,10 @@ export type ShipperForEdit = NonNullable<Awaited<ReturnType<typeof getShipperFor
 // 이용 센터로 고를 수 있는 센터 (전체 센터 — 사용 중지 센터는 이미 연결된 경우에만 보인다)
 export async function getCenterChoices() {
   const centers = await prisma.center.findMany({
-    select: { id: true, code: true, name: true, isActive: true },
+    select: { id: true, code: true, name: true, status: true },
     orderBy: { code: 'asc' },
   })
-  return textIds(centers)
+  return textIds(centers.map(withIsActive))
 }
 
 export type CenterChoice = Awaited<ReturnType<typeof getCenterChoices>>[number]

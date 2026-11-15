@@ -3,6 +3,7 @@ import type { CenterInput } from '@/lib/centers/center-schema'
 import { getExternalCodes } from '@/lib/master-code/external-codes'
 import { textIds } from '@/lib/id'
 import { prisma } from '@/lib/prisma'
+import { isActiveStatus, withIsActive } from '@/lib/status'
 import { isInScope, type DataScope } from '@/lib/scope/data-scope'
 
 // 수정 화면용 센터 한 건 (데이터 범위 밖이면 null → 화면은 "찾을 수 없음")
@@ -19,7 +20,7 @@ export async function getCenterForEdit(id: bigint, scope: DataScope) {
           name: true,
           type: true,
           storageCondition: true,
-          isActive: true,
+          status: true,
           _count: { select: { locations: true } },
         },
         orderBy: [{ type: 'desc' }, { code: 'asc' }],
@@ -29,7 +30,7 @@ export async function getCenterForEdit(id: bigint, scope: DataScope) {
           id: true,
           code: true,
           name: true,
-          isActive: true,
+          status: true,
           regions: { select: { regionCode: true } },
         },
         orderBy: { code: 'asc' },
@@ -56,13 +57,13 @@ export async function getCenterForEdit(id: bigint, scope: DataScope) {
     systemCode: center.systemCode,
     // 동시 수정 막기: 저장할 때 이 버전을 함께 보낸다
     rowVersion: center.rowVersion,
-    isActive: center.isActive,
+    isActive: isActiveStatus(center.status),
     input,
-    warehouses: center.warehouses.map(({ _count, ...w }) => ({
+    warehouses: center.warehouses.map(withIsActive).map(({ _count, ...w }) => ({
       ...w,
       locationCount: _count.locations,
     })),
-    deliveryZones: center.deliveryZones.map(({ regions, ...z }) => ({
+    deliveryZones: center.deliveryZones.map(withIsActive).map(({ regions, ...z }) => ({
       ...z,
       regionCodes: regions.map((r) => r.regionCode),
     })),

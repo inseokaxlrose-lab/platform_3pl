@@ -4,7 +4,9 @@ import { z } from 'zod'
 import { createAction } from '@/lib/actions/create-action'
 import { listQuerySchema, toPrismaQuery } from '@/lib/grid/grid-query'
 import { getExternalCodes } from '@/lib/master-code/external-codes'
+import { statusWhere } from '@/lib/grid/list-filters'
 import { prisma } from '@/lib/prisma'
+import { withIsActive } from '@/lib/status'
 import { isYes } from '@/lib/yn'
 import { UNIT_KINDS } from '@/lib/units/unit-labels'
 import { unitCreateSchema, unitUpdateSchema } from '@/lib/units/unit-schema'
@@ -29,7 +31,7 @@ export const listUnitsAction = createAction({
         name: 'name',
         kind: 'kind',
         sortOrder: 'sortOrder',
-        isActive: 'isActive',
+        isActive: 'status',
       },
       defaultOrderBy: { sortOrder: 'asc' },
     })
@@ -37,12 +39,7 @@ export const listUnitsAction = createAction({
       ? (filters.kind as (typeof UNIT_KINDS)[number])
       : undefined
     const where = {
-      AND: [
-        query.where,
-        kind ? { kind } : {},
-        filters.status === 'ACTIVE' ? { isActive: true } : {},
-        filters.status === 'INACTIVE' ? { isActive: false } : {},
-      ],
+      AND: [query.where, kind ? { kind } : {}, statusWhere(filters)],
     }
     const [rows, rowCount] = await prisma.$transaction([
       prisma.unit.findMany({
@@ -60,7 +57,7 @@ export const listUnitsAction = createAction({
           kind: true,
           decimals: true,
           sortOrder: true,
-          isActive: true,
+          status: true,
           isSystem: true,
           rowVersion: true,
           updatedAt: true,
@@ -77,7 +74,7 @@ export const listUnitsAction = createAction({
         externalCodes: await getExternalCodes('UNIT', row.id),
       })),
     )
-    return { rows: withCodes, rowCount }
+    return { rows: withCodes.map(withIsActive), rowCount }
   },
 })
 
