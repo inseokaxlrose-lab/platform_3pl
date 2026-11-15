@@ -37,7 +37,7 @@ Next.js (App Router) · TypeScript · PostgreSQL · Prisma · Tailwind + shadcn/
 - **운영사(멀티테넌트)별로 나눈다**: 운영사 데이터 표는 `operator_id`를 갖고, 다른 운영사의 데이터는 보이지도 고쳐지지도 않아야 한다. 서버 액션 안은 `prisma.ts`가 자동으로 거르고 채운다(새로 만드는 함수는 `requireOperatorId()`). 화면 조회 함수는 `scopeFilter`·`isInScope`(select에 `operatorId`)·`operatorFilter`로 거른다. 아이디·이메일만 전체 고유(`acrossOperators`). 새 운영사에 넣을 기본값(공통코드·단위·권한그룹)은 `src/config/defaults/`에 두고 `provisionOperator`가 복사한다 (`docs/decisions/0039`).
 - **번호는 숫자만 저장**: 사업자·법인등록번호, 전화·팩스는 하이픈 없이 저장하고, 화면 표시·입력에서만 `src/lib/format/`의 함수로 하이픈을 붙인다 (`docs/decisions/0029`).
 - **재고는 직접 수정 금지**: 재고 수량은 반드시 재고 변경 공통 함수(이력 기록 포함)로만 바꾼다. 수량 변경과 이력 기록은 하나의 DB 트랜잭션으로 묶는다.
-- **재고는 기본단위로 저장**: 환산단위(BOX, CARTON, PLT)는 화면 표시·입력용이며, 환산은 공통 함수에서만 한다. 수량은 Decimal.
+- **재고는 기본단위로 저장**: 환산단위(BOX, CARTON, PLT)는 화면 표시·입력용이며, 환산은 공통 함수(`src/lib/units/convert.ts`: `toBaseQty`·`splitBaseQty`·`labelQuantities`·`formatQty` 등)에서만 한다. 수량은 DB Decimal, 코드에서는 글자로 주고받고 `Number`로 바꿔 계산하지 않는다 (`docs/decisions/0042`).
 - **로트번호·유통기한은 품목 설정에 따름**: 사용하는 품목은 필수 입력, 사용하지 않는 품목은 null.
 - **재고 조정은 사유 필수**.
 - 용어는 `docs/PRD.md`의 용어 정리를 따른다.
