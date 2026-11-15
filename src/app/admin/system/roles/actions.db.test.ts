@@ -4,7 +4,7 @@ import type { PermissionCode } from '@/config/permissions'
 import { prisma } from '@/lib/prisma'
 import { getCurrentPermissions, getCurrentUser } from '@/lib/session'
 import { createTestUser, versionOf } from '@/test/factories'
-import { resetDatabase } from '@/test/reset-database'
+import { resetDatabase, TEST_OPERATOR_ID } from '@/test/reset-database'
 import {
   createPermissionGroupAction,
   deletePermissionGroupAction,
@@ -13,11 +13,14 @@ import {
 } from './actions'
 import { getPermissionGroup } from './queries'
 
+// 화면 조회 함수에 넘기는 범위: 테스트 운영사 전체
+const OWN_SCOPE = { kind: 'ALL', operatorId: TEST_OPERATOR_ID } as const
+
 // 로그인 사용자·권한은 가짜로 (DB 처리는 실제로)
 vi.mock('@/lib/session', () => ({
   getCurrentUser: vi.fn(),
   getCurrentPermissions: vi.fn(),
-  getCurrentScope: vi.fn(async () => ({ kind: 'ALL' })),
+  getCurrentScope: vi.fn(async () => ({ kind: 'ALL', operatorId: TEST_OPERATOR_ID })),
 }))
 
 const ALL_ROLE_PERMISSIONS: PermissionCode[] = [
@@ -56,7 +59,7 @@ describe('권한그룹 서버 액션', () => {
     })
     expect(result.ok).toBe(true)
 
-    const group = await getPermissionGroup(BigInt(result.ok ? result.data.id : 0))
+    const group = await getPermissionGroup(BigInt(result.ok ? result.data.id : 0), OWN_SCOPE)
     expect(group).toMatchObject({ name: '센터 운영자', area: 'ADMIN', obsoleteCodes: [] })
     expect(group?.permissionCodes).toEqual(['inbound.asn.read', 'inbound.asn.close'])
   })
@@ -71,6 +74,7 @@ describe('권한그룹 서버 액션', () => {
   it('수정: 권한 목록을 통째로 바꾸고, 옛 코드는 정리되며, 영역은 그대로', async () => {
     const group = await prisma.permissionGroup.create({
       data: {
+        operatorId: TEST_OPERATOR_ID,
         name: '재고 담당',
         area: 'ADMIN',
         permissions: {
@@ -81,7 +85,9 @@ describe('권한그룹 서버 액션', () => {
         },
       },
     })
-    expect((await getPermissionGroup(group.id))?.obsoleteCodes).toEqual(['gone.menu.read'])
+    expect((await getPermissionGroup(group.id, OWN_SCOPE))?.obsoleteCodes).toEqual([
+      'gone.menu.read',
+    ])
 
     const result = await updatePermissionGroupAction({
       id: String(group.id),
@@ -91,7 +97,7 @@ describe('권한그룹 서버 액션', () => {
     })
 
     expect(result.ok).toBe(true)
-    const updated = await getPermissionGroup(group.id)
+    const updated = await getPermissionGroup(group.id, OWN_SCOPE)
     expect(updated).toMatchObject({ name: '재고 담당자', area: 'ADMIN', obsoleteCodes: [] })
     expect(updated?.permissionCodes).toEqual([
       'stock.adjustments.read',
@@ -111,7 +117,9 @@ describe('권한그룹 서버 액션', () => {
   })
 
   it('삭제: 사용자가 있으면 몇 명인지 알려주고 막는다', async () => {
-    const group = await prisma.permissionGroup.create({ data: { name: '사용 중', area: 'ADMIN' } })
+    const group = await prisma.permissionGroup.create({
+      data: { operatorId: TEST_OPERATOR_ID, name: '사용 중', area: 'ADMIN' },
+    })
     const user = await createTestUser('worker', { userType: 'OPERATOR' })
     await prisma.userPermissionGroup.create({ data: { userId: user.id, groupId: group.id } })
 
@@ -125,6 +133,7 @@ describe('권한그룹 서버 액션', () => {
   it('삭제: 사용자가 없으면 논리 삭제되고, 같은 이름으로 다시 만들 수 있다', async () => {
     const group = await prisma.permissionGroup.create({
       data: {
+        operatorId: TEST_OPERATOR_ID,
         name: '임시',
         area: 'ADMIN',
         permissions: { create: [{ permissionCode: 'stock.inventory.read' }] },
@@ -139,7 +148,9 @@ describe('권한그룹 서버 액션', () => {
     expect(await prisma.permissionGroupPermission.count()).toBe(1)
     // 지운 이름은 다시 쓸 수 있다 (부분 고유 조건)
     await expect(
-      prisma.permissionGroup.create({ data: { name: '임시', area: 'ADMIN' } }),
+      prisma.permissionGroup.create({
+        data: { operatorId: TEST_OPERATOR_ID, name: '임시', area: 'ADMIN' },
+      }),
     ).resolves.toMatchObject({ name: '임시' })
   })
 
@@ -147,6 +158,7 @@ describe('권한그룹 서버 액션', () => {
     for (const name of ['가 그룹', '나 그룹', '다 그룹']) {
       await prisma.permissionGroup.create({
         data: {
+          operatorId: TEST_OPERATOR_ID,
           name,
           area: 'ADMIN',
           permissions: { create: [{ permissionCode: 'stock.inventory.read' }] },

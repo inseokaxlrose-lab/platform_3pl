@@ -7,7 +7,7 @@ import { prisma } from '@/lib/prisma'
 import { getCurrentPermissions, getCurrentUser } from '@/lib/session'
 import { createUserAccount } from '@/lib/users/create-user-account'
 import { createTestCenter, createTestShipper, versionOf } from '@/test/factories'
-import { resetDatabase } from '@/test/reset-database'
+import { resetDatabase, TEST_OPERATOR_ID } from '@/test/reset-database'
 import {
   createUserAction,
   listUsersAction,
@@ -19,10 +19,13 @@ import {
 } from './actions'
 import { getUserForEdit, getUserOverrides } from './queries'
 
+// 화면 조회 함수에 넘기는 범위: 테스트 운영사 전체
+const OWN_SCOPE = { kind: 'ALL', operatorId: TEST_OPERATOR_ID } as const
+
 vi.mock('@/lib/session', () => ({
   getCurrentUser: vi.fn(),
   getCurrentPermissions: vi.fn(),
-  getCurrentScope: vi.fn(async () => ({ kind: 'ALL' })),
+  getCurrentScope: vi.fn(async () => ({ kind: 'ALL', operatorId: TEST_OPERATOR_ID })),
 }))
 
 // 테스트 전용 비밀번호 (테스트 DB에서만 사용)
@@ -63,13 +66,18 @@ beforeEach(async () => {
   centerId = (await createTestCenter('ICN')).id
   shipperId = (await createTestShipper('GANA')).id
   adminGroupId = (
-    await prisma.permissionGroup.create({ data: { name: '센터 작업자', area: 'ADMIN' } })
+    await prisma.permissionGroup.create({
+      data: { operatorId: TEST_OPERATOR_ID, name: '센터 작업자', area: 'ADMIN' },
+    })
   ).id
   portalGroupId = (
-    await prisma.permissionGroup.create({ data: { name: '화주 담당', area: 'PORTAL' } })
+    await prisma.permissionGroup.create({
+      data: { operatorId: TEST_OPERATOR_ID, name: '화주 담당', area: 'PORTAL' },
+    })
   ).id
   operatorId = (
     await createUserAccount({
+      operatorId: TEST_OPERATOR_ID,
       username: 'boss',
       password: PASSWORD,
       name: '관리자',
@@ -88,7 +96,7 @@ describe('사용자 등록', () => {
     const result = await createUserAction(newUser())
     expect(result.ok).toBe(true)
 
-    const saved = await getUserForEdit(BigInt(result.ok ? result.data.id : 0))
+    const saved = await getUserForEdit(BigInt(result.ok ? result.data.id : 0), OWN_SCOPE)
     expect(saved).toMatchObject({
       username: 'Kim.Worker',
       userType: 'CENTER',
@@ -173,13 +181,13 @@ describe('사용자 수정', () => {
     })
 
     expect(result.ok).toBe(true)
-    expect(await getUserForEdit(BigInt(id))).toMatchObject({
+    expect(await getUserForEdit(BigInt(id), OWN_SCOPE)).toMatchObject({
       name: '김작업자',
       email: 'kim@example.com',
       userType: 'CENTER',
       permissionGroupIds: [],
     })
-    expect((await getUserForEdit(BigInt(id)))?.centerIds.sort()).toEqual(
+    expect((await getUserForEdit(BigInt(id), OWN_SCOPE))?.centerIds.sort()).toEqual(
       [String(centerId), String(second.id)].sort(),
     )
   })
@@ -272,7 +280,7 @@ describe('사용자별 추가·제외 권한', () => {
       }),
     ).toMatchObject({ ok: true, data: { grants: 1, denies: 1 } })
 
-    expect(await getUserOverrides(BigInt(id))).toEqual({
+    expect(await getUserOverrides(BigInt(id), OWN_SCOPE)).toEqual({
       groupCodes: expect.arrayContaining(['master.items.read', 'master.items.update']),
       grants: ['master.items.create'],
       denies: ['master.items.update'],

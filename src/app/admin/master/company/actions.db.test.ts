@@ -1,17 +1,17 @@
 import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { PermissionCode } from '@/config/permissions'
-import { COMPANY_ID, getCompany } from '@/lib/company/company'
-import type { CompanyInput } from '@/lib/company/company-schema'
+import { getOperator } from '@/lib/operator/operator'
+import type { OperatorInput } from '@/lib/operator/operator-schema'
 import { prisma } from '@/lib/prisma'
 import { getCurrentPermissions, getCurrentUser } from '@/lib/session'
 import { createTestCodeGroup, createTestUser } from '@/test/factories'
-import { resetDatabase } from '@/test/reset-database'
-import { saveCompanyAction } from './actions'
+import { createTestOperator, resetDatabase, TEST_OPERATOR_ID } from '@/test/reset-database'
+import { saveOperatorAction } from './actions'
 
 vi.mock('@/lib/session', () => ({
   getCurrentUser: vi.fn(),
   getCurrentPermissions: vi.fn(),
-  getCurrentScope: vi.fn(async () => ({ kind: 'ALL' })),
+  getCurrentScope: vi.fn(async () => ({ kind: 'ALL', operatorId: TEST_OPERATOR_ID })),
 }))
 
 let adminId = 0n
@@ -26,7 +26,7 @@ function signIn(codes: PermissionCode[]) {
   vi.mocked(getCurrentPermissions).mockResolvedValue(new Set(codes))
 }
 
-const input = (overrides: Partial<CompanyInput> = {}): CompanyInput => ({
+const input = (overrides: Partial<OperatorInput> = {}): OperatorInput => ({
   name: '예시물류(주)',
   businessNumber: '1234567891',
   ceoName: '홍대표',
@@ -51,14 +51,16 @@ const input = (overrides: Partial<CompanyInput> = {}): CompanyInput => ({
   ...overrides,
 })
 
-// 저장: 지금 버전(아직 없으면 null)을 붙여 보낸다 — 화면이 불러온 버전 대신
-async function save(value: CompanyInput) {
-  const current = await prisma.company.findUnique({
-    where: { id: COMPANY_ID },
+// 저장: 내 운영사의 지금 버전을 붙여 보낸다 — 화면이 불러온 버전 대신
+async function save(value: OperatorInput) {
+  const current = await prisma.operator.findUniqueOrThrow({
+    where: { id: TEST_OPERATOR_ID },
     select: { rowVersion: true },
   })
-  return saveCompanyAction({ ...value, rowVersion: current?.rowVersion ?? null })
+  return saveOperatorAction({ ...value, rowVersion: current.rowVersion })
 }
+
+const myOperator = () => getOperator(TEST_OPERATOR_ID)
 
 beforeEach(async () => {
   await resetDatabase()
@@ -77,19 +79,18 @@ afterAll(async () => {
 })
 
 describe('운영사 정보 저장', () => {
-  it('처음 저장하면 만들고, 담당자는 입력 순서대로, 고친 사람을 남긴다', async () => {
-    expect(await getCompany()).toBeNull()
-    expect(await save(input())).toEqual({ ok: true, data: { rowVersion: 1 } })
+  it('내 운영사 정보를 고치고, 담당자는 입력 순서대로, 고친 사람을 남긴다', async () => {
+    expect(await save(input())).toEqual({ ok: true, data: { rowVersion: 2 } })
 
-    const company = await getCompany()
+    const company = await myOperator()
     expect(company).toMatchObject({
-      id: COMPANY_ID,
+      id: TEST_OPERATOR_ID,
       businessNumber: '1234567891',
       email: null,
-      // 등록·수정자는 로그인 사용자 아이디로 자동 기록
-      createdBy: 'boss',
+      // 수정자는 로그인 사용자 아이디로 자동 기록 (운영사는 테스트 준비에서 system이 만들었다)
+      createdBy: 'system',
       updatedBy: 'boss',
-      rowVersion: 1,
+      rowVersion: 2,
     })
     expect(
       company?.contacts.map((c) => [c.sortOrder, c.duty, c.name, c.phone, c.isPrimary]),
@@ -100,7 +101,7 @@ describe('운영사 정보 저장', () => {
     ])
   })
 
-  it('다시 저장하면 같은 한 줄을 고치고, 담당자는 통째로 바뀐다', async () => {
+  it('다시 저장하면 담당자는 통째로 바뀐다', async () => {
     await save(input())
     await save(
       input({
@@ -111,11 +112,16 @@ describe('운영사 정보 저장', () => {
       }),
     )
 
-    expect(await prisma.company.count()).toBe(1)
-    const company = await getCompany()
+    const company = await myOperator()
     expect(company?.name).toBe('새이름물류')
     expect(company?.contacts.map((c) => c.name)).toEqual(['박출고'])
-    expect(await prisma.companyContact.count()).toBe(1)
+    expect(await prisma.operatorContact.count()).toBe(1)
+  })
+
+  it('다른 운영사의 정보는 건드리지 않는다 (0039)', async () => {
+    const other = await createTestOperator('다른물류')
+    await save(input({ name: '새이름물류' }))
+    expect(await getOperator(other.id)).toMatchObject({ name: '다른물류', rowVersion: 1 })
   })
 
   it('입력 규칙에 맞지 않으면 칸별 오류, 저장하지 않는다', async () => {
@@ -127,7 +133,7 @@ describe('운영사 정보 저장', () => {
         fieldErrors: { businessNumber: [expect.any(String)], fax: [expect.any(String)] },
       },
     })
-    expect(await getCompany()).toBeNull()
+    expect((await myOperator())?.name).toBe('테스트운영사')
   })
 
   it('담당 업무: 없는 코드·사용 중지 코드는 거부, 이미 저장돼 있던 사용 중지 코드는 그대로 둘 수 있다', async () => {
@@ -175,6 +181,6 @@ describe('운영사 정보 저장', () => {
       ok: false,
       error: { code: 'FORBIDDEN' },
     })
-    expect(await getCompany()).toBeNull()
+    expect((await myOperator())?.name).toBe('테스트운영사')
   })
 })

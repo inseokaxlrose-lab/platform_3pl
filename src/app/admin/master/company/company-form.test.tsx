@@ -1,11 +1,11 @@
 import { act, fireEvent, render, screen, within } from '@testing-library/react'
 import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { CommonCodeProvider } from '@/components/common-code'
-import type { CompanyInput } from '@/lib/company/company-schema'
-import { saveCompanyAction } from './actions'
+import type { OperatorInput } from '@/lib/operator/operator-schema'
+import { saveOperatorAction } from './actions'
 import { CompanyForm } from './company-form'
 
-vi.mock('./actions', () => ({ saveCompanyAction: vi.fn() }))
+vi.mock('./actions', () => ({ saveOperatorAction: vi.fn() }))
 vi.mock('next/navigation', () => ({
   useRouter: () => ({ refresh: vi.fn(), push: vi.fn() }),
   usePathname: () => '/admin/test',
@@ -19,7 +19,7 @@ beforeAll(() => {
   Element.prototype.scrollIntoView = vi.fn()
 })
 
-const EMPTY: CompanyInput = {
+const EMPTY: OperatorInput = {
   name: '',
   businessNumber: '',
   ceoName: '',
@@ -41,15 +41,10 @@ const CODES = {
   ],
 }
 
-const renderForm = (initial: CompanyInput = EMPTY, readOnly = false) =>
+const renderForm = (initial: OperatorInput = EMPTY, readOnly = false) =>
   render(
     <CommonCodeProvider options={CODES}>
-      <CompanyForm
-        header={{ title: '운영사' }}
-        initial={initial}
-        version={null}
-        readOnly={readOnly}
-      />
+      <CompanyForm header={{ title: '운영사' }} initial={initial} version={1} readOnly={readOnly} />
     </CommonCodeProvider>,
   )
 
@@ -60,8 +55,8 @@ const addContact = () => fireEvent.click(screen.getByRole('button', { name: '담
 const save = () => act(async () => fireEvent.click(screen.getByRole('button', { name: '저장' })))
 
 beforeEach(() => {
-  vi.mocked(saveCompanyAction).mockReset()
-  vi.mocked(saveCompanyAction).mockResolvedValue({ ok: true, data: { rowVersion: 1 } })
+  vi.mocked(saveOperatorAction).mockReset()
+  vi.mocked(saveOperatorAction).mockResolvedValue({ ok: true, data: { rowVersion: 1 } })
 })
 
 describe('CompanyForm', () => {
@@ -78,7 +73,7 @@ describe('CompanyForm', () => {
     expect(within(row).getByText('담당 업무를 골라 주세요.')).toBeTruthy()
     expect(within(row).getByText('담당자명을 입력해 주세요.')).toBeTruthy()
     expect(within(row).getByText('연락처와 이메일 중 하나는 입력해 주세요.')).toBeTruthy()
-    expect(saveCompanyAction).not.toHaveBeenCalled()
+    expect(saveOperatorAction).not.toHaveBeenCalled()
   })
 
   it('담당자는 5명까지, 첫 담당자가 대표, 행을 지울 수 있다', () => {
@@ -105,7 +100,7 @@ describe('CompanyForm', () => {
     expect(screen.getByText('변경사항 있음')).toBeTruthy()
     await save()
 
-    expect(saveCompanyAction).toHaveBeenCalledWith(
+    expect(saveOperatorAction).toHaveBeenCalledWith(
       expect.objectContaining({
         name: '예시물류(주)',
         businessNumber: '1234567891',
@@ -117,7 +112,7 @@ describe('CompanyForm', () => {
   })
 
   it('서버의 행 단위 오류도 그 칸에 보여준다', async () => {
-    vi.mocked(saveCompanyAction).mockResolvedValue({
+    vi.mocked(saveOperatorAction).mockResolvedValue({
       ok: false,
       error: {
         code: 'VALIDATION',

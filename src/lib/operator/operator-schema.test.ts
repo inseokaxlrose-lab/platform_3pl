@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import { z } from 'zod'
-import { companySchema, MAX_COMPANY_CONTACTS, type CompanyInput } from './company-schema'
+import { operatorSchema, MAX_OPERATOR_CONTACTS, type OperatorInput } from './operator-schema'
 
-const input = (overrides: Partial<CompanyInput> = {}): CompanyInput => ({
+const input = (overrides: Partial<OperatorInput> = {}): OperatorInput => ({
   name: ' 예시물류(주) ',
   businessNumber: '1234567891',
   ceoName: '',
@@ -18,14 +18,14 @@ const input = (overrides: Partial<CompanyInput> = {}): CompanyInput => ({
   ...overrides,
 })
 
-const errorsOf = (value: CompanyInput) => {
-  const parsed = companySchema.safeParse(value)
+const errorsOf = (value: OperatorInput) => {
+  const parsed = operatorSchema.safeParse(value)
   return parsed.success ? {} : z.flattenError(parsed.error).fieldErrors
 }
 
 describe('운영사 정보 입력 규칙', () => {
   it('정리해서 저장할 값을 만든다 (공백 제거, 빈 칸 null, 번호는 숫자만, 이메일 소문자)', () => {
-    expect(companySchema.parse(input())).toMatchObject({
+    expect(operatorSchema.parse(input())).toMatchObject({
       name: '예시물류(주)',
       businessNumber: '1234567891',
       ceoName: null,
@@ -53,11 +53,11 @@ describe('운영사 정보 입력 규칙', () => {
     })
     expect(errorsOf(input({ phone: '1588-1234', fax: '010-1234-5678' }))).toEqual({})
     expect(
-      companySchema.parse(input({ phone: '02-123-4567', fax: '010 1234 5678' })),
+      operatorSchema.parse(input({ phone: '02-123-4567', fax: '010 1234 5678' })),
     ).toMatchObject({ phone: '021234567', fax: '01012345678' })
   })
 
-  it(`담당자: 업무·이름 필수, 연락처·이메일 중 하나, 대표 1명, 최대 ${MAX_COMPANY_CONTACTS}명`, () => {
+  it(`담당자: 업무·이름 필수, 연락처·이메일 중 하나, 대표 1명, 최대 ${MAX_OPERATOR_CONTACTS}명`, () => {
     const contact = {
       duty: 'INBOUND',
       name: '김담당',
@@ -65,14 +65,14 @@ describe('운영사 정보 입력 규칙', () => {
       email: '',
       isPrimary: true,
     }
-    expect(companySchema.parse(input({ contacts: [contact] })).contacts).toEqual([
+    expect(operatorSchema.parse(input({ contacts: [contact] })).contacts).toEqual([
       { duty: 'INBOUND', name: '김담당', phone: '01012345678', email: null, isPrimary: true },
     ])
 
     expect(errorsOf(input({ contacts: [{ ...contact, duty: '', name: '', phone: '' }] }))).toEqual({
       contacts: expect.any(Array),
     })
-    const issues = companySchema
+    const issues = operatorSchema
       .safeParse(input({ contacts: [{ ...contact, duty: '', name: '', phone: '' }] }))
       .error!.issues.map((i) => [i.path.join('.'), i.message])
     expect(issues).toEqual([
@@ -85,10 +85,10 @@ describe('운영사 정보 입력 규칙', () => {
       contacts: ['대표 담당자를 1명 정해 주세요.'],
     })
     expect(
-      errorsOf(input({ contacts: Array(MAX_COMPANY_CONTACTS + 1).fill(contact) })),
+      errorsOf(input({ contacts: Array(MAX_OPERATOR_CONTACTS + 1).fill(contact) })),
     ).toMatchObject({
       contacts: expect.arrayContaining([
-        `담당자는 ${MAX_COMPANY_CONTACTS}명까지 등록할 수 있습니다.`,
+        `담당자는 ${MAX_OPERATOR_CONTACTS}명까지 등록할 수 있습니다.`,
       ]),
     })
   })

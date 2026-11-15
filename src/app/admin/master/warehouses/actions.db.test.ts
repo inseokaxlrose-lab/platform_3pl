@@ -8,7 +8,7 @@ import type { DataScope } from '@/lib/scope/data-scope'
 import { getCurrentPermissions, getCurrentScope, getCurrentUser } from '@/lib/session'
 import type { WarehouseCreateInput } from '@/lib/warehouses/warehouse-schema'
 import { createTestCenter, versionOf } from '@/test/factories'
-import { resetDatabase } from '@/test/reset-database'
+import { resetDatabase, TEST_OPERATOR_ID } from '@/test/reset-database'
 import {
   createWarehouseAction,
   listWarehousesAction,
@@ -29,7 +29,7 @@ const CODES: PermissionCode[] = [
   'master.warehouses.update',
 ]
 
-function signIn(scope: DataScope = { kind: 'ALL' }, codes = CODES) {
+function signIn(scope: DataScope = { kind: 'ALL', operatorId: TEST_OPERATOR_ID }, codes = CODES) {
   vi.mocked(getCurrentUser).mockResolvedValue({
     id: 1n,
     name: '사용자',
@@ -209,7 +209,7 @@ describe('목록 · 데이터 범위 · 권한', () => {
 
   it('센터 직원: 소속 센터 창고만 보고, 다른 센터 창고는 고치거나 추가할 수 없다', async () => {
     const gmhWarehouse = await create({ centerId: String(gmhId), code: 'B01' })
-    signIn({ kind: 'CENTERS', centerIds: [icnId] })
+    signIn({ kind: 'CENTERS', operatorId: TEST_OPERATOR_ID, centerIds: [icnId] })
 
     const result = await listWarehousesAction(createDataGridState())
     expect(result.ok && result.data.rows.map((r) => r.center)).toEqual(['ICN 센터 (ICN)'])
@@ -239,7 +239,7 @@ describe('목록 · 데이터 범위 · 권한', () => {
   })
 
   it('조회 권한만 있으면 등록·수정 불가', async () => {
-    signIn({ kind: 'ALL' }, ['master.warehouses.read'])
+    signIn({ kind: 'ALL', operatorId: TEST_OPERATOR_ID }, ['master.warehouses.read'])
     expect(await createWarehouseAction(input())).toMatchObject({
       ok: false,
       error: { code: 'FORBIDDEN' },
@@ -275,7 +275,7 @@ describe('목록 검색 조건 · 일괄 처리 · 엑셀', () => {
     })
 
     const b = await create({ centerId: String(gmhId), code: 'B01' })
-    signIn({ kind: 'CENTERS', centerIds: [icnId] })
+    signIn({ kind: 'CENTERS', operatorId: TEST_OPERATOR_ID, centerIds: [icnId] })
     expect(await setWarehousesActiveAction({ ids: [a.id, b.id], isActive: true })).toMatchObject({
       ok: false,
       error: { code: 'NOT_FOUND' },

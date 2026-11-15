@@ -5,7 +5,7 @@ import { assertCodeValues, loadCodeOptions } from '@/lib/common-code/common-code
 import { prisma } from '@/lib/prisma'
 import { versionOf } from '@/test/factories'
 import { getCurrentPermissions, getCurrentScope, getCurrentUser } from '@/lib/session'
-import { resetDatabase } from '@/test/reset-database'
+import { resetDatabase, TEST_OPERATOR_ID } from '@/test/reset-database'
 import {
   createCodeGroupAction,
   createCodeItemAction,
@@ -40,7 +40,7 @@ function signIn(codes = ALL_CODES) {
     userType: 'OPERATOR',
   })
   vi.mocked(getCurrentPermissions).mockResolvedValue(new Set(codes))
-  vi.mocked(getCurrentScope).mockResolvedValue({ kind: 'ALL' })
+  vi.mocked(getCurrentScope).mockResolvedValue({ kind: 'ALL', operatorId: TEST_OPERATOR_ID })
 }
 
 const group = (overrides: Record<string, unknown> = {}) => ({
@@ -115,7 +115,7 @@ describe('공통코드 그룹', () => {
     })
 
     const system = await prisma.codeGroup.create({
-      data: { code: 'SYS', name: '시스템', isSystem: 'Y' },
+      data: { operatorId: TEST_OPERATOR_ID, code: 'SYS', name: '시스템', isSystem: 'Y' },
     })
     expect(await deleteCodeGroupAction({ id: String(system.id) })).toMatchObject({ ok: false })
     expect(
@@ -207,7 +207,7 @@ describe('공통코드 읽기·검사', () => {
     await createItem(BigInt(g.id), 'B', { sortOrder: 2 })
     await createItem(BigInt(g.id), 'A', { sortOrder: 1, isActive: false })
     await createGroup({ code: 'OFF', isActive: false })
-    expect(await loadCodeOptions()).toEqual({
+    expect(await loadCodeOptions(TEST_OPERATOR_ID)).toEqual({
       DUTY: [
         { code: 'A', name: 'A', isActive: false },
         { code: 'B', name: 'B', isActive: true },
@@ -246,6 +246,6 @@ describe('되살리기 (0038)', () => {
     })
     expect(await restoreCodeGroupAction({ id: g.id })).toMatchObject({ ok: true })
     expect(await restoreCodeItemAction({ id: item.id })).toMatchObject({ ok: true })
-    expect((await loadCodeOptions()).TEMP_GROUP?.map((i) => i.code)).toEqual(['A'])
+    expect((await loadCodeOptions(TEST_OPERATOR_ID)).TEMP_GROUP?.map((i) => i.code)).toEqual(['A'])
   })
 })

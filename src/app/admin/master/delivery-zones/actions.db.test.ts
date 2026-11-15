@@ -7,7 +7,7 @@ import { prisma } from '@/lib/prisma'
 import type { DataScope } from '@/lib/scope/data-scope'
 import { getCurrentPermissions, getCurrentScope, getCurrentUser } from '@/lib/session'
 import { createTestCenter, versionOf } from '@/test/factories'
-import { resetDatabase } from '@/test/reset-database'
+import { resetDatabase, TEST_OPERATOR_ID } from '@/test/reset-database'
 import {
   createDeliveryZoneAction,
   deleteDeliveryZonesAction,
@@ -31,7 +31,7 @@ const CODES: PermissionCode[] = [
   'master.delivery-zones.delete',
 ]
 
-function signIn(scope: DataScope = { kind: 'ALL' }, codes = CODES) {
+function signIn(scope: DataScope = { kind: 'ALL', operatorId: TEST_OPERATOR_ID }, codes = CODES) {
   vi.mocked(getCurrentUser).mockResolvedValue({
     id: 1n,
     name: '관리자',
@@ -182,7 +182,7 @@ describe('목록 · 범위 · 일괄 처리', () => {
   it('센터 직원: 소속 센터 권역만 보고, 다른 센터 권역은 고치거나 추가·삭제할 수 없다', async () => {
     const busan = await create({ centerId: String(gmhId), code: 'BUSAN', regionCodes: ['26'] })
     await create({ code: 'SEOUL', regionCodes: ['11'] })
-    signIn({ kind: 'CENTERS', centerIds: [icnId] })
+    signIn({ kind: 'CENTERS', operatorId: TEST_OPERATOR_ID, centerIds: [icnId] })
 
     const list = await listDeliveryZonesAction(createDataGridState())
     expect(list.ok && list.data.rows.map((z) => z.code)).toEqual(['SEOUL'])
@@ -197,9 +197,15 @@ describe('목록 · 범위 · 일괄 처리', () => {
       error: { code: 'NOT_FOUND' },
     })
     // 이미 쓰는 지역 목록도 소속 센터 것만
-    expect(Object.keys(await getTakenRegions({ kind: 'CENTERS', centerIds: [icnId] }))).toEqual([
-      String(icnId),
-    ])
+    expect(
+      Object.keys(
+        await getTakenRegions({
+          kind: 'CENTERS',
+          operatorId: TEST_OPERATOR_ID,
+          centerIds: [icnId],
+        }),
+      ),
+    ).toEqual([String(icnId)])
   })
 
   it('삭제는 논리 삭제: 목록에서 빠지고, 외부 코드는 지우고, 담당 지역은 비게 된다 / 엑셀 전체는 엑셀 권한 필요', async () => {

@@ -2,14 +2,14 @@ import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { prisma } from '@/lib/prisma'
 import { getCurrentPermissions, getCurrentUser } from '@/lib/session'
 import { createTestCenter, createTestUser } from '@/test/factories'
-import { resetDatabase } from '@/test/reset-database'
+import { resetDatabase, TEST_OPERATOR_ID } from '@/test/reset-database'
 import { loadUserGridSettings } from './grid-settings'
 import { resetGridSettingsAction, saveGridSettingsAction } from './grid-settings-actions'
 
 vi.mock('@/lib/session', () => ({
   getCurrentUser: vi.fn(),
   getCurrentPermissions: vi.fn(async () => new Set()),
-  getCurrentScope: vi.fn(async () => ({ kind: 'ALL' })),
+  getCurrentScope: vi.fn(async () => ({ kind: 'ALL', operatorId: TEST_OPERATOR_ID })),
 }))
 
 let aliceId = 0n

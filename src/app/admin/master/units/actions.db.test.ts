@@ -6,7 +6,7 @@ import { prisma } from '@/lib/prisma'
 import { versionOf } from '@/test/factories'
 import { getCurrentPermissions, getCurrentScope, getCurrentUser } from '@/lib/session'
 import type { UnitCreateInput } from '@/lib/units/unit-schema'
-import { resetDatabase } from '@/test/reset-database'
+import { resetDatabase, TEST_OPERATOR_ID } from '@/test/reset-database'
 import {
   createUnitAction,
   deleteUnitsAction,
@@ -19,7 +19,7 @@ import {
 vi.mock('@/lib/session', () => ({
   getCurrentUser: vi.fn(),
   getCurrentPermissions: vi.fn(),
-  getCurrentScope: vi.fn(async () => ({ kind: 'ALL' })),
+  getCurrentScope: vi.fn(async () => ({ kind: 'ALL', operatorId: TEST_OPERATOR_ID })),
 }))
 
 const CODES: PermissionCode[] = [
@@ -37,7 +37,7 @@ function signIn(codes = CODES) {
     userType: 'OPERATOR',
   })
   vi.mocked(getCurrentPermissions).mockResolvedValue(new Set(codes))
-  vi.mocked(getCurrentScope).mockResolvedValue({ kind: 'ALL' })
+  vi.mocked(getCurrentScope).mockResolvedValue({ kind: 'ALL', operatorId: TEST_OPERATOR_ID })
 }
 
 const input = (overrides: Partial<UnitCreateInput> = {}): UnitCreateInput => ({
@@ -99,7 +99,7 @@ describe('단위 등록·수정', () => {
     })
 
     const ea = await prisma.unit.create({
-      data: { code: 'EA', name: '개', kind: 'BASE', isSystem: 'Y' },
+      data: { operatorId: TEST_OPERATOR_ID, code: 'EA', name: '개', kind: 'BASE', isSystem: 'Y' },
     })
     expect(
       await updateUnitAction({
@@ -135,7 +135,13 @@ describe('목록 · 일괄 처리 · 권한', () => {
   it('일괄 사용 중지·삭제: 시스템 단위가 섞이면 전체 거부, 삭제하면 외부 코드도 지운다', async () => {
     const kg = await create({ externalCodes: { SAP: 'KGM', ERP: '' } })
     const plt = await prisma.unit.create({
-      data: { code: 'PLT', name: '팔레트', kind: 'PACK', isSystem: 'Y' },
+      data: {
+        operatorId: TEST_OPERATOR_ID,
+        code: 'PLT',
+        name: '팔레트',
+        kind: 'PACK',
+        isSystem: 'Y',
+      },
     })
     expect(
       await setUnitsActiveAction({ ids: [kg.id, String(plt.id)], isActive: false }),

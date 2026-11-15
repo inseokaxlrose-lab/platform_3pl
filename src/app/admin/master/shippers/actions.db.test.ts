@@ -1,6 +1,7 @@
 import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { createDataGridState } from '@/components/data-grid/state'
 import type { PermissionCode } from '@/config/permissions'
+import { runInContext } from '@/lib/actor'
 import { countCodeUsage } from '@/lib/common-code/code-usage'
 import { getExternalCodes } from '@/lib/master-code/external-codes'
 import { prisma } from '@/lib/prisma'
@@ -8,7 +9,7 @@ import type { DataScope } from '@/lib/scope/data-scope'
 import { getCurrentPermissions, getCurrentScope, getCurrentUser } from '@/lib/session'
 import type { ShipperInput } from '@/lib/shippers/shipper-schema'
 import { createTestCenter, createTestCodeGroup, versionOf } from '@/test/factories'
-import { resetDatabase } from '@/test/reset-database'
+import { resetDatabase, TEST_OPERATOR_ID } from '@/test/reset-database'
 import {
   createShipperAction,
   listShippersAction,
@@ -29,7 +30,7 @@ const CODES: PermissionCode[] = [
   'master.shippers.update',
 ]
 
-function signIn(scope: DataScope = { kind: 'ALL' }, codes = CODES) {
+function signIn(scope: DataScope = { kind: 'ALL', operatorId: TEST_OPERATOR_ID }, codes = CODES) {
   vi.mocked(getCurrentUser).mockResolvedValue({
     id: 1n,
     name: '관리자',
@@ -101,7 +102,11 @@ describe('화주사 등록·수정', () => {
     ])
     expect(await getExternalCodes('SHIPPER', BigInt(shipper.id))).toEqual({ SAP: 'V100', ERP: '' })
     // 담당 업무 코드가 쓰이고 있으면 공통코드에서 지울 수 없다
-    expect(await countCodeUsage(prisma, 'CONTACT_DUTY', 'INBOUND')).toBe(1)
+    // (사용 수는 운영사마다 센다 → 테스트 운영사 출입증 안에서)
+    const usage = await runInContext({ actor: 'system', operatorId: TEST_OPERATOR_ID }, () =>
+      countCodeUsage(prisma, 'CONTACT_DUTY', 'INBOUND'),
+    )
+    expect(usage).toBe(1)
   })
 
   it('입력 규칙: 이용 센터 1곳 이상, 사업자번호는 비우거나 검증번호까지, 담당자 규칙', async () => {
@@ -201,15 +206,23 @@ describe('목록 · 데이터 범위', () => {
   it('센터 직원: 자기 센터를 이용하는 화주사만 보고, 등록·수정·사용 중지는 못 한다', async () => {
     const gana = await create({ code: 'GANA', centerIds: [String(icnId)] })
     const dara = await create({ code: 'DARA', centerIds: [String(gmhId)] })
-    signIn({ kind: 'CENTERS', centerIds: [gmhId] })
+    signIn({ kind: 'CENTERS', operatorId: TEST_OPERATOR_ID, centerIds: [gmhId] })
 
     const list = await listShippersAction(createDataGridState())
     expect(list.ok && list.data.rows.map((s) => s.code)).toEqual(['DARA'])
     expect(
-      await getShipperForEdit(BigInt(gana.id), { kind: 'CENTERS', centerIds: [gmhId] }),
+      await getShipperForEdit(BigInt(gana.id), {
+        kind: 'CENTERS',
+        operatorId: TEST_OPERATOR_ID,
+        centerIds: [gmhId],
+      }),
     ).toBeNull()
     expect(
-      await getShipperForEdit(BigInt(dara.id), { kind: 'CENTERS', centerIds: [gmhId] }),
+      await getShipperForEdit(BigInt(dara.id), {
+        kind: 'CENTERS',
+        operatorId: TEST_OPERATOR_ID,
+        centerIds: [gmhId],
+      }),
     ).not.toBeNull()
 
     expect(await createShipperAction(input({ code: 'NEW' }))).toMatchObject({

@@ -1,12 +1,16 @@
 import { afterAll, beforeEach, describe, expect, it } from 'vitest'
 import { prisma } from '@/lib/prisma'
 import { createTestUser } from '@/test/factories'
-import { resetDatabase } from '@/test/reset-database'
+import { resetDatabase, TEST_OPERATOR_ID } from '@/test/reset-database'
 import { loadUserPermissions } from './load-user-permissions'
 
 function createGroup(name: string, codes: string[]) {
   return prisma.permissionGroup.create({
-    data: { name, permissions: { create: codes.map((permissionCode) => ({ permissionCode })) } },
+    data: {
+      operatorId: TEST_OPERATOR_ID,
+      name,
+      permissions: { create: codes.map((permissionCode) => ({ permissionCode })) },
+    },
   })
 }
 
