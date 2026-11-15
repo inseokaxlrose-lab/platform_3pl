@@ -146,11 +146,11 @@ async function seedSampleCompany() {
     data: {
       id: 'default',
       name: '예시물류(주)',
-      businessNumber: '220-81-12341',
+      businessNumber: '2208112341',
       ceoName: '홍길동',
       businessType: '서비스',
       businessItem: '물류대행',
-      phone: '02-123-4567',
+      phone: '021234567',
       contacts: { create: [{ sortOrder: 0, duty: '입고 문의', name: '김입고' }] },
     },
   })

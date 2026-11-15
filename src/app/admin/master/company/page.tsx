@@ -2,6 +2,7 @@ import type { Metadata } from 'next'
 import { PageHeader } from '@/components/common'
 import { formatDate } from '@/components/data-grid'
 import { AccessDenied } from '@/components/permission'
+import { formatBusinessNumber, formatPhone } from '@/lib/format'
 import { getCompany, type Company } from '@/lib/company/company'
 import type { CompanyInput } from '@/lib/company/company-schema'
 import { hasPermission } from '@/lib/session'
@@ -9,16 +10,17 @@ import { CompanyForm } from './company-form'
 
 export const metadata: Metadata = { title: '운영사' }
 
-// DB 값 → 입력값 (빈 값은 빈 글자)
+// DB 값 → 입력값 (빈 값은 빈 글자, 숫자만 저장된 번호는 하이픈을 붙여서 — 0029)
 function toInput(company: Company | null): CompanyInput {
+  const phone = (value: string | null | undefined) => formatPhone(value ?? '')
   return {
     name: company?.name ?? '',
-    businessNumber: company?.businessNumber ?? '',
+    businessNumber: formatBusinessNumber(company?.businessNumber ?? ''),
     ceoName: company?.ceoName ?? '',
     businessType: company?.businessType ?? '',
     businessItem: company?.businessItem ?? '',
-    phone: company?.phone ?? '',
-    fax: company?.fax ?? '',
+    phone: phone(company?.phone),
+    fax: phone(company?.fax),
     email: company?.email ?? '',
     zipCode: company?.zipCode ?? '',
     address: company?.address ?? '',
@@ -26,7 +28,7 @@ function toInput(company: Company | null): CompanyInput {
     contacts: (company?.contacts ?? []).map((c) => ({
       duty: c.duty,
       name: c.name,
-      phone: c.phone ?? '',
+      phone: phone(c.phone),
       email: c.email ?? '',
     })),
   }

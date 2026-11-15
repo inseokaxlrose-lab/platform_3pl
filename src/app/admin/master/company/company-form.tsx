@@ -14,6 +14,7 @@ import {
   type CompanyData,
   type CompanyInput,
 } from '@/lib/company/company-schema'
+import { formatBusinessNumber, formatPhone } from '@/lib/format'
 import { saveCompanyAction } from './actions'
 
 type CompanyFormProps = {
@@ -22,22 +23,23 @@ type CompanyFormProps = {
   readOnly: boolean
 }
 
-// 저장할 값(빈 칸 null) → 입력값(빈 글자)
+// 저장할 값(빈 칸 null, 번호는 숫자만) → 입력값(빈 글자, 번호는 하이픈을 붙여서)
 function toFormValues(data: CompanyData): CompanyInput {
   const text = (value: string | null) => value ?? ''
+  const phone = (value: string | null) => formatPhone(value ?? '')
   return {
     name: data.name,
-    businessNumber: data.businessNumber,
+    businessNumber: formatBusinessNumber(data.businessNumber),
     ceoName: text(data.ceoName),
     businessType: text(data.businessType),
     businessItem: text(data.businessItem),
-    phone: text(data.phone),
-    fax: text(data.fax),
+    phone: phone(data.phone),
+    fax: phone(data.fax),
     email: text(data.email),
     zipCode: text(data.zipCode),
     address: text(data.address),
     addressDetail: text(data.addressDetail),
-    contacts: data.contacts.map((c) => ({ ...c, phone: text(c.phone), email: text(c.email) })),
+    contacts: data.contacts.map((c) => ({ ...c, phone: phone(c.phone), email: text(c.email) })),
   }
 }
 
@@ -83,7 +85,7 @@ export function CompanyForm({ initial, readOnly }: CompanyFormProps) {
         setMessage({ ok: false, text: result.error.message })
         return
       }
-      // 저장된 모양(사업자번호 하이픈, 이메일 소문자, 공백 제거)으로 입력값을 맞추고 '마지막 수정'을 새로 읽는다
+      // 저장된 모양(번호는 하이픈을 붙여 다시 표시, 이메일 소문자, 공백 제거)으로 입력값을 맞추고 '마지막 수정'을 새로 읽는다
       setForm(toFormValues(parsed.data))
       router.refresh()
       setMessage({ ok: true, text: '저장했습니다.' })

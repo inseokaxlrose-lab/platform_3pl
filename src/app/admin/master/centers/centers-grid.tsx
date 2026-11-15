@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { useEffect, useState } from 'react'
 import { ACTIVE_STATUS } from '@/components/common'
 import { DataGrid, type DataGridColumn, useDataGridState } from '@/components/data-grid'
+import { formatPhone } from '@/lib/format'
 import { listCentersAction } from './actions'
 
 type Row = {
@@ -37,7 +38,11 @@ const columns: DataGridColumn<Row>[] = [
   },
   { id: 'name', header: '센터명', accessor: 'name', sortable: true },
   { id: 'address', header: '주소', accessor: 'address' },
-  { id: 'phone', header: '대표 전화', accessor: 'phone' },
+  {
+    id: 'phone',
+    header: '대표 전화',
+    accessor: (row) => (row.phone ? formatPhone(row.phone) : null),
+  },
   { id: 'warehouseCount', header: '창고 수', accessor: 'warehouseCount', format: 'number' },
   {
     id: 'isActive',
