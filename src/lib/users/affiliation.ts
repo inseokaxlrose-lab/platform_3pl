@@ -1,11 +1,11 @@
 // 사용자 유형별 소속 규칙 (등록·수정 공용, 0016)
 // - 센터 직원: 소속 센터 1개 이상, 화주사 없음
 // - 화주사 사용자: 소속 화주사 1개, 센터 없음
-// - 운영사: 소속 없음
+// - 운영사·플랫폼 관리자: 소속 없음
 export type AffiliationIssue = { path: 'centerIds' | 'shipperId'; message: string }
 
 export function affiliationIssues(
-  userType: 'OPERATOR' | 'CENTER' | 'SHIPPER',
+  userType: 'OPERATOR' | 'CENTER' | 'SHIPPER' | 'PLATFORM',
   // 키는 화면에서는 글자, 서버에서는 bigint (개수·유무만 본다)
   centerIds: readonly (string | bigint)[],
   shipperId: string | bigint | null | undefined,

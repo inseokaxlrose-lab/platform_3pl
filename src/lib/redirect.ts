@@ -1,10 +1,12 @@
 // 사용자 유형별 영역·홈과, 로그인 후 돌아갈 주소 검사 (브라우저·서버 공용, 순수 함수)
 
-export type UserTypeValue = 'OPERATOR' | 'CENTER' | 'SHIPPER'
-export type Area = 'admin' | 'portal'
+export type UserTypeValue = 'OPERATOR' | 'CENTER' | 'SHIPPER' | 'PLATFORM'
+export type Area = 'admin' | 'portal' | 'platform'
 
-// 영역: 운영사·센터 직원 → 운영사 화면, 화주사 사용자 → 화주 포털
+// 영역: 운영사·센터 직원 → 운영사 화면, 화주사 사용자 → 화주 포털, 플랫폼 관리자 → 플랫폼 화면
+// (플랫폼 관리자가 운영사로 전환하면 운영사 화면에도 들어간다 — session.ts requireUser)
 export function areaOf(userType: UserTypeValue): Area {
+  if (userType === 'PLATFORM') return 'platform'
   return userType === 'SHIPPER' ? 'portal' : 'admin'
 }
 

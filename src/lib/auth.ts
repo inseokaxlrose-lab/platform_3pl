@@ -4,10 +4,13 @@ import { prismaAdapter } from 'better-auth/adapters/prisma'
 import { nextCookies } from 'better-auth/next-js'
 import { username } from 'better-auth/plugins'
 import { prisma } from '@/lib/prisma'
+import { isOperatorActive } from '@/lib/operator/operator-status'
 import { isActiveStatus } from '@/lib/status'
 
 // 사용 중지 계정 로그인 시 오류 메시지 (로그인 화면에서 이 값으로 구분한다)
 export const ACCOUNT_DISABLED = 'ACCOUNT_DISABLED'
+// 운영사가 운영 중(ACTIVE)이 아닐 때 (대기·정지·해지, 0039)
+export const OPERATOR_DISABLED = 'OPERATOR_DISABLED'
 
 // 인증 설정 (Better Auth) — docs/decisions/0010-auth-and-permission-model.md
 // - 로그인: 아이디 + 비밀번호 (현장 작업자는 이메일이 없을 수 있음)
@@ -37,13 +40,17 @@ export const auth = betterAuth({
     session: {
       create: {
         // 로그인 직전 검사: 사용 중지된 계정(status 'INACTIVE')은 세션을 만들지 않는다
+        // 운영사가 운영 중이 아니어도 막는다 (플랫폼 관리자는 운영사가 없다)
         before: async (session) => {
           const user = await prisma.user.findUnique({
             where: { id: BigInt(session.userId) },
-            select: { status: true },
+            select: { status: true, userType: true, operator: { select: { status: true } } },
           })
           if (!user || !isActiveStatus(user.status)) {
             throw new APIError('FORBIDDEN', { message: ACCOUNT_DISABLED })
+          }
+          if (user.userType !== 'PLATFORM' && !isOperatorActive(user.operator?.status)) {
+            throw new APIError('FORBIDDEN', { message: OPERATOR_DISABLED })
           }
         },
       },

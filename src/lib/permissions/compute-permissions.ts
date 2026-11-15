@@ -1,4 +1,5 @@
 import {
+  ALL_PERMISSION_CODES,
   isPermissionCode,
   PERMISSION_MENUS,
   type PermissionArea,
@@ -25,6 +26,11 @@ export type PermissionResult = {
   ignored: { code: string; reason: IgnoredReason }[]
 }
 
+// 한 영역의 모든 권한 코드 (플랫폼 관리자, 운영사로 전환해 작업할 때의 운영사 화면 전체 권한)
+export function areaCodes(area: PermissionArea): PermissionCode[] {
+  return ALL_PERMISSION_CODES.filter((code) => PERMISSION_MENUS[menuOf(code)].area === area)
+}
+
 // 'inbound.asn.close' → 'inbound.asn'
 function menuOf(code: PermissionCode) {
   return code.slice(0, code.lastIndexOf('.')) as PermissionMenu
@@ -41,9 +47,11 @@ export function isOperatorOnly(code: PermissionCode) {
 // - 메뉴 조회(read) 권한이 없으면 그 메뉴의 다른 버튼 권한도 무효
 // - 사용 중지 계정은 권한 없음
 // - 시스템 메뉴(system.*: 사용자·권한그룹 등)는 운영사 사용자만 (권한 상승 방지, 0018)
+// - 플랫폼 관리자는 권한그룹 없이 플랫폼 영역 권한을 모두 갖는다 (0039)
 export function computePermissions(input: PermissionInput): PermissionResult {
   const ignored: PermissionResult['ignored'] = []
   if (!input.isActive) return { codes: new Set(), ignored }
+  if (input.userType === 'PLATFORM') return { codes: new Set(areaCodes('platform')), ignored }
 
   const area: PermissionArea = areaOf(input.userType)
   const seenIgnored = new Set<string>()

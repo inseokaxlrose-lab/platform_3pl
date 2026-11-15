@@ -49,7 +49,8 @@ export async function getUserForEdit(id: bigint, scope: DataScope) {
       permissionGroups: { select: { groupId: true } },
     },
   })
-  if (!user) return null
+  // 플랫폼 관리자는 운영사가 없어 찾아지지 않는다 (타입을 좁히기 위한 확인)
+  if (!user || user.userType === 'PLATFORM') return null
   // 화면으로 보낼 값이라 키는 글자로
   return textIds({
     id: user.id,

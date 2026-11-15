@@ -20,12 +20,13 @@ import { resetUserPassword, setUserActive } from '@/lib/users/manage-user'
 import { idSchema } from '@/lib/id'
 
 // 사용자 관리 서버 액션 (docs/decisions/0018-user-admin.md)
-// 시스템 메뉴는 운영사만 쓸 수 있다 (권한 계산에서 이미 막지만 서버에서 한 번 더 확인)
+// 시스템 메뉴는 운영사 관리자만 쓸 수 있다 (권한 계산에서 이미 막지만 서버에서 한 번 더 확인)
+// 플랫폼 관리자는 운영사로 작업 중일 때만 운영사 화면 권한이 있으므로 함께 허용한다 (0039)
 
 type UserType = 'OPERATOR' | 'CENTER' | 'SHIPPER'
 
 function requireOperator(user: CurrentUser) {
-  if (user.userType !== 'OPERATOR') {
+  if (user.userType !== 'OPERATOR' && user.userType !== 'PLATFORM') {
     throw new ActionError('FORBIDDEN', '사용자 관리는 운영사 사용자만 할 수 있습니다.')
   }
 }
@@ -126,7 +127,8 @@ export const listUsersAction = createAction({
         name: row.name,
         // 이메일이 없는 사용자의 내부용 주소는 보여주지 않는다
         email: row.email.endsWith('@users.local') ? null : row.email,
-        userType: row.userType,
+        // 운영사 조건으로 걸러 플랫폼 관리자(운영사 없음)는 나오지 않는다
+        userType: row.userType as UserType,
         isActive: row.isActive,
         createdAt: row.createdAt,
         affiliation:
@@ -182,6 +184,9 @@ export const updateUserAction = createAction({
     })
     assertRowVersion(found, input.rowVersion, '사용자를 찾을 수 없습니다.')
     const target = found!
+    // 플랫폼 관리자는 운영사가 없어 여기서 찾아지지 않는다 (타입을 좁히기 위한 확인)
+    if (target.userType === 'PLATFORM')
+      throw new ActionError('NOT_FOUND', '사용자를 찾을 수 없습니다.')
 
     assertAffiliation(target.userType, input.centerIds, input.shipperId)
     await assertGroupsMatch(input.permissionGroupIds, target.userType)

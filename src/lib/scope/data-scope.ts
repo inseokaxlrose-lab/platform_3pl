@@ -13,7 +13,8 @@ export type DataScope =
   | { kind: 'NONE'; operatorId?: bigint }
 
 type ScopeInput = {
-  operatorId: bigint
+  // 플랫폼 관리자는 운영사가 없다 (null → NONE. 운영사로 작업할 때의 범위는 session.ts가 정한다)
+  operatorId: bigint | null
   userType: UserTypeValue
   isActive: boolean
   centers: { id: bigint; isActive: boolean }[]
@@ -23,6 +24,7 @@ type ScopeInput = {
 // 데이터 범위 계산: 애매하면 막는다 (소속 없는 센터 직원 = 전체가 아니라 NONE)
 export function computeScope(input: ScopeInput): DataScope {
   const { operatorId } = input
+  if (operatorId === null || input.userType === 'PLATFORM') return { kind: 'NONE' }
   if (!input.isActive) return { kind: 'NONE', operatorId }
   switch (input.userType) {
     case 'OPERATOR':

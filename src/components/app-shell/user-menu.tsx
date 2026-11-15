@@ -13,7 +13,12 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { signOutAction } from '@/lib/auth-actions'
 
-const USER_TYPE_LABELS = { OPERATOR: '운영사', CENTER: '센터', SHIPPER: '화주사' } as const
+const USER_TYPE_LABELS = {
+  OPERATOR: '운영사',
+  CENTER: '센터',
+  SHIPPER: '화주사',
+  PLATFORM: '플랫폼',
+} as const
 
 type UserMenuProps = {
   user: { name: string; username: string; userType: keyof typeof USER_TYPE_LABELS }

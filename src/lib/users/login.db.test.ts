@@ -1,5 +1,5 @@
 import { afterAll, beforeEach, describe, expect, it } from 'vitest'
-import { ACCOUNT_DISABLED, auth } from '@/lib/auth'
+import { ACCOUNT_DISABLED, auth, OPERATOR_DISABLED } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { createTestCenter, createTestShipper } from '@/test/factories'
 import { resetDatabase, TEST_OPERATOR_ID } from '@/test/reset-database'
@@ -101,6 +101,60 @@ describe('계정 만들기 + 로그인 (Better Auth)', () => {
 
     await expect(signIn('leaver')).rejects.toMatchObject({ message: ACCOUNT_DISABLED })
     expect(await prisma.session.count()).toBe(0)
+  })
+
+  it('운영사가 운영 중(ACTIVE)이 아니면 로그인할 수 없다 (0039)', async () => {
+    await createUserAccount({
+      operatorId: TEST_OPERATOR_ID,
+      username: 'op.user',
+      password: PASSWORD,
+      name: '김운영',
+      userType: 'OPERATOR',
+    })
+    for (const status of ['SUSPENDED', 'PENDING', 'TERMINATED']) {
+      await prisma.operator.update({ where: { id: TEST_OPERATOR_ID }, data: { status } })
+      await expect(signIn('op.user')).rejects.toMatchObject({ message: OPERATOR_DISABLED })
+    }
+    expect(await prisma.session.count()).toBe(0)
+
+    await prisma.operator.update({ where: { id: TEST_OPERATOR_ID }, data: { status: 'ACTIVE' } })
+    expect((await signIn('op.user'))?.user).toBeDefined()
+  })
+
+  it('플랫폼 관리자는 운영사 없이 만들고 로그인한다 (다른 유형은 운영사가 꼭 있어야 한다)', async () => {
+    await createUserAccount({
+      operatorId: null,
+      username: 'platform1',
+      password: PASSWORD,
+      name: '플랫폼',
+      userType: 'PLATFORM',
+    })
+    expect((await signIn('platform1'))?.user).toMatchObject({ userType: 'PLATFORM' })
+
+    await expect(
+      createUserAccount({
+        operatorId: null,
+        username: 'nobody',
+        password: PASSWORD,
+        name: '소속 없음',
+        userType: 'OPERATOR',
+      }),
+    ).rejects.toThrow('플랫폼 관리자만')
+    await expect(
+      createUserAccount({
+        operatorId: TEST_OPERATOR_ID,
+        username: 'platform2',
+        password: PASSWORD,
+        name: '운영사 있는 플랫폼',
+        userType: 'PLATFORM',
+      }),
+    ).rejects.toThrow('플랫폼 관리자만')
+    // DB 검사 조건도 같은 규칙을 지킨다
+    await expect(
+      prisma.user.create({
+        data: { name: 'x', email: 'x@users.local', username: 'x', userType: 'CENTER' },
+      }),
+    ).rejects.toThrow()
   })
 
   it('아이디는 대소문자를 구분하지 않는다', async () => {
