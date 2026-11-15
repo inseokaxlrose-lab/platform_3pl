@@ -3,7 +3,7 @@
 import { Checkbox } from '@/components/ui/checkbox'
 import { Label } from '@/components/ui/label'
 
-// 여러 개 고르기 (센터, 권한그룹)
+// 여러 개 고르기 — 펼친 체크 목록 (센터·권한그룹처럼 선택지가 적을 때. 많으면 MultiSelect)
 export function CheckboxList({
   name,
   options,

@@ -3,7 +3,7 @@
 import { useRouter } from 'next/navigation'
 import type { z } from 'zod'
 import { StatusBadge } from '@/components/common'
-import { EmailInput } from '@/components/inputs'
+import { CheckboxList, EmailInput } from '@/components/inputs'
 import {
   Field,
   FormGrid,
@@ -27,7 +27,6 @@ import {
   type UserFormValue,
 } from '@/lib/users/user-schema'
 import { createUserAction, updateUserAction } from './actions'
-import { CheckboxList } from './checkbox-list'
 import { USER_TYPE_LABELS, type UserTypeKey } from './labels'
 import type { UserForEdit, UserFormOptions } from './queries'
 

@@ -109,7 +109,7 @@ const adminNavigation: NavArea = {
           title: '화주사',
           href: '/admin/master/shippers',
           icon: StoreIcon,
-          ready: false,
+          ready: true,
           permission: 'master.shippers.read',
         },
         {
