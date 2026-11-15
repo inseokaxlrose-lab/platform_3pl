@@ -23,6 +23,16 @@ export async function getCenterForEdit(id: string, scope: DataScope) {
         },
         orderBy: [{ type: 'desc' }, { code: 'asc' }],
       },
+      deliveryZones: {
+        select: {
+          id: true,
+          code: true,
+          name: true,
+          isActive: true,
+          regions: { select: { regionCode: true } },
+        },
+        orderBy: { code: 'asc' },
+      },
     },
   })
   if (!center) return null
@@ -47,6 +57,10 @@ export async function getCenterForEdit(id: string, scope: DataScope) {
     warehouses: center.warehouses.map(({ _count, ...w }) => ({
       ...w,
       locationCount: _count.locations,
+    })),
+    deliveryZones: center.deliveryZones.map(({ regions, ...z }) => ({
+      ...z,
+      regionCodes: regions.map((r) => r.regionCode),
     })),
   }
 }

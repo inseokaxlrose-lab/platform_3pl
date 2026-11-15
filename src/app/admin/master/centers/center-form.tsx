@@ -1,6 +1,7 @@
 'use client'
 
-import { PowerIcon } from 'lucide-react'
+import { PlusIcon, PowerIcon } from 'lucide-react'
+import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { ConfirmDialog, ExternalCodesFields, StatusBadge } from '@/components/common'
 import { AddressInput, PhoneInput } from '@/components/inputs'
@@ -16,6 +17,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { unwrap } from '@/lib/actions'
 import { centerSchema, type CenterData, type CenterInput } from '@/lib/centers/center-schema'
+import { summarizeRegions } from '@/lib/delivery-zones/regions'
 import { EMPTY_EXTERNAL_CODES } from '@/lib/master-code/external-codes-schema'
 import { createCenterAction, setCenterActiveAction, updateCenterAction } from './actions'
 import type { CenterForEdit } from './queries'
@@ -60,6 +62,8 @@ type CenterFormProps = {
   canToggleActive?: boolean
   // 창고 섹션: 조회 권한이면 창고로 이동, 등록 권한이면 [창고 추가]
   warehouseAccess?: { canView: boolean; canAdd: boolean }
+  // 배송권역 섹션: 조회 권한이면 섹션을 보여주고 권역으로 이동, 등록 권한이면 [권역 추가]
+  zoneAccess?: { canView: boolean; canAdd: boolean }
 }
 
 // 센터 등록·수정 (docs/decisions/0026, 입력 화면 틀 0031)
@@ -69,6 +73,7 @@ export function CenterForm({
   readOnly,
   canToggleActive = false,
   warehouseAccess = { canView: false, canAdd: false },
+  zoneAccess = { canView: false, canAdd: false },
 }: CenterFormProps) {
   const router = useRouter()
   const form = useMasterForm({
@@ -255,6 +260,48 @@ export function CenterForm({
         ),
       },
     )
+    // 배송권역 요약 (0033)
+    if (zoneAccess.canView) {
+      sections.push({
+        id: 'delivery-zones',
+        title: `배송권역 (${center.deliveryZones.length})`,
+        standalone: true,
+        description: '이 센터가 배송을 담당하는 지역입니다.',
+        action: zoneAccess.canAdd && center.isActive && (
+          <Button asChild type="button" variant="outline" size="sm">
+            <Link href={`/admin/master/delivery-zones/new?centerId=${center.id}`}>
+              <PlusIcon />
+              권역 추가
+            </Link>
+          </Button>
+        ),
+        content:
+          center.deliveryZones.length === 0 ? (
+            <p className="text-sm text-muted-foreground">등록된 배송권역이 없습니다.</p>
+          ) : (
+            <ul className="divide-y rounded-md border text-sm">
+              {center.deliveryZones.map((z) => (
+                <li key={z.id}>
+                  <Link
+                    href={`/admin/master/delivery-zones/${z.id}`}
+                    className="flex items-center justify-between gap-3 px-3 py-2 hover:bg-muted/50"
+                  >
+                    <div className="min-w-0">
+                      <p className="truncate font-medium">
+                        {z.name} <span className="text-muted-foreground">({z.code})</span>
+                      </p>
+                      <p className="truncate text-xs text-muted-foreground">
+                        {summarizeRegions(z.regionCodes, 4)}
+                      </p>
+                    </div>
+                    {!z.isActive && <StatusBadge tone="danger">사용 중지</StatusBadge>}
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          ),
+      })
+    }
   }
 
   return <MasterFormPage form={form} readOnly={readOnly} sections={sections} />

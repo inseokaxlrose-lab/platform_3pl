@@ -95,7 +95,7 @@ const adminNavigation: NavArea = {
           title: '배송권역',
           href: '/admin/master/delivery-zones',
           icon: MapIcon,
-          ready: false,
+          ready: true,
           permission: 'master.delivery-zones.read',
         },
         {
