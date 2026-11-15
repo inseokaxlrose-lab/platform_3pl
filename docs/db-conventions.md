@@ -1,6 +1,6 @@
 # DB 명명 규칙 · 공통 칸
 
-- 상태: 1a(이름 바꾸기) **적용 완료** — 마이그레이션 `20261115075033_naming_convention` / 1b(BIGINT 키) **적용 완료** — `20261115083253_bigint_keys`. 1c(Y/N)·2단계(공통 칸)는 아래 규칙대로 진행 예정
+- 상태: 1a(이름 바꾸기) **적용 완료** — 마이그레이션 `20261115075033_naming_convention` / 1b(BIGINT 키) **적용 완료** — `20261115083253_bigint_keys` / 1c(Y/N) **적용 완료** — `_yn_char`. 2단계(공통 칸)는 아래 규칙대로 진행 예정
 - 결정: 사용자 결정 2026-11-15 — 정의서 규칙을 모든 표에 적용, `_yn`은 CHAR(1) 'Y'/'N', 내부 키 BIGINT, 코드 쪽 이름은 camelCase 유지
 - 관련: `docs/specs/operator.md`(운영사 컬럼 정의서, 받는 대로 추가), 0037(명명 규칙)·0038(공통 칸)·0039(멀티테넌트) 예정
 
@@ -21,7 +21,9 @@
 | 정렬 순서 | `sort_seq` | |
 
 - **코드 쪽 이름은 그대로**(camelCase): Prisma `@@map`/`@map`으로 DB 이름만 바꾼다. 예) 코드 `center.businessNumber` ↔ DB `tb_center.biz_reg_no`.
-- **`_yn` 값**: 코드에서는 `'Y' | 'N'` 타입(`Yn`), 화면 입력(스위치)·입력 규칙(Zod)에서 boolean ↔ `'Y'/'N'`으로 바꾼다.
+- **`_yn` 값** (`src/lib/yn.ts`): DB는 CHAR(1) `'Y'`/`'N'` + 검사 조건(`표_칸_check`). 화면·입력 규칙(Zod)은 true/false 그대로 두고, **DB에 쓸 때 `toYn`, 읽을 때 `isYes`**로 바꾼다. 목록 검색 조건은 `ynFilter`(`'Y'`/`'N'`).
+  - 주의: Prisma 타입은 `string`이라 `if (row.isSystem)`처럼 쓰면 `'N'`도 참이 된다 — 반드시 `isYes(...)`.
+  - 대상(1c): `lot_mgmt_yn`·`expiry_mgmt_yn`(화주사), `primary_yn`(화주사·운영사 담당자), `system_yn`(공통코드 그룹·단위). `is_active`는 2단계에서 `status_cd`로 바뀌므로 그대로 두었다.
   - 예외: Better Auth가 직접 쓰는 `email_verified`는 라이브러리가 true/false로 쓰므로 boolean 유지.
 - **BIGINT 키** (자동 증가, `src/lib/id.ts`): 서버·DB는 JS `bigint`, 화면·주소·서버 액션 입출력은 글자(`'12'`). 경계에서만 바꾼다.
   | 경계 | 방법 |
