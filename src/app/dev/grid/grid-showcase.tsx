@@ -53,6 +53,8 @@ export function GridShowcase() {
   })
   const [loading, setLoading] = useState(true)
   const [selectedIds, setSelectedIds] = useState<string[]>([])
+  // 행 클릭으로 고른 행 (목록 → 상세 화면 흉내)
+  const [activeRow, setActiveRow] = useState<FakeInventoryRow | null>(null)
 
   // 상태가 바뀌면 서버에 다시 묻는다 (늦게 온 이전 응답은 버린다)
   useEffect(() => {
@@ -87,6 +89,8 @@ export function GridShowcase() {
         getRowId={(row) => row.id}
         enableRowSelection
         onSelectionChange={setSelectedIds}
+        onRowClick={setActiveRow}
+        activeRowId={activeRow?.id}
         searchPlaceholder="품목명·코드·로케이션·화주사·로트 검색"
         exportCsv={{ fileName: '재고목록', fetchRows: () => queryAllFakeInventory(state) }}
         toolbarActions={
@@ -99,6 +103,7 @@ export function GridShowcase() {
       <p className="mt-3 text-xs text-muted-foreground">
         현재 상태: {JSON.stringify(state)} · 선택 id: {selectedIds.slice(0, 5).join(', ')}
         {selectedIds.length > 5 && ` 외 ${selectedIds.length - 5}건`}
+        {' · '}행 클릭(onRowClick): {activeRow ? `${activeRow.id} 고름 (강조 표시)` : '없음'}
       </p>
       <p className="mt-1 text-xs text-muted-foreground">
         컬럼 순서·숨김은 [컬럼] 메뉴, 너비는 제목 칸 오른쪽 끝을 끌어서(두 번 클릭하면 기본 너비)

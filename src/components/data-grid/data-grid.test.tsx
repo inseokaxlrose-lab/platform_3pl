@@ -357,3 +357,29 @@ describe('DataGrid 컬럼 표시 · 순서', () => {
     expect(headers()).toEqual(['상태', '품목명', '수량'])
   })
 })
+
+describe('DataGrid 행 클릭 (목록 → 상세)', () => {
+  it('행을 누르거나 Enter를 치면 그 행을 알려주고, 체크박스를 누른 것은 행 클릭이 아니다', () => {
+    const onRowClick = vi.fn()
+    render(<Harness onRowClick={onRowClick} />)
+    const row = screen.getByText('품목2').closest('tr')!
+
+    fireEvent.click(row)
+    expect(onRowClick).toHaveBeenLastCalledWith(expect.objectContaining({ id: 'r2' }))
+
+    fireEvent.keyDown(screen.getByText('품목3').closest('tr')!, { key: 'Enter' })
+    expect(onRowClick).toHaveBeenLastCalledWith(expect.objectContaining({ id: 'r3' }))
+
+    onRowClick.mockClear()
+    fireEvent.click(within(row).getByRole('checkbox'))
+    expect(onRowClick).not.toHaveBeenCalled()
+  })
+
+  it('고른 행(activeRowId)을 강조하고 선택 상태로 알린다', () => {
+    render(<Harness onRowClick={() => {}} activeRowId="r2" />)
+    const row = screen.getByText('품목2').closest('tr')!
+    expect(row.getAttribute('aria-selected')).toBe('true')
+    expect(row.hasAttribute('data-active')).toBe(true)
+    expect(screen.getByText('품목1').closest('tr')!.getAttribute('aria-selected')).toBe('false')
+  })
+})

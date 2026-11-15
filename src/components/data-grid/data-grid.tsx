@@ -79,7 +79,16 @@ export type DataGridProps<TData extends RowData> = {
   // CSV 내보내기: 주면 툴바에 [내보내기] 버튼이 생긴다
   // fetchRows는 "현재 검색·정렬 조건에 맞는 전체 행"을 돌려줘야 한다 (현재 페이지만이 아님)
   exportCsv?: { fileName: string; fetchRows: () => Promise<TData[]> }
+  // 행을 누르면(또는 행에서 Enter) 호출: 왼쪽 목록에서 고른 행의 상세를 오른쪽에 보여줄 때 (예: 공통코드 그룹 → 코드)
+  // 행 안의 버튼·링크·체크박스를 누른 것은 행 클릭으로 치지 않는다
+  onRowClick?: (row: TData) => void
+  // 강조해서 보여줄 행 id (onRowClick으로 고른 행)
+  activeRowId?: string
 }
+
+// 행 안의 다른 조작 요소를 누른 것인지 (그때는 행 클릭으로 치지 않는다)
+const isInteractiveTarget = (target: EventTarget) =>
+  target instanceof Element && target.closest('a, button, input, [role="checkbox"]') !== null
 
 // 업데이트 값(값 또는 함수) 풀기: TanStack은 "새 값" 대신 "이전 값을 받아 새 값을 만드는 함수"를 줄 때가 있다
 function resolve<T>(updater: Updater<T>, previous: T): T {
@@ -103,6 +112,8 @@ export function DataGrid<TData extends RowData>({
   toolbarActions,
   empty,
   exportCsv,
+  onRowClick,
+  activeRowId,
 }: DataGridProps<TData>) {
   const [rowSelection, setRowSelection] = useState<RowSelectionState>({})
 
@@ -450,7 +461,32 @@ export function DataGrid<TData extends RowData>({
 
             {!isFirstLoading &&
               rows.map((row) => (
-                <TableRow key={row.id} data-state={row.getIsSelected() ? 'selected' : undefined}>
+                <TableRow
+                  key={row.id}
+                  data-state={row.getIsSelected() ? 'selected' : undefined}
+                  data-active={row.id === activeRowId || undefined}
+                  aria-selected={onRowClick ? row.id === activeRowId : undefined}
+                  tabIndex={onRowClick ? 0 : undefined}
+                  className={cn(
+                    onRowClick &&
+                      'cursor-pointer focus-visible:outline-2 focus-visible:outline-ring',
+                    row.id === activeRowId && 'bg-accent hover:bg-accent',
+                  )}
+                  onClick={
+                    onRowClick &&
+                    ((event) => {
+                      if (!isInteractiveTarget(event.target)) onRowClick(row.original)
+                    })
+                  }
+                  onKeyDown={
+                    onRowClick &&
+                    ((event) => {
+                      if (event.key === 'Enter' && event.target === event.currentTarget) {
+                        onRowClick(row.original)
+                      }
+                    })
+                  }
+                >
                   {row.getVisibleCells().map((cell) => {
                     if (cell.column.id === SELECT_COLUMN_ID) {
                       return (
