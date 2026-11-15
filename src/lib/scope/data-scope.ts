@@ -35,6 +35,7 @@ export function computeScope(input: ScopeInput): DataScope {
 }
 
 // 표에서 센터·화주사를 가리키는 칸 이름 (관계를 거치면 점으로: 'warehouse.centerId')
+// 여러 개와 연결된 관계는 'some'으로: 'centers.some.centerId' = 연결된 센터 중 하나라도 (화주사의 이용 센터)
 export type ScopeFields = { center?: string; shipper?: string }
 
 // 개발 실수: 범위에 필요한 칸을 지정하지 않음 → 조건 없이 조회되는 사고를 막기 위해 오류
@@ -74,11 +75,17 @@ export function scopeFilter(scope: DataScope, fields: ScopeFields): Record<strin
   }
 }
 
-// 'warehouse.centerId' 경로로 값 꺼내기
-function readPath(record: unknown, path: string): unknown {
+// 'warehouse.centerId' 경로로 값들 꺼내기 ('some'을 만나면 목록의 모든 항목에서 이어서 꺼낸다)
+function readPath(record: unknown, path: string): unknown[] {
   return path
     .split('.')
-    .reduce<unknown>((value, key) => (value as Record<string, unknown> | null)?.[key], record)
+    .reduce<unknown[]>(
+      (values, key) =>
+        key === 'some'
+          ? values.flatMap((value) => (Array.isArray(value) ? value : []))
+          : values.map((value) => (value as Record<string, unknown> | null)?.[key]),
+      [record],
+    )
 }
 
 // 한 건이 범위 안인지
@@ -90,10 +97,10 @@ export function isInScope(scope: DataScope, record: unknown, fields: ScopeFields
       return false
     case 'CENTERS':
       if (!fields.center) throw new ScopeFieldMissingError(scope.kind)
-      return scope.centerIds.includes(readPath(record, fields.center) as string)
+      return readPath(record, fields.center).some((id) => scope.centerIds.includes(id as string))
     case 'SHIPPER':
       if (!fields.shipper) throw new ScopeFieldMissingError(scope.kind)
-      return readPath(record, fields.shipper) === scope.shipperId
+      return readPath(record, fields.shipper).includes(scope.shipperId)
   }
 }
 

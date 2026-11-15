@@ -108,3 +108,23 @@ describe('isInScope / assertInScope (한 건 검사)', () => {
     expect(() => assertInScope({ kind: 'ALL' }, null, fields)).toThrow('대상을 찾을 수 없습니다.')
   })
 })
+
+describe('여러 개와 연결된 관계 (some)', () => {
+  const fields = { center: 'centers.some.centerId', shipper: 'id' }
+  const shipper = { id: 'S1', centers: [{ centerId: 'ICN' }, { centerId: 'GMH' }] }
+
+  it('목록 조건: 연결된 센터 중 하나라도 소속 센터', () => {
+    expect(scopeFilter({ kind: 'CENTERS', centerIds: ['ICN'] }, fields)).toEqual({
+      centers: { some: { centerId: { in: ['ICN'] } } },
+    })
+  })
+
+  it('한 건 검사: 연결된 센터 중 하나라도 소속이면 범위 안', () => {
+    expect(isInScope({ kind: 'CENTERS', centerIds: ['GMH'] }, shipper, fields)).toBe(true)
+    expect(isInScope({ kind: 'CENTERS', centerIds: ['PUS'] }, shipper, fields)).toBe(false)
+    expect(
+      isInScope({ kind: 'CENTERS', centerIds: ['ICN'] }, { id: 'S2', centers: [] }, fields),
+    ).toBe(false)
+    expect(isInScope({ kind: 'SHIPPER', shipperId: 'S1' }, shipper, fields)).toBe(true)
+  })
+})
