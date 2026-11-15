@@ -25,6 +25,7 @@ import {
   useMasterForm,
 } from '@/components/master-form'
 import { Input } from '@/components/ui/input'
+import { ExcelUploadShowcase } from './excel-upload-showcase'
 import { ListShowcase } from './list-showcase'
 import type { CodeOptions } from '@/lib/common-code'
 import { isValidBusinessNumber } from '@/lib/format'
@@ -310,6 +311,13 @@ export function ComponentsShowcase() {
         <div className="rounded-lg border p-6">
           <FormSample />
         </div>
+      </section>
+      <section className="mt-10 space-y-4">
+        <h2 className="text-lg font-semibold">엑셀 업로드 (ExcelUploadDialog)</h2>
+        <p className="text-sm text-muted-foreground">
+          양식 내려받기 → 파일 고르기 → 검사 결과 미리보기(오류 행·사유) → 오류가 없을 때만 등록.
+        </p>
+        <ExcelUploadShowcase />
       </section>
       <section className="mt-10 space-y-4">
         <h2 className="text-lg font-semibold">목록·검색 화면 틀 (MasterListPage)</h2>
