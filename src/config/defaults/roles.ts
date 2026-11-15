@@ -47,7 +47,7 @@ export const DEFAULT_GROUPS: readonly DefaultGroup[] = [
     description: '센터 사무직: 전표 수신·작업 지시, 실사 확정 (시드가 관리)',
     codes: [
       ...readOnly(
-        'master.company',
+        'master.operator',
         'master.centers',
         'master.warehouses',
         'master.locations',

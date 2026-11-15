@@ -12,7 +12,7 @@ type DefaultCodeGroup = {
 
 export const DEFAULT_CODE_GROUPS: readonly DefaultCodeGroup[] = [
   {
-    code: 'CONTACT_DUTY',
+    code: 'CONTACT_ROLE',
     name: '담당 업무',
     description: '운영사·화주사·거래처 담당자의 주요 업무',
     items: [
@@ -23,6 +23,20 @@ export const DEFAULT_CODE_GROUPS: readonly DefaultCodeGroup[] = [
       { code: 'CONTRACT', name: '계약' },
       { code: 'IT', name: 'IT' },
       { code: 'ETC', name: '기타' },
+    ],
+  },
+  {
+    code: 'SERVICE_TYPE',
+    name: '제공 서비스',
+    description: '운영사가 제공하는 물류 서비스',
+    items: [
+      { code: 'STORAGE', name: '보관' },
+      { code: 'INOUT', name: '입출고' },
+      { code: 'PARCEL', name: '택배' },
+      { code: 'RETURN', name: '반품' },
+      { code: 'VAS', name: '유통가공' },
+      { code: 'KITTING', name: '키팅' },
+      { code: 'TRANSPORT', name: '운송' },
     ],
   },
 ]

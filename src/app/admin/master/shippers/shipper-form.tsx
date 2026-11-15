@@ -32,7 +32,7 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { unwrap } from '@/lib/actions'
-import { CONTACT_DUTY_GROUP, EMPTY_CONTACT, MAX_CONTACTS } from '@/lib/contacts/contact-schema'
+import { CONTACT_ROLE_GROUP, EMPTY_CONTACT, MAX_CONTACTS } from '@/lib/contacts/contact-schema'
 import { EMPTY_EXTERNAL_CODES } from '@/lib/master-code/external-codes-schema'
 import {
   LABEL_UNITS,
@@ -315,7 +315,7 @@ export function ShipperForm({
               label: '담당 업무',
               required: true,
               width: '8.5rem',
-              input: { codeGroup: CONTACT_DUTY_GROUP },
+              input: { codeGroup: CONTACT_ROLE_GROUP },
             },
             { key: 'name', label: '담당자명', required: true, width: '8rem' },
             { key: 'phone', label: '연락처', width: '10rem', input: 'phone' },

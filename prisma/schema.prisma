@@ -456,33 +456,113 @@ model UserFavoriteMenu {
   @@map("tb_user_favorite_menu")
 }
 
-// 운영사 (docs/decisions/0024, 0039): 플랫폼을 쓰는 3PL 회사. 운영사마다 센터·화주사·공통코드·사용자를 따로 가진다
+// 운영사 (docs/specs/operator.md, docs/decisions/0024·0039·0040): 플랫폼을 쓰는 3PL 회사
+// 운영사마다 센터·화주사·공통코드·사용자를 따로 가진다. [1차] = DB·화면, [2차] = DB만(기본값) — 화면은 이후
+// 플랫폼이 정하는 코드(유형·상태·사업자 구분·과세·요금제 등)는 상수 src/config/operator-codes.ts + DB 검사 조건
 model Operator {
-  id             BigInt            @id @default(autoincrement()) @map("operator_id")
-  name           String            @map("operator_nm")
-  // 사업자등록번호·전화번호는 하이픈 없이 숫자만 (검증번호 확인 후, 0029)
-  businessNumber String            @map("biz_reg_no")
-  ceoName        String?           @map("ceo_nm")
-  // 업태 / 종목 (거래명세서·세금계산서용)
-  businessType   String?           @map("biz_condition")
-  businessItem   String?           @map("biz_item")
-  phone          String?           @map("tel_no")
-  fax            String?           @map("fax_no")
-  email          String?
-  // 주소: 카카오 우편번호 서비스로 검색해 채우고, 상세주소만 직접 입력
-  zipCode        String?           @map("zip_cd")
-  address        String?           @map("addr1")
-  addressDetail  String?           @map("addr2")
-  createdAt      DateTime          @default(now()) @map("created_at")
-  updatedAt      DateTime          @updatedAt @map("updated_at")
-  // 등록·수정한 사람 아이디(username, 자동: 현재 작업자 / 시드 seed / 기존 데이터 system), 동시 수정 막기용 버전 (docs/db-conventions.md 공통 칸)
-  createdBy      String            @default("system") @map("created_by") @db.VarChar(50)
-  updatedBy      String            @default("system") @map("updated_by") @db.VarChar(50)
-  rowVersion     Int               @default(1) @map("row_version")
-  // 운영사 상태 (공통코드 OPERATOR_STATUS): PENDING 대기 / ACTIVE 운영 / SUSPENDED 정지 / TERMINATED 해지
+  id BigInt @id @default(autoincrement()) @map("operator_id")
+
+  // ── ① 기본 정보 [1차]
+  // 운영사코드: 영문 대문자·숫자·_- 2~20자, 등록 후 바꿀 수 없다. 관리자 아이디 admin.{코드 소문자}
+  code           String    @map("operator_cd") @db.VarChar(20)
+  name           String    @map("operator_nm") @db.VarChar(100)
+  nameEn         String?   @map("operator_nm_en") @db.VarChar(100)
+  shortName      String?   @map("operator_short_nm") @db.VarChar(50)
+  // 운영사 유형 OPERATOR_TYPE (3PL 기본)
+  type           String    @default("3PL") @map("operator_type_cd") @db.VarChar(20)
+  // 운영 상태 OPERATOR_STATUS: PENDING 대기 / ACTIVE 운영 / SUSPENDED 정지 / TERMINATED 해지
   // ACTIVE가 아니면 그 운영사의 사용자는 로그인·사용할 수 없다 (플랫폼 관리자가 바꾼다, 0039)
-  status         String            @default("ACTIVE") @map("status_cd") @db.VarChar(20)
-  contacts       OperatorContact[]
+  status         String    @default("ACTIVE") @map("status_cd") @db.VarChar(20)
+  // 상태변경 사유 (정지·해지로 바꿀 때 필수)
+  statusReason   String?   @map("status_reason") @db.VarChar(200)
+  // 사업자등록번호·법인등록번호·전화번호는 하이픈 없이 숫자만 (0029)
+  businessNumber String    @map("biz_reg_no") @db.Char(10)
+  // 사업자 구분 BIZ_ENTITY (CORP 법인 / INDIVIDUAL 개인), 법인등록번호는 법인일 때만
+  bizEntity      String    @default("CORP") @map("biz_entity_cd") @db.VarChar(10)
+  corpRegNo      String?   @map("corp_reg_no") @db.Char(13)
+  subBizNo       String?   @map("sub_biz_no") @db.Char(4)
+  // 과세유형 TAX_TYPE
+  taxType        String    @default("GENERAL") @map("tax_type_cd") @db.VarChar(10)
+  ceoName        String?   @map("ceo_nm") @db.VarChar(50)
+  // 업태 / 종목 (거래명세서·세금계산서용)
+  businessType   String?   @map("biz_condition") @db.VarChar(100)
+  businessItem   String?   @map("biz_item") @db.VarChar(100)
+  establishedOn  DateTime? @map("establish_dt") @db.Date
+
+  // ── ② 연락처·주소 [1차]
+  phone         String?  @map("tel_no") @db.VarChar(15)
+  fax           String?  @map("fax_no") @db.VarChar(15)
+  email         String?  @db.VarChar(100)
+  homepageUrl   String?  @map("homepage_url") @db.VarChar(200)
+  // 국가 ISO 3166 (화면 미노출)
+  country       String   @default("KR") @map("country_cd") @db.Char(2)
+  // 주소: 카카오 우편번호 서비스로 검색해 채우고, 상세주소만 직접 입력. 지번주소는 검색 결과를 자동 저장
+  zipCode       String?  @map("zip_cd") @db.VarChar(10)
+  address       String?  @map("addr1") @db.VarChar(200)
+  addressDetail String?  @map("addr2") @db.VarChar(200)
+  addressJibun  String?  @map("addr_jibun") @db.VarChar(200)
+  // 좌표 (주소 검색이 주지 않아 지금은 비어 있다)
+  latitude      Decimal? @db.Decimal(10, 7)
+  longitude     Decimal? @db.Decimal(10, 7)
+
+  // ── ③ 물류 자격 [2차]
+  warehouseRegNo   String?            @map("warehouse_reg_no") @db.VarChar(30)
+  freightLicenseNo String?            @map("freight_license_no") @db.VarChar(30)
+  bondedYn         String             @default("N") @map("bonded_yn") @db.Char(1)
+  customsYn        String             @default("N") @map("customs_yn") @db.Char(1)
+  glnCode          String?            @map("gln_cd") @db.VarChar(13)
+  // 제공 서비스(SERVICE_TYPE, 운영사 공통코드)·취급 온도대(TEMP_ZONE) — 하위 표
+  services         OperatorService[]
+  tempZones        OperatorTempZone[]
+
+  // ── ④ 운영 기본값 [2차] (센터·화주가 상속)
+  currency       String    @default("KRW") @map("currency_cd") @db.Char(3)
+  timezone       String    @default("Asia/Seoul") @db.VarChar(50)
+  lang           String    @default("ko-KR") @map("lang_cd") @db.VarChar(5)
+  weightUnit     String    @default("KG") @map("weight_unit_cd") @db.VarChar(5)
+  lengthUnit     String    @default("CM") @map("length_unit_cd") @db.VarChar(5)
+  // 재고할당 규칙 ALLOC_RULE
+  allocRule      String    @default("FIFO") @map("alloc_rule_cd") @db.VarChar(10)
+  useLot         String    @default("N") @map("lot_mgmt_yn") @db.Char(1)
+  useExpiry      String    @default("N") @map("expiry_mgmt_yn") @db.Char(1)
+  useSerial      String    @default("N") @map("serial_mgmt_yn") @db.Char(1)
+  shipCutoffTime DateTime? @map("ship_cutoff_time") @db.Time(0)
+  // 정산 마감일: 1~31일, 99 = 말일
+  closingDay     Int       @default(99) @map("closing_day") @db.SmallInt
+
+  // ── ⑤ 계약·요금제 [2차] (플랫폼만)
+  plan            String    @default("TRIAL") @map("plan_cd") @db.VarChar(20)
+  contractStartOn DateTime  @default(dbgenerated("CURRENT_DATE")) @map("contract_start_dt") @db.Date
+  // 비어 있으면 무기한
+  contractEndOn   DateTime? @map("contract_end_dt") @db.Date
+  billingBasis    String?   @map("billing_basis_cd") @db.VarChar(10)
+  // 비어 있으면 무제한
+  maxUserCount    Int?      @map("max_user_cnt")
+  maxCenterCount  Int?      @map("max_center_cnt")
+  maxClientCount  Int?      @map("max_client_cnt")
+  billingEmail    String?   @map("billing_email") @db.VarChar(100)
+  taxInvoiceEmail String?   @map("tax_invoice_email") @db.VarChar(100)
+  // 유입 경로 (플랫폼 관리자만 표시, 값 목록은 아직 정하지 않음)
+  salesChannel    String?   @map("sales_channel_cd") @db.VarChar(20)
+
+  // ── ⑥ 출력 설정 [2차] (파일 표가 생기면 로고·직인에 외래 키를 건다)
+  printCompanyName String? @map("print_company_nm") @db.VarChar(100)
+  logoFileId       BigInt? @map("logo_file_id")
+  stampFileId      BigInt? @map("stamp_file_id")
+
+  // ── ⑦ 확장·시스템
+  extAttr Json?   @map("ext_attr")
+  // 비고 [1차, 기본 정보 아래]
+  remark  String? @db.VarChar(1000)
+
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
+  // 등록·수정한 사람 아이디(username, 자동: 현재 작업자 / 시드 seed / 기존 데이터 system), 동시 수정 막기용 버전 (docs/db-conventions.md 공통 칸)
+  createdBy  String   @default("system") @map("created_by") @db.VarChar(50)
+  updatedBy  String   @default("system") @map("updated_by") @db.VarChar(50)
+  rowVersion Int      @default(1) @map("row_version")
+
+  contacts OperatorContact[]
 
   // 이 운영사의 데이터 (운영사를 지울 수 없게 Restrict)
   users            User[]
@@ -500,25 +580,51 @@ model Operator {
   // 논리 삭제: 'Y'면 지운 것 (목록·조회에서 빠지고 되살릴 수 있다, 0038)
   delYn String @default("N") @map("del_yn") @db.Char(1)
 
+  // 운영사코드는 삭제 안 된 것끼리만 겹치면 안 된다 (0038)
+  @@unique([code], where: raw("del_yn = 'N'"), map: "tb_operator_operator_cd_key")
   @@map("tb_operator")
 }
 
-// 운영사 담당자 (최대 5명, 화면에서 정한 순서대로)
+// 운영사 담당자 [1차] (최대 5명, 화면에서 정한 순서대로). 감사 칸 없이 운영사 이력으로 본다 (0038, 사용자 결정)
 model OperatorContact {
-  id         BigInt   @id @default(autoincrement()) @map("contact_id")
-  operatorId BigInt   @map("operator_id")
-  sortOrder  Int      @map("sort_seq")
-  // 담당 업무: 공통코드 CONTACT_DUTY의 코드 (예: INBOUND, 0030)
-  duty       String   @map("role_cd")
-  name       String   @map("contact_nm")
-  phone      String?  @map("tel_no")
-  email      String?
+  id           BigInt   @id @default(autoincrement()) @map("contact_id")
+  operatorId   BigInt   @map("operator_id")
+  sortOrder    Int      @map("sort_seq")
+  // 담당 업무: 운영사 공통코드 CONTACT_ROLE의 코드 (예: INBOUND, 0030)
+  duty         String   @map("role_cd") @db.VarChar(20)
+  name         String   @map("contact_nm") @db.VarChar(50)
+  phone        String?  @map("tel_no") @db.VarChar(15)
+  email        String?  @db.VarChar(100)
   // 대표 담당자 (담당자가 있으면 정확히 1명)
-  isPrimary  String   @default("N") @map("primary_yn") @db.Char(1)
-  operator   Operator @relation(fields: [operatorId], references: [id], onDelete: Cascade)
+  isPrimary    String   @default("N") @map("primary_yn") @db.Char(1)
+  // [2차] 부서·직책·알림 수신
+  deptName     String?  @map("dept_nm") @db.VarChar(50)
+  positionName String?  @map("position_nm") @db.VarChar(50)
+  notifyYn     String   @default("Y") @map("notify_yn") @db.Char(1)
+  operator     Operator @relation(fields: [operatorId], references: [id], onDelete: Cascade)
 
   @@index([operatorId, sortOrder])
   @@map("tb_operator_contact")
+}
+
+// 운영사 제공 서비스 [2차]: 운영사 공통코드 SERVICE_TYPE (운영사 이력으로 본다)
+model OperatorService {
+  operatorId BigInt   @map("operator_id")
+  serviceCd  String   @map("service_cd") @db.VarChar(20)
+  operator   Operator @relation(fields: [operatorId], references: [id], onDelete: Cascade)
+
+  @@id([operatorId, serviceCd])
+  @@map("tb_operator_service")
+}
+
+// 운영사 취급 온도대 [2차]: TEMP_ZONE (AMBIENT·CHILLED·FROZEN·CONSTANT, 상수 + 검사 조건)
+model OperatorTempZone {
+  operatorId BigInt   @map("operator_id")
+  tempZoneCd String   @map("temp_zone_cd") @db.VarChar(20)
+  operator   Operator @relation(fields: [operatorId], references: [id], onDelete: Cascade)
+
+  @@id([operatorId, tempZoneCd])
+  @@map("tb_operator_temp_zone")
 }
 
 // 외부 코드 매핑 (docs/decisions/0025): 우리 기준정보 ↔ SAP·ERP 등 외부 시스템 코드

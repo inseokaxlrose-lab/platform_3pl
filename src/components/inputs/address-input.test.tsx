@@ -48,6 +48,8 @@ describe('toAddress (검색 결과 → 저장할 주소)', () => {
     expect(toAddress(RESULT)).toEqual({
       zipCode: '13529',
       address: '경기 성남시 분당구 판교역로 166 (백현동)',
+      // 지번주소도 함께 (따로 저장하는 화면용, 0040)
+      jibunAddress: '경기 성남시 분당구 백현동 532',
     })
     expect(toAddress({ ...RESULT, apartment: 'Y' }).address).toBe(
       '경기 성남시 분당구 판교역로 166 (백현동, 테스트빌딩)',

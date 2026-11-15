@@ -9,9 +9,12 @@ import type { Db } from '@/lib/prisma'
 type CountUsage = (db: Db, operatorId: bigint, code: string) => Promise<number>
 const CODE_USAGES: Record<string, CountUsage> = {
   // 담당 업무: 운영사·화주사 담당자 (거래처 담당자를 만들면 여기에 더한다)
-  CONTACT_DUTY: async (db, operatorId, code) =>
+  CONTACT_ROLE: async (db, operatorId, code) =>
     (await db.operatorContact.count({ where: { operatorId, duty: code } })) +
     (await db.shipperContact.count({ where: { shipper: { operatorId }, duty: code } })),
+  // 제공 서비스: 운영사 (0040)
+  SERVICE_TYPE: async (db, operatorId, code) =>
+    db.operatorService.count({ where: { operatorId, serviceCd: code } }),
 }
 
 // 지금 운영사에서 이 코드를 쓰는 행 수 (지울 수 있는지 확인용)

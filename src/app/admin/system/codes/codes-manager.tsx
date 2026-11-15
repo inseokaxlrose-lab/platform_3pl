@@ -317,7 +317,7 @@ export function CodesManager() {
                 : `코드 수정 — ${activeGroup?.name ?? ''}`
           }
           codeLabel={dialog.kind === 'group' ? '그룹 코드' : '코드'}
-          codePlaceholder={dialog.kind === 'group' ? '예: CONTACT_DUTY' : '예: INBOUND'}
+          codePlaceholder={dialog.kind === 'group' ? '예: CONTACT_ROLE' : '예: INBOUND'}
           initial={dialog.initial}
           lockedNote={lockedNote}
           onSave={async ({ code, ...rest }) => {

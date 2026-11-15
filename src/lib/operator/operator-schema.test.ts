@@ -1,10 +1,28 @@
 import { describe, expect, it } from 'vitest'
 import { z } from 'zod'
-import { operatorSchema, MAX_OPERATOR_CONTACTS, type OperatorInput } from './operator-schema'
+import {
+  adminUsernameOf,
+  MAX_OPERATOR_CONTACTS,
+  operatorRegisterSchema,
+  operatorSchema,
+  operatorSelfSchema,
+  operatorStatusSchema,
+  type OperatorInput,
+} from './operator-schema'
 
 const input = (overrides: Partial<OperatorInput> = {}): OperatorInput => ({
   name: ' 예시물류(주) ',
+  nameEn: '',
+  shortName: '',
+  type: '3PL',
   businessNumber: '1234567891',
+  bizEntity: 'CORP',
+  corpRegNo: '',
+  subBizNo: '',
+  taxType: 'GENERAL',
+  establishedOn: '',
+  addressJibun: '',
+  remark: '',
   ceoName: '',
   businessType: '',
   businessItem: '',
@@ -91,5 +109,66 @@ describe('운영사 정보 입력 규칙', () => {
         `담당자는 ${MAX_OPERATOR_CONTACTS}명까지 등록할 수 있습니다.`,
       ]),
     })
+  })
+
+  it('플랫폼이 정하는 코드는 값 목록 안에서만 (유형·사업자 구분·과세유형)', () => {
+    expect(errorsOf(input({ type: 'SHOP', bizEntity: 'X', taxType: '' }))).toMatchObject({
+      type: ['운영사 유형을 골라 주세요.'],
+      bizEntity: ['사업자 구분을 골라 주세요.'],
+      taxType: ['과세유형을 골라 주세요.'],
+    })
+  })
+
+  it('법인등록번호는 검증번호까지, 개인 사업자면 저장할 때 비운다 · 종사업장번호·설립일 형식', () => {
+    expect(
+      errorsOf(input({ corpRegNo: '110111-1111112', subBizNo: '12', establishedOn: '2026-13-40' })),
+    ).toMatchObject({
+      corpRegNo: [expect.stringContaining('법인등록번호')],
+      subBizNo: ['종사업장번호는 숫자 4자리입니다.'],
+      establishedOn: ['날짜를 확인해 주세요.'],
+    })
+    expect(
+      operatorSchema.parse(input({ corpRegNo: '110111-1111113', establishedOn: '2020-03-02' })),
+    ).toMatchObject({ corpRegNo: '1101111111113', establishedOn: new Date('2020-03-02T00:00:00Z') })
+    expect(
+      operatorSchema.parse(input({ bizEntity: 'INDIVIDUAL', corpRegNo: '110111-1111113' }))
+        .corpRegNo,
+    ).toBeNull()
+  })
+
+  it('운영사 자기 화면 규칙에는 유형이 없다 (보내도 버린다)', () => {
+    expect(operatorSelfSchema.parse(input({ type: 'MIXED' }))).not.toHaveProperty('type')
+  })
+})
+
+describe('운영사 등록 · 상태 변경 입력 규칙 (0040)', () => {
+  const register = {
+    code: ' nara ',
+    name: '나라물류',
+    businessNumber: '312-81-12349',
+    ceoName: '',
+    type: '3PL',
+  }
+
+  it('운영사코드는 대문자로, 영문·숫자·_- 2~20자 · 관리자 아이디는 admin.{코드 소문자}', () => {
+    expect(operatorRegisterSchema.parse(register)).toMatchObject({ code: 'NARA', ceoName: null })
+    expect(operatorRegisterSchema.safeParse({ ...register, code: '나라' }).success).toBe(false)
+    expect(operatorRegisterSchema.safeParse({ ...register, code: 'A' }).success).toBe(false)
+    expect(adminUsernameOf('NARA_2')).toBe('admin.nara_2')
+  })
+
+  it('정지·해지로 바꿀 때는 사유가 필수', () => {
+    const status = { id: '1', rowVersion: 1, reason: '' }
+    expect(operatorStatusSchema.safeParse({ ...status, status: 'ACTIVE' }).success).toBe(true)
+    const suspended = operatorStatusSchema.safeParse({ ...status, status: 'SUSPENDED' })
+    expect(suspended.error?.issues[0]).toMatchObject({
+      path: ['reason'],
+      message: '정지·해지 사유를 입력해 주세요.',
+    })
+    expect(
+      operatorStatusSchema.safeParse({ ...status, status: 'TERMINATED', reason: '계약 종료' })
+        .success,
+    ).toBe(true)
+    expect(operatorStatusSchema.safeParse({ ...status, status: 'CLOSED' }).success).toBe(false)
   })
 })

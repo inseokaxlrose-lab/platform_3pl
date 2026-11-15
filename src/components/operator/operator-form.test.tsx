@@ -2,10 +2,10 @@ import { act, fireEvent, render, screen, within } from '@testing-library/react'
 import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { CommonCodeProvider } from '@/components/common-code'
 import type { OperatorInput } from '@/lib/operator/operator-schema'
-import { saveOperatorAction } from './actions'
-import { CompanyForm } from './company-form'
+import { OperatorForm } from './operator-form'
 
-vi.mock('./actions', () => ({ saveOperatorAction: vi.fn() }))
+// 저장 서버 액션 흉내 (운영사 자기 화면 / 플랫폼 편집이 각각 넘긴다)
+const saveOperatorAction = vi.fn()
 vi.mock('next/navigation', () => ({
   useRouter: () => ({ refresh: vi.fn(), push: vi.fn() }),
   usePathname: () => '/admin/test',
@@ -21,7 +21,17 @@ beforeAll(() => {
 
 const EMPTY: OperatorInput = {
   name: '',
+  nameEn: '',
+  shortName: '',
+  type: '3PL',
   businessNumber: '',
+  bizEntity: 'CORP',
+  corpRegNo: '',
+  subBizNo: '',
+  taxType: 'GENERAL',
+  establishedOn: '',
+  addressJibun: '',
+  remark: '',
   ceoName: '',
   businessType: '',
   businessItem: '',
@@ -35,16 +45,41 @@ const EMPTY: OperatorInput = {
 }
 
 const CODES = {
-  CONTACT_DUTY: [
+  CONTACT_ROLE: [
     { code: 'INBOUND', name: '입고', isActive: true },
     { code: 'SETTLEMENT', name: '정산', isActive: true },
   ],
 }
 
-const renderForm = (initial: OperatorInput = EMPTY, readOnly = false) =>
+const renderForm = (
+  initial: OperatorInput = EMPTY,
+  readOnly = false,
+  platform: { operatorId: string } | null = null,
+) =>
   render(
     <CommonCodeProvider options={CODES}>
-      <CompanyForm header={{ title: '운영사' }} initial={initial} version={1} readOnly={readOnly} />
+      {platform ? (
+        <OperatorForm
+          header={{ title: '운영사' }}
+          code="DEMO"
+          initial={initial}
+          version={1}
+          readOnly={readOnly}
+          canEditType
+          operatorId={platform.operatorId}
+          saveAction={saveOperatorAction}
+        />
+      ) : (
+        <OperatorForm
+          header={{ title: '운영사' }}
+          code="DEMO"
+          initial={initial}
+          version={1}
+          readOnly={readOnly}
+          canEditType={false}
+          saveAction={saveOperatorAction}
+        />
+      )}
     </CommonCodeProvider>,
   )
 
@@ -59,7 +94,7 @@ beforeEach(() => {
   vi.mocked(saveOperatorAction).mockResolvedValue({ ok: true, data: { rowVersion: 1 } })
 })
 
-describe('CompanyForm', () => {
+describe('OperatorForm', () => {
   it('저장 전에 화면에서 검사해 칸·담당자 행별 오류를 보여주고, 서버에 보내지 않는다', async () => {
     renderForm()
     type('회사명', '예시')
@@ -130,6 +165,26 @@ describe('CompanyForm', () => {
     await save()
     const row = screen.getByRole('row', { name: '1번째 행' })
     expect(within(row).getByText('서버가 거부한 이름')).toBeTruthy()
+  })
+
+  it('운영사코드는 늘 읽기 전용, 유형은 플랫폼만, 법인등록번호는 법인일 때만 보인다 (0040)', () => {
+    renderForm()
+    expect(field('운영사코드')).toHaveProperty('disabled', true)
+    expect(field('운영사코드')).toHaveProperty('value', 'DEMO')
+    expect(field('운영사 유형')).toHaveProperty('disabled', true)
+    expect(field('법인등록번호')).toBeTruthy()
+  })
+
+  it('플랫폼 편집은 유형을 고칠 수 있고, 저장할 때 대상 운영사 키를 함께 보낸다', async () => {
+    renderForm({ ...EMPTY, name: '예시', businessNumber: '1234567891' }, false, {
+      operatorId: '7',
+    })
+    expect(field('운영사 유형')).toHaveProperty('disabled', false)
+    type('회사명', '예시2')
+    await save()
+    expect(saveOperatorAction).toHaveBeenCalledWith(
+      expect.objectContaining({ id: '7', name: '예시2', rowVersion: 1 }),
+    )
   })
 
   it('[취소]는 처음 값으로 되돌린다', () => {

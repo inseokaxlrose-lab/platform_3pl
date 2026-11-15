@@ -3,7 +3,7 @@ import { looksLikeSystemCode } from '@/config/master-codes'
 import { ActionError } from '@/lib/actions/action-error'
 import { requireOperatorId } from '@/lib/actor'
 import { assertCodeValues } from '@/lib/common-code/common-codes'
-import { CONTACT_DUTY_GROUP } from '@/lib/contacts/contact-schema'
+import { CONTACT_ROLE_GROUP } from '@/lib/contacts/contact-schema'
 import { saveExternalCodes } from '@/lib/master-code/external-codes'
 import { nextSystemCode } from '@/lib/master-code/system-code'
 import { assertRowVersion, withVersionGuard } from '@/lib/row-version'
@@ -77,7 +77,7 @@ export async function createShipper(data: ShipperData) {
     await assertCenters(tx, data.centerIds)
     await assertCodeValues(
       tx,
-      CONTACT_DUTY_GROUP,
+      CONTACT_ROLE_GROUP,
       data.contacts.map((c) => c.duty),
       { label: '담당 업무' },
     )
@@ -122,7 +122,7 @@ export async function updateShipper(id: bigint, rowVersion: number, data: Shippe
     )
     await assertCodeValues(
       tx,
-      CONTACT_DUTY_GROUP,
+      CONTACT_ROLE_GROUP,
       data.contacts.map((c) => c.duty),
       { label: '담당 업무', keep: current.contacts.map((c) => c.duty) },
     )
