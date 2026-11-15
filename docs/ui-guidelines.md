@@ -138,7 +138,7 @@ return (
   rows={value.contacts}
   onChange={(contacts) => set({ contacts })}
   columns={[
-    { key: 'duty', label: '담당 업무', required: true, width: '8.5rem', input: { codeGroup: 'CONTACT_DUTY' } },
+    { key: 'duty', label: '담당 업무', required: true, width: '8.5rem', input: { codeGroup: 'CONTACT_ROLE' } },
     { key: 'name', label: '담당자명', required: true, width: '8rem' },
     { key: 'phone', label: '연락처', width: '10rem', input: 'phone' },
     { key: 'email', label: '이메일', input: 'email' },

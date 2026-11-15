@@ -73,7 +73,7 @@
 
 ## 표·칸 대응표 (1단계 — 지금 25개 표, 197개 칸)
 
-> 운영사 관련(`tb_operator` 등)은 4단계에서 정의서대로 칸이 더 늘어난다. 2단계(공통 칸)·3단계(`operator_id`) 칸은 여기 없다.
+> 운영사 관련(`tb_operator` 등)의 최종 칸은 `docs/operator-columns.md`(4단계, 0040). 2단계(공통 칸)·3단계(`operator_id`) 칸은 여기 없다.
 
 ### tb_user ← `user` (코드 모델 `User`)
 
