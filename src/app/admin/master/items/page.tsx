@@ -1,11 +1,17 @@
 import { PlusIcon } from 'lucide-react'
 import type { Metadata } from 'next'
 import Link from 'next/link'
+import { ItemsList } from '@/components/item'
 import { AccessDenied } from '@/components/permission'
 import { Button } from '@/components/ui/button'
 import { getCurrentScope, hasPermission } from '@/lib/session'
-import { ItemsList } from './items-list'
-import { getItemFormOptions } from './queries'
+import { getItemFormOptions } from '@/lib/items/item-queries'
+import {
+  deleteItemsAction,
+  listItemsAction,
+  restoreItemsAction,
+  setItemsActiveAction,
+} from './actions'
 
 export const metadata: Metadata = { title: '품목' }
 
@@ -21,7 +27,13 @@ export default async function ItemsPage() {
   ])
   return (
     <ItemsList
+      gridId="master-items"
+      basePath="/admin/master/items"
       shippers={options.shippers}
+      listAction={listItemsAction}
+      setActiveAction={setItemsActiveAction}
+      deleteAction={deleteItemsAction}
+      restoreAction={restoreItemsAction}
       can={{ update: canUpdate, delete: canDelete, export: canExport }}
       actions={
         canCreate && (

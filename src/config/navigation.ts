@@ -251,7 +251,7 @@ const portalNavigation: NavArea = {
           title: '품목',
           href: '/portal/items',
           icon: PackageIcon,
-          ready: false,
+          ready: true,
           permission: 'portal.items.read',
         },
       ],

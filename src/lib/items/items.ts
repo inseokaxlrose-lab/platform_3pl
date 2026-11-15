@@ -12,6 +12,13 @@ import { DELETED_ONLY, NOT_DELETED, isActiveStatus, toStatus } from '@/lib/statu
 import { isYes } from '@/lib/yn'
 import { effectiveItemOptions, type ItemCreateData, type ItemData } from './item-schema'
 
+// 외부 코드는 선택: 화주 포털은 외부 코드를 보내지 않는다 → 운영사가 넣은 값을 그대로 둔다 (0041)
+type WithoutExternal<T extends { externalCodes: unknown }> = Omit<T, 'externalCodes'> & {
+  externalCodes?: T['externalCodes']
+}
+type SaveItemData = WithoutExternal<ItemData>
+type CreateItemData = WithoutExternal<ItemCreateData>
+
 // 품목 저장 (docs/decisions/0041). 권한·데이터 범위 검사는 서버 액션에서 한다
 // - 화주사는 등록 후 바꿀 수 없다 (재고·이력이 화주사에 묶인다)
 // - 환산단위는 저장할 때마다 통째로 바꾼다 (품목의 이력으로 본다)
@@ -48,7 +55,7 @@ async function assertBarcode(db: Db, shipperId: bigint, barcode: string | null, 
 // 단위 검사: 기본단위는 기본단위(BASE), 환산단위는 환산단위(PACK)만, 새로 고르는 단위는 사용 중이어야 한다
 // keep: 이미 저장돼 있던 단위 (그 사이 사용 중지됐어도 그대로 둘 수 있다)
 // 입수량 소수 자리는 기본단위의 소수 자리수까지 (EA면 정수만)
-async function assertUnits(db: Db, data: ItemData, keep: bigint[] = []) {
+async function assertUnits(db: Db, data: SaveItemData, keep: bigint[] = []) {
   const ids = [data.baseUnitId, ...data.units.map((u) => u.unitId)]
   const units = await db.unit.findMany({
     where: { id: { in: ids } },
@@ -83,7 +90,7 @@ async function assertUnits(db: Db, data: ItemData, keep: bigint[] = []) {
 // DB 칸으로 옮길 값 (관리 옵션은 '' → null = 화주사 기본값 따름)
 // 유통기한을 실제로 쓰지 않으면 임박 기준 일수는 비운다
 function fieldsOf(
-  data: ItemData,
+  data: SaveItemData,
   shipper: { useLot: string; useExpiry: string; labelUnit: 'PLT' | 'BOX' },
 ) {
   const options = effectiveItemOptions(data, {
@@ -115,7 +122,7 @@ const unitRows = (itemId: bigint, units: ItemData['units']) =>
 const SHIPPER_DEFAULTS = { useLot: true, useExpiry: true, labelUnit: true, status: true } as const
 
 // 등록 (한 트랜잭션: 시스템 코드 → 품목 → 환산단위 → 외부 코드)
-export async function createItem(data: ItemCreateData) {
+export async function createItem(data: CreateItemData) {
   return prisma.$transaction(async (tx) => {
     const shipper = await tx.shipper.findUnique({
       where: { id: data.shipperId },
@@ -141,7 +148,7 @@ export async function createItem(data: ItemCreateData) {
       select: { id: true, systemCode: true, code: true, rowVersion: true },
     })
     await tx.itemUnit.createMany({ data: unitRows(item.id, data.units) })
-    await saveExternalCodes(tx, 'ITEM', item.id, data.externalCodes)
+    if (data.externalCodes) await saveExternalCodes(tx, 'ITEM', item.id, data.externalCodes)
     return item
   })
 }
@@ -149,7 +156,7 @@ export async function createItem(data: ItemCreateData) {
 // 수정: 시스템 코드·화주사는 바뀌지 않는다. 품목코드를 비우면 시스템 코드로
 // TODO(재고 작업, ROADMAP M4): 재고가 있는 품목의 기본단위는 바꿀 수 없게 막는다
 // rowVersion: 화면이 불러온 버전 (그 사이 다른 사람이 저장했으면 충돌)
-export async function updateItem(id: bigint, rowVersion: number, data: ItemData) {
+export async function updateItem(id: bigint, rowVersion: number, data: SaveItemData) {
   return prisma.$transaction(async (tx) => {
     const found = await tx.item.findUnique({
       where: { id },
@@ -177,7 +184,7 @@ export async function updateItem(id: bigint, rowVersion: number, data: ItemData)
     )
     await tx.itemUnit.deleteMany({ where: { itemId: id } })
     await tx.itemUnit.createMany({ data: unitRows(id, data.units) })
-    await saveExternalCodes(tx, 'ITEM', id, data.externalCodes)
+    if (data.externalCodes) await saveExternalCodes(tx, 'ITEM', id, data.externalCodes)
     return saved
   })
 }

@@ -4,7 +4,7 @@ import { BackToListButton } from '@/components/master-list'
 import { AccessDenied } from '@/components/permission'
 import { getCurrentScope, hasPermission } from '@/lib/session'
 import { createItemAction, setItemsActiveAction, updateItemAction } from '../actions'
-import { getItemFormOptions } from '../queries'
+import { getItemFormOptions } from '@/lib/items/item-queries'
 
 export const metadata: Metadata = { title: '품목 등록' }
 
