@@ -10,7 +10,8 @@ import type { DataScope } from '@/lib/scope/data-scope'
 import { loadDataScope } from '@/lib/scope/load-data-scope'
 
 export type CurrentUser = {
-  id: string
+  // 내부 키 (Better Auth는 글자로 주므로 bigint로 바꾼다)
+  id: bigint
   name: string
   username: string
   userType: UserTypeValue
@@ -23,7 +24,7 @@ export const getCurrentUser = cache(async (): Promise<CurrentUser | null> => {
   if (!session || !session.user.isActive) return null
   const user = session.user
   return {
-    id: user.id,
+    id: BigInt(user.id),
     name: user.name,
     username: user.displayUsername ?? user.username ?? '',
     userType: user.userType as UserTypeValue,

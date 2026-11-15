@@ -5,15 +5,15 @@ import type { UserTypeValue } from '@/lib/redirect'
 // docs/decisions/0016-data-scope.md
 export type DataScope =
   | { kind: 'ALL' } // 운영사: 전체
-  | { kind: 'CENTERS'; centerIds: string[] } // 센터 직원: 소속 센터
-  | { kind: 'SHIPPER'; shipperId: string } // 화주사 사용자: 자기 화주사
+  | { kind: 'CENTERS'; centerIds: bigint[] } // 센터 직원: 소속 센터
+  | { kind: 'SHIPPER'; shipperId: bigint } // 화주사 사용자: 자기 화주사
   | { kind: 'NONE' } // 아무것도 볼 수 없음 (소속이 없거나 사용 중지)
 
 type ScopeInput = {
   userType: UserTypeValue
   isActive: boolean
-  centers: { id: string; isActive: boolean }[]
-  shipper: { id: string; isActive: boolean } | null
+  centers: { id: bigint; isActive: boolean }[]
+  shipper: { id: bigint; isActive: boolean } | null
 }
 
 // 데이터 범위 계산: 애매하면 막는다 (소속 없는 센터 직원 = 전체가 아니라 NONE)
@@ -97,7 +97,7 @@ export function isInScope(scope: DataScope, record: unknown, fields: ScopeFields
       return false
     case 'CENTERS':
       if (!fields.center) throw new ScopeFieldMissingError(scope.kind)
-      return readPath(record, fields.center).some((id) => scope.centerIds.includes(id as string))
+      return readPath(record, fields.center).some((id) => scope.centerIds.includes(id as bigint))
     case 'SHIPPER':
       if (!fields.shipper) throw new ScopeFieldMissingError(scope.kind)
       return readPath(record, fields.shipper).includes(scope.shipperId)

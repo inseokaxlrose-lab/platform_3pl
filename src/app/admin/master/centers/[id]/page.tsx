@@ -2,6 +2,7 @@ import type { Metadata } from 'next'
 import { notFound } from 'next/navigation'
 import { BackToListButton } from '@/components/master-list'
 import { AccessDenied } from '@/components/permission'
+import { parseId } from '@/lib/id'
 import { getCurrentScope, hasPermission } from '@/lib/session'
 import { CenterForm } from '../center-form'
 import { getCenterForEdit } from '../queries'
@@ -11,7 +12,9 @@ export const metadata: Metadata = { title: '센터 수정' }
 // 센터 수정 (데이터 범위 밖이면 "찾을 수 없음" — 존재 여부도 알려주지 않는다)
 export default async function EditCenterPage({ params }: PageProps<'/admin/master/centers/[id]'>) {
   if (!(await hasPermission('master.centers.read'))) return <AccessDenied />
-  const { id } = await params
+  // 주소의 키가 숫자 모양이 아니면 바로 "찾을 수 없음"
+  const id = parseId((await params).id)
+  if (id === null) notFound()
   const [scope, canUpdate, canViewWarehouses, canAddWarehouse, canViewZones, canAddZone] =
     await Promise.all([
       getCurrentScope(),

@@ -1,4 +1,5 @@
 import 'server-only'
+import { textIds } from '@/lib/id'
 import { prisma } from '@/lib/prisma'
 import { scopeFilter, type DataScope } from '@/lib/scope/data-scope'
 
@@ -13,7 +14,7 @@ export async function getWarehouseOptions(scope: DataScope) {
     select: { warehouseId: true, zone: true },
     orderBy: [{ warehouseId: 'asc' }, { zone: 'asc' }],
   })
-  const zonesOf = (warehouseId: string) =>
+  const zonesOf = (warehouseId: bigint) =>
     zoneRows.filter((z) => z.warehouseId === warehouseId).map((z) => z.zone!)
   const warehouses = await prisma.warehouse.findMany({
     where: { AND: [scopeFilter(scope, { center: 'centerId' }), { center: { isActive: true } }] },
@@ -27,14 +28,17 @@ export async function getWarehouseOptions(scope: DataScope) {
     },
     orderBy: [{ center: { code: 'asc' } }, { code: 'asc' }],
   })
-  return warehouses.map((w) => ({
-    id: w.id,
-    label: `${w.name} (${w.code})`,
-    centerId: w.center.id,
-    centerLabel: `${w.center.name} (${w.center.code})`,
-    addable: w.type === 'GENERAL' && w.isActive,
-    zones: zonesOf(w.id),
-  }))
+  // 화면으로 보낼 값이라 키는 글자로
+  return textIds(
+    warehouses.map((w) => ({
+      id: w.id,
+      label: `${w.name} (${w.code})`,
+      centerId: w.center.id,
+      centerLabel: `${w.center.name} (${w.center.code})`,
+      addable: w.type === 'GENERAL' && w.isActive,
+      zones: zonesOf(w.id),
+    })),
+  )
 }
 
 export type WarehouseOption = Awaited<ReturnType<typeof getWarehouseOptions>>[number]

@@ -13,14 +13,14 @@ vi.mock('@/lib/session', () => ({
   getCurrentScope: vi.fn(async () => ({ kind: 'ALL' })),
 }))
 
-let aliceId = ''
-let bobId = ''
+let aliceId = 0n
+let bobId = 0n
 
-function signInAs(id: string) {
+function signInAs(id: bigint) {
   vi.mocked(getCurrentUser).mockResolvedValue({
     id,
     name: '사용자',
-    username: id,
+    username: String(id),
     userType: 'CENTER',
   })
 }

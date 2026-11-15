@@ -34,11 +34,11 @@ const USER_PERMISSIONS: PermissionCode[] = [
   'system.users.update',
 ]
 
-let operatorId = ''
-let centerId = ''
-let shipperId = ''
-let adminGroupId = ''
-let portalGroupId = ''
+let operatorId = 0n
+let centerId = 0n
+let shipperId = 0n
+let adminGroupId = 0n
+let portalGroupId = 0n
 
 function signInAs(userType: 'OPERATOR' | 'CENTER', id = operatorId) {
   vi.mocked(getCurrentUser).mockResolvedValue({ id, name: '관리자', username: 'boss', userType })
@@ -52,9 +52,9 @@ const newUser = (overrides: Record<string, unknown> = {}) => ({
   email: '',
   password: PASSWORD,
   passwordConfirm: PASSWORD,
-  centerIds: [centerId],
+  centerIds: [String(centerId)],
   shipperId: '',
-  permissionGroupIds: [adminGroupId],
+  permissionGroupIds: [String(adminGroupId)],
   ...overrides,
 })
 
@@ -88,13 +88,13 @@ describe('사용자 등록', () => {
     const result = await createUserAction(newUser())
     expect(result.ok).toBe(true)
 
-    const saved = await getUserForEdit(result.ok ? result.data.id : '')
+    const saved = await getUserForEdit(BigInt(result.ok ? result.data.id : 0))
     expect(saved).toMatchObject({
       username: 'Kim.Worker',
       userType: 'CENTER',
       email: '', // 내부용 주소는 화면에 보이지 않는다
-      centerIds: [centerId],
-      permissionGroupIds: [adminGroupId],
+      centerIds: [String(centerId)],
+      permissionGroupIds: [String(adminGroupId)],
     })
     expect(
       await auth.api.signInUsername({ body: { username: 'kim.worker', password: PASSWORD } }),
@@ -132,8 +132,8 @@ describe('사용자 등록', () => {
         newUser({
           userType: 'SHIPPER',
           centerIds: [],
-          shipperId,
-          permissionGroupIds: [adminGroupId],
+          shipperId: String(shipperId),
+          permissionGroupIds: [String(adminGroupId)],
         }),
       ),
     ).toMatchObject({
@@ -147,8 +147,8 @@ describe('사용자 등록', () => {
             username: 'gana.user',
             userType: 'SHIPPER',
             centerIds: [],
-            shipperId,
-            permissionGroupIds: [portalGroupId],
+            shipperId: String(shipperId),
+            permissionGroupIds: [String(portalGroupId)],
           }),
         )
       ).ok,
@@ -166,19 +166,21 @@ describe('사용자 수정', () => {
       id,
       name: '김작업자',
       email: 'kim@example.com',
-      centerIds: [second.id, centerId],
+      centerIds: [String(second.id), String(centerId)],
       shipperId: '',
       permissionGroupIds: [],
     })
 
     expect(result.ok).toBe(true)
-    expect(await getUserForEdit(id)).toMatchObject({
+    expect(await getUserForEdit(BigInt(id))).toMatchObject({
       name: '김작업자',
       email: 'kim@example.com',
       userType: 'CENTER',
       permissionGroupIds: [],
     })
-    expect((await getUserForEdit(id))?.centerIds.sort()).toEqual([centerId, second.id].sort())
+    expect((await getUserForEdit(BigInt(id)))?.centerIds.sort()).toEqual(
+      [String(centerId), String(second.id)].sort(),
+    )
   })
 })
 
@@ -187,18 +189,18 @@ describe('사용 중지 · 비밀번호 초기화', () => {
     const created = await createUserAction(newUser())
     const id = created.ok ? created.data.id : ''
     await auth.api.signInUsername({ body: { username: 'kim.worker', password: PASSWORD } })
-    expect(await prisma.session.count({ where: { userId: id } })).toBe(1)
+    expect(await prisma.session.count({ where: { userId: BigInt(id) } })).toBe(1)
 
     expect(await setUserActiveAction({ id, isActive: false })).toMatchObject({ ok: true })
 
-    expect(await prisma.session.count({ where: { userId: id } })).toBe(0)
+    expect(await prisma.session.count({ where: { userId: BigInt(id) } })).toBe(0)
     await expect(
       auth.api.signInUsername({ body: { username: 'kim.worker', password: PASSWORD } }),
     ).rejects.toBeTruthy()
   })
 
   it('자기 자신은 사용 중지할 수 없다', async () => {
-    expect(await setUserActiveAction({ id: operatorId, isActive: false })).toMatchObject({
+    expect(await setUserActiveAction({ id: String(operatorId), isActive: false })).toMatchObject({
       ok: false,
       error: { code: 'CONFLICT', message: '자기 자신은 사용 중지할 수 없습니다.' },
     })
@@ -213,7 +215,7 @@ describe('사용 중지 · 비밀번호 초기화', () => {
       await resetUserPasswordAction({ id, password: NEW_PASSWORD, passwordConfirm: NEW_PASSWORD }),
     ).toMatchObject({ ok: true })
 
-    expect(await prisma.session.count({ where: { userId: id } })).toBe(0)
+    expect(await prisma.session.count({ where: { userId: BigInt(id) } })).toBe(0)
     await expect(
       auth.api.signInUsername({ body: { username: 'kim.worker', password: PASSWORD } }),
     ).rejects.toBeTruthy()
@@ -237,7 +239,7 @@ describe('목록 · 운영사 전용', () => {
   })
 
   it('운영사가 아니면 권한 코드가 있어도 서버에서 한 번 더 막는다', async () => {
-    signInAs('CENTER', 'someone')
+    signInAs('CENTER', 999n)
     expect(await listUsersAction(createDataGridState())).toMatchObject({
       ok: false,
       error: { code: 'FORBIDDEN', message: '사용자 관리는 운영사 사용자만 할 수 있습니다.' },
@@ -269,12 +271,12 @@ describe('사용자별 추가·제외 권한', () => {
       }),
     ).toMatchObject({ ok: true, data: { grants: 1, denies: 1 } })
 
-    expect(await getUserOverrides(id)).toEqual({
+    expect(await getUserOverrides(BigInt(id))).toEqual({
       groupCodes: expect.arrayContaining(['master.items.read', 'master.items.update']),
       grants: ['master.items.create'],
       denies: ['master.items.update'],
     })
-    const { codes } = await loadUserPermissions(id)
+    const { codes } = await loadUserPermissions(BigInt(id))
     expect([...codes].sort()).toEqual(['master.items.create', 'master.items.read'])
   })
 
@@ -283,7 +285,7 @@ describe('사용자별 추가·제외 권한', () => {
     await updateUserOverridesAction({ id, grants: ['master.items.create'], denies: [] })
     await updateUserOverridesAction({ id, grants: [], denies: [] })
 
-    expect(await prisma.userPermissionOverride.count({ where: { userId: id } })).toBe(0)
+    expect(await prisma.userPermissionOverride.count({ where: { userId: BigInt(id) } })).toBe(0)
   })
 
   it('센터 직원에게 시스템 권한·포털 권한은 줄 수 없고, 추가와 제외를 겹칠 수 없다', async () => {
@@ -299,13 +301,13 @@ describe('사용자별 추가·제외 권한', () => {
         error: { code: 'VALIDATION' },
       })
     }
-    expect(await prisma.userPermissionOverride.count({ where: { userId: id } })).toBe(0)
+    expect(await prisma.userPermissionOverride.count({ where: { userId: BigInt(id) } })).toBe(0)
   })
 
   it('자기 자신의 개별 권한은 바꿀 수 없다', async () => {
     expect(
       await updateUserOverridesAction({
-        id: operatorId,
+        id: String(operatorId),
         grants: [],
         denies: ['system.users.read'],
       }),
@@ -338,16 +340,16 @@ describe('목록 검색 조건 · 일괄 처리 · 엑셀', () => {
         username: 'gana.user',
         userType: 'SHIPPER',
         centerIds: [],
-        shipperId,
-        permissionGroupIds: [portalGroupId],
+        shipperId: String(shipperId),
+        permissionGroupIds: [String(portalGroupId)],
       }),
     )
 
     expect(await usernames({ userType: 'CENTER' })).toEqual(['Kim.Worker'])
     expect(await usernames({ userType: 'OPERATOR' })).toEqual(['boss'])
-    expect(await usernames({ group: portalGroupId })).toEqual(['gana.user'])
-    expect(await usernames({ center: centerId })).toEqual(['Kim.Worker'])
-    expect(await usernames({ shipper: shipperId })).toEqual(['gana.user'])
+    expect(await usernames({ group: String(portalGroupId) })).toEqual(['gana.user'])
+    expect(await usernames({ center: String(centerId) })).toEqual(['Kim.Worker'])
+    expect(await usernames({ shipper: String(shipperId) })).toEqual(['gana.user'])
     expect(await usernames({ status: 'INACTIVE' })).toEqual([])
     expect(await usernames({ userType: 'NOPE' })).toHaveLength(3) // 모르는 값은 조건 없음
 
@@ -359,11 +361,13 @@ describe('목록 검색 조건 · 일괄 처리 · 엑셀', () => {
     const created = await createUserAction(newUser())
     const id = created.ok ? created.data.id : ''
 
-    expect(await setUsersActiveAction({ ids: [id, operatorId], isActive: false })).toMatchObject({
+    expect(
+      await setUsersActiveAction({ ids: [id, String(operatorId)], isActive: false }),
+    ).toMatchObject({
       ok: false,
       error: { code: 'CONFLICT' },
     })
-    expect(await setUsersActiveAction({ ids: [id, 'nope'], isActive: false })).toMatchObject({
+    expect(await setUsersActiveAction({ ids: [id, '999999'], isActive: false })).toMatchObject({
       ok: false,
       error: { code: 'NOT_FOUND' },
     })

@@ -1,11 +1,12 @@
 import 'server-only'
 import type { CenterInput } from '@/lib/centers/center-schema'
 import { getExternalCodes } from '@/lib/master-code/external-codes'
+import { textIds } from '@/lib/id'
 import { prisma } from '@/lib/prisma'
 import { isInScope, type DataScope } from '@/lib/scope/data-scope'
 
 // 수정 화면용 센터 한 건 (데이터 범위 밖이면 null → 화면은 "찾을 수 없음")
-export async function getCenterForEdit(id: string, scope: DataScope) {
+export async function getCenterForEdit(id: bigint, scope: DataScope) {
   if (!isInScope(scope, { id }, { center: 'id' })) return null
   const center = await prisma.center.findUnique({
     where: { id },
@@ -49,7 +50,8 @@ export async function getCenterForEdit(id: string, scope: DataScope) {
     addressDetail: text(center.addressDetail),
     externalCodes: await getExternalCodes('CENTER', id),
   }
-  return {
+  // 화면으로 보낼 값이라 키는 글자로
+  return textIds({
     id: center.id,
     systemCode: center.systemCode,
     isActive: center.isActive,
@@ -62,7 +64,7 @@ export async function getCenterForEdit(id: string, scope: DataScope) {
       ...z,
       regionCodes: regions.map((r) => r.regionCode),
     })),
-  }
+  })
 }
 
 export type CenterForEdit = NonNullable<Awaited<ReturnType<typeof getCenterForEdit>>>

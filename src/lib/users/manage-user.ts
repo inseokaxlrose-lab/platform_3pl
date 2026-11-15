@@ -4,7 +4,7 @@ import { prisma } from '@/lib/prisma'
 import { passwordSchema } from './create-user-account'
 
 // 비밀번호 초기화: 새 비밀번호를 Better Auth 방식으로 암호화해 저장하고, 로그인을 모두 끊는다
-export async function resetUserPassword(userId: string, newPassword: string) {
+export async function resetUserPassword(userId: bigint, newPassword: string) {
   const password = passwordSchema.parse(newPassword)
   const context = await auth.$context
   const passwordHash = await context.password.hash(password)
@@ -21,7 +21,7 @@ export async function resetUserPassword(userId: string, newPassword: string) {
 }
 
 // 사용 중지 / 다시 사용: 사용 중지하면 로그인을 즉시 끊는다
-export async function setUserActive(userId: string, isActive: boolean) {
+export async function setUserActive(userId: bigint, isActive: boolean) {
   await prisma.$transaction(async (tx) => {
     await tx.user.update({ where: { id: userId }, data: { isActive } })
     if (!isActive) await tx.session.deleteMany({ where: { userId } })

@@ -29,7 +29,7 @@ const ALL_ROLE_PERMISSIONS: PermissionCode[] = [
 
 function signInWith(codes: PermissionCode[]) {
   vi.mocked(getCurrentUser).mockResolvedValue({
-    id: 'op',
+    id: 1n,
     name: '운영',
     username: 'op',
     userType: 'OPERATOR',
@@ -56,7 +56,7 @@ describe('권한그룹 서버 액션', () => {
     })
     expect(result.ok).toBe(true)
 
-    const group = await getPermissionGroup(result.ok ? result.data.id : '')
+    const group = await getPermissionGroup(BigInt(result.ok ? result.data.id : 0))
     expect(group).toMatchObject({ name: '센터 운영자', area: 'ADMIN', obsoleteCodes: [] })
     expect(group?.permissionCodes).toEqual(['inbound.asn.read', 'inbound.asn.close'])
   })
@@ -84,7 +84,7 @@ describe('권한그룹 서버 액션', () => {
     expect((await getPermissionGroup(group.id))?.obsoleteCodes).toEqual(['gone.menu.read'])
 
     const result = await updatePermissionGroupAction({
-      id: group.id,
+      id: String(group.id),
       name: '재고 담당자',
       permissionCodes: ['stock.adjustments.confirm', 'portal.stock.read'],
     })
@@ -100,7 +100,7 @@ describe('권한그룹 서버 액션', () => {
 
   it('수정: 없는 그룹은 NOT_FOUND', async () => {
     expect(
-      await updatePermissionGroupAction({ id: 'nope', name: 'x', permissionCodes: [] }),
+      await updatePermissionGroupAction({ id: '999999', name: 'x', permissionCodes: [] }),
     ).toMatchObject({ ok: false, error: { code: 'NOT_FOUND' } })
   })
 
@@ -109,7 +109,7 @@ describe('권한그룹 서버 액션', () => {
     const user = await createTestUser('worker', { userType: 'OPERATOR' })
     await prisma.userPermissionGroup.create({ data: { userId: user.id, groupId: group.id } })
 
-    const result = await deletePermissionGroupAction({ id: group.id })
+    const result = await deletePermissionGroupAction({ id: String(group.id) })
 
     expect(result).toMatchObject({ ok: false, error: { code: 'CONFLICT' } })
     expect(result.ok === false && result.error.message).toContain('사용자 1명')
@@ -124,9 +124,9 @@ describe('권한그룹 서버 액션', () => {
         permissions: { create: [{ permissionCode: 'stock.inventory.read' }] },
       },
     })
-    expect(await deletePermissionGroupAction({ id: group.id })).toEqual({
+    expect(await deletePermissionGroupAction({ id: String(group.id) })).toEqual({
       ok: true,
-      data: { id: group.id },
+      data: { id: String(group.id) },
     })
     expect(await prisma.permissionGroupPermission.count()).toBe(0)
   })

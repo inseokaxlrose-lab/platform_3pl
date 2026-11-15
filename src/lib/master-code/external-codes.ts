@@ -15,7 +15,7 @@ import type { Db } from './system-code'
 // 한 대상의 외부 코드
 export async function getExternalCodes(
   entityType: ExternalEntityType,
-  entityId: string,
+  entityId: bigint,
   db: Db = prisma,
 ): Promise<ExternalCodes> {
   const rows = await db.externalCode.findMany({ where: { entityType, entityId } })
@@ -31,7 +31,7 @@ export async function getExternalCodes(
 export async function saveExternalCodes(
   db: Db,
   entityType: ExternalEntityType,
-  entityId: string,
+  entityId: bigint,
   codes: Partial<ExternalCodes>,
 ) {
   for (const system of EXTERNAL_SYSTEM_KEYS) {
@@ -62,7 +62,7 @@ export async function saveExternalCodes(
 export async function deleteExternalCodes(
   db: Db,
   entityType: ExternalEntityType,
-  entityId: string,
+  entityId: bigint,
 ) {
   await db.externalCode.deleteMany({ where: { entityType, entityId } })
 }

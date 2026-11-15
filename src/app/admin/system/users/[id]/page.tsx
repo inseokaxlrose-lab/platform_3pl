@@ -1,4 +1,5 @@
 import type { Metadata } from 'next'
+import { parseId } from '@/lib/id'
 import { notFound } from 'next/navigation'
 import { BackToListButton } from '@/components/master-list'
 import { AccessDenied } from '@/components/permission'
@@ -15,7 +16,9 @@ export const metadata: Metadata = { title: '사용자 수정' }
 export default async function EditUserPage({ params }: PageProps<'/admin/system/users/[id]'>) {
   if (!(await hasPermission('system.users.read'))) return <AccessDenied />
 
-  const { id } = await params
+  // 주소의 키가 숫자 모양이 아니면 바로 "찾을 수 없음"
+  const id = parseId((await params).id)
+  if (id === null) notFound()
   const [user, options, overrides, currentUser, canUpdate] = await Promise.all([
     getUserForEdit(id),
     getUserFormOptions(),
@@ -39,7 +42,11 @@ export default async function EditUserPage({ params }: PageProps<'/admin/system/
           title: '개별 권한',
           standalone: true,
           content: (
-            <OverridePanel user={user} overrides={overrides} isSelf={currentUser?.id === user.id} />
+            <OverridePanel
+              user={user}
+              overrides={overrides}
+              isSelf={String(currentUser?.id) === user.id}
+            />
           ),
         },
         ...(canUpdate

@@ -14,7 +14,7 @@ vi.mock('@/lib/session', () => ({
   getCurrentScope: vi.fn(async () => ({ kind: 'ALL' })),
 }))
 
-let adminId = ''
+let adminId = 0n
 
 function signIn(codes: PermissionCode[]) {
   vi.mocked(getCurrentUser).mockResolvedValue({

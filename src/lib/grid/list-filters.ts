@@ -1,4 +1,5 @@
 import { digitsOnly } from '@/lib/format'
+import { parseId } from '@/lib/id'
 
 // 목록 검색 조건 해석 (서버 공용 순수 함수)
 // 화면의 조건 값은 모두 글자라서(URL과 같은 모양) 서버에서 이 함수들로 Prisma 조건으로 바꾼다
@@ -16,6 +17,11 @@ export function textFilter(filters: Filters, key: string) {
 export function digitsFilter(filters: Filters, key: string) {
   const value = digitsOnly(filters[key] ?? '')
   return value ? { contains: value } : undefined
+}
+
+// 키 (센터·창고 고르기 등): 글자 → bigint ('12' → 12n). 숫자 모양이 아니면 조건 없음
+export function idFilter(filters: Filters, key: string) {
+  return parseId(filters[key]?.trim()) ?? undefined
 }
 
 // 여러 코드 중 하나 ('A,B' → { in: ['A','B'] })

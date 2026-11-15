@@ -10,19 +10,20 @@ import {
   updateDeliveryZone,
 } from '@/lib/delivery-zones/delivery-zones'
 import { listQuerySchema, toPrismaQuery } from '@/lib/grid/grid-query'
-import { dateRangeFilter } from '@/lib/grid/list-filters'
+import { dateRangeFilter, idFilter } from '@/lib/grid/list-filters'
 import { prisma } from '@/lib/prisma'
 import { assertInScope, scopeFilter, type DataScope } from '@/lib/scope/data-scope'
+import { idSchema } from '@/lib/id'
 
 // 배송권역 서버 액션 (docs/decisions/0033)
 // 데이터 범위: 센터 직원은 소속 센터의 권역만 보고 다룬다
 
 const ZONE_SCOPE = { center: 'centerId' }
 
-const idsSchema = z.array(z.string().min(1)).min(1).max(500)
+const idsSchema = z.array(idSchema).min(1).max(500)
 
 // 고른 권역이 모두 범위 안에 있어야 한다 (하나라도 밖·없음이면 전체 거부)
-async function assertZonesInScope(ids: string[], scope: DataScope) {
+async function assertZonesInScope(ids: bigint[], scope: DataScope) {
   const unique = [...new Set(ids)]
   const count = await prisma.deliveryZone.count({
     where: { AND: [{ id: { in: unique } }, scopeFilter(scope, ZONE_SCOPE)] },
@@ -61,7 +62,7 @@ export const listDeliveryZonesAction = createAction({
       AND: [
         query.where,
         scopeFilter(scope, ZONE_SCOPE),
-        filters.center ? { centerId: filters.center } : {},
+        idFilter(filters, 'center') ? { centerId: idFilter(filters, 'center') } : {},
         filters.status === 'ACTIVE' ? { isActive: true } : {},
         filters.status === 'INACTIVE' ? { isActive: false } : {},
         sido ? { regions: { some: { regionCode: { startsWith: sido } } } } : {},
@@ -112,7 +113,7 @@ export const createDeliveryZoneAction = createAction({
 
 export const updateDeliveryZoneAction = createAction({
   permission: 'master.delivery-zones.update',
-  input: deliveryZoneSchema.extend({ id: z.string().min(1) }),
+  input: deliveryZoneSchema.extend({ id: idSchema }),
   handler: async ({ input: { id, ...data }, scope }) => {
     await assertZonesInScope([id], scope)
     return updateDeliveryZone(id, data)

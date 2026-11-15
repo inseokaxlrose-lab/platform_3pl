@@ -18,11 +18,12 @@ import {
 } from '@/lib/common-code/code-schema'
 import { dataGridStateSchema, toPrismaQuery } from '@/lib/grid/grid-query'
 import { prisma } from '@/lib/prisma'
+import { idSchema } from '@/lib/id'
 
 // 공통코드 관리 서버 액션 (docs/decisions/0030)
 // 시스템 데이터라 데이터 범위가 없다. 시스템 메뉴라 운영사 사용자만 권한을 가질 수 있다 (0018)
 
-const idInput = z.object({ id: z.string().min(1) })
+const idInput = z.object({ id: idSchema })
 
 export const listCodeGroupsAction = createAction({
   permission: 'system.codes.read',
@@ -59,7 +60,7 @@ export const listCodeGroupsAction = createAction({
 
 export const listCodeItemsAction = createAction({
   permission: 'system.codes.read',
-  input: dataGridStateSchema.extend({ groupId: z.string().min(1) }),
+  input: dataGridStateSchema.extend({ groupId: idSchema }),
   handler: async ({ input: { groupId, ...state } }) => {
     const query = toPrismaQuery(state, {
       searchFields: ['code', 'name'],

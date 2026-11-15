@@ -1,4 +1,5 @@
 import type { Metadata } from 'next'
+import { parseId } from '@/lib/id'
 import { notFound } from 'next/navigation'
 import { BackToListButton } from '@/components/master-list'
 import { AccessDenied } from '@/components/permission'
@@ -12,7 +13,9 @@ export const metadata: Metadata = { title: '권한그룹 수정' }
 export default async function EditRolePage({ params }: PageProps<'/admin/system/roles/[id]'>) {
   if (!(await hasPermission('system.roles.read'))) return <AccessDenied />
 
-  const { id } = await params
+  // 주소의 키가 숫자 모양이 아니면 바로 "찾을 수 없음"
+  const id = parseId((await params).id)
+  if (id === null) notFound()
   const group = await getPermissionGroup(id)
   if (!group) notFound()
 

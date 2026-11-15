@@ -32,7 +32,7 @@ const CODES: PermissionCode[] = [
 
 function signIn(scope: DataScope = { kind: 'ALL' }, codes = CODES) {
   vi.mocked(getCurrentUser).mockResolvedValue({
-    id: 'u1',
+    id: 1n,
     name: '관리자',
     username: 'boss',
     userType: scope.kind === 'ALL' ? 'OPERATOR' : 'CENTER',
@@ -41,11 +41,11 @@ function signIn(scope: DataScope = { kind: 'ALL' }, codes = CODES) {
   vi.mocked(getCurrentScope).mockResolvedValue(scope)
 }
 
-let icnId = ''
-let gmhId = ''
+let icnId = 0n
+let gmhId = 0n
 
 const input = (overrides: Partial<DeliveryZoneInput> = {}): DeliveryZoneInput => ({
-  centerId: icnId,
+  centerId: String(icnId),
   code: '',
   name: '서울 권역',
   description: '',
@@ -79,9 +79,12 @@ describe('배송권역 등록·수정', () => {
     })
     expect(zone.systemCode).toMatch(/^DZ\d{6}$/)
     expect(zone.code).toBe(zone.systemCode)
-    const regions = await prisma.deliveryZoneRegion.findMany({ where: { zoneId: zone.id } })
+    const regions = await prisma.deliveryZoneRegion.findMany({ where: { zoneId: BigInt(zone.id) } })
     expect(regions.map((r) => r.regionCode).sort()).toEqual(['11', '41130'])
-    expect(await getExternalCodes('DELIVERY_ZONE', zone.id)).toEqual({ SAP: 'Z100', ERP: '' })
+    expect(await getExternalCodes('DELIVERY_ZONE', BigInt(zone.id))).toEqual({
+      SAP: 'Z100',
+      ERP: '',
+    })
   })
 
   it('입력 규칙: 지역 1곳 이상, 모르는 지역 거부, 같은 권역 안 겹침 거부, 시스템 코드 모양 거부', async () => {
@@ -116,7 +119,7 @@ describe('배송권역 등록·수정', () => {
     // 다른 센터는 허용
     expect(
       await createDeliveryZoneAction(
-        input({ centerId: gmhId, code: 'SEOUL', regionCodes: ['11'] }),
+        input({ centerId: String(gmhId), code: 'SEOUL', regionCodes: ['11'] }),
       ),
     ).toMatchObject({ ok: true })
     // 같은 센터 안 코드 중복은 거부
@@ -129,11 +132,16 @@ describe('배송권역 등록·수정', () => {
     const zone = await create({ code: 'SEOUL', regionCodes: ['11'] })
     const result = await updateDeliveryZoneAction({
       id: zone.id,
-      ...input({ centerId: gmhId, code: 'SEOUL', name: '서울·인천', regionCodes: ['11', '28'] }),
+      ...input({
+        centerId: String(gmhId),
+        code: 'SEOUL',
+        name: '서울·인천',
+        regionCodes: ['11', '28'],
+      }),
     })
     expect(result).toMatchObject({ ok: true })
     const saved = await prisma.deliveryZone.findUniqueOrThrow({
-      where: { id: zone.id },
+      where: { id: BigInt(zone.id) },
       include: { regions: true },
     })
     expect(saved.centerId).toBe(icnId)
@@ -151,13 +159,13 @@ describe('목록 · 범위 · 일괄 처리', () => {
       regionCodes: ['41130', '41460'],
     })
     await setDeliveryZonesActiveAction({ ids: [gyeonggi.id], isActive: false })
-    await create({ centerId: gmhId, code: 'BUSAN', name: '부산', regionCodes: ['26'] })
+    await create({ centerId: String(gmhId), code: 'BUSAN', name: '부산', regionCodes: ['26'] })
 
     const codes = async (filters: Record<string, string>) => {
       const r = await listDeliveryZonesAction({ ...createDataGridState(), filters })
       return r.ok ? r.data.rows.map((z) => z.code).sort() : r.error
     }
-    expect(await codes({ center: icnId })).toEqual(['SEOUL', 'SOUTH'])
+    expect(await codes({ center: String(icnId) })).toEqual(['SEOUL', 'SOUTH'])
     expect(await codes({ status: 'INACTIVE' })).toEqual(['SOUTH'])
     expect(await codes({ sido: '41' })).toEqual(['SOUTH'])
     expect(await codes({ sido: 'xx' })).toEqual(['BUSAN', 'SEOUL', 'SOUTH'])
@@ -170,14 +178,14 @@ describe('목록 · 범위 · 일괄 처리', () => {
   })
 
   it('센터 직원: 소속 센터 권역만 보고, 다른 센터 권역은 고치거나 추가·삭제할 수 없다', async () => {
-    const busan = await create({ centerId: gmhId, code: 'BUSAN', regionCodes: ['26'] })
+    const busan = await create({ centerId: String(gmhId), code: 'BUSAN', regionCodes: ['26'] })
     await create({ code: 'SEOUL', regionCodes: ['11'] })
     signIn({ kind: 'CENTERS', centerIds: [icnId] })
 
     const list = await listDeliveryZonesAction(createDataGridState())
     expect(list.ok && list.data.rows.map((z) => z.code)).toEqual(['SEOUL'])
     expect(
-      await createDeliveryZoneAction(input({ centerId: gmhId, regionCodes: ['27'] })),
+      await createDeliveryZoneAction(input({ centerId: String(gmhId), regionCodes: ['27'] })),
     ).toMatchObject({
       ok: false,
       error: { code: 'NOT_FOUND' },
@@ -188,7 +196,7 @@ describe('목록 · 범위 · 일괄 처리', () => {
     })
     // 이미 쓰는 지역 목록도 소속 센터 것만
     expect(Object.keys(await getTakenRegions({ kind: 'CENTERS', centerIds: [icnId] }))).toEqual([
-      icnId,
+      String(icnId),
     ])
   })
 
@@ -207,7 +215,7 @@ describe('목록 · 범위 · 일괄 처리', () => {
 
   it('사용 중지된 센터에는 권역을 추가할 수 없다', async () => {
     await prisma.center.update({ where: { id: gmhId }, data: { isActive: false } })
-    expect(await createDeliveryZoneAction(input({ centerId: gmhId }))).toMatchObject({
+    expect(await createDeliveryZoneAction(input({ centerId: String(gmhId) }))).toMatchObject({
       ok: false,
       error: { code: 'CONFLICT' },
     })

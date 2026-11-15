@@ -1,6 +1,7 @@
 import 'server-only'
 import { z } from 'zod'
 import type { PermissionCode } from '@/config/permissions'
+import { textIds, type WithTextIds } from '@/lib/id'
 import type { DataScope } from '@/lib/scope/data-scope'
 import {
   getCurrentPermissions,
@@ -38,14 +39,14 @@ const MESSAGES = {
 } as const
 
 // 서버 액션 공통 틀 — 데이터를 바꾸는 모든 서버 액션은 이것으로 만든다 (CLAUDE.md)
-// 검사 순서: ① 로그인 → ② 권한 → ③ 입력 → ④ 처리
+// 검사 순서: ① 로그인 → ② 권한 → ③ 입력 → ④ 처리 → ⑤ 결과의 키(bigint)를 글자로
 // 권한을 입력보다 먼저 검사한다: 권한 없는 사람에게 입력 규칙 힌트를 주지 않기 위해
 export function createAction<TSchema extends z.ZodType, TData>({
   permission,
   input,
   handler,
 }: CreateActionOptions<TSchema, TData>) {
-  return async (rawInput: z.input<TSchema>): Promise<ActionResult<TData>> => {
+  return async (rawInput: z.input<TSchema>): Promise<ActionResult<WithTextIds<TData>>> => {
     const user = await getCurrentUser()
     if (!user) return failure('UNAUTHENTICATED', MESSAGES.UNAUTHENTICATED)
 
@@ -69,7 +70,8 @@ export function createAction<TSchema extends z.ZodType, TData>({
     try {
       const scope = await getCurrentScope()
       const data = await handler({ user, input: parsed.data, permissions, scope })
-      return { ok: true, data }
+      // 결과는 화면으로 가므로 안의 키(bigint)를 모두 글자로 바꾼다 (docs/db-conventions.md)
+      return { ok: true, data: textIds(data) }
     } catch (error) {
       if (error instanceof ActionError) return failure(error.code, error.message)
       // 예상 못 한 오류: 자세한 내용은 서버 기록에만 남기고 사용자에게는 일반 문구

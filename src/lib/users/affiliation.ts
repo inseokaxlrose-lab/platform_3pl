@@ -6,8 +6,9 @@ export type AffiliationIssue = { path: 'centerIds' | 'shipperId'; message: strin
 
 export function affiliationIssues(
   userType: 'OPERATOR' | 'CENTER' | 'SHIPPER',
-  centerIds: readonly string[],
-  shipperId: string | null | undefined,
+  // 키는 화면에서는 글자, 서버에서는 bigint (개수·유무만 본다)
+  centerIds: readonly (string | bigint)[],
+  shipperId: string | bigint | null | undefined,
 ): AffiliationIssue[] {
   const issues: AffiliationIssue[] = []
   if (userType === 'CENTER' && centerIds.length === 0) {

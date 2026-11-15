@@ -4,12 +4,13 @@ import { z } from 'zod'
 import { ActionError } from '@/lib/actions/action-error'
 import { createAction } from '@/lib/actions/create-action'
 import { listQuerySchema, toPrismaQuery } from '@/lib/grid/grid-query'
-import { codesFilter, dateRangeFilter } from '@/lib/grid/list-filters'
+import { codesFilter, dateRangeFilter, idFilter } from '@/lib/grid/list-filters'
 import { STORAGE_CONDITIONS, WAREHOUSE_TYPE_LABELS } from '@/lib/warehouses/warehouse-labels'
 import { prisma } from '@/lib/prisma'
 import { assertInScope, scopeFilter } from '@/lib/scope/data-scope'
 import { createWarehouseSchema, updateWarehouseSchema } from '@/lib/warehouses/warehouse-schema'
 import { createWarehouse, setWarehouseActive, updateWarehouse } from '@/lib/warehouses/warehouses'
+import { idSchema } from '@/lib/id'
 
 // 창고 관리 서버 액션 (docs/decisions/0027)
 // 데이터 범위: 센터 직원은 소속 센터의 창고만 보고 다룬다 (창고 추가도 자기 센터 안에서만)
@@ -17,7 +18,7 @@ import { createWarehouse, setWarehouseActive, updateWarehouse } from '@/lib/ware
 const WAREHOUSE_SCOPE = { center: 'centerId' }
 
 // 범위 안의 창고인지 확인하고 가져온다 (밖이면 "찾을 수 없음")
-async function findWarehouseInScope(id: string, scope: Parameters<typeof assertInScope>[0]) {
+async function findWarehouseInScope(id: bigint, scope: Parameters<typeof assertInScope>[0]) {
   const warehouse = await prisma.warehouse.findUnique({
     where: { id },
     select: { id: true, centerId: true },
@@ -59,7 +60,7 @@ export const listWarehousesAction = createAction({
       AND: [
         query.where,
         scopeFilter(scope, WAREHOUSE_SCOPE),
-        filters.center ? { centerId: filters.center } : {},
+        idFilter(filters, 'center') ? { centerId: idFilter(filters, 'center') } : {},
         type ? { type: type as keyof typeof WAREHOUSE_TYPE_LABELS } : {},
         storage?.length ? { storageCondition: { in: storage } } : {},
         filters.status === 'ACTIVE' ? { isActive: true } : {},
@@ -120,7 +121,7 @@ export const createWarehouseAction = createAction({
 
 export const updateWarehouseAction = createAction({
   permission: 'master.warehouses.update',
-  input: updateWarehouseSchema.extend({ id: z.string().min(1) }),
+  input: updateWarehouseSchema.extend({ id: idSchema }),
   handler: async ({ input: { id, ...data }, scope }) => {
     await findWarehouseInScope(id, scope)
     return updateWarehouse(id, data)
@@ -129,7 +130,7 @@ export const updateWarehouseAction = createAction({
 
 export const setWarehouseActiveAction = createAction({
   permission: 'master.warehouses.update',
-  input: z.object({ id: z.string().min(1), isActive: z.boolean() }),
+  input: z.object({ id: idSchema, isActive: z.boolean() }),
   handler: async ({ input, scope }) => {
     await findWarehouseInScope(input.id, scope)
     return setWarehouseActive(input.id, input.isActive)
@@ -140,7 +141,7 @@ export const setWarehouseActiveAction = createAction({
 // 하나라도 범위 밖·없음이면 전체 거부, 입고대기 창고가 섞이면 사용 중지 거부
 export const setWarehousesActiveAction = createAction({
   permission: 'master.warehouses.update',
-  input: z.object({ ids: z.array(z.string().min(1)).min(1).max(500), isActive: z.boolean() }),
+  input: z.object({ ids: z.array(idSchema).min(1).max(500), isActive: z.boolean() }),
   handler: async ({ input, scope }) => {
     const ids = [...new Set(input.ids)]
     const found = await prisma.warehouse.findMany({

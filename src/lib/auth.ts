@@ -13,6 +13,12 @@ export const ACCOUNT_DISABLED = 'ACCOUNT_DISABLED'
 // - 회원가입: 끔. 계정은 운영사 관리자가 사용자 관리 화면에서 만든다
 export const auth = betterAuth({
   database: prismaAdapter(prisma, { provider: 'postgresql' }),
+  advanced: {
+    database: {
+      // 키는 DB가 매기는 BIGINT 자동 증가 (docs/db-conventions.md). Better Auth는 글자로 돌려준다 ('12')
+      generateId: 'serial',
+    },
+  },
   emailAndPassword: {
     enabled: true,
     disableSignUp: true,
@@ -32,7 +38,7 @@ export const auth = betterAuth({
         // 로그인 직전 검사: 사용 중지된 계정(isActive = false)은 세션을 만들지 않는다
         before: async (session) => {
           const user = await prisma.user.findUnique({
-            where: { id: session.userId },
+            where: { id: BigInt(session.userId) },
             select: { isActive: true },
           })
           if (!user?.isActive) {

@@ -33,7 +33,7 @@ const CODES: PermissionCode[] = [
 
 function signIn(scope: DataScope = { kind: 'ALL' }, codes = CODES) {
   vi.mocked(getCurrentUser).mockResolvedValue({
-    id: 'u1',
+    id: 1n,
     name: '사용자',
     username: 'u1',
     userType: scope.kind === 'ALL' ? 'OPERATOR' : 'CENTER',
@@ -42,11 +42,11 @@ function signIn(scope: DataScope = { kind: 'ALL' }, codes = CODES) {
   vi.mocked(getCurrentScope).mockResolvedValue(scope)
 }
 
-let icnId = ''
-let gmhId = ''
-let icnWarehouseId = '' // 이천 일반 창고
-let gmhWarehouseId = '' // 김해 일반 창고
-let icnStagingId = '' // 이천 입고대기 창고
+let icnId = 0n
+let gmhId = 0n
+let icnWarehouseId = 0n // 이천 일반 창고
+let gmhWarehouseId = 0n // 김해 일반 창고
+let icnStagingId = 0n // 이천 입고대기 창고
 
 const RANGE = {
   zoneFrom: 'A',
@@ -60,14 +60,14 @@ const RANGE = {
   separator: '-' as const,
 }
 
-async function generalWarehouse(centerId: string, code: string) {
+async function generalWarehouse(centerId: bigint, code: string) {
   const w = await prisma.warehouse.create({
     data: { centerId, systemCode: await nextSystemCode('WAREHOUSE'), code, name: code },
   })
   return w.id
 }
 
-const codesOf = async (warehouseId: string) =>
+const codesOf = async (warehouseId: bigint) =>
   (await prisma.location.findMany({ where: { warehouseId }, orderBy: { code: 'asc' } })).map(
     (l) => l.code,
   )
@@ -89,41 +89,46 @@ afterAll(async () => {
 
 describe('한 칸 등록', () => {
   it('대문자로 저장하고, 같은 창고의 같은 코드는 거부 (다른 창고는 허용)', async () => {
-    expect(await createLocationAction({ warehouseId: icnWarehouseId, code: 'x-01' })).toMatchObject(
-      {
-        ok: true,
-        data: { code: 'X-01' },
-      },
-    )
-    expect(await createLocationAction({ warehouseId: icnWarehouseId, code: 'X-01' })).toMatchObject(
-      {
-        ok: false,
-        error: { code: 'CONFLICT' },
-      },
-    )
-    expect((await createLocationAction({ warehouseId: gmhWarehouseId, code: 'X-01' })).ok).toBe(
-      true,
-    )
+    expect(
+      await createLocationAction({ warehouseId: String(icnWarehouseId), code: 'x-01' }),
+    ).toMatchObject({
+      ok: true,
+      data: { code: 'X-01' },
+    })
+    expect(
+      await createLocationAction({ warehouseId: String(icnWarehouseId), code: 'X-01' }),
+    ).toMatchObject({
+      ok: false,
+      error: { code: 'CONFLICT' },
+    })
+    expect(
+      (await createLocationAction({ warehouseId: String(gmhWarehouseId), code: 'X-01' })).ok,
+    ).toBe(true)
   })
 
   it('입고대기 창고·사용 중지된 창고에는 추가할 수 없다', async () => {
-    expect(await createLocationAction({ warehouseId: icnStagingId, code: 'S-01' })).toMatchObject({
+    expect(
+      await createLocationAction({ warehouseId: String(icnStagingId), code: 'S-01' }),
+    ).toMatchObject({
       ok: false,
       error: { code: 'CONFLICT', message: expect.stringContaining('입고대기') },
     })
     await prisma.warehouse.update({ where: { id: icnWarehouseId }, data: { isActive: false } })
-    expect(await createLocationAction({ warehouseId: icnWarehouseId, code: 'S-01' })).toMatchObject(
-      {
-        ok: false,
-        error: { code: 'CONFLICT', message: expect.stringContaining('사용 중지') },
-      },
-    )
+    expect(
+      await createLocationAction({ warehouseId: String(icnWarehouseId), code: 'S-01' }),
+    ).toMatchObject({
+      ok: false,
+      error: { code: 'CONFLICT', message: expect.stringContaining('사용 중지') },
+    })
   })
 })
 
 describe('일괄 생성', () => {
   it('미리보기는 만들지 않고 개수·처음·마지막을 알려준다', async () => {
-    const preview = await previewBulkLocationsAction({ warehouseId: icnWarehouseId, range: RANGE })
+    const preview = await previewBulkLocationsAction({
+      warehouseId: String(icnWarehouseId),
+      range: RANGE,
+    })
     expect(preview).toEqual({
       ok: true,
       data: {
@@ -138,9 +143,11 @@ describe('일괄 생성', () => {
   })
 
   it('없는 코드만 만들고 구역·열·단을 함께 저장, 다시 실행하면 전부 건너뛴다', async () => {
-    await createLocationAction({ warehouseId: icnWarehouseId, code: 'A-01-02' })
+    await createLocationAction({ warehouseId: String(icnWarehouseId), code: 'A-01-02' })
 
-    expect(await bulkCreateLocationsAction({ warehouseId: icnWarehouseId, range: RANGE })).toEqual({
+    expect(
+      await bulkCreateLocationsAction({ warehouseId: String(icnWarehouseId), range: RANGE }),
+    ).toEqual({
       ok: true,
       data: { created: 11, skipped: 1 },
     })
@@ -149,7 +156,9 @@ describe('일괄 생성', () => {
     })
     expect(located).toMatchObject({ zone: 'B', aisle: '02', level: '03' })
 
-    expect(await bulkCreateLocationsAction({ warehouseId: icnWarehouseId, range: RANGE })).toEqual({
+    expect(
+      await bulkCreateLocationsAction({ warehouseId: String(icnWarehouseId), range: RANGE }),
+    ).toEqual({
       ok: true,
       data: { created: 0, skipped: 12 },
     })
@@ -159,12 +168,12 @@ describe('일괄 생성', () => {
   it('범위 규칙 위반·입고대기 창고는 거부', async () => {
     expect(
       await bulkCreateLocationsAction({
-        warehouseId: icnWarehouseId,
+        warehouseId: String(icnWarehouseId),
         range: { ...RANGE, zoneTo: 'Z', aisleTo: 99, levelTo: 9 },
       }),
     ).toMatchObject({ ok: false, error: { code: 'VALIDATION' } })
     expect(
-      await bulkCreateLocationsAction({ warehouseId: icnStagingId, range: RANGE }),
+      await bulkCreateLocationsAction({ warehouseId: String(icnStagingId), range: RANGE }),
     ).toMatchObject({
       ok: false,
       error: { code: 'CONFLICT' },
@@ -174,12 +183,12 @@ describe('일괄 생성', () => {
 
 describe('사용 중지 · 삭제 (여러 개)', () => {
   it('골라서 사용 중지 / 다시 사용, 삭제', async () => {
-    await bulkCreateLocationsAction({ warehouseId: icnWarehouseId, range: RANGE })
+    await bulkCreateLocationsAction({ warehouseId: String(icnWarehouseId), range: RANGE })
     const ids = (
       await prisma.location.findMany({ where: { warehouseId: icnWarehouseId, zone: 'A' } })
     ).map((l) => l.id)
 
-    expect(await setLocationsActiveAction({ ids, isActive: false })).toEqual({
+    expect(await setLocationsActiveAction({ ids: ids.map(String), isActive: false })).toEqual({
       ok: true,
       data: { updated: 6 },
     })
@@ -187,7 +196,10 @@ describe('사용 중지 · 삭제 (여러 개)', () => {
       await prisma.location.count({ where: { warehouseId: icnWarehouseId, isActive: false } }),
     ).toBe(6)
 
-    expect(await deleteLocationsAction({ ids })).toEqual({ ok: true, data: { deleted: 6 } })
+    expect(await deleteLocationsAction({ ids: ids.map(String) })).toEqual({
+      ok: true,
+      data: { deleted: 6 },
+    })
     expect(await codesOf(icnWarehouseId)).toHaveLength(6)
   })
 
@@ -195,8 +207,8 @@ describe('사용 중지 · 삭제 (여러 개)', () => {
     const defaultLocation = await prisma.location.findFirstOrThrow({
       where: { warehouseId: icnStagingId },
     })
-    const normal = await createLocationAction({ warehouseId: icnWarehouseId, code: 'N-01' })
-    const ids = [defaultLocation.id, normal.ok ? normal.data.id : '']
+    const normal = await createLocationAction({ warehouseId: String(icnWarehouseId), code: 'N-01' })
+    const ids = [String(defaultLocation.id), normal.ok ? normal.data.id : '']
 
     expect(await setLocationsActiveAction({ ids, isActive: false })).toMatchObject({
       ok: false,
@@ -207,17 +219,17 @@ describe('사용 중지 · 삭제 (여러 개)', () => {
       error: { code: 'CONFLICT' },
     })
     expect(await prisma.location.count({ where: { isActive: false } })).toBe(0)
-    expect(await prisma.location.count({ where: { id: { in: ids } } })).toBe(2)
+    expect(await prisma.location.count({ where: { id: { in: ids.map(BigInt) } } })).toBe(2)
   })
 })
 
 describe('목록 · 데이터 범위 · 권한', () => {
   it('창고·구역 거르기, 기본 정렬은 센터 → 창고 → 코드, 구역 목록', async () => {
-    await bulkCreateLocationsAction({ warehouseId: icnWarehouseId, range: RANGE })
+    await bulkCreateLocationsAction({ warehouseId: String(icnWarehouseId), range: RANGE })
 
     const result = await listLocationsAction({
       ...createDataGridState({ pageSize: 50 }),
-      filters: { warehouse: icnWarehouseId, zone: 'B' },
+      filters: { warehouse: String(icnWarehouseId), zone: 'B' },
     })
     expect(result.ok && result.data.rows.map((r) => r.code)).toEqual([
       'B-01-01',
@@ -229,11 +241,11 @@ describe('목록 · 데이터 범위 · 권한', () => {
     ])
     // 구역 선택지: 창고마다 그 창고의 구역
     const options = await getWarehouseOptions({ kind: 'ALL' })
-    expect(options.find((w) => w.id === icnWarehouseId)?.zones).toEqual(['A', 'B'])
+    expect(options.find((w) => w.id === String(icnWarehouseId))?.zones).toEqual(['A', 'B'])
     // 상태 거르기
     const inactive = await listLocationsAction({
       ...createDataGridState(),
-      filters: { warehouse: icnWarehouseId, status: 'INACTIVE' },
+      filters: { warehouse: String(icnWarehouseId), status: 'INACTIVE' },
     })
     expect(inactive.ok && inactive.data.rowCount).toBe(0)
 
@@ -245,7 +257,10 @@ describe('목록 · 데이터 범위 · 권한', () => {
   })
 
   it('센터 직원: 소속 센터 로케이션만, 다른 센터 창고·로케이션은 다룰 수 없다', async () => {
-    const gmhLocation = await createLocationAction({ warehouseId: gmhWarehouseId, code: 'G-01' })
+    const gmhLocation = await createLocationAction({
+      warehouseId: String(gmhWarehouseId),
+      code: 'G-01',
+    })
     const gmhLocationId = gmhLocation.ok ? gmhLocation.data.id : ''
     signIn({ kind: 'CENTERS', centerIds: [icnId] })
 
@@ -254,7 +269,9 @@ describe('목록 · 데이터 범위 · 권한', () => {
       new Set(['ICN 센터 (ICN)']),
     )
 
-    expect(await createLocationAction({ warehouseId: gmhWarehouseId, code: 'X' })).toMatchObject({
+    expect(
+      await createLocationAction({ warehouseId: String(gmhWarehouseId), code: 'X' }),
+    ).toMatchObject({
       ok: false,
       error: { code: 'NOT_FOUND' },
     })
@@ -272,11 +289,13 @@ describe('목록 · 데이터 범위 · 권한', () => {
 
   it('조회 권한만 있으면 등록·수정·삭제 불가', async () => {
     signIn({ kind: 'ALL' }, ['master.locations.read'])
-    expect(await createLocationAction({ warehouseId: icnWarehouseId, code: 'X' })).toMatchObject({
+    expect(
+      await createLocationAction({ warehouseId: String(icnWarehouseId), code: 'X' }),
+    ).toMatchObject({
       ok: false,
       error: { code: 'FORBIDDEN' },
     })
-    expect(await deleteLocationsAction({ ids: ['x'] })).toMatchObject({
+    expect(await deleteLocationsAction({ ids: ['999999'] })).toMatchObject({
       ok: false,
       error: { code: 'FORBIDDEN' },
     })

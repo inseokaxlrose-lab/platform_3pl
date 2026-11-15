@@ -5,8 +5,8 @@ import { resetDatabase } from '@/test/reset-database'
 import { scopeFilter, ScopeFieldMissingError } from './data-scope'
 import { loadDataScope } from './load-data-scope'
 
-let icn = ''
-let pus = ''
+let icn = 0n
+let pus = 0n
 
 beforeEach(async () => {
   await resetDatabase()
@@ -20,7 +20,7 @@ afterAll(async () => {
 })
 
 // 센터 표 자체에 범위를 걸어 조회 (센터 표에서 "센터를 가리키는 칸"은 id)
-async function visibleCenterCodes(userId: string) {
+async function visibleCenterCodes(userId: bigint) {
   const scope = await loadDataScope(userId)
   const centers = await prisma.center.findMany({
     where: scopeFilter(scope, { center: 'id' }),
@@ -85,6 +85,6 @@ describe('데이터 범위 (DB)', () => {
     const op = await createTestUser('op2', { userType: 'OPERATOR' })
     await prisma.user.update({ where: { id: op.id }, data: { isActive: false } })
     expect(await loadDataScope(op.id)).toEqual({ kind: 'NONE' })
-    expect(await loadDataScope('no-such-user')).toEqual({ kind: 'NONE' })
+    expect(await loadDataScope(999999n)).toEqual({ kind: 'NONE' })
   })
 })

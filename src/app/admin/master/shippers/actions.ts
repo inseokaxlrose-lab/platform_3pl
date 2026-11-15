@@ -4,11 +4,12 @@ import { z } from 'zod'
 import { ActionError } from '@/lib/actions/action-error'
 import { createAction } from '@/lib/actions/create-action'
 import { listQuerySchema, toPrismaQuery } from '@/lib/grid/grid-query'
-import { dateRangeFilter, ynFilter } from '@/lib/grid/list-filters'
+import { dateRangeFilter, idFilter, ynFilter } from '@/lib/grid/list-filters'
 import { prisma } from '@/lib/prisma'
 import { assertInScope, scopeFilter, type DataScope } from '@/lib/scope/data-scope'
 import { LABEL_UNITS, shipperSchema } from '@/lib/shippers/shipper-schema'
 import { createShipper, updateShipper } from '@/lib/shippers/shippers'
+import { idSchema } from '@/lib/id'
 
 // 화주사 관리 서버 액션 (docs/decisions/0035)
 // 데이터 범위: 센터 직원은 자기 센터를 이용하는 화주사만 본다. 등록·수정·사용 중지는 운영사(전체 범위)만
@@ -51,7 +52,9 @@ export const listShippersAction = createAction({
       AND: [
         query.where,
         scopeFilter(scope, SHIPPER_SCOPE),
-        filters.center ? { centers: { some: { centerId: filters.center } } } : {},
+        idFilter(filters, 'center')
+          ? { centers: { some: { centerId: idFilter(filters, 'center') } } }
+          : {},
         filters.status === 'ACTIVE' ? { isActive: true } : {},
         filters.status === 'INACTIVE' ? { isActive: false } : {},
         useLot !== undefined ? { useLot } : {},
@@ -105,7 +108,7 @@ export const createShipperAction = createAction({
 
 export const updateShipperAction = createAction({
   permission: 'master.shippers.update',
-  input: shipperSchema.extend({ id: z.string().min(1) }),
+  input: shipperSchema.extend({ id: idSchema }),
   handler: async ({ input: { id, ...data }, scope }) => {
     requireAllScope(scope, '화주사 수정')
     const shipper = await prisma.shipper.findUnique({ where: { id }, select: { id: true } })
@@ -117,7 +120,7 @@ export const updateShipperAction = createAction({
 // 사용 중지 / 다시 사용 (한 건·여러 건 공용): 사용 중지하면 그 화주사 사용자의 데이터 범위가 비워진다
 export const setShippersActiveAction = createAction({
   permission: 'master.shippers.update',
-  input: z.object({ ids: z.array(z.string().min(1)).min(1).max(500), isActive: z.boolean() }),
+  input: z.object({ ids: z.array(idSchema).min(1).max(500), isActive: z.boolean() }),
   handler: async ({ input, scope }) => {
     requireAllScope(scope, '화주사 사용 중지')
     const ids = [...new Set(input.ids)]

@@ -8,11 +8,12 @@ import { prisma } from '@/lib/prisma'
 import { UNIT_KINDS } from '@/lib/units/unit-labels'
 import { unitCreateSchema, unitUpdateSchema } from '@/lib/units/unit-schema'
 import { createUnit, deleteUnits, setUnitsActive, updateUnit } from '@/lib/units/units'
+import { idSchema } from '@/lib/id'
 
 // 단위 관리 서버 액션 (docs/decisions/0034)
 // 단위는 전체 공통 기준정보라 데이터 범위(센터·화주사)를 적용하지 않는다
 
-const idsSchema = z.array(z.string().min(1)).min(1).max(200)
+const idsSchema = z.array(idSchema).min(1).max(200)
 
 // 목록 (검색 조건: 단위 목록 화면의 searchFields와 같은 키 — kind·status)
 export const listUnitsAction = createAction({

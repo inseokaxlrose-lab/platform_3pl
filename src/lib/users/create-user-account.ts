@@ -1,5 +1,4 @@
 import 'server-only'
-import { randomUUID } from 'node:crypto'
 import { z } from 'zod'
 import { passwordSchema, usernameSchema } from './user-schema'
 import { auth } from '@/lib/auth'
@@ -10,6 +9,7 @@ import { affiliationIssues, internalEmail } from './affiliation'
 // 아이디·비밀번호 규칙은 화면과 함께 쓰는 user-schema.ts에 있다
 export { passwordSchema, usernameSchema } from './user-schema'
 
+// 서버 안에서만 부르므로 키는 bigint 그대로 받는다
 const createUserAccountSchema = z
   .object({
     username: usernameSchema,
@@ -19,10 +19,10 @@ const createUserAccountSchema = z
     // 이메일이 없으면 내부용 주소를 채운다 (Better Auth는 이메일 칸이 필수)
     email: z.email().optional(),
     // 소속 (데이터 범위 기준): 센터 직원 → 센터 1개 이상, 화주사 사용자 → 화주사 1개, 운영사 → 없음
-    centerIds: z.array(z.string().min(1)).default([]),
-    shipperId: z.string().min(1).optional(),
+    centerIds: z.array(z.bigint()).default([]),
+    shipperId: z.bigint().optional(),
     // 배정할 권한그룹 (영역이 사용자 유형과 맞는지는 호출하는 쪽에서 확인)
-    permissionGroupIds: z.array(z.string().min(1)).default([]),
+    permissionGroupIds: z.array(z.bigint()).default([]),
   })
   .superRefine((data, ctx) => {
     for (const issue of affiliationIssues(data.userType, data.centerIds, data.shipperId)) {
@@ -38,7 +38,6 @@ export async function createUserAccount(input: CreateUserAccountInput) {
   const data = createUserAccountSchema.parse(input)
   // Better Auth와 같은 규칙: 아이디는 소문자로 저장해 대소문자를 구분하지 않는다
   const username = data.username.toLowerCase()
-  const userId = randomUUID()
 
   // Better Auth 설정의 암호화 방식을 그대로 사용 (로그인 시 같은 방식으로 비교)
   const context = await auth.$context
@@ -47,7 +46,6 @@ export async function createUserAccount(input: CreateUserAccountInput) {
   return prisma.$transaction(async (tx) => {
     const user = await tx.user.create({
       data: {
-        id: userId,
         name: data.name,
         email: data.email ? data.email.toLowerCase() : internalEmail(username),
         username,
@@ -60,12 +58,12 @@ export async function createUserAccount(input: CreateUserAccountInput) {
         },
       },
     })
-    // 아이디·비밀번호 로그인 수단 (Better Auth 형식: providerId 'credential', accountId = 사용자 id)
+    // 아이디·비밀번호 로그인 수단 (Better Auth 형식: providerId 'credential', accountId = 사용자 키 글자)
+    // 키는 DB가 자동으로 매긴다 (generateId: 'serial')
     await tx.account.create({
       data: {
-        id: randomUUID(),
-        userId,
-        accountId: userId,
+        userId: user.id,
+        accountId: String(user.id),
         providerId: 'credential',
         password: passwordHash,
       },

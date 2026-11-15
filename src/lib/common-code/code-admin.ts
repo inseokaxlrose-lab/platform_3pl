@@ -36,7 +36,7 @@ export async function updateCodeGroup({ id, ...data }: GroupUpdate) {
   return prisma.codeGroup.update({ where: { id }, data, select: { id: true } })
 }
 
-export async function deleteCodeGroup(id: string) {
+export async function deleteCodeGroup(id: bigint) {
   const group = await prisma.codeGroup.findUnique({
     where: { id },
     select: { code: true, isSystem: true, _count: { select: { items: true } } },
@@ -72,7 +72,7 @@ export async function updateCodeItem({ id, ...data }: ItemUpdate) {
   return prisma.codeItem.update({ where: { id }, data, select: { id: true } })
 }
 
-export async function deleteCodeItem(id: string) {
+export async function deleteCodeItem(id: bigint) {
   return prisma.$transaction(async (tx) => {
     const item = await tx.codeItem.findUnique({
       where: { id },

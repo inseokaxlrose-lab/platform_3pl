@@ -10,10 +10,10 @@ import { unwrap } from './unwrap'
 vi.mock('@/lib/session', () => ({
   getCurrentUser: vi.fn(),
   getCurrentPermissions: vi.fn(),
-  getCurrentScope: vi.fn(async () => ({ kind: 'CENTERS', centerIds: ['ICN'] })),
+  getCurrentScope: vi.fn(async () => ({ kind: 'CENTERS', centerIds: [1n] })),
 }))
 
-const user: CurrentUser = { id: 'u1', name: '김운영', username: 'kim', userType: 'CENTER' }
+const user: CurrentUser = { id: 1n, name: '김운영', username: 'kim', userType: 'CENTER' }
 
 function signedIn(codes: PermissionCode[]) {
   vi.mocked(getCurrentUser).mockResolvedValue(user)
@@ -111,7 +111,7 @@ describe('createAction 검사 순서', () => {
         user,
         input: { asnId: 'A1', reason: '화주 요청' },
         // 처리 함수는 데이터 범위를 함께 받는다
-        scope: { kind: 'CENTERS', centerIds: ['ICN'] },
+        scope: { kind: 'CENTERS', centerIds: [1n] },
       }),
     )
   })
@@ -160,7 +160,8 @@ describe("permission: 'signed-in' (개인 설정용)", () => {
 
   it('메뉴 권한이 하나도 없어도 로그인했으면 처리한다', async () => {
     signedIn([])
-    expect(await saveMine({ value: 'x' })).toEqual({ ok: true, data: { owner: 'u1', value: 'x' } })
+    // 결과 안의 키(bigint)는 화면으로 가기 전에 글자로 바뀐다
+    expect(await saveMine({ value: 'x' })).toEqual({ ok: true, data: { owner: '1', value: 'x' } })
   })
 
   it('로그인하지 않았으면 여전히 UNAUTHENTICATED', async () => {

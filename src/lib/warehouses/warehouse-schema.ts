@@ -2,6 +2,7 @@ import { z } from 'zod'
 import { externalCodesSchema } from '@/lib/master-code/external-codes-schema'
 import { requiredText, userCodeField } from '@/lib/validation/common-fields'
 import { STORAGE_CONDITIONS } from './warehouse-labels'
+import { idField } from '@/lib/id'
 
 // 창고 입력 규칙 — 화면·서버 공용 (docs/decisions/0027)
 // 유형은 입력받지 않는다: 사용자가 만드는 창고는 항상 일반, 입고대기는 센터 등록 때 자동으로만
@@ -16,7 +17,7 @@ const warehouseFields = {
 
 // 등록: 어느 센터의 창고인지 함께 (등록 후에는 센터를 바꿀 수 없다)
 export const createWarehouseSchema = z.object({
-  centerId: z.string().min(1, '센터를 골라 주세요.'),
+  centerId: idField('센터를 골라 주세요.'),
   ...warehouseFields,
 })
 

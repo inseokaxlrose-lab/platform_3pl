@@ -3,7 +3,7 @@ import { prisma } from '@/lib/prisma'
 import { computeScope, type DataScope } from './data-scope'
 
 // 사용자의 데이터 범위를 DB에서 읽어 계산한다 (사용자가 없으면 NONE)
-export async function loadDataScope(userId: string): Promise<DataScope> {
+export async function loadDataScope(userId: bigint): Promise<DataScope> {
   const user = await prisma.user.findUnique({
     where: { id: userId },
     select: {

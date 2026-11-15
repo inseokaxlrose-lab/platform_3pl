@@ -4,7 +4,7 @@ import { STORAGE_CONDITIONS } from './warehouse-labels'
 import { createWarehouseSchema, type WarehouseCreateInput } from './warehouse-schema'
 
 const input = (overrides: Partial<WarehouseCreateInput> = {}): WarehouseCreateInput => ({
-  centerId: 'c1',
+  centerId: '1',
   code: '',
   name: '상온 1창고',
   storageCondition: 'AMBIENT',

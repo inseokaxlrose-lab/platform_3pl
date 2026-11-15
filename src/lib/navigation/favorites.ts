@@ -18,7 +18,7 @@ export function isMenuHref(href: string) {
 
 // 한 사용자의 즐겨찾기 메뉴 주소 (추가한 순서)
 // 권한·영역 거르기는 화면(사이드바)에서 메뉴 목록과 맞춰 한다
-export async function loadFavoriteMenus(userId: string): Promise<string[]> {
+export async function loadFavoriteMenus(userId: bigint): Promise<string[]> {
   const rows = await prisma.userFavoriteMenu.findMany({
     where: { userId },
     select: { href: true },

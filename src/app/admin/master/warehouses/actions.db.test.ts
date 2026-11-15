@@ -31,7 +31,7 @@ const CODES: PermissionCode[] = [
 
 function signIn(scope: DataScope = { kind: 'ALL' }, codes = CODES) {
   vi.mocked(getCurrentUser).mockResolvedValue({
-    id: 'u1',
+    id: 1n,
     name: '사용자',
     username: 'u1',
     userType: scope.kind === 'ALL' ? 'OPERATOR' : 'CENTER',
@@ -40,11 +40,11 @@ function signIn(scope: DataScope = { kind: 'ALL' }, codes = CODES) {
   vi.mocked(getCurrentScope).mockResolvedValue(scope)
 }
 
-let icnId = ''
-let gmhId = ''
+let icnId = 0n
+let gmhId = 0n
 
 const input = (overrides: Partial<WarehouseCreateInput> = {}): WarehouseCreateInput => ({
-  centerId: icnId,
+  centerId: String(icnId),
   code: '',
   name: '상온 1창고',
   storageCondition: 'AMBIENT',
@@ -59,7 +59,7 @@ async function create(overrides: Partial<WarehouseCreateInput> = {}) {
 }
 
 // 센터의 입고대기 창고
-const stagingOf = (centerId: string) =>
+const stagingOf = (centerId: bigint) =>
   prisma.warehouse.findFirstOrThrow({ where: { centerId, type: 'INBOUND_STAGING' } })
 
 beforeEach(async () => {
@@ -82,10 +82,13 @@ describe('창고 등록', () => {
       storageCondition: 'CHILLED',
       externalCodes: { SAP: 'W100', ERP: '' },
     })
-    const saved = await prisma.warehouse.findUniqueOrThrow({ where: { id: created.id } })
+    const saved = await prisma.warehouse.findUniqueOrThrow({ where: { id: BigInt(created.id) } })
     expect(saved).toMatchObject({ code: 'A01', type: 'GENERAL', storageCondition: 'CHILLED' })
     expect(saved.systemCode).toMatch(/^WH\d{6}$/)
-    expect(await getExternalCodes('WAREHOUSE', created.id)).toEqual({ SAP: 'W100', ERP: '' })
+    expect(await getExternalCodes('WAREHOUSE', BigInt(created.id))).toEqual({
+      SAP: 'W100',
+      ERP: '',
+    })
   })
 
   it('코드는 같은 센터 안에서만 중복 금지 (다른 센터는 같은 코드 가능)', async () => {
@@ -94,7 +97,9 @@ describe('창고 등록', () => {
       ok: false,
       error: { code: 'CONFLICT', message: expect.stringContaining('A01') },
     })
-    expect((await createWarehouseAction(input({ centerId: gmhId, code: 'A01' }))).ok).toBe(true)
+    expect((await createWarehouseAction(input({ centerId: String(gmhId), code: 'A01' }))).ok).toBe(
+      true,
+    )
     // 자동으로 만든 입고대기 창고의 코드와도 겹칠 수 없다
     expect(await createWarehouseAction(input({ code: 'INBOUND' }))).toMatchObject({
       ok: false,
@@ -108,7 +113,7 @@ describe('창고 등록', () => {
       error: { code: 'VALIDATION' },
     })
     await prisma.center.update({ where: { id: gmhId }, data: { isActive: false } })
-    expect(await createWarehouseAction(input({ centerId: gmhId }))).toMatchObject({
+    expect(await createWarehouseAction(input({ centerId: String(gmhId) }))).toMatchObject({
       ok: false,
       error: { code: 'CONFLICT', message: expect.stringContaining('사용 중지된 센터') },
     })
@@ -125,11 +130,11 @@ describe('창고 수정 · 입고대기 보호', () => {
       storageCondition: 'FROZEN',
       externalCodes: { SAP: '', ERP: 'E-1' },
     })
-    let saved = await prisma.warehouse.findUniqueOrThrow({ where: { id: created.id } })
+    let saved = await prisma.warehouse.findUniqueOrThrow({ where: { id: BigInt(created.id) } })
     expect(saved).toMatchObject({ code: 'A02', name: '냉동 창고', storageCondition: 'FROZEN' })
 
     await updateWarehouseAction({ id: created.id, ...input({ code: '' }) })
-    saved = await prisma.warehouse.findUniqueOrThrow({ where: { id: created.id } })
+    saved = await prisma.warehouse.findUniqueOrThrow({ where: { id: BigInt(created.id) } })
     expect(saved.code).toBe(saved.systemCode)
   })
 
@@ -138,7 +143,7 @@ describe('창고 수정 · 입고대기 보호', () => {
 
     expect(
       await updateWarehouseAction({
-        id: staging.id,
+        id: String(staging.id),
         code: '',
         name: '입고대기(냉장)',
         storageCondition: 'CHILLED',
@@ -153,12 +158,14 @@ describe('창고 수정 · 입고대기 보호', () => {
     })
 
     expect(
-      await updateWarehouseAction({ id: staging.id, ...input({ code: 'NEWCODE' }) }),
+      await updateWarehouseAction({ id: String(staging.id), ...input({ code: 'NEWCODE' }) }),
     ).toMatchObject({
       ok: false,
       error: { code: 'VALIDATION', message: expect.stringContaining('입고대기') },
     })
-    expect(await setWarehouseActiveAction({ id: staging.id, isActive: false })).toMatchObject({
+    expect(
+      await setWarehouseActiveAction({ id: String(staging.id), isActive: false }),
+    ).toMatchObject({
       ok: false,
       error: { code: 'CONFLICT', message: '입고대기 창고는 사용 중지할 수 없습니다.' },
     })
@@ -167,20 +174,20 @@ describe('창고 수정 · 입고대기 보호', () => {
   it('일반 창고는 사용 중지 / 다시 사용', async () => {
     const created = await create()
     await setWarehouseActiveAction({ id: created.id, isActive: false })
-    expect((await prisma.warehouse.findUniqueOrThrow({ where: { id: created.id } })).isActive).toBe(
-      false,
-    )
+    expect(
+      (await prisma.warehouse.findUniqueOrThrow({ where: { id: BigInt(created.id) } })).isActive,
+    ).toBe(false)
   })
 })
 
 describe('목록 · 데이터 범위 · 권한', () => {
   it('센터 고르기·검색, 로케이션 수 함께', async () => {
     await create({ code: 'A01' })
-    await create({ centerId: gmhId, code: 'B01', name: '김해 1창고' })
+    await create({ centerId: String(gmhId), code: 'B01', name: '김해 1창고' })
 
     const icnOnly = await listWarehousesAction({
       ...createDataGridState(),
-      filters: { center: icnId },
+      filters: { center: String(icnId) },
     })
     expect(icnOnly.ok && icnOnly.data.rows.map((r) => r.code)).toEqual(['A01', 'INBOUND'])
 
@@ -191,7 +198,7 @@ describe('목록 · 데이터 범위 · 권한', () => {
   })
 
   it('센터 직원: 소속 센터 창고만 보고, 다른 센터 창고는 고치거나 추가할 수 없다', async () => {
-    const gmhWarehouse = await create({ centerId: gmhId, code: 'B01' })
+    const gmhWarehouse = await create({ centerId: String(gmhId), code: 'B01' })
     signIn({ kind: 'CENTERS', centerIds: [icnId] })
 
     const result = await listWarehousesAction(createDataGridState())
@@ -199,7 +206,7 @@ describe('목록 · 데이터 범위 · 권한', () => {
     // 다른 센터를 골라도 범위 밖은 나오지 않는다
     const other = await listWarehousesAction({
       ...createDataGridState(),
-      filters: { center: gmhId },
+      filters: { center: String(gmhId) },
     })
     expect(other.ok && other.data.rows).toEqual([])
 
@@ -207,7 +214,7 @@ describe('목록 · 데이터 범위 · 권한', () => {
       ok: false,
       error: { code: 'NOT_FOUND' },
     })
-    expect(await createWarehouseAction(input({ centerId: gmhId }))).toMatchObject({
+    expect(await createWarehouseAction(input({ centerId: String(gmhId) }))).toMatchObject({
       ok: false,
       error: { code: 'NOT_FOUND' },
     })
@@ -232,10 +239,10 @@ describe('목록 검색 조건 · 일괄 처리 · 엑셀', () => {
 
   it('유형·보관 조건·상태로 거른다 (모르는 값은 조건 없음)', async () => {
     await create({ code: 'A01', storageCondition: 'FROZEN' })
-    expect(await codes({ center: icnId, type: 'INBOUND_STAGING' })).toEqual(['INBOUND'])
-    expect(await codes({ center: icnId, storage: 'FROZEN' })).toEqual(['A01'])
-    expect(await codes({ center: icnId, type: 'HOT' })).toEqual(['A01', 'INBOUND'])
-    expect(await codes({ center: icnId, status: 'INACTIVE' })).toEqual([])
+    expect(await codes({ center: String(icnId), type: 'INBOUND_STAGING' })).toEqual(['INBOUND'])
+    expect(await codes({ center: String(icnId), storage: 'FROZEN' })).toEqual(['A01'])
+    expect(await codes({ center: String(icnId), type: 'HOT' })).toEqual(['A01', 'INBOUND'])
+    expect(await codes({ center: String(icnId), status: 'INACTIVE' })).toEqual([])
   })
 
   it('일괄 사용 중지: 입고대기 창고가 섞이면 전체 거부, 범위 밖이 섞여도 전체 거부', async () => {
@@ -244,14 +251,14 @@ describe('목록 검색 조건 · 일괄 처리 · 엑셀', () => {
       where: { centerId: icnId, type: 'INBOUND_STAGING' },
     })
     expect(
-      await setWarehousesActiveAction({ ids: [a.id, staging.id], isActive: false }),
+      await setWarehousesActiveAction({ ids: [a.id, String(staging.id)], isActive: false }),
     ).toMatchObject({ ok: false, error: { code: 'CONFLICT' } })
     expect(await setWarehousesActiveAction({ ids: [a.id], isActive: false })).toEqual({
       ok: true,
       data: { count: 1 },
     })
 
-    const b = await create({ centerId: gmhId, code: 'B01' })
+    const b = await create({ centerId: String(gmhId), code: 'B01' })
     signIn({ kind: 'CENTERS', centerIds: [icnId] })
     expect(await setWarehousesActiveAction({ ids: [a.id, b.id], isActive: true })).toMatchObject({
       ok: false,

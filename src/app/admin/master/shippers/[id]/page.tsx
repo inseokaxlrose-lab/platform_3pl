@@ -2,6 +2,7 @@ import type { Metadata } from 'next'
 import { notFound } from 'next/navigation'
 import { BackToListButton } from '@/components/master-list'
 import { AccessDenied } from '@/components/permission'
+import { parseId } from '@/lib/id'
 import { getCurrentScope, hasPermission } from '@/lib/session'
 import { getCenterChoices, getShipperForEdit } from '../queries'
 import { ShipperForm } from '../shipper-form'
@@ -13,7 +14,9 @@ export default async function EditShipperPage({
   params,
 }: PageProps<'/admin/master/shippers/[id]'>) {
   if (!(await hasPermission('master.shippers.read'))) return <AccessDenied />
-  const { id } = await params
+  // 주소의 키가 숫자 모양이 아니면 바로 "찾을 수 없음"
+  const id = parseId((await params).id)
+  if (id === null) notFound()
   const scope = await getCurrentScope()
   const [shipper, centers, canUpdate, canViewUsers, canAddUser] = await Promise.all([
     getShipperForEdit(id, scope),

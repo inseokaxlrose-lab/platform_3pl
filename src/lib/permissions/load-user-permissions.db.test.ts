@@ -81,6 +81,6 @@ describe('loadUserPermissions (DB)', () => {
   })
 
   it('없는 사용자는 권한이 없다', async () => {
-    expect((await loadUserPermissions('no-such-user')).codes.size).toBe(0)
+    expect((await loadUserPermissions(999999n)).codes.size).toBe(0)
   })
 })

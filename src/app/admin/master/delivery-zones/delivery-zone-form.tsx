@@ -82,6 +82,8 @@ export function DeliveryZoneForm({
       zone ? updateDeliveryZoneAction({ id: zone.id, ...value }) : createDeliveryZoneAction(value),
     afterSave: (saved) => ({
       ...saved,
+      // 검사를 거친 값은 키가 bigint라 화면 값(글자)으로 되돌린다
+      centerId: String(saved.centerId),
       description: saved.description ?? '',
       externalCodes: { ...EMPTY_EXTERNAL_CODES, ...saved.externalCodes },
     }),
