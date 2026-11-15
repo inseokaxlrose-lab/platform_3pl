@@ -274,7 +274,7 @@ export function SearchPanel({ fields, values, onSearch, onReset }: SearchPanelPr
   return (
     <form
       role="search"
-      className="mb-4 rounded-lg border bg-card p-4 text-card-foreground"
+      className="rounded-lg border bg-card p-card text-card-foreground"
       onSubmit={(event) => {
         event.preventDefault()
         onSearch(draft)

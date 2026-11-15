@@ -45,6 +45,8 @@ export type FieldProps = {
   hint?: React.ReactNode
   // 이름표를 누르면 초점이 갈 입력 id
   htmlFor?: string
+  // true면 앞 칸에 이어 붙이지 않고 새 줄 첫 칸에서 시작 (줄바꿈용 빈 칸을 넣지 않는다)
+  newRow?: boolean
   className?: string
   children: React.ReactNode
 }
@@ -57,11 +59,19 @@ export function Field({
   error,
   hint,
   htmlFor,
+  newRow,
   className,
   children,
 }: FieldProps) {
   return (
-    <div className={cn('grid min-w-0 content-start gap-2', SPAN_CLASS[span], className)}>
+    <div
+      className={cn(
+        'grid min-w-0 content-start gap-2',
+        SPAN_CLASS[span],
+        newRow && 'md:col-start-1',
+        className,
+      )}
+    >
       <Label htmlFor={htmlFor}>
         {label}
         {required && <span className="text-destructive"> *</span>}

@@ -3,7 +3,7 @@
 import { RotateCcwIcon } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { useState } from 'react'
-import { PageHeader } from '@/components/common'
+import { AppPage } from '@/components/app-page'
 import type { RowData } from '@tanstack/react-table'
 import { DataGrid, type DataGridColumn } from '@/components/data-grid'
 import { Button } from '@/components/ui/button'
@@ -14,6 +14,8 @@ import type { ListQuery } from './use-list-query'
 type MasterListPageProps<TRow extends RowData> = {
   title: string
   description?: React.ReactNode
+  // 설명 다음 줄 (상태 배지 등)
+  meta?: React.ReactNode
   // 제목 오른쪽 버튼 (예: [신규 등록]) — 권한 검사는 화면에서 (<Can> 또는 서버에서 계산한 값)
   actions?: React.ReactNode
   // DataGrid id (사용자별 설정 저장 키, useListQuery의 gridId와 같게)
@@ -41,6 +43,7 @@ type MasterListPageProps<TRow extends RowData> = {
 export function MasterListPage<TRow extends RowData>({
   title,
   description,
+  meta,
   actions,
   gridId,
   searchFields,
@@ -80,8 +83,8 @@ export function MasterListPage<TRow extends RowData>({
       : { title: emptyTitle }
 
   return (
-    <>
-      <PageHeader title={title} description={description} actions={actions} />
+    // 공통 페이지 틀: 화면 전체 폭 (검색 영역·그리드는 카드, 사이 간격은 section 토큰)
+    <AppPage title={title} description={description} meta={meta} actions={actions}>
       <SearchPanel
         fields={searchFields}
         values={list.values}
@@ -108,6 +111,6 @@ export function MasterListPage<TRow extends RowData>({
         exportExcel={excelName ? { fileName: excelName, fetchRows: list.fetchAll } : undefined}
         empty={empty}
       />
-    </>
+    </AppPage>
   )
 }

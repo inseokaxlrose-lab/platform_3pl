@@ -1,6 +1,7 @@
 'use client'
 
 import { PlusIcon, Trash2Icon } from 'lucide-react'
+import { SectionToolbar } from '@/components/app-page/section-toolbar'
 import { CodeSelect, EmailInput, PhoneInput } from '@/components/inputs'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -44,6 +45,8 @@ type EditableSubTableProps<TRow> = {
   // useMasterForm의 errors (행 오류 'name.0.key', 표 오류 'name')
   errors?: FormErrors
   addLabel?: string
+  // 건수 단위 (예: '명' → "2 / 5명")
+  countUnit?: string
   emptyText?: string
   disabled?: boolean
 }
@@ -63,6 +66,7 @@ export function EditableSubTable<TRow extends Record<string, unknown>>({
   primary,
   errors = {},
   addLabel = '추가',
+  countUnit = '개',
   emptyText = '등록된 항목이 없습니다.',
   disabled = false,
 }: EditableSubTableProps<TRow>) {
@@ -121,6 +125,30 @@ export function EditableSubTable<TRow extends Record<string, unknown>>({
 
   return (
     <div className="space-y-3">
+      {/* 목록 그리드와 같은 툴바 배치: 왼쪽 건수, 오른쪽 [+ 추가] (표 위) */}
+      <SectionToolbar
+        start={
+          <span className={cn('text-muted-foreground tabular-nums', full && 'text-warning')}>
+            {Number.isFinite(maxRows)
+              ? `${rows.length} / ${maxRows}${countUnit}${full ? ' (최대)' : ''}`
+              : `${rows.length}${countUnit}`}
+          </span>
+        }
+        end={
+          !disabled && (
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              disabled={full}
+              onClick={() => onChange(withPrimary([...rows, createRow()]))}
+            >
+              <PlusIcon />
+              {addLabel}
+            </Button>
+          )
+        }
+      />
       {rows.length === 0 ? (
         <p className="rounded-md border border-dashed py-6 text-center text-sm text-muted-foreground">
           {emptyText}
@@ -221,26 +249,6 @@ export function EditableSubTable<TRow extends Record<string, unknown>>({
         <p role="alert" className="text-sm text-destructive">
           {tableError}
         </p>
-      )}
-
-      {!disabled && (
-        <div className="flex items-center gap-3">
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            disabled={full}
-            onClick={() => onChange(withPrimary([...rows, createRow()]))}
-          >
-            <PlusIcon />
-            {addLabel}
-          </Button>
-          <span className={cn('text-xs text-muted-foreground', full && 'text-warning')}>
-            {Number.isFinite(maxRows)
-              ? `${rows.length} / ${maxRows}${full ? ' (최대)' : ''}`
-              : `${rows.length}개`}
-          </span>
-        </div>
       )}
     </div>
   )

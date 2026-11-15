@@ -10,7 +10,10 @@ import { useMasterForm } from './use-master-form'
 
 const push = vi.fn()
 const refresh = vi.fn()
-vi.mock('next/navigation', () => ({ useRouter: () => ({ push, refresh }) }))
+vi.mock('next/navigation', () => ({
+  useRouter: () => ({ push, refresh }),
+  usePathname: () => '/admin/test',
+}))
 
 beforeAll(() => {
   // jsdom에 없는 브라우저 기능 채우기
@@ -61,7 +64,7 @@ describe('EditableSubTable', () => {
     fireEvent.click(add)
     expect(rows().map((r) => r.isPrimary)).toEqual([true, false])
     expect(add).toHaveProperty('disabled', true)
-    expect(screen.getByText('2 / 2 (최대)')).toBeTruthy()
+    expect(screen.getByText('2 / 2개 (최대)')).toBeTruthy()
   })
 
   it('대표는 하나만, 대표 행을 지우면 남은 첫 행이 대표', () => {
@@ -109,6 +112,7 @@ function FormHarness({ save }: { save: () => Promise<{ ok: true; data: null }> }
     <>
       <a href="/elsewhere">다른 화면</a>
       <MasterFormPage
+        header={{ title: '견본' }}
         form={form}
         sections={[
           {
@@ -204,6 +208,7 @@ describe('MasterFormPage 따로 처리하는 섹션 · 저장 후 동작', () =>
     })
     return (
       <MasterFormPage
+        header={{ title: '견본' }}
         form={form}
         sections={[
           {

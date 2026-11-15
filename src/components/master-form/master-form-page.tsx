@@ -2,7 +2,9 @@
 
 import { RotateCcwIcon, SaveIcon } from 'lucide-react'
 import { useEffect, useId, useRef, useState } from 'react'
+import { AppPage } from '@/components/app-page'
 import { StatusBadge } from '@/components/common'
+import type { PageHeaderProps } from '@/components/common/page-header'
 import {
   AlertDialog,
   AlertDialogAction,
@@ -23,37 +25,40 @@ export type MasterFormSection = {
   id: string
   title: string
   description?: React.ReactNode
-  // 제목 오른쪽 (예: 안내 배지)
+  // 제목 오른쪽 (예: 추가 버튼)
   action?: React.ReactNode
   content: React.ReactNode
   // true면 "따로 처리하는 섹션": 자기 버튼으로 바로 처리하는 내용(계정 사용 중지, 요약 표 등)
-  // 폼 밖에 그려 저장 막대·변경 감지에서 빠지고, 폼 섹션들 뒤에 온다 (목차에는 함께)
+  // 폼 밖에 그려 저장·변경 감지에서 빠지고, 폼 섹션들 뒤에 온다 (목차에는 함께, 제목 옆 "바로 적용")
   standalone?: boolean
 }
+
+// 헤더: 제목·설명·meta·보조 버튼 (저장·취소는 이 틀이 맨 오른쪽에 붙인다)
+export type MasterFormHeader = Omit<PageHeaderProps, 'className'>
 
 type MasterFormPageProps = {
   // useMasterForm의 반환값
   form: MasterFormState
+  header: MasterFormHeader
   // 위에서 아래로 그릴 섹션 (새 섹션은 이 배열에 추가만 하면 목차에도 생긴다)
   sections: MasterFormSection[]
-  // 수정 권한이 없으면 true: 저장 막대를 숨긴다 (입력 칸 잠금은 화면에서 disabled로)
+  // 수정 권한이 없으면 true: 저장·취소를 숨긴다 (입력 칸 잠금은 화면에서 disabled로)
   readOnly?: boolean
-  // 저장 막대 왼쪽에 함께 보여줄 정보 (예: 마지막 수정)
-  meta?: React.ReactNode
 }
 
 const sectionDomId = (id: string) => `section-${id}`
+// 고정 헤더 아래로 맞추는 위치: 상단 바(3.5rem) + 페이지 헤더 높이 + 여유 1rem
+const BELOW_HEADER = 'calc(3.5rem + var(--page-header-h, 0px) + 1rem)'
 
-// 기준정보 입력 화면 틀 (docs/ui-guidelines.md)
-// - 본문은 제한 폭(max-w-5xl)으로 가운데, 넓은 화면에서는 왼쪽에 섹션 목차(지금 보는 섹션·오류 섹션 표시)
-// - 섹션은 카드 대신 구분선으로 나눈다 (테두리 중첩 금지)
-// - 아래 고정 저장 막대: 변경사항 있음 · [취소] · [저장]. 변경이 없으면 둘 다 꺼진다
-// - 저장 검사에 실패하면 첫 오류 칸으로 스크롤·초점, 저장하지 않은 채 떠나려 하면 확인 창
+// 기준정보 입력 화면 틀 (docs/ui-guidelines.md "입력 화면", "페이지 틀")
+// - AppPage(form): 헤더는 화면 전체 폭·고정, 왼쪽 목차 + 본문(최대 폭, 왼쪽 정렬)
+// - 헤더 오른쪽: [도움말] → 보조 버튼 → 변경사항 있음 · [취소] · [저장] (스크롤해도 늘 보인다)
+// - 섹션은 카드 대신 구분선, 저장 검사에 실패하면 첫 오류 칸으로, 저장하지 않고 떠나면 확인 창
 export function MasterFormPage({
   form,
+  header,
   sections: allSections,
   readOnly = false,
-  meta,
 }: MasterFormPageProps) {
   const formRef = useRef<HTMLFormElement>(null)
   const formId = useId()
@@ -64,8 +69,9 @@ export function MasterFormPage({
   const [activeId, setActiveId] = useState(sections[0]?.id)
   const [errorSectionIds, setErrorSectionIds] = useState<string[]>([])
   const guard = useDirtyGuard(form.dirty && !readOnly)
+  const editable = !readOnly && formSections.length > 0
 
-  // 지금 보는 섹션: 화면 위쪽 1/3 안에 들어온 섹션
+  // 지금 보는 섹션: 헤더 아래 위쪽 1/3 안에 들어온 섹션
   // 섹션 배열은 그릴 때마다 새로 만들어지므로 id 목록 글자로 비교한다 (매번 다시 관찰하지 않게)
   const sectionKey = sections.map((s) => s.id).join(',')
   useEffect(() => {
@@ -80,7 +86,7 @@ export function MasterFormPage({
         const id = visible[0].target.getAttribute('data-section-id')!
         setActiveId((current) => (current === id ? current : id))
       },
-      { rootMargin: '0px 0px -66% 0px' },
+      { rootMargin: '-20% 0px -60% 0px' },
     )
     elements.forEach((el) => observer.observe(el))
     return () => observer.disconnect()
@@ -105,91 +111,97 @@ export function MasterFormPage({
     if (!first) return
     first.scrollIntoView({ block: 'center', behavior: 'smooth' })
     // 입력 칸이면 초점까지 (표 전체 오류 문구처럼 칸이 아니면 스크롤만)
-    if (first.matches('input, button, textarea, [role="combobox"]'))
+    if (first.matches('input, button, textarea, [role="combobox"]')) {
       first.focus({ preventScroll: true })
+    }
     // 저장 시도마다 한 번만 (오류 문구가 바뀔 때 다시 끌어당기지 않게)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [form.submitCount, form.errors])
 
+  // 헤더 오른쪽 저장 영역: 결과 문구 또는 "변경사항 있음" · [취소] · [저장](주 버튼, 맨 오른쪽)
+  const saveControls = editable && (
+    <>
+      {form.message ? (
+        <p
+          role={form.message.ok ? 'status' : 'alert'}
+          className={cn('text-sm', form.message.ok ? 'text-success' : 'text-destructive')}
+        >
+          {form.message.text}
+        </p>
+      ) : (
+        form.dirty && <StatusBadge tone="warning">변경사항 있음</StatusBadge>
+      )}
+      <Button
+        type="button"
+        variant="outline"
+        disabled={!form.dirty || form.pending}
+        onClick={form.cancel}
+      >
+        <RotateCcwIcon />
+        취소
+      </Button>
+      {/* 헤더는 폼 밖에 있어서 form 속성으로 폼과 잇는다 */}
+      <Button type="submit" form={formId} disabled={!form.dirty || form.pending}>
+        <SaveIcon />
+        {form.pending ? '저장 중…' : '저장'}
+      </Button>
+    </>
+  )
+
+  const toc = (
+    <nav aria-label="섹션 목차" className="sticky" style={{ top: BELOW_HEADER }}>
+      <ul className="space-y-1 border-l text-sm">
+        {sections.map((s) => {
+          const hasError = errorSectionIds.includes(s.id)
+          return (
+            <li key={s.id}>
+              <a
+                href={`#${sectionDomId(s.id)}`}
+                aria-current={activeId === s.id ? 'true' : undefined}
+                className={cn(
+                  '-ml-px flex items-center gap-2 border-l-2 border-transparent py-1 pl-3 text-muted-foreground hover:text-foreground',
+                  activeId === s.id && 'border-primary font-medium text-foreground',
+                  hasError && 'text-destructive hover:text-destructive',
+                )}
+                onClick={(event) => {
+                  event.preventDefault()
+                  document
+                    .getElementById(sectionDomId(s.id))
+                    ?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+                  setActiveId(s.id)
+                }}
+              >
+                {s.title}
+                {hasError && (
+                  <span aria-label="오류 있음" className="size-1.5 rounded-full bg-destructive" />
+                )}
+              </a>
+            </li>
+          )
+        })}
+      </ul>
+    </nav>
+  )
+
   return (
-    <div className="mx-auto w-full max-w-5xl">
-      <div className="lg:grid lg:grid-cols-[10rem_minmax(0,1fr)] lg:gap-10">
-        <nav aria-label="섹션 목차" className="hidden lg:block">
-          <ul className="sticky top-20 space-y-1 border-l text-sm">
-            {sections.map((s) => {
-              const hasError = errorSectionIds.includes(s.id)
-              return (
-                <li key={s.id}>
-                  <a
-                    href={`#${sectionDomId(s.id)}`}
-                    aria-current={activeId === s.id ? 'true' : undefined}
-                    className={cn(
-                      '-ml-px flex items-center gap-2 border-l-2 border-transparent py-1 pl-3 text-muted-foreground hover:text-foreground',
-                      activeId === s.id && 'border-primary font-medium text-foreground',
-                      hasError && 'text-destructive hover:text-destructive',
-                    )}
-                    onClick={(event) => {
-                      event.preventDefault()
-                      document
-                        .getElementById(sectionDomId(s.id))
-                        ?.scrollIntoView({ behavior: 'smooth', block: 'start' })
-                      setActiveId(s.id)
-                    }}
-                  >
-                    {s.title}
-                    {hasError && (
-                      <span
-                        aria-label="오류 있음"
-                        className="size-1.5 rounded-full bg-destructive"
-                      />
-                    )}
-                  </a>
-                </li>
-              )
-            })}
-          </ul>
-        </nav>
-
-        <div className="min-w-0">
-          <form id={formId} ref={formRef} onSubmit={form.submit} noValidate>
-            {formSections.map((section, index) => renderSection(section, index))}
-          </form>
-          {standaloneSections.map((section, index) =>
-            renderSection(section, formSections.length + index),
-          )}
-        </div>
-      </div>
-
-      {!readOnly && formSections.length > 0 && (
-        <div className="sticky bottom-0 z-10 mt-4 flex flex-wrap items-center justify-end gap-3 border-t bg-background/95 py-3 backdrop-blur supports-[backdrop-filter]:bg-background/80">
-          <div className="mr-auto flex items-center gap-3 text-xs text-muted-foreground">
-            {meta}
-          </div>
-          {form.message ? (
-            <p
-              role={form.message.ok ? 'status' : 'alert'}
-              className={cn('text-sm', form.message.ok ? 'text-success' : 'text-destructive')}
-            >
-              {form.message.text}
-            </p>
-          ) : (
-            form.dirty && <StatusBadge tone="warning">변경사항 있음</StatusBadge>
-          )}
-          <Button
-            type="button"
-            variant="outline"
-            disabled={!form.dirty || form.pending}
-            onClick={form.cancel}
-          >
-            <RotateCcwIcon />
-            취소
-          </Button>
-          {/* 저장 막대는 폼 밖에 있어서 form 속성으로 폼과 잇는다 */}
-          <Button type="submit" form={formId} disabled={!form.dirty || form.pending}>
-            <SaveIcon />
-            {form.pending ? '저장 중…' : '저장'}
-          </Button>
-        </div>
+    <AppPage
+      variant="form"
+      {...header}
+      actions={
+        (header.actions || saveControls) && (
+          <>
+            {header.actions}
+            {saveControls}
+          </>
+        )
+      }
+      aside={toc}
+    >
+      <form id={formId} ref={formRef} onSubmit={form.submit} noValidate>
+        {formSections.map((section, index) => renderSection(section, index))}
+      </form>
+      {standaloneSections.map((section, index) =>
+        renderSection(section, formSections.length + index),
       )}
 
       <AlertDialog open={guard.pendingHref !== null} onOpenChange={(open) => !open && guard.stay()}>
@@ -208,11 +220,11 @@ export function MasterFormPage({
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-    </div>
+    </AppPage>
   )
 }
 
-// 섹션 하나: 카드 대신 위쪽 구분선 (첫 섹션은 선 없음)
+// 섹션 하나: 카드 대신 위쪽 구분선 (첫 섹션은 선 없음), 간격은 section 토큰
 function renderSection(section: MasterFormSection, index: number) {
   return (
     <section
@@ -220,12 +232,19 @@ function renderSection(section: MasterFormSection, index: number) {
       id={sectionDomId(section.id)}
       data-section-id={section.id}
       aria-labelledby={`${sectionDomId(section.id)}-title`}
-      className={cn('scroll-mt-20 pb-8', index > 0 && 'border-t pt-8')}
+      style={{ scrollMarginTop: BELOW_HEADER }}
+      className={cn('pb-section', index > 0 && 'border-t pt-section')}
     >
-      <div className="mb-5 flex items-start justify-between gap-3">
+      <div className="mb-4 flex items-start justify-between gap-3">
         <div className="space-y-1">
-          <h2 id={`${sectionDomId(section.id)}-title`} className="text-base font-semibold">
-            {section.title}
+          <h2 className="flex items-center gap-2 text-base font-semibold">
+            {/* 섹션 이름은 제목 글자만 ("바로 적용" 표시는 빼고) */}
+            <span id={`${sectionDomId(section.id)}-title`}>{section.title}</span>
+            {section.standalone && (
+              <span className="rounded-sm border px-1.5 py-0.5 text-xs leading-none font-normal text-muted-foreground">
+                바로 적용
+              </span>
+            )}
           </h2>
           {section.description && (
             <p className="text-sm text-muted-foreground">{section.description}</p>
