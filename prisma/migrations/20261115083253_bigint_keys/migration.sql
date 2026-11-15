@@ -1,0 +1,178 @@
+-- M2.5 1b: 내부 키를 글자(cuid) → BIGINT 자동 증가로 (docs/db-conventions.md, 0037)
+-- 기존 데이터는 보존한다: 표마다 등록 순서대로 1, 2, 3… 번호를 새로 매기고,
+-- 외래키는 모두 ON UPDATE CASCADE라 부모 번호가 바뀌면 자식 칸도 함께 바뀐다.
+-- 외래키가 없는 외부 코드(tb_ext_code.entity_id)는 대상 종류별로 직접 바꾼다.
+
+-- 1) 로그인 세션·인증 대기값은 비운다 (모두 다시 로그인)
+TRUNCATE TABLE "tb_session", "tb_verification";
+
+-- 2) 번호 다시 매기기
+CREATE TEMP TABLE "map_tb_user" AS SELECT "user_id" AS old_id, (row_number() OVER (ORDER BY "created_at", "user_id"))::text AS new_id FROM "tb_user";
+UPDATE "tb_user" x SET "user_id" = m.new_id FROM "map_tb_user" m WHERE x."user_id" = m.old_id;
+CREATE TEMP TABLE "map_tb_account" AS SELECT "acct_id" AS old_id, (row_number() OVER (ORDER BY "created_at", "acct_id"))::text AS new_id FROM "tb_account";
+UPDATE "tb_account" x SET "acct_id" = m.new_id FROM "map_tb_account" m WHERE x."acct_id" = m.old_id;
+CREATE TEMP TABLE "map_tb_perm_group" AS SELECT "perm_group_id" AS old_id, (row_number() OVER (ORDER BY "created_at", "perm_group_id"))::text AS new_id FROM "tb_perm_group";
+UPDATE "tb_perm_group" x SET "perm_group_id" = m.new_id FROM "map_tb_perm_group" m WHERE x."perm_group_id" = m.old_id;
+CREATE TEMP TABLE "map_tb_center" AS SELECT "center_id" AS old_id, (row_number() OVER (ORDER BY "created_at", "center_id"))::text AS new_id FROM "tb_center";
+UPDATE "tb_ext_code" e SET "entity_id" = m.new_id FROM "map_tb_center" m WHERE e."entity_type_cd" = 'CENTER' AND e."entity_id" = m.old_id;
+UPDATE "tb_center" x SET "center_id" = m.new_id FROM "map_tb_center" m WHERE x."center_id" = m.old_id;
+CREATE TEMP TABLE "map_tb_warehouse" AS SELECT "warehouse_id" AS old_id, (row_number() OVER (ORDER BY "created_at", "warehouse_id"))::text AS new_id FROM "tb_warehouse";
+UPDATE "tb_ext_code" e SET "entity_id" = m.new_id FROM "map_tb_warehouse" m WHERE e."entity_type_cd" = 'WAREHOUSE' AND e."entity_id" = m.old_id;
+UPDATE "tb_warehouse" x SET "warehouse_id" = m.new_id FROM "map_tb_warehouse" m WHERE x."warehouse_id" = m.old_id;
+CREATE TEMP TABLE "map_tb_location" AS SELECT "location_id" AS old_id, (row_number() OVER (ORDER BY "created_at", "location_id"))::text AS new_id FROM "tb_location";
+UPDATE "tb_ext_code" e SET "entity_id" = m.new_id FROM "map_tb_location" m WHERE e."entity_type_cd" = 'LOCATION' AND e."entity_id" = m.old_id;
+UPDATE "tb_location" x SET "location_id" = m.new_id FROM "map_tb_location" m WHERE x."location_id" = m.old_id;
+CREATE TEMP TABLE "map_tb_shipper" AS SELECT "shipper_id" AS old_id, (row_number() OVER (ORDER BY "created_at", "shipper_id"))::text AS new_id FROM "tb_shipper";
+UPDATE "tb_ext_code" e SET "entity_id" = m.new_id FROM "map_tb_shipper" m WHERE e."entity_type_cd" = 'SHIPPER' AND e."entity_id" = m.old_id;
+UPDATE "tb_shipper" x SET "shipper_id" = m.new_id FROM "map_tb_shipper" m WHERE x."shipper_id" = m.old_id;
+CREATE TEMP TABLE "map_tb_shipper_contact" AS SELECT "contact_id" AS old_id, (row_number() OVER (ORDER BY "shipper_id", "sort_seq", "contact_id"))::text AS new_id FROM "tb_shipper_contact";
+UPDATE "tb_shipper_contact" x SET "contact_id" = m.new_id FROM "map_tb_shipper_contact" m WHERE x."contact_id" = m.old_id;
+CREATE TEMP TABLE "map_tb_operator" AS SELECT "operator_id" AS old_id, (row_number() OVER (ORDER BY "created_at", "operator_id"))::text AS new_id FROM "tb_operator";
+UPDATE "tb_operator" x SET "operator_id" = m.new_id FROM "map_tb_operator" m WHERE x."operator_id" = m.old_id;
+CREATE TEMP TABLE "map_tb_operator_contact" AS SELECT "contact_id" AS old_id, (row_number() OVER (ORDER BY "company_id", "sort_seq", "contact_id"))::text AS new_id FROM "tb_operator_contact";
+UPDATE "tb_operator_contact" x SET "contact_id" = m.new_id FROM "map_tb_operator_contact" m WHERE x."contact_id" = m.old_id;
+CREATE TEMP TABLE "map_tb_ext_code" AS SELECT "ext_code_id" AS old_id, (row_number() OVER (ORDER BY "created_at", "ext_code_id"))::text AS new_id FROM "tb_ext_code";
+UPDATE "tb_ext_code" x SET "ext_code_id" = m.new_id FROM "map_tb_ext_code" m WHERE x."ext_code_id" = m.old_id;
+CREATE TEMP TABLE "map_tb_code_group" AS SELECT "group_id" AS old_id, (row_number() OVER (ORDER BY "created_at", "group_id"))::text AS new_id FROM "tb_code_group";
+UPDATE "tb_code_group" x SET "group_id" = m.new_id FROM "map_tb_code_group" m WHERE x."group_id" = m.old_id;
+CREATE TEMP TABLE "map_tb_code_item" AS SELECT "code_item_id" AS old_id, (row_number() OVER (ORDER BY "created_at", "code_item_id"))::text AS new_id FROM "tb_code_item";
+UPDATE "tb_code_item" x SET "code_item_id" = m.new_id FROM "map_tb_code_item" m WHERE x."code_item_id" = m.old_id;
+CREATE TEMP TABLE "map_tb_delivery_zone" AS SELECT "zone_id" AS old_id, (row_number() OVER (ORDER BY "created_at", "zone_id"))::text AS new_id FROM "tb_delivery_zone";
+UPDATE "tb_ext_code" e SET "entity_id" = m.new_id FROM "map_tb_delivery_zone" m WHERE e."entity_type_cd" = 'DELIVERY_ZONE' AND e."entity_id" = m.old_id;
+UPDATE "tb_delivery_zone" x SET "zone_id" = m.new_id FROM "map_tb_delivery_zone" m WHERE x."zone_id" = m.old_id;
+CREATE TEMP TABLE "map_tb_delivery_zone_region" AS SELECT "zone_region_id" AS old_id, (row_number() OVER (ORDER BY "zone_id", "zone_region_id"))::text AS new_id FROM "tb_delivery_zone_region";
+UPDATE "tb_delivery_zone_region" x SET "zone_region_id" = m.new_id FROM "map_tb_delivery_zone_region" m WHERE x."zone_region_id" = m.old_id;
+CREATE TEMP TABLE "map_tb_unit" AS SELECT "unit_id" AS old_id, (row_number() OVER (ORDER BY "created_at", "unit_id"))::text AS new_id FROM "tb_unit";
+UPDATE "tb_ext_code" e SET "entity_id" = m.new_id FROM "map_tb_unit" m WHERE e."entity_type_cd" = 'UNIT' AND e."entity_id" = m.old_id;
+UPDATE "tb_unit" x SET "unit_id" = m.new_id FROM "map_tb_unit" m WHERE x."unit_id" = m.old_id;
+
+-- 아이디·비밀번호 계정의 상대 키는 사용자 키와 같다 (Better Auth 규칙)
+UPDATE "tb_account" SET "provider_account_id" = "user_id" WHERE "provider_id" = 'credential';
+
+-- 3) 외래키를 잠시 떼고 칸 형식을 BIGINT로 (운영사의 고정 기본값 'default'는 먼저 지운다)
+ALTER TABLE "tb_operator" ALTER COLUMN "operator_id" DROP DEFAULT;
+ALTER TABLE "tb_user" DROP CONSTRAINT "tb_user_shipper_id_fkey";
+ALTER TABLE "tb_session" DROP CONSTRAINT "tb_session_user_id_fkey";
+ALTER TABLE "tb_account" DROP CONSTRAINT "tb_account_user_id_fkey";
+ALTER TABLE "tb_perm_group_perm" DROP CONSTRAINT "tb_perm_group_perm_group_id_fkey";
+ALTER TABLE "tb_user_perm_group" DROP CONSTRAINT "tb_user_perm_group_group_id_fkey";
+ALTER TABLE "tb_user_perm_group" DROP CONSTRAINT "tb_user_perm_group_user_id_fkey";
+ALTER TABLE "tb_user_perm_override" DROP CONSTRAINT "tb_user_perm_override_user_id_fkey";
+ALTER TABLE "tb_user_center" DROP CONSTRAINT "tb_user_center_center_id_fkey";
+ALTER TABLE "tb_user_center" DROP CONSTRAINT "tb_user_center_user_id_fkey";
+ALTER TABLE "tb_user_grid_setting" DROP CONSTRAINT "tb_user_grid_setting_user_id_fkey";
+ALTER TABLE "tb_user_favorite_menu" DROP CONSTRAINT "tb_user_favorite_menu_user_id_fkey";
+ALTER TABLE "tb_operator" DROP CONSTRAINT "tb_operator_updated_by_id_fkey";
+ALTER TABLE "tb_operator_contact" DROP CONSTRAINT "tb_operator_contact_company_id_fkey";
+ALTER TABLE "tb_warehouse" DROP CONSTRAINT "tb_warehouse_center_id_fkey";
+ALTER TABLE "tb_location" DROP CONSTRAINT "tb_location_warehouse_id_fkey";
+ALTER TABLE "tb_code_item" DROP CONSTRAINT "tb_code_item_group_id_fkey";
+ALTER TABLE "tb_delivery_zone" DROP CONSTRAINT "tb_delivery_zone_center_id_fkey";
+ALTER TABLE "tb_delivery_zone_region" DROP CONSTRAINT "tb_delivery_zone_region_zone_id_fkey";
+ALTER TABLE "tb_shipper_center" DROP CONSTRAINT "tb_shipper_center_center_id_fkey";
+ALTER TABLE "tb_shipper_center" DROP CONSTRAINT "tb_shipper_center_shipper_id_fkey";
+ALTER TABLE "tb_shipper_contact" DROP CONSTRAINT "tb_shipper_contact_shipper_id_fkey";
+ALTER TABLE "tb_user" ALTER COLUMN "user_id" SET DATA TYPE BIGINT USING "user_id"::bigint, ALTER COLUMN "shipper_id" SET DATA TYPE BIGINT USING "shipper_id"::bigint;
+ALTER TABLE "tb_account" ALTER COLUMN "acct_id" SET DATA TYPE BIGINT USING "acct_id"::bigint, ALTER COLUMN "user_id" SET DATA TYPE BIGINT USING "user_id"::bigint;
+ALTER TABLE "tb_perm_group" ALTER COLUMN "perm_group_id" SET DATA TYPE BIGINT USING "perm_group_id"::bigint;
+ALTER TABLE "tb_center" ALTER COLUMN "center_id" SET DATA TYPE BIGINT USING "center_id"::bigint;
+ALTER TABLE "tb_warehouse" ALTER COLUMN "warehouse_id" SET DATA TYPE BIGINT USING "warehouse_id"::bigint, ALTER COLUMN "center_id" SET DATA TYPE BIGINT USING "center_id"::bigint;
+ALTER TABLE "tb_location" ALTER COLUMN "location_id" SET DATA TYPE BIGINT USING "location_id"::bigint, ALTER COLUMN "warehouse_id" SET DATA TYPE BIGINT USING "warehouse_id"::bigint;
+ALTER TABLE "tb_shipper" ALTER COLUMN "shipper_id" SET DATA TYPE BIGINT USING "shipper_id"::bigint;
+ALTER TABLE "tb_shipper_contact" ALTER COLUMN "contact_id" SET DATA TYPE BIGINT USING "contact_id"::bigint, ALTER COLUMN "shipper_id" SET DATA TYPE BIGINT USING "shipper_id"::bigint;
+ALTER TABLE "tb_operator" ALTER COLUMN "operator_id" SET DATA TYPE BIGINT USING "operator_id"::bigint, ALTER COLUMN "updated_by_id" SET DATA TYPE BIGINT USING "updated_by_id"::bigint;
+ALTER TABLE "tb_operator_contact" ALTER COLUMN "contact_id" SET DATA TYPE BIGINT USING "contact_id"::bigint, ALTER COLUMN "company_id" SET DATA TYPE BIGINT USING "company_id"::bigint;
+ALTER TABLE "tb_ext_code" ALTER COLUMN "ext_code_id" SET DATA TYPE BIGINT USING "ext_code_id"::bigint, ALTER COLUMN "entity_id" SET DATA TYPE BIGINT USING "entity_id"::bigint;
+ALTER TABLE "tb_code_group" ALTER COLUMN "group_id" SET DATA TYPE BIGINT USING "group_id"::bigint;
+ALTER TABLE "tb_code_item" ALTER COLUMN "code_item_id" SET DATA TYPE BIGINT USING "code_item_id"::bigint, ALTER COLUMN "group_id" SET DATA TYPE BIGINT USING "group_id"::bigint;
+ALTER TABLE "tb_delivery_zone" ALTER COLUMN "zone_id" SET DATA TYPE BIGINT USING "zone_id"::bigint, ALTER COLUMN "center_id" SET DATA TYPE BIGINT USING "center_id"::bigint;
+ALTER TABLE "tb_delivery_zone_region" ALTER COLUMN "zone_region_id" SET DATA TYPE BIGINT USING "zone_region_id"::bigint, ALTER COLUMN "zone_id" SET DATA TYPE BIGINT USING "zone_id"::bigint;
+ALTER TABLE "tb_unit" ALTER COLUMN "unit_id" SET DATA TYPE BIGINT USING "unit_id"::bigint;
+ALTER TABLE "tb_session" ALTER COLUMN "session_id" SET DATA TYPE BIGINT USING "session_id"::bigint, ALTER COLUMN "user_id" SET DATA TYPE BIGINT USING "user_id"::bigint;
+ALTER TABLE "tb_verification" ALTER COLUMN "verification_id" SET DATA TYPE BIGINT USING "verification_id"::bigint;
+ALTER TABLE "tb_perm_group_perm" ALTER COLUMN "group_id" SET DATA TYPE BIGINT USING "group_id"::bigint;
+ALTER TABLE "tb_user_perm_group" ALTER COLUMN "group_id" SET DATA TYPE BIGINT USING "group_id"::bigint, ALTER COLUMN "user_id" SET DATA TYPE BIGINT USING "user_id"::bigint;
+ALTER TABLE "tb_user_perm_override" ALTER COLUMN "user_id" SET DATA TYPE BIGINT USING "user_id"::bigint;
+ALTER TABLE "tb_user_center" ALTER COLUMN "center_id" SET DATA TYPE BIGINT USING "center_id"::bigint, ALTER COLUMN "user_id" SET DATA TYPE BIGINT USING "user_id"::bigint;
+ALTER TABLE "tb_user_grid_setting" ALTER COLUMN "user_id" SET DATA TYPE BIGINT USING "user_id"::bigint;
+ALTER TABLE "tb_user_favorite_menu" ALTER COLUMN "user_id" SET DATA TYPE BIGINT USING "user_id"::bigint;
+ALTER TABLE "tb_shipper_center" ALTER COLUMN "center_id" SET DATA TYPE BIGINT USING "center_id"::bigint, ALTER COLUMN "shipper_id" SET DATA TYPE BIGINT USING "shipper_id"::bigint;
+
+-- 4) 자동 증가 (BIGSERIAL과 같은 모양: 표_칸_seq, 다음 번호는 지금 최댓값 + 1)
+CREATE SEQUENCE "tb_user_user_id_seq" OWNED BY "tb_user"."user_id";
+ALTER TABLE "tb_user" ALTER COLUMN "user_id" SET DEFAULT nextval('"tb_user_user_id_seq"');
+SELECT setval('"tb_user_user_id_seq"', COALESCE(MAX("user_id"), 0) + 1, false) FROM "tb_user";
+CREATE SEQUENCE "tb_account_acct_id_seq" OWNED BY "tb_account"."acct_id";
+ALTER TABLE "tb_account" ALTER COLUMN "acct_id" SET DEFAULT nextval('"tb_account_acct_id_seq"');
+SELECT setval('"tb_account_acct_id_seq"', COALESCE(MAX("acct_id"), 0) + 1, false) FROM "tb_account";
+CREATE SEQUENCE "tb_perm_group_perm_group_id_seq" OWNED BY "tb_perm_group"."perm_group_id";
+ALTER TABLE "tb_perm_group" ALTER COLUMN "perm_group_id" SET DEFAULT nextval('"tb_perm_group_perm_group_id_seq"');
+SELECT setval('"tb_perm_group_perm_group_id_seq"', COALESCE(MAX("perm_group_id"), 0) + 1, false) FROM "tb_perm_group";
+CREATE SEQUENCE "tb_center_center_id_seq" OWNED BY "tb_center"."center_id";
+ALTER TABLE "tb_center" ALTER COLUMN "center_id" SET DEFAULT nextval('"tb_center_center_id_seq"');
+SELECT setval('"tb_center_center_id_seq"', COALESCE(MAX("center_id"), 0) + 1, false) FROM "tb_center";
+CREATE SEQUENCE "tb_warehouse_warehouse_id_seq" OWNED BY "tb_warehouse"."warehouse_id";
+ALTER TABLE "tb_warehouse" ALTER COLUMN "warehouse_id" SET DEFAULT nextval('"tb_warehouse_warehouse_id_seq"');
+SELECT setval('"tb_warehouse_warehouse_id_seq"', COALESCE(MAX("warehouse_id"), 0) + 1, false) FROM "tb_warehouse";
+CREATE SEQUENCE "tb_location_location_id_seq" OWNED BY "tb_location"."location_id";
+ALTER TABLE "tb_location" ALTER COLUMN "location_id" SET DEFAULT nextval('"tb_location_location_id_seq"');
+SELECT setval('"tb_location_location_id_seq"', COALESCE(MAX("location_id"), 0) + 1, false) FROM "tb_location";
+CREATE SEQUENCE "tb_shipper_shipper_id_seq" OWNED BY "tb_shipper"."shipper_id";
+ALTER TABLE "tb_shipper" ALTER COLUMN "shipper_id" SET DEFAULT nextval('"tb_shipper_shipper_id_seq"');
+SELECT setval('"tb_shipper_shipper_id_seq"', COALESCE(MAX("shipper_id"), 0) + 1, false) FROM "tb_shipper";
+CREATE SEQUENCE "tb_shipper_contact_contact_id_seq" OWNED BY "tb_shipper_contact"."contact_id";
+ALTER TABLE "tb_shipper_contact" ALTER COLUMN "contact_id" SET DEFAULT nextval('"tb_shipper_contact_contact_id_seq"');
+SELECT setval('"tb_shipper_contact_contact_id_seq"', COALESCE(MAX("contact_id"), 0) + 1, false) FROM "tb_shipper_contact";
+CREATE SEQUENCE "tb_operator_operator_id_seq" OWNED BY "tb_operator"."operator_id";
+ALTER TABLE "tb_operator" ALTER COLUMN "operator_id" SET DEFAULT nextval('"tb_operator_operator_id_seq"');
+SELECT setval('"tb_operator_operator_id_seq"', COALESCE(MAX("operator_id"), 0) + 1, false) FROM "tb_operator";
+CREATE SEQUENCE "tb_operator_contact_contact_id_seq" OWNED BY "tb_operator_contact"."contact_id";
+ALTER TABLE "tb_operator_contact" ALTER COLUMN "contact_id" SET DEFAULT nextval('"tb_operator_contact_contact_id_seq"');
+SELECT setval('"tb_operator_contact_contact_id_seq"', COALESCE(MAX("contact_id"), 0) + 1, false) FROM "tb_operator_contact";
+CREATE SEQUENCE "tb_ext_code_ext_code_id_seq" OWNED BY "tb_ext_code"."ext_code_id";
+ALTER TABLE "tb_ext_code" ALTER COLUMN "ext_code_id" SET DEFAULT nextval('"tb_ext_code_ext_code_id_seq"');
+SELECT setval('"tb_ext_code_ext_code_id_seq"', COALESCE(MAX("ext_code_id"), 0) + 1, false) FROM "tb_ext_code";
+CREATE SEQUENCE "tb_code_group_group_id_seq" OWNED BY "tb_code_group"."group_id";
+ALTER TABLE "tb_code_group" ALTER COLUMN "group_id" SET DEFAULT nextval('"tb_code_group_group_id_seq"');
+SELECT setval('"tb_code_group_group_id_seq"', COALESCE(MAX("group_id"), 0) + 1, false) FROM "tb_code_group";
+CREATE SEQUENCE "tb_code_item_code_item_id_seq" OWNED BY "tb_code_item"."code_item_id";
+ALTER TABLE "tb_code_item" ALTER COLUMN "code_item_id" SET DEFAULT nextval('"tb_code_item_code_item_id_seq"');
+SELECT setval('"tb_code_item_code_item_id_seq"', COALESCE(MAX("code_item_id"), 0) + 1, false) FROM "tb_code_item";
+CREATE SEQUENCE "tb_delivery_zone_zone_id_seq" OWNED BY "tb_delivery_zone"."zone_id";
+ALTER TABLE "tb_delivery_zone" ALTER COLUMN "zone_id" SET DEFAULT nextval('"tb_delivery_zone_zone_id_seq"');
+SELECT setval('"tb_delivery_zone_zone_id_seq"', COALESCE(MAX("zone_id"), 0) + 1, false) FROM "tb_delivery_zone";
+CREATE SEQUENCE "tb_delivery_zone_region_zone_region_id_seq" OWNED BY "tb_delivery_zone_region"."zone_region_id";
+ALTER TABLE "tb_delivery_zone_region" ALTER COLUMN "zone_region_id" SET DEFAULT nextval('"tb_delivery_zone_region_zone_region_id_seq"');
+SELECT setval('"tb_delivery_zone_region_zone_region_id_seq"', COALESCE(MAX("zone_region_id"), 0) + 1, false) FROM "tb_delivery_zone_region";
+CREATE SEQUENCE "tb_unit_unit_id_seq" OWNED BY "tb_unit"."unit_id";
+ALTER TABLE "tb_unit" ALTER COLUMN "unit_id" SET DEFAULT nextval('"tb_unit_unit_id_seq"');
+SELECT setval('"tb_unit_unit_id_seq"', COALESCE(MAX("unit_id"), 0) + 1, false) FROM "tb_unit";
+CREATE SEQUENCE "tb_session_session_id_seq" OWNED BY "tb_session"."session_id";
+ALTER TABLE "tb_session" ALTER COLUMN "session_id" SET DEFAULT nextval('"tb_session_session_id_seq"');
+SELECT setval('"tb_session_session_id_seq"', COALESCE(MAX("session_id"), 0) + 1, false) FROM "tb_session";
+CREATE SEQUENCE "tb_verification_verification_id_seq" OWNED BY "tb_verification"."verification_id";
+ALTER TABLE "tb_verification" ALTER COLUMN "verification_id" SET DEFAULT nextval('"tb_verification_verification_id_seq"');
+SELECT setval('"tb_verification_verification_id_seq"', COALESCE(MAX("verification_id"), 0) + 1, false) FROM "tb_verification";
+
+-- 5) 외래키 다시 붙이기 (이름·동작 그대로)
+ALTER TABLE "tb_user" ADD CONSTRAINT "tb_user_shipper_id_fkey" FOREIGN KEY ("shipper_id") REFERENCES "tb_shipper"("shipper_id") ON UPDATE CASCADE ON DELETE RESTRICT;
+ALTER TABLE "tb_session" ADD CONSTRAINT "tb_session_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "tb_user"("user_id") ON UPDATE CASCADE ON DELETE CASCADE;
+ALTER TABLE "tb_account" ADD CONSTRAINT "tb_account_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "tb_user"("user_id") ON UPDATE CASCADE ON DELETE CASCADE;
+ALTER TABLE "tb_perm_group_perm" ADD CONSTRAINT "tb_perm_group_perm_group_id_fkey" FOREIGN KEY ("group_id") REFERENCES "tb_perm_group"("perm_group_id") ON UPDATE CASCADE ON DELETE CASCADE;
+ALTER TABLE "tb_user_perm_group" ADD CONSTRAINT "tb_user_perm_group_group_id_fkey" FOREIGN KEY ("group_id") REFERENCES "tb_perm_group"("perm_group_id") ON UPDATE CASCADE ON DELETE RESTRICT;
+ALTER TABLE "tb_user_perm_group" ADD CONSTRAINT "tb_user_perm_group_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "tb_user"("user_id") ON UPDATE CASCADE ON DELETE CASCADE;
+ALTER TABLE "tb_user_perm_override" ADD CONSTRAINT "tb_user_perm_override_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "tb_user"("user_id") ON UPDATE CASCADE ON DELETE CASCADE;
+ALTER TABLE "tb_user_center" ADD CONSTRAINT "tb_user_center_center_id_fkey" FOREIGN KEY ("center_id") REFERENCES "tb_center"("center_id") ON UPDATE CASCADE ON DELETE RESTRICT;
+ALTER TABLE "tb_user_center" ADD CONSTRAINT "tb_user_center_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "tb_user"("user_id") ON UPDATE CASCADE ON DELETE CASCADE;
+ALTER TABLE "tb_user_grid_setting" ADD CONSTRAINT "tb_user_grid_setting_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "tb_user"("user_id") ON UPDATE CASCADE ON DELETE CASCADE;
+ALTER TABLE "tb_user_favorite_menu" ADD CONSTRAINT "tb_user_favorite_menu_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "tb_user"("user_id") ON UPDATE CASCADE ON DELETE CASCADE;
+ALTER TABLE "tb_operator" ADD CONSTRAINT "tb_operator_updated_by_id_fkey" FOREIGN KEY ("updated_by_id") REFERENCES "tb_user"("user_id") ON UPDATE CASCADE ON DELETE SET NULL;
+ALTER TABLE "tb_operator_contact" ADD CONSTRAINT "tb_operator_contact_company_id_fkey" FOREIGN KEY ("company_id") REFERENCES "tb_operator"("operator_id") ON UPDATE CASCADE ON DELETE CASCADE;
+ALTER TABLE "tb_warehouse" ADD CONSTRAINT "tb_warehouse_center_id_fkey" FOREIGN KEY ("center_id") REFERENCES "tb_center"("center_id") ON UPDATE CASCADE ON DELETE RESTRICT;
+ALTER TABLE "tb_location" ADD CONSTRAINT "tb_location_warehouse_id_fkey" FOREIGN KEY ("warehouse_id") REFERENCES "tb_warehouse"("warehouse_id") ON UPDATE CASCADE ON DELETE RESTRICT;
+ALTER TABLE "tb_code_item" ADD CONSTRAINT "tb_code_item_group_id_fkey" FOREIGN KEY ("group_id") REFERENCES "tb_code_group"("group_id") ON UPDATE CASCADE ON DELETE RESTRICT;
+ALTER TABLE "tb_delivery_zone" ADD CONSTRAINT "tb_delivery_zone_center_id_fkey" FOREIGN KEY ("center_id") REFERENCES "tb_center"("center_id") ON UPDATE CASCADE ON DELETE RESTRICT;
+ALTER TABLE "tb_delivery_zone_region" ADD CONSTRAINT "tb_delivery_zone_region_zone_id_fkey" FOREIGN KEY ("zone_id") REFERENCES "tb_delivery_zone"("zone_id") ON UPDATE CASCADE ON DELETE CASCADE;
+ALTER TABLE "tb_shipper_center" ADD CONSTRAINT "tb_shipper_center_center_id_fkey" FOREIGN KEY ("center_id") REFERENCES "tb_center"("center_id") ON UPDATE CASCADE ON DELETE RESTRICT;
+ALTER TABLE "tb_shipper_center" ADD CONSTRAINT "tb_shipper_center_shipper_id_fkey" FOREIGN KEY ("shipper_id") REFERENCES "tb_shipper"("shipper_id") ON UPDATE CASCADE ON DELETE CASCADE;
+ALTER TABLE "tb_shipper_contact" ADD CONSTRAINT "tb_shipper_contact_shipper_id_fkey" FOREIGN KEY ("shipper_id") REFERENCES "tb_shipper"("shipper_id") ON UPDATE CASCADE ON DELETE CASCADE;
