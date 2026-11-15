@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import { digitsOnly, isValidPhone } from '@/lib/format'
+import { digitsOnly, isValidBusinessNumber, isValidPhone } from '@/lib/format'
 
 // 입력 칸 공통 규칙 — 화면·서버 공용 (운영사·센터·화주사·거래처 등 기준정보 입력에서 재사용)
 
@@ -23,6 +23,16 @@ export const optionalPhone = z
   .refine(
     (value) => value === '' || isValidPhone(value),
     '전화번호를 확인해 주세요. (예: 02-123-4567, 010-1234-5678, 1588-1234)',
+  )
+  .transform((value) => digitsOnly(value) || null)
+
+// 사업자등록번호 (선택): 비우면 null, 넣으면 검증번호까지 확인하고 숫자만 저장 (0029)
+export const optionalBusinessNumber = z
+  .string()
+  .trim()
+  .refine(
+    (value) => value === '' || isValidBusinessNumber(value),
+    '사업자등록번호를 확인해 주세요. (10자리, 검증번호 불일치)',
   )
   .transform((value) => digitsOnly(value) || null)
 
