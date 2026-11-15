@@ -23,7 +23,8 @@ export default async function EditCenterPage({ params }: PageProps<'/admin/maste
   if (!center) notFound()
 
   return (
-    <>
+    // 제목도 본문과 같은 제한 폭 (입력 화면 틀)
+    <div className="mx-auto w-full max-w-5xl space-y-6">
       <PageHeader
         title={`${center.input.name} (${center.input.code})`}
         // 마지막으로 본 목록(검색 조건·페이지·정렬 그대로)으로
@@ -35,6 +36,6 @@ export default async function EditCenterPage({ params }: PageProps<'/admin/maste
         canToggleActive={canUpdate && scope.kind === 'ALL'}
         warehouseAccess={{ canView: canViewWarehouses, canAdd: canAddWarehouse }}
       />
-    </>
+    </div>
   )
 }

@@ -1,6 +1,7 @@
 import type { Metadata } from 'next'
 import { AccessDenied } from '@/components/permission'
 import { PageHeader } from '@/components/common'
+import { BackToListButton } from '@/components/master-list'
 import { getCurrentScope, hasPermission } from '@/lib/session'
 import { CenterForm } from '../center-form'
 
@@ -13,12 +14,13 @@ export default async function NewCenterPage() {
   if (!allowed) return <AccessDenied />
 
   return (
-    <>
+    <div className="mx-auto w-full max-w-5xl space-y-6">
       <PageHeader
         title="센터 등록"
         description="센터 코드를 비우면 자동으로 부여되는 시스템 코드를 그대로 씁니다."
+        actions={<BackToListButton listPath="/admin/master/centers" />}
       />
       <CenterForm readOnly={false} />
-    </>
+    </div>
   )
 }

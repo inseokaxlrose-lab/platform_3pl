@@ -1,6 +1,5 @@
 import 'server-only'
 import type { CenterInput } from '@/lib/centers/center-schema'
-import { formatPhone } from '@/lib/format'
 import { getExternalCodes } from '@/lib/master-code/external-codes'
 import { prisma } from '@/lib/prisma'
 import { isInScope, type DataScope } from '@/lib/scope/data-scope'
@@ -28,15 +27,13 @@ export async function getCenterForEdit(id: string, scope: DataScope) {
   })
   if (!center) return null
   const text = (value: string | null) => value ?? ''
-  // DB에는 숫자만 있으므로 입력 칸에는 하이픈을 붙여 보여준다 (0029)
-  const phone = (value: string | null) => formatPhone(value ?? '')
   const input: CenterInput = {
     code: center.code,
     name: center.name,
-    phone: phone(center.phone),
-    fax: phone(center.fax),
+    phone: text(center.phone),
+    fax: text(center.fax),
     managerName: text(center.managerName),
-    managerPhone: phone(center.managerPhone),
+    managerPhone: text(center.managerPhone),
     zipCode: text(center.zipCode),
     address: text(center.address),
     addressDetail: text(center.addressDetail),
