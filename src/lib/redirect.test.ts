@@ -8,6 +8,13 @@ describe('영역·홈', () => {
     expect(areaOf('SHIPPER')).toBe('portal')
     expect(homeOf('SHIPPER')).toBe('/portal')
   })
+
+  it('플랫폼 관리자는 플랫폼 화면 (로그인 후 다른 영역 주소로는 보내지 않는다)', () => {
+    expect(areaOf('PLATFORM')).toBe('platform')
+    expect(homeOf('PLATFORM')).toBe('/platform')
+    expect(safeNextPath('/platform/operators', 'PLATFORM')).toBe('/platform/operators')
+    expect(safeNextPath('/admin', 'PLATFORM')).toBe('/platform')
+  })
 })
 
 describe('safeNextPath (로그인 후 돌아갈 주소)', () => {

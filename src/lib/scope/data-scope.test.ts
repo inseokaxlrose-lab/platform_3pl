@@ -68,6 +68,10 @@ describe('computeScope (데이터 범위 계산)', () => {
     ).toEqual({ kind: 'NONE', operatorId: OP })
   })
 
+  it('플랫폼 관리자는 운영사가 없어 NONE (운영사로 작업할 때의 범위는 session.ts가 정한다)', () => {
+    expect(computeScope({ ...base, operatorId: null, userType: 'PLATFORM' })).toEqual(none)
+  })
+
   it('사용 중지 계정은 운영사 관리자여도 NONE', () => {
     expect(computeScope({ ...base, isActive: false, userType: 'OPERATOR' })).toEqual({
       kind: 'NONE',
