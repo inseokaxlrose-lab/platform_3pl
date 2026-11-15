@@ -2,6 +2,7 @@ import 'server-only'
 import { assertAllFound, assertNoCodeConflict } from '@/lib/soft-delete'
 import type { z } from 'zod'
 import { ActionError } from '@/lib/actions/action-error'
+import { requireOperatorId } from '@/lib/actor'
 import { prisma } from '@/lib/prisma'
 import { assertRowVersion, withVersionGuard } from '@/lib/row-version'
 import { DELETED_ONLY, NOT_DELETED, withStatus } from '@/lib/status'
@@ -24,10 +25,15 @@ type GroupUpdate = z.output<typeof codeGroupUpdateSchema>
 type ItemCreate = z.output<typeof codeItemCreateSchema>
 type ItemUpdate = z.output<typeof codeItemUpdateSchema>
 
+// 공통코드는 운영사마다 따로 (같은 그룹 코드를 운영사마다 쓸 수 있다, 0039)
 export async function createCodeGroup(data: GroupCreate) {
-  const exists = await prisma.codeGroup.findUnique({ where: { code: data.code } })
+  const operatorId = requireOperatorId()
+  const exists = await prisma.codeGroup.findFirst({ where: { operatorId, code: data.code } })
   if (exists) throw new ActionError('CONFLICT', `이미 있는 그룹 코드입니다: ${data.code}`)
-  return prisma.codeGroup.create({ data: withStatus(data), select: { id: true, code: true } })
+  return prisma.codeGroup.create({
+    data: { ...withStatus(data), operatorId },
+    select: { id: true, code: true },
+  })
 }
 
 // rowVersion: 팝업을 열 때의 버전 (그 사이 다른 사람이 저장했으면 충돌)
@@ -74,6 +80,7 @@ export async function deleteCodeGroup(id: bigint) {
 }
 
 export async function createCodeItem(data: ItemCreate) {
+  // 그룹은 지금 운영사의 것만 찾는다 (prisma.ts 운영사 거르기) → 코드는 그룹의 운영사를 따른다
   const group = await prisma.codeGroup.findUnique({ where: { id: data.groupId } })
   if (!group) throw new ActionError('NOT_FOUND', '코드 그룹을 찾을 수 없습니다.')
   const exists = await prisma.codeItem.findUnique({
@@ -82,7 +89,10 @@ export async function createCodeItem(data: ItemCreate) {
   if (exists) {
     throw new ActionError('CONFLICT', `이 그룹에 이미 있는 코드입니다: ${data.code}`)
   }
-  return prisma.codeItem.create({ data: withStatus(data), select: { id: true, code: true } })
+  return prisma.codeItem.create({
+    data: { ...withStatus(data), operatorId: group.operatorId },
+    select: { id: true, code: true },
+  })
 }
 
 // rowVersion: 팝업을 열 때의 버전 (그 사이 다른 사람이 저장했으면 충돌)

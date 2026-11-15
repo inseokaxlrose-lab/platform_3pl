@@ -117,7 +117,10 @@ export const updateShipperAction = createAction({
   input: shipperSchema.extend({ id: idSchema, rowVersion: rowVersionField }),
   handler: async ({ input: { id, rowVersion, ...data }, scope }) => {
     requireAllScope(scope, '화주사 수정')
-    const shipper = await prisma.shipper.findUnique({ where: { id }, select: { id: true } })
+    const shipper = await prisma.shipper.findUnique({
+      where: { id },
+      select: { id: true, operatorId: true },
+    })
     assertInScope(scope, shipper, { shipper: 'id' })
     return updateShipper(id, rowVersion, data)
   },

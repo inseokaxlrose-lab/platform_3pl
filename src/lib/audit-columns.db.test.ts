@@ -1,7 +1,7 @@
 import { afterAll, beforeEach, describe, expect, it } from 'vitest'
 import { runAsActor } from '@/lib/actor'
 import { prisma } from '@/lib/prisma'
-import { resetDatabase } from '@/test/reset-database'
+import { resetDatabase, TEST_OPERATOR_ID } from '@/test/reset-database'
 
 // 공통 칸 자동 채우기 (prisma.ts): 등록·수정자 = 지금 작업자, 수정할 때마다 버전 +1
 beforeEach(async () => {
@@ -12,7 +12,13 @@ afterAll(async () => {
   await prisma.$disconnect()
 })
 
-const unit = (code: string) => ({ code, name: code, kind: 'BASE' as const })
+const unit = (code: string) => ({
+  operatorId: TEST_OPERATOR_ID,
+  code,
+  name: code,
+  kind: 'BASE' as const,
+})
+const unitC = { operatorId_code: { operatorId: TEST_OPERATOR_ID, code: 'C' } }
 
 describe('공통 칸 자동 채우기', () => {
   it('작업자를 정하지 않으면 system, 정하면 그 아이디로 등록·수정자를 남긴다', async () => {
@@ -39,12 +45,12 @@ describe('공통 칸 자동 채우기', () => {
     ])
 
     await runAsActor('park', () =>
-      prisma.unit.upsert({ where: { code: 'C' }, create: unit('C'), update: {} }),
+      prisma.unit.upsert({ where: unitC, create: unit('C'), update: {} }),
     )
     await runAsActor('choi', () =>
-      prisma.unit.upsert({ where: { code: 'C' }, create: unit('C'), update: { name: 'C2' } }),
+      prisma.unit.upsert({ where: unitC, create: unit('C'), update: { name: 'C2' } }),
     )
-    expect(await prisma.unit.findUniqueOrThrow({ where: { code: 'C' } })).toMatchObject({
+    expect(await prisma.unit.findUniqueOrThrow({ where: unitC })).toMatchObject({
       createdBy: 'park',
       updatedBy: 'choi',
       rowVersion: 2,

@@ -1,6 +1,7 @@
 import 'server-only'
 import { assertAllFound, assertNoCodeConflict } from '@/lib/soft-delete'
 import { ActionError } from '@/lib/actions/action-error'
+import { requireOperatorId } from '@/lib/actor'
 import { DEFAULT_LOCATION_CODE } from '@/lib/centers/center-defaults'
 import { prisma } from '@/lib/prisma'
 import { expandLocationRange, type GeneratedLocation, type LocationRange } from './location-range'
@@ -35,7 +36,7 @@ export async function createLocation(warehouse: TargetWarehouse, code: string) {
   })
   if (exists) throw new ActionError('CONFLICT', `이 창고에 이미 있는 로케이션입니다: ${code}`)
   return prisma.location.create({
-    data: { warehouseId: warehouse.id, code },
+    data: { operatorId: requireOperatorId(), warehouseId: warehouse.id, code },
     select: { id: true, code: true },
   })
 }
@@ -76,8 +77,9 @@ export async function previewBulkLocations(warehouse: TargetWarehouse, range: Lo
 export async function bulkCreateLocations(warehouse: TargetWarehouse, range: LocationRange) {
   assertCanAddTo(warehouse)
   const plan = await planBulk(warehouse.id, range)
+  const operatorId = requireOperatorId()
   const { count } = await prisma.location.createMany({
-    data: plan.toCreate.map((l) => ({ warehouseId: warehouse.id, ...l })),
+    data: plan.toCreate.map((l) => ({ operatorId, warehouseId: warehouse.id, ...l })),
     // 미리 거른 뒤에도 동시에 누가 만들었을 수 있어 한 번 더 건너뛴다
     skipDuplicates: true,
   })

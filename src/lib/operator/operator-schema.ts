@@ -14,10 +14,10 @@ import { digitsOnly, isValidBusinessNumber } from '@/lib/format'
 export {
   CONTACT_DUTY_GROUP,
   EMPTY_CONTACT,
-  MAX_CONTACTS as MAX_COMPANY_CONTACTS,
+  MAX_CONTACTS as MAX_OPERATOR_CONTACTS,
 } from '@/lib/contacts/contact-schema'
 
-export const companySchema = z.object({
+export const operatorSchema = z.object({
   name: z.string().trim().min(1, '회사명을 입력해 주세요.').max(100, '100자 이하로 입력해 주세요.'),
   businessNumber: z
     .string()
@@ -35,5 +35,5 @@ export const companySchema = z.object({
 })
 
 // 화면 입력값 (모두 글자) / 저장할 값 (빈 칸은 null, 사업자번호·전화번호는 숫자만)
-export type CompanyInput = z.input<typeof companySchema>
-export type CompanyData = z.output<typeof companySchema>
+export type OperatorInput = z.input<typeof operatorSchema>
+export type OperatorData = z.output<typeof operatorSchema>

@@ -8,7 +8,6 @@ import { isInScope, type DataScope } from '@/lib/scope/data-scope'
 
 // 수정 화면용 센터 한 건 (데이터 범위 밖이면 null → 화면은 "찾을 수 없음")
 export async function getCenterForEdit(id: bigint, scope: DataScope) {
-  if (!isInScope(scope, { id }, { center: 'id' })) return null
   const center = await prisma.center.findUnique({
     where: { id },
     include: {
@@ -40,7 +39,8 @@ export async function getCenterForEdit(id: bigint, scope: DataScope) {
       },
     },
   })
-  if (!center) return null
+  // 범위(운영사·소속 센터) 밖이면 없는 것으로
+  if (!center || !isInScope(scope, center, { center: 'id' })) return null
   const text = (value: string | null) => value ?? ''
   const input: CenterInput = {
     code: center.code,

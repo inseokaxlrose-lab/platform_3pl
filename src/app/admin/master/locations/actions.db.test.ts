@@ -7,7 +7,7 @@ import { prisma } from '@/lib/prisma'
 import type { DataScope } from '@/lib/scope/data-scope'
 import { getCurrentPermissions, getCurrentScope, getCurrentUser } from '@/lib/session'
 import { createTestCenter } from '@/test/factories'
-import { resetDatabase } from '@/test/reset-database'
+import { resetDatabase, TEST_OPERATOR_ID } from '@/test/reset-database'
 import {
   bulkCreateLocationsAction,
   createLocationAction,
@@ -31,7 +31,7 @@ const CODES: PermissionCode[] = [
   'master.locations.delete',
 ]
 
-function signIn(scope: DataScope = { kind: 'ALL' }, codes = CODES) {
+function signIn(scope: DataScope = { kind: 'ALL', operatorId: TEST_OPERATOR_ID }, codes = CODES) {
   vi.mocked(getCurrentUser).mockResolvedValue({
     id: 1n,
     name: '사용자',
@@ -62,7 +62,13 @@ const RANGE = {
 
 async function generalWarehouse(centerId: bigint, code: string) {
   const w = await prisma.warehouse.create({
-    data: { centerId, systemCode: await nextSystemCode('WAREHOUSE'), code, name: code },
+    data: {
+      operatorId: TEST_OPERATOR_ID,
+      centerId,
+      systemCode: await nextSystemCode('WAREHOUSE'),
+      code,
+      name: code,
+    },
   })
   return w.id
 }
@@ -240,7 +246,7 @@ describe('목록 · 데이터 범위 · 권한', () => {
       'B-02-03',
     ])
     // 구역 선택지: 창고마다 그 창고의 구역
-    const options = await getWarehouseOptions({ kind: 'ALL' })
+    const options = await getWarehouseOptions({ kind: 'ALL', operatorId: TEST_OPERATOR_ID })
     expect(options.find((w) => w.id === String(icnWarehouseId))?.zones).toEqual(['A', 'B'])
     // 상태 거르기
     const inactive = await listLocationsAction({
@@ -262,7 +268,7 @@ describe('목록 · 데이터 범위 · 권한', () => {
       code: 'G-01',
     })
     const gmhLocationId = gmhLocation.ok ? gmhLocation.data.id : ''
-    signIn({ kind: 'CENTERS', centerIds: [icnId] })
+    signIn({ kind: 'CENTERS', operatorId: TEST_OPERATOR_ID, centerIds: [icnId] })
 
     const result = await listLocationsAction(createDataGridState({ pageSize: 50 }))
     expect(result.ok && new Set(result.data.rows.map((r) => r.center))).toEqual(
@@ -288,7 +294,7 @@ describe('목록 · 데이터 범위 · 권한', () => {
   })
 
   it('조회 권한만 있으면 등록·수정·삭제 불가', async () => {
-    signIn({ kind: 'ALL' }, ['master.locations.read'])
+    signIn({ kind: 'ALL', operatorId: TEST_OPERATOR_ID }, ['master.locations.read'])
     expect(
       await createLocationAction({ warehouseId: String(icnWarehouseId), code: 'X' }),
     ).toMatchObject({

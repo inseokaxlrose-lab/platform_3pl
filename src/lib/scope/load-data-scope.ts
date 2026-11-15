@@ -8,6 +8,7 @@ export async function loadDataScope(userId: bigint): Promise<DataScope> {
   const user = await prisma.user.findUnique({
     where: { id: userId },
     select: {
+      operatorId: true,
       userType: true,
       status: true,
       centers: { select: { center: { select: { id: true, status: true } } } },
@@ -18,6 +19,7 @@ export async function loadDataScope(userId: bigint): Promise<DataScope> {
 
   // 상태(status_cd) → 사용 여부로 바꿔 계산
   return computeScope({
+    operatorId: user.operatorId,
     userType: user.userType,
     isActive: isActiveStatus(user.status),
     centers: user.centers.map(({ center }) => withIsActive(center)),

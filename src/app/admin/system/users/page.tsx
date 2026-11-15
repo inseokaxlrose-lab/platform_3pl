@@ -3,7 +3,7 @@ import type { Metadata } from 'next'
 import Link from 'next/link'
 import { AccessDenied } from '@/components/permission'
 import { Button } from '@/components/ui/button'
-import { hasPermission } from '@/lib/session'
+import { getCurrentScope, hasPermission } from '@/lib/session'
 import { getUserFormOptions } from './queries'
 import { UsersList } from './users-list'
 
@@ -13,7 +13,7 @@ export const metadata: Metadata = { title: '사용자' }
 export default async function UsersPage() {
   if (!(await hasPermission('system.users.read'))) return <AccessDenied />
   const [options, canCreate, canUpdate, canExport] = await Promise.all([
-    getUserFormOptions(),
+    getUserFormOptions(await getCurrentScope()),
     hasPermission('system.users.create'),
     hasPermission('system.users.update'),
     hasPermission('system.users.export'),

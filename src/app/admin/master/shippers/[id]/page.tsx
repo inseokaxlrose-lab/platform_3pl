@@ -20,7 +20,7 @@ export default async function EditShipperPage({
   const scope = await getCurrentScope()
   const [shipper, centers, canUpdate, canViewUsers, canAddUser] = await Promise.all([
     getShipperForEdit(id, scope),
-    getCenterChoices(),
+    getCenterChoices(scope),
     hasPermission('master.shippers.update'),
     hasPermission('system.users.read'),
     hasPermission('system.users.create'),

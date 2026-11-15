@@ -110,7 +110,12 @@ export const createDeliveryZoneAction = createAction({
   permission: 'master.delivery-zones.create',
   input: deliveryZoneSchema,
   handler: async ({ input, scope }) => {
-    assertInScope(scope, { centerId: input.centerId }, ZONE_SCOPE)
+    // 범위 검사는 DB에서 읽은 센터로 (운영사·소속 센터)
+    const center = await prisma.center.findUnique({
+      where: { id: input.centerId },
+      select: { id: true, operatorId: true },
+    })
+    assertInScope(scope, center, { center: 'id' })
     return createDeliveryZone(input)
   },
 })

@@ -2,7 +2,7 @@ import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { prisma } from '@/lib/prisma'
 import { getCurrentUser } from '@/lib/session'
 import { createTestCenter, createTestUser } from '@/test/factories'
-import { resetDatabase } from '@/test/reset-database'
+import { resetDatabase, TEST_OPERATOR_ID } from '@/test/reset-database'
 import { setFavoriteMenuAction } from './favorite-actions'
 import { loadFavoriteMenus, MAX_FAVORITE_MENUS } from './favorites'
 
@@ -10,7 +10,7 @@ vi.mock('@/lib/session', () => ({
   getCurrentUser: vi.fn(),
   // 메뉴 권한이 하나도 없어도 즐겨찾기는 다룰 수 있어야 한다
   getCurrentPermissions: vi.fn(async () => new Set()),
-  getCurrentScope: vi.fn(async () => ({ kind: 'ALL' })),
+  getCurrentScope: vi.fn(async () => ({ kind: 'ALL', operatorId: TEST_OPERATOR_ID })),
 }))
 
 let aliceId = 0n

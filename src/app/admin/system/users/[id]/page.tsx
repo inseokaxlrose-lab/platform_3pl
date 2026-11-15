@@ -3,7 +3,7 @@ import { parseId } from '@/lib/id'
 import { notFound } from 'next/navigation'
 import { BackToListButton } from '@/components/master-list'
 import { AccessDenied } from '@/components/permission'
-import { getCurrentUser, hasPermission } from '@/lib/session'
+import { getCurrentScope, getCurrentUser, hasPermission } from '@/lib/session'
 import { AccountPanel } from '../account-panel'
 import { OverridePanel } from '../override-panel'
 import { getUserForEdit, getUserFormOptions, getUserOverrides } from '../queries'
@@ -19,10 +19,11 @@ export default async function EditUserPage({ params }: PageProps<'/admin/system/
   // 주소의 키가 숫자 모양이 아니면 바로 "찾을 수 없음"
   const id = parseId((await params).id)
   if (id === null) notFound()
+  const scope = await getCurrentScope()
   const [user, options, overrides, currentUser, canUpdate] = await Promise.all([
-    getUserForEdit(id),
-    getUserFormOptions(),
-    getUserOverrides(id),
+    getUserForEdit(id, scope),
+    getUserFormOptions(scope),
+    getUserOverrides(id, scope),
     getCurrentUser(),
     hasPermission('system.users.update'),
   ])

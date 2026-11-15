@@ -1,7 +1,7 @@
 import { afterAll, beforeEach, describe, expect, it } from 'vitest'
 import { prisma } from '@/lib/prisma'
 import { createTestCenter } from '@/test/factories'
-import { resetDatabase } from '@/test/reset-database'
+import { resetDatabase, TEST_OPERATOR_ID } from '@/test/reset-database'
 import { DEFAULT_LOCATION_CODE, ensureCenterDefaults } from './center-defaults'
 
 beforeEach(async () => {
@@ -42,7 +42,14 @@ describe('센터 기본 구성 (입고대기 창고 + 기본 로케이션)', () 
     await ensureCenterDefaults(prisma, center.id)
     const make = (code: string, type: 'GENERAL' | 'INBOUND_STAGING') =>
       prisma.warehouse.create({
-        data: { centerId: center.id, systemCode: `T-${code}`, code, name: code, type },
+        data: {
+          operatorId: TEST_OPERATOR_ID,
+          centerId: center.id,
+          systemCode: `T-${code}`,
+          code,
+          name: code,
+          type,
+        },
       })
 
     await expect(make('INBOUND2', 'INBOUND_STAGING')).rejects.toMatchObject({ code: 'P2002' })

@@ -3,11 +3,13 @@
 import { z } from 'zod'
 import { ActionError } from '@/lib/actions/action-error'
 import { createAction } from '@/lib/actions/create-action'
+import { acrossOperators, requireOperatorId } from '@/lib/actor'
 import { listQuerySchema, toPrismaQuery } from '@/lib/grid/grid-query'
 import { dateRangeFilter, idFilter, statusWhere } from '@/lib/grid/list-filters'
 import { USER_TYPES } from '@/lib/users/user-schema'
 import { overridesIssue } from '@/lib/permissions/override-state'
 import { prisma } from '@/lib/prisma'
+import { operatorFilter } from '@/lib/scope/data-scope'
 import { withIsActive } from '@/lib/status'
 import { assertRowVersion, withVersionGuard } from '@/lib/row-version'
 import type { CurrentUser } from '@/lib/session'
@@ -46,8 +48,11 @@ function assertAffiliation(userType: UserType, centerIds: bigint[], shipperId?: 
   if (issue) throw new ActionError('VALIDATION', issue.message)
 }
 
+// 이메일·아이디는 운영사와 상관없이 전체에서 하나 → 운영사 거르기를 끄고 검사한다 (0039)
 async function assertEmailFree(email: string, exceptUserId?: bigint) {
-  const owner = await prisma.user.findUnique({ where: { email }, select: { id: true } })
+  const owner = await acrossOperators(() =>
+    prisma.user.findUnique({ where: { email }, select: { id: true } }),
+  )
   if (owner && owner.id !== exceptUserId) {
     throw new ActionError('CONFLICT', '이미 사용 중인 이메일입니다.')
   }
@@ -57,7 +62,7 @@ async function assertEmailFree(email: string, exceptUserId?: bigint) {
 export const listUsersAction = createAction({
   permission: 'system.users.read',
   input: listQuerySchema,
-  handler: async ({ user, input, permissions }) => {
+  handler: async ({ user, input, permissions, scope }) => {
     requireOperator(user)
     if (input.exportAll && !permissions.has('system.users.export')) {
       throw new ActionError('FORBIDDEN', '엑셀 내려받기 권한이 없습니다.')
@@ -80,6 +85,7 @@ export const listUsersAction = createAction({
     const createdAt = dateRangeFilter(filters, 'createdAt')
     const where = {
       AND: [
+        operatorFilter(scope),
         query.where,
         userType ? { userType } : {},
         statusWhere(filters),
@@ -141,12 +147,16 @@ export const createUserAction = createAction({
     await assertGroupsMatch(input.permissionGroupIds, input.userType)
 
     const username = input.username.toLowerCase()
-    if (await prisma.user.findUnique({ where: { username }, select: { id: true } })) {
+    const taken = await acrossOperators(() =>
+      prisma.user.findUnique({ where: { username }, select: { id: true } }),
+    )
+    if (taken) {
       throw new ActionError('CONFLICT', '이미 사용 중인 아이디입니다.')
     }
     await assertEmailFree(input.email?.toLowerCase() ?? internalEmail(username))
 
     const created = await createUserAccount({
+      operatorId: requireOperatorId(),
       username: input.username,
       password: input.password,
       name: input.name,

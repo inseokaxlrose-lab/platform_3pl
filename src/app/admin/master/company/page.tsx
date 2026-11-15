@@ -1,9 +1,9 @@
 import type { Metadata } from 'next'
 import { formatDate } from '@/components/data-grid'
 import { AccessDenied } from '@/components/permission'
-import { getCompany, type Company } from '@/lib/company/company'
-import type { CompanyInput } from '@/lib/company/company-schema'
-import { hasPermission } from '@/lib/session'
+import { getOperator, type Operator } from '@/lib/operator/operator'
+import type { OperatorInput } from '@/lib/operator/operator-schema'
+import { getCurrentScope, hasPermission } from '@/lib/session'
 import { actorLabel } from '@/lib/users/actor-label'
 import { isYes } from '@/lib/yn'
 import { CompanyForm } from './company-form'
@@ -11,7 +11,7 @@ import { CompanyForm } from './company-form'
 export const metadata: Metadata = { title: '운영사' }
 
 // DB 값 → 입력값 (빈 값은 빈 글자. 번호는 숫자 그대로 — 입력 부품이 하이픈을 붙여 보여준다, 0029)
-function toInput(company: Company | null): CompanyInput {
+function toInput(company: Operator): OperatorInput {
   const text = (value: string | null | undefined) => value ?? ''
   return {
     name: text(company?.name),
@@ -35,32 +35,29 @@ function toInput(company: Company | null): CompanyInput {
   }
 }
 
-// 운영사 정보 화면: 운영사 1곳의 정보 (수정 권한이 없으면 읽기 전용, docs/decisions/0024)
+// 운영사 정보 화면: 내 운영사의 정보 (수정 권한이 없으면 읽기 전용, docs/decisions/0024, 0039)
 export default async function CompanyPage() {
   if (!(await hasPermission('master.company.read'))) return <AccessDenied />
 
+  const { operatorId } = await getCurrentScope()
   const [company, canUpdate] = await Promise.all([
-    getCompany(),
+    operatorId === undefined ? null : getOperator(operatorId),
     hasPermission('master.company.update'),
   ])
-  const updated = company
-    ? `마지막 수정: ${await actorLabel(company.updatedBy)} · ${formatDate(company.updatedAt, true)}`
-    : null
+  // 운영사가 없는 사용자는 없다 (사용자는 반드시 운영사에 속한다). 혹시 없으면 볼 수 없음으로
+  if (!company) return <AccessDenied />
+  const updated = `마지막 수정: ${await actorLabel(company.updatedBy)} · ${formatDate(company.updatedAt, true)}`
 
   return (
     <CompanyForm
       header={{
         title: '운영사',
-        description: company
-          ? '이 시스템을 운영하는 회사의 정보입니다.'
-          : canUpdate
-            ? '아직 등록된 정보가 없습니다. 입력 후 저장하세요.'
-            : '아직 등록된 정보가 없습니다.',
+        description: '우리 회사(운영사)의 정보입니다.',
         // 설명 다음 줄: 마지막으로 고친 사람·시각
         meta: updated,
       }}
       initial={toInput(company)}
-      version={company?.rowVersion ?? null}
+      version={company.rowVersion}
       readOnly={!canUpdate}
     />
   )

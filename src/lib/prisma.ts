@@ -1,6 +1,6 @@
 import { PrismaPg } from '@prisma/adapter-pg'
 import { PrismaClient } from '@/generated/prisma/client'
-import { currentActor } from './actor'
+import { currentActor, currentOperatorId } from './actor'
 
 // 앱 전체에서 DB 연결 통로(PrismaClient)를 하나만 쓰기 위한 파일
 // 개발 모드에서는 코드를 고칠 때마다 모듈이 다시 불러와지므로,
@@ -14,7 +14,7 @@ export const AUDITED_MODELS: ReadonlySet<string> = new Set([
   'Warehouse',
   'Location',
   'Shipper',
-  'Company',
+  'Operator',
   'CodeGroup',
   'CodeItem',
   'DeliveryZone',
@@ -28,7 +28,23 @@ export const SOFT_DELETE_MODELS: ReadonlySet<string> = new Set([
   'Warehouse',
   'Location',
   'Shipper',
-  'Company',
+  'Operator',
+  'CodeGroup',
+  'CodeItem',
+  'DeliveryZone',
+  'Unit',
+])
+
+// 운영사 데이터가 들어가는 표 (operator_id가 있는 표, docs/decisions/0039)
+// 서버 액션 안(운영사 출입증이 있을 때)에서는 읽기·수정·삭제에 이 운영사 조건이 자동으로 붙고, 등록에 운영사가 자동으로 채워진다
+export const TENANT_MODELS: ReadonlySet<string> = new Set([
+  'User',
+  'PermissionGroup',
+  'Center',
+  'Warehouse',
+  'Location',
+  'Shipper',
+  'ExternalCode',
   'CodeGroup',
   'CodeItem',
   'DeliveryZone',
@@ -55,12 +71,36 @@ function notDeleted<T extends { where?: unknown }>(model: string, args: T): T {
   return { ...args, where: { ...(args.where as Data | undefined), delYn: 'N' } }
 }
 
-// 등록: 등록·수정자를 지금 작업자로
-const forCreate = (data: Data): Data => ({
-  ...data,
-  createdBy: currentActor(),
-  updatedBy: currentActor(),
-})
+// 운영사 거르기: 서버 액션 안이면 지금 운영사의 줄만 (조건에 다른 운영사를 적어도 지금 운영사로 덮어쓴다 → 새지 않는 쪽으로)
+// 서버 액션 밖(화면 조회 함수)은 데이터 범위 scopeFilter·isInScope가 운영사를 거른다
+function inTenant<T extends { where?: unknown }>(model: string, args: T): T {
+  const operatorId = currentOperatorId()
+  if (operatorId === undefined || !TENANT_MODELS.has(model)) return args
+  return { ...args, where: { ...(args.where as Data | undefined), operatorId } }
+}
+
+// 읽기·수정·삭제 조건: 지운 줄 빼기 + 운영사 거르기
+const scoped = <T extends { where?: unknown }>(model: string, args: T): T =>
+  inTenant(model, notDeleted(model, args))
+
+// 등록: 운영사를 지금 운영사로 채운다 (다른 운영사를 적었으면 개발 실수 → 오류)
+function withOperator(model: string, data: Data): Data {
+  const operatorId = currentOperatorId()
+  if (operatorId === undefined || !TENANT_MODELS.has(model)) return data
+  if (data.operatorId !== undefined && data.operatorId !== operatorId) {
+    throw new Error(
+      `[${model}] 지금 운영사(${operatorId})가 아닌 운영사의 데이터를 만들 수 없습니다.`,
+    )
+  }
+  return { ...data, operatorId }
+}
+
+// 등록: 등록·수정자를 지금 작업자로, 운영사를 지금 운영사로
+function forCreate(model: string, data: Data): Data {
+  const withTenant = withOperator(model, data)
+  if (!AUDITED_MODELS.has(model)) return withTenant
+  return { ...withTenant, createdBy: currentActor(), updatedBy: currentActor() }
+}
 
 // 수정: 수정자를 지금 작업자로, 버전 +1 (동시 수정 막기)
 const forUpdate = (data: Data): Data => ({
@@ -78,60 +118,63 @@ function createPrismaClient() {
   // 공통 칸 자동 채우기: 화면·기능 코드에서 따로 넣지 않는다
   // (안쪽 관계로 함께 만드는 줄은 채워지지 않으므로, 공통 칸이 있는 표는 바깥에서 직접 만든다)
   return new PrismaClient({ adapter }).$extends({
-    name: 'audit-columns',
+    name: 'audit-tenant-columns',
     query: {
       $allModels: {
-        // 읽기·수정·개수는 지운 줄을 빼고 (지운 것을 다루려면 조건에 delYn을 직접 적는다)
+        // 읽기·수정·개수는 지운 줄을 빼고 (지운 것을 다루려면 조건에 delYn을 직접 적는다), 서버 액션 안이면 지금 운영사만
         findUnique({ model, args, query }) {
-          return query(notDeleted(model, args))
+          return query(scoped(model, args))
         },
         findUniqueOrThrow({ model, args, query }) {
-          return query(notDeleted(model, args))
+          return query(scoped(model, args))
         },
         findFirst({ model, args, query }) {
-          return query(notDeleted(model, args))
+          return query(scoped(model, args))
         },
         findFirstOrThrow({ model, args, query }) {
-          return query(notDeleted(model, args))
+          return query(scoped(model, args))
         },
         findMany({ model, args, query }) {
-          return query(notDeleted(model, args))
+          return query(scoped(model, args))
         },
         count({ model, args, query }) {
-          return query(notDeleted(model, args))
+          return query(scoped(model, args))
         },
         aggregate({ model, args, query }) {
-          return query(notDeleted(model, args))
+          return query(scoped(model, args))
         },
         groupBy({ model, args, query }) {
-          return query(notDeleted(model, args))
+          return query(scoped(model, args))
         },
         create({ model, args, query }) {
-          if (AUDITED_MODELS.has(model)) args.data = forCreate(args.data as Data) as never
+          args.data = forCreate(model, args.data as Data) as never
           return query(args)
         },
         createMany({ model, args, query }) {
-          if (AUDITED_MODELS.has(model)) {
-            const rows = Array.isArray(args.data) ? args.data : [args.data]
-            args.data = rows.map((row) => forCreate(row as Data)) as never
-          }
+          const rows = Array.isArray(args.data) ? args.data : [args.data]
+          args.data = rows.map((row) => forCreate(model, row as Data)) as never
           return query(args)
+        },
+        // 실제 지우기(외부 코드 등 공통 칸이 없는 표)도 지금 운영사의 줄만
+        delete({ model, args, query }) {
+          return query(inTenant(model, args))
+        },
+        deleteMany({ model, args, query }) {
+          return query(inTenant(model, args))
         },
         update({ model, args, query }) {
           if (AUDITED_MODELS.has(model)) args.data = forUpdate(args.data as Data) as never
-          return query(notDeleted(model, args))
+          return query(scoped(model, args))
         },
         updateMany({ model, args, query }) {
           if (AUDITED_MODELS.has(model)) args.data = forUpdate(args.data as Data) as never
-          return query(notDeleted(model, args))
+          return query(scoped(model, args))
         },
         upsert({ model, args, query }) {
-          if (AUDITED_MODELS.has(model)) {
-            args.create = forCreate(args.create as Data) as never
-            args.update = forUpdate(args.update as Data) as never
-          }
+          args.create = forCreate(model, args.create as Data) as never
+          if (AUDITED_MODELS.has(model)) args.update = forUpdate(args.update as Data) as never
           // 지운 줄은 찾지 않는다 → 없으면 새로 만든다 (부분 고유 조건과도 맞다)
-          return query(notDeleted(model, args))
+          return query(scoped(model, args))
         },
       },
     },

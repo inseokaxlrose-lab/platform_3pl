@@ -1,6 +1,7 @@
 import 'server-only'
 import { looksLikeSystemCode } from '@/config/master-codes'
 import { ActionError } from '@/lib/actions/action-error'
+import { requireOperatorId } from '@/lib/actor'
 import { assertCodeValues } from '@/lib/common-code/common-codes'
 import { CONTACT_DUTY_GROUP } from '@/lib/contacts/contact-schema'
 import { saveExternalCodes } from '@/lib/master-code/external-codes'
@@ -21,7 +22,10 @@ async function assertShipperCode(db: Db, code: string, ownSystemCode: string, ex
       `'${code}'는 시스템 코드 모양이라 화주사 코드로 쓸 수 없습니다.`,
     )
   }
-  const owner = await db.shipper.findUnique({ where: { code }, select: { id: true } })
+  const owner = await db.shipper.findFirst({
+    where: { operatorId: requireOperatorId(), code },
+    select: { id: true },
+  })
   if (owner && owner.id !== exceptId) {
     throw new ActionError('CONFLICT', `이미 있는 화주사 코드입니다: ${code}`)
   }
@@ -80,6 +84,7 @@ export async function createShipper(data: ShipperData) {
     const shipper = await tx.shipper.create({
       data: {
         ...fieldsOf(data),
+        operatorId: requireOperatorId(),
         systemCode,
         code,
         centers: { create: data.centerIds.map((centerId) => ({ centerId })) },

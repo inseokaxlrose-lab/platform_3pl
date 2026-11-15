@@ -5,7 +5,7 @@ import { textIds } from '@/lib/id'
 import { prisma } from '@/lib/prisma'
 import { isActiveStatus, withIsActive } from '@/lib/status'
 import { isYes } from '@/lib/yn'
-import { isInScope, type DataScope } from '@/lib/scope/data-scope'
+import { isInScope, operatorFilter, type DataScope } from '@/lib/scope/data-scope'
 import type { ShipperInput } from '@/lib/shippers/shipper-schema'
 
 // 수정 화면용 화주사 한 건 (범위 밖이면 null → "찾을 수 없음")
@@ -65,9 +65,10 @@ export async function getShipperForEdit(id: bigint, scope: DataScope) {
 
 export type ShipperForEdit = NonNullable<Awaited<ReturnType<typeof getShipperForEdit>>>
 
-// 이용 센터로 고를 수 있는 센터 (전체 센터 — 사용 중지 센터는 이미 연결된 경우에만 보인다)
-export async function getCenterChoices() {
+// 이용 센터로 고를 수 있는 센터 (내 운영사의 전체 센터 — 사용 중지 센터는 이미 연결된 경우에만 보인다)
+export async function getCenterChoices(scope: DataScope) {
   const centers = await prisma.center.findMany({
+    where: operatorFilter(scope),
     select: { id: true, code: true, name: true, status: true },
     orderBy: { code: 'asc' },
   })

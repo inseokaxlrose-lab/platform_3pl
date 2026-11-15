@@ -20,6 +20,7 @@ import {
 } from '@/lib/common-code/code-schema'
 import { dataGridStateSchema, toPrismaQuery } from '@/lib/grid/grid-query'
 import { prisma } from '@/lib/prisma'
+import { operatorFilter } from '@/lib/scope/data-scope'
 import { DELETED_ONLY, NOT_DELETED, withIsActive } from '@/lib/status'
 import { isYes } from '@/lib/yn'
 import { idSchema } from '@/lib/id'
@@ -32,15 +33,17 @@ const idInput = z.object({ id: idSchema })
 export const listCodeGroupsAction = createAction({
   permission: 'system.codes.read',
   input: dataGridStateSchema,
-  handler: async ({ input }) => {
+  handler: async ({ input, scope }) => {
     const query = toPrismaQuery(input, {
       searchFields: ['code', 'name'],
       sortable: { code: 'code', name: 'name', sortOrder: 'sortOrder', isActive: 'status' },
       defaultOrderBy: { code: 'asc' },
     })
+    const where = { AND: [operatorFilter(scope), query.where] }
     const [rows, rowCount] = await prisma.$transaction([
       prisma.codeGroup.findMany({
         ...query,
+        where,
         orderBy: input.sorting.length > 0 ? query.orderBy : [{ sortOrder: 'asc' }, { code: 'asc' }],
         select: {
           id: true,
@@ -54,7 +57,7 @@ export const listCodeGroupsAction = createAction({
           _count: { select: { items: { where: NOT_DELETED } } },
         },
       }),
-      prisma.codeGroup.count({ where: query.where }),
+      prisma.codeGroup.count({ where }),
     ])
     return {
       // 예/아니오 칸은 화면에서 true/false로
@@ -71,13 +74,13 @@ export const listCodeGroupsAction = createAction({
 export const listCodeItemsAction = createAction({
   permission: 'system.codes.read',
   input: dataGridStateSchema.extend({ groupId: idSchema }),
-  handler: async ({ input: { groupId, ...state } }) => {
+  handler: async ({ input: { groupId, ...state }, scope }) => {
     const query = toPrismaQuery(state, {
       searchFields: ['code', 'name'],
       sortable: { code: 'code', name: 'name', sortOrder: 'sortOrder', isActive: 'status' },
       defaultOrderBy: { code: 'asc' },
     })
-    const where = { AND: [query.where, { groupId }] }
+    const where = { AND: [operatorFilter(scope), query.where, { groupId }] }
     const [rows, rowCount] = await prisma.$transaction([
       prisma.codeItem.findMany({
         ...query,

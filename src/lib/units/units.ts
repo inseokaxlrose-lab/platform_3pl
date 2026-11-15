@@ -1,6 +1,7 @@
 import 'server-only'
 import { assertAllFound, assertNoCodeConflict } from '@/lib/soft-delete'
 import { ActionError } from '@/lib/actions/action-error'
+import { requireOperatorId } from '@/lib/actor'
 import { deleteExternalCodes, saveExternalCodes } from '@/lib/master-code/external-codes'
 import { assertRowVersion, withVersionGuard } from '@/lib/row-version'
 import { prisma } from '@/lib/prisma'
@@ -14,11 +15,15 @@ import { DELETED_ONLY, NOT_DELETED, toStatus, withStatus } from '@/lib/status'
 // - 삭제는 품목에서 쓰지 않는 단위만 (사용 검사는 품목 작업 때 채운다)
 
 export async function createUnit({ externalCodes, ...data }: UnitCreateData) {
-  if (await prisma.unit.findUnique({ where: { code: data.code } })) {
+  const operatorId = requireOperatorId()
+  if (await prisma.unit.findFirst({ where: { operatorId, code: data.code } })) {
     throw new ActionError('CONFLICT', `이미 있는 단위 코드입니다: ${data.code}`)
   }
   return prisma.$transaction(async (tx) => {
-    const unit = await tx.unit.create({ data: withStatus(data), select: { id: true, code: true } })
+    const unit = await tx.unit.create({
+      data: { ...withStatus(data), operatorId },
+      select: { id: true, code: true },
+    })
     await saveExternalCodes(tx, 'UNIT', unit.id, externalCodes)
     return unit
   })

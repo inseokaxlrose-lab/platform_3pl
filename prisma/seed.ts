@@ -1,16 +1,15 @@
 // 개발용 시드: npm run db:seed (여러 번 실행해도 안전)
+// - 예시 운영사 (아직 없을 때만, 사업자번호는 검증번호 규칙으로 만든 가상 번호) — 아래 데이터는 모두 이 운영사 것 (0039)
 // - 역할별 권한그룹 4개: 실행할 때마다 prisma/seed-roles.ts 정의와 똑같이 맞춘다
 // - 예시 센터·화주사 (코드 기준으로 없을 때만 만든다) + 센터마다 입고대기 창고·기본 로케이션
 // - 슈퍼 계정: .env의 SEED_ADMIN_USERNAME / SEED_ADMIN_PASSWORD (비밀번호는 코드에 두지 않는다)
-// - 예시 운영사 정보 (아직 없을 때만, 사업자번호는 검증번호 규칙으로 만든 가상 번호)
 // - 역할별 견본 계정 4개: .env의 SEED_SAMPLE_PASSWORD (비어 있거나 운영 환경이면 건너뛴다)
 // 이미 있는 계정은 비밀번호·소속을 덮어쓰지 않는다 (화면에서 바꾼 값을 지키기 위해)
 import 'dotenv/config'
 import { ensureCenterDefaults } from '../src/lib/centers/center-defaults'
 import { nextSystemCode } from '../src/lib/master-code/system-code'
 import { prisma } from '../src/lib/prisma'
-import { COMPANY_ID } from '../src/lib/company/company'
-import { runAsActor } from '../src/lib/actor'
+import { acrossOperators, runAsActor, runInContext } from '../src/lib/actor'
 import { toYn } from '../src/lib/yn'
 import { createUserAccount } from '../src/lib/users/create-user-account'
 import { SEED_CODE_GROUPS } from './seed-codes'
@@ -19,12 +18,17 @@ import { SEED_UNITS } from './seed-units'
 
 // 권한그룹을 만들고, 권한 목록을 정의와 똑같이 맞춘다 (새 메뉴 추가 시 시드만 다시 실행)
 // 돌려주는 값: 그룹 이름 → id
-async function seedGroups() {
+async function seedGroups(operatorId: bigint) {
   const ids = new Map<string, bigint>()
   for (const definition of SEED_GROUPS) {
     const group = await prisma.permissionGroup.upsert({
-      where: { name: definition.name },
-      create: { name: definition.name, area: definition.area, description: definition.description },
+      where: { operatorId_name: { operatorId, name: definition.name } },
+      create: {
+        operatorId,
+        name: definition.name,
+        area: definition.area,
+        description: definition.description,
+      },
       update: { area: definition.area, description: definition.description },
     })
     const codes = [...new Set(definition.codes)]
@@ -48,16 +52,21 @@ async function linkGroup(userId: bigint, groupId: bigint) {
   })
 }
 
-async function seedSuperAdmin(groupId: bigint) {
+// 아이디는 운영사와 상관없이 전체에서 하나 → 찾을 때 운영사 거르기를 끈다
+const findUserByUsername = (username: string) =>
+  acrossOperators(() => prisma.user.findUnique({ where: { username } }))
+
+async function seedSuperAdmin(operatorId: bigint, groupId: bigint) {
   const username = (process.env.SEED_ADMIN_USERNAME ?? 'admin').toLowerCase()
   const password = process.env.SEED_ADMIN_PASSWORD
   if (!password) {
     throw new Error('SEED_ADMIN_PASSWORD가 .env에 없습니다. .env.example을 참고해 추가해 주세요.')
   }
 
-  let user = await prisma.user.findUnique({ where: { username } })
+  let user = await findUserByUsername(username)
   if (!user) {
     user = await createUserAccount({
+      operatorId,
       username,
       password,
       name: '슈퍼 관리자',
@@ -67,8 +76,10 @@ async function seedSuperAdmin(groupId: bigint) {
   } else {
     console.log(`슈퍼 계정 이미 있음: ${username} (비밀번호는 그대로)`)
   }
-  if (user.userType !== 'OPERATOR') {
-    throw new Error(`'${username}' 계정이 운영사 유형이 아니라 슈퍼 계정으로 쓸 수 없습니다.`)
+  if (user.userType !== 'OPERATOR' || user.operatorId !== operatorId) {
+    throw new Error(
+      `'${username}' 계정이 이 운영사의 운영사 유형이 아니라 슈퍼 계정으로 쓸 수 없습니다.`,
+    )
   }
 
   await prisma.user.update({ where: { id: user.id }, data: { status: 'ACTIVE' } })
@@ -76,7 +87,7 @@ async function seedSuperAdmin(groupId: bigint) {
 }
 
 // 역할별 견본 계정: 없을 때만 만든다
-async function seedSampleAccounts(groupIds: Map<string, bigint>) {
+async function seedSampleAccounts(operatorId: bigint, groupIds: Map<string, bigint>) {
   if (process.env.NODE_ENV === 'production') {
     console.log('견본 계정: 운영 환경이라 건너뜀')
     return
@@ -88,19 +99,22 @@ async function seedSampleAccounts(groupIds: Map<string, bigint>) {
   }
 
   for (const account of SAMPLE_ACCOUNTS) {
-    if (await prisma.user.findUnique({ where: { username: account.username } })) {
+    if (await findUserByUsername(account.username)) {
       console.log(`견본 계정 이미 있음: ${account.username} (그대로 둠)`)
       continue
     }
     const centers = await prisma.center.findMany({
-      where: { code: { in: account.centerCodes ?? [] } },
+      where: { operatorId, code: { in: account.centerCodes ?? [] } },
       select: { id: true },
     })
     const shipper = account.shipperCode
-      ? await prisma.shipper.findUniqueOrThrow({ where: { code: account.shipperCode } })
+      ? await prisma.shipper.findUniqueOrThrow({
+          where: { operatorId_code: { operatorId, code: account.shipperCode } },
+        })
       : null
 
     await createUserAccount({
+      operatorId,
       username: account.username,
       password,
       name: account.name,
@@ -124,30 +138,33 @@ const SAMPLE_SHIPPERS = [
 ]
 
 // 예시 조직: 이미 있으면 건드리지 않는다 (화면에서 바꾼 이름을 덮어쓰지 않기 위해)
-async function seedSampleOrganizations() {
+async function seedSampleOrganizations(operatorId: bigint) {
   for (const center of SAMPLE_CENTERS) {
     // 없을 때만 만든다 (시스템 코드는 시퀀스로 발급)
     const found =
-      (await prisma.center.findUnique({ where: { code: center.code } })) ??
+      (await prisma.center.findUnique({
+        where: { operatorId_code: { operatorId, code: center.code } },
+      })) ??
       (await prisma.center.create({
-        data: { ...center, systemCode: await nextSystemCode('CENTER') },
+        data: { ...center, operatorId, systemCode: await nextSystemCode('CENTER') },
       }))
     // 입고대기 창고 + 기본 로케이션 (이미 있으면 그대로)
     await ensureCenterDefaults(prisma, found.id)
   }
   for (const { centerCodes, ...shipper } of SAMPLE_SHIPPERS) {
     const centers = await prisma.center.findMany({
-      where: { code: { in: centerCodes } },
+      where: { operatorId, code: { in: centerCodes } },
       select: { id: true },
     })
     const found = await prisma.shipper.findUnique({
-      where: { code: shipper.code },
+      where: { operatorId_code: { operatorId, code: shipper.code } },
       select: { id: true, _count: { select: { centers: true } } },
     })
     if (!found) {
       await prisma.shipper.create({
         data: {
           ...shipper,
+          operatorId,
           useLot: toYn(shipper.useLot),
           useExpiry: toYn(shipper.useExpiry),
           systemCode: await nextSystemCode('SHIPPER'),
@@ -169,16 +186,16 @@ async function seedSampleOrganizations() {
   console.log(`예시 센터 ${SAMPLE_CENTERS.length}곳 · 화주사 ${SAMPLE_SHIPPERS.length}곳 확인`)
 }
 
-// 예시 운영사 정보: 없을 때만 만든다 (화면에서 입력한 실제 정보를 덮어쓰지 않기 위해)
-async function seedSampleCompany() {
-  const exists = await prisma.company.findUnique({ where: { id: COMPANY_ID } })
+// 예시 운영사: 없을 때만 만든다 (화면에서 입력한 실제 정보를 덮어쓰지 않기 위해)
+// 가장 먼저 만든 운영사(운영사 1)를 예시 운영사로 본다. 돌려주는 값: 운영사 키
+async function seedSampleOperator(): Promise<bigint> {
+  const exists = await prisma.operator.findFirst({ orderBy: { id: 'asc' } })
   if (exists) {
-    console.log(`운영사 정보 이미 있음: ${exists.name} (그대로 둠)`)
-    return
+    console.log(`운영사 이미 있음: ${exists.name} (그대로 둠)`)
+    return exists.id
   }
-  await prisma.company.create({
+  const created = await prisma.operator.create({
     data: {
-      id: COMPANY_ID,
       name: '예시물류(주)',
       businessNumber: '2208112341',
       ceoName: '홍길동',
@@ -188,21 +205,22 @@ async function seedSampleCompany() {
       contacts: { create: [{ sortOrder: 0, duty: '입고 문의', name: '김입고' }] },
     },
   })
-  console.log('예시 운영사 정보 생성')
+  console.log(`예시 운영사 생성: ${created.name}`)
+  return created.id
 }
 
 // 공통코드 시스템 그룹 (0030): 없으면 만들고, 이미 있으면 시스템 표시만 맞춘다 (고친 이름·순서는 그대로)
-async function seedCommonCodes() {
+async function seedCommonCodes(operatorId: bigint) {
   for (const { items, ...group } of SEED_CODE_GROUPS) {
     const saved = await prisma.codeGroup.upsert({
-      where: { code: group.code },
-      create: { ...group, isSystem: 'Y' },
+      where: { operatorId_code: { operatorId, code: group.code } },
+      create: { ...group, operatorId, isSystem: 'Y' },
       update: { isSystem: 'Y' },
     })
     for (const [index, item] of items.entries()) {
       await prisma.codeItem.upsert({
         where: { groupId_code: { groupId: saved.id, code: item.code } },
-        create: { ...item, groupId: saved.id, sortOrder: (index + 1) * 10 },
+        create: { ...item, operatorId, groupId: saved.id, sortOrder: (index + 1) * 10 },
         update: {},
       })
     }
@@ -211,13 +229,13 @@ async function seedCommonCodes() {
 }
 
 // 기본 단위 (0034): 없으면 만들고, 이미 있으면 시스템 표시만 맞춘다
-async function seedUnits() {
+async function seedUnits(operatorId: bigint) {
   for (const [index, unit] of SEED_UNITS.entries()) {
     // 예/아니오 칸은 DB에 'Y'/'N'으로
     const isSystem = toYn(unit.isSystem ?? false)
     await prisma.unit.upsert({
-      where: { code: unit.code },
-      create: { ...unit, isSystem, sortOrder: (index + 1) * 10 },
+      where: { operatorId_code: { operatorId, code: unit.code } },
+      create: { ...unit, operatorId, isSystem, sortOrder: (index + 1) * 10 },
       update: { isSystem },
     })
   }
@@ -225,13 +243,16 @@ async function seedUnits() {
 }
 
 async function main() {
-  await seedCommonCodes()
-  await seedUnits()
-  await seedSampleOrganizations()
-  await seedSampleCompany()
-  const groupIds = await seedGroups()
-  await seedSuperAdmin(groupIds.get(SUPER_GROUP_NAME)!)
-  await seedSampleAccounts(groupIds)
+  const operatorId = await seedSampleOperator()
+  // 이 아래는 모두 예시 운영사의 데이터 (운영사 출입증: 읽기·쓰기가 이 운영사로 걸러지고 채워진다)
+  await runInContext({ actor: 'seed', operatorId }, async () => {
+    await seedCommonCodes(operatorId)
+    await seedUnits(operatorId)
+    await seedSampleOrganizations(operatorId)
+    const groupIds = await seedGroups(operatorId)
+    await seedSuperAdmin(operatorId, groupIds.get(SUPER_GROUP_NAME)!)
+    await seedSampleAccounts(operatorId, groupIds)
+  })
 }
 
 // 시드가 만든 데이터의 등록·수정자는 'seed'

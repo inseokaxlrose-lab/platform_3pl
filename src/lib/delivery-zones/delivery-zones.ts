@@ -2,6 +2,7 @@ import 'server-only'
 import { assertAllFound, assertNoCodeConflict } from '@/lib/soft-delete'
 import { looksLikeSystemCode } from '@/config/master-codes'
 import { ActionError } from '@/lib/actions/action-error'
+import { requireOperatorId } from '@/lib/actor'
 import { deleteExternalCodes, saveExternalCodes } from '@/lib/master-code/external-codes'
 import { nextSystemCode } from '@/lib/master-code/system-code'
 import { assertRowVersion, withVersionGuard } from '@/lib/row-version'
@@ -83,6 +84,7 @@ export async function createDeliveryZone(data: DeliveryZoneData) {
     await assertRegionsFree(tx, data.centerId, data.regionCodes)
     const zone = await tx.deliveryZone.create({
       data: {
+        operatorId: requireOperatorId(),
         centerId: data.centerId,
         systemCode,
         code,

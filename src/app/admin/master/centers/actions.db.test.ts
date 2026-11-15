@@ -7,7 +7,7 @@ import { prisma } from '@/lib/prisma'
 import { versionOf } from '@/test/factories'
 import type { DataScope } from '@/lib/scope/data-scope'
 import { getCurrentPermissions, getCurrentScope, getCurrentUser } from '@/lib/session'
-import { resetDatabase } from '@/test/reset-database'
+import { resetDatabase, TEST_OPERATOR_ID } from '@/test/reset-database'
 import {
   createCenterAction,
   listCentersAction,
@@ -28,7 +28,10 @@ const ALL_CODES: PermissionCode[] = [
   'master.centers.update',
 ]
 
-function signIn(scope: DataScope = { kind: 'ALL' }, codes = ALL_CODES) {
+function signIn(
+  scope: DataScope = { kind: 'ALL', operatorId: TEST_OPERATOR_ID },
+  codes = ALL_CODES,
+) {
   vi.mocked(getCurrentUser).mockResolvedValue({
     id: 1n,
     name: '관리자',
@@ -232,7 +235,7 @@ describe('목록 · 데이터 범위 · 권한', () => {
   it('센터 직원: 소속 센터만 보이고, 다른 센터는 고칠 수 없다 (존재도 알려주지 않음)', async () => {
     const icn = await create({ code: 'ICN' })
     const gmh = await create({ code: 'GMH', name: '김해센터' })
-    signIn({ kind: 'CENTERS', centerIds: [BigInt(icn.id)] })
+    signIn({ kind: 'CENTERS', operatorId: TEST_OPERATOR_ID, centerIds: [BigInt(icn.id)] })
 
     const result = await listCentersAction(createDataGridState())
     expect(result.ok && result.data.rows.map((r) => r.code)).toEqual(['ICN'])
@@ -260,7 +263,7 @@ describe('목록 · 데이터 범위 · 권한', () => {
 
   it('센터 직원은 권한 코드가 있어도 등록·사용 중지는 못 한다 (운영사만)', async () => {
     const icn = await create({ code: 'ICN' })
-    signIn({ kind: 'CENTERS', centerIds: [BigInt(icn.id)] })
+    signIn({ kind: 'CENTERS', operatorId: TEST_OPERATOR_ID, centerIds: [BigInt(icn.id)] })
 
     expect(await createCenterAction(input({ code: 'NEW' }))).toMatchObject({
       ok: false,
@@ -273,7 +276,7 @@ describe('목록 · 데이터 범위 · 권한', () => {
   })
 
   it('권한이 없으면 거부 (조회만 있으면 등록·수정 불가)', async () => {
-    signIn({ kind: 'ALL' }, ['master.centers.read'])
+    signIn({ kind: 'ALL', operatorId: TEST_OPERATOR_ID }, ['master.centers.read'])
     expect(await createCenterAction(input())).toMatchObject({
       ok: false,
       error: { code: 'FORBIDDEN' },
@@ -300,6 +303,7 @@ describe('목록 검색 조건 · 일괄 처리 · 엑셀', () => {
     await prisma.center.update({ where: { id: BigInt(gmh.id) }, data: { status: 'INACTIVE' } })
     await prisma.warehouse.create({
       data: {
+        operatorId: TEST_OPERATOR_ID,
         centerId: BigInt(icn.id),
         systemCode: 'WH-T1',
         code: 'COLD',
@@ -333,7 +337,7 @@ describe('목록 검색 조건 · 일괄 처리 · 엑셀', () => {
     })
     expect(await codes({ status: 'ACTIVE' })).toEqual([])
 
-    signIn({ kind: 'CENTERS', centerIds: [BigInt(a.id)] })
+    signIn({ kind: 'CENTERS', operatorId: TEST_OPERATOR_ID, centerIds: [BigInt(a.id)] })
     expect(await setCentersActiveAction({ ids: [a.id], isActive: true })).toMatchObject({
       ok: false,
       error: { code: 'FORBIDDEN' },
@@ -347,7 +351,7 @@ describe('목록 검색 조건 · 일괄 처리 · 엑셀', () => {
       ok: false,
       error: { code: 'FORBIDDEN' },
     })
-    signIn({ kind: 'ALL' }, [...ALL_CODES, 'master.centers.export'])
+    signIn({ kind: 'ALL', operatorId: TEST_OPERATOR_ID }, [...ALL_CODES, 'master.centers.export'])
     const result = await list({}, { exportAll: true, pageIndex: 5 })
     expect(result.ok && result.data.rows.map((r) => r.code)).toEqual(['AAA', 'BBB'])
   })
