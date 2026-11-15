@@ -241,6 +241,7 @@ model Center {
   deliveryZones DeliveryZone[]
   shippers      ShipperCenter[]
   stocks        Stock[]
+  asns          Asn[]
 
   // 논리 삭제: 'Y'면 지운 것 (목록·조회에서 빠지고 되살릴 수 있다, 0038)
   delYn String @default("N") @map("del_yn") @db.Char(1)
@@ -385,6 +386,7 @@ model Shipper {
   items     Item[]
   customers Customer[]
   stocks    Stock[]
+  asns      Asn[]
 
   // 논리 삭제: 'Y'면 지운 것 (목록·조회에서 빠지고 되살릴 수 있다, 0038)
   delYn String @default("N") @map("del_yn") @db.Char(1)
@@ -586,6 +588,10 @@ model Operator {
   customers        Customer[]
   stocks           Stock[]
   stockTxns        StockTxn[]
+  asns             Asn[]
+  asnLines         AsnLine[]
+  receipts         InboundReceipt[]
+  receiptLines     InboundReceiptLine[]
 
   // 논리 삭제: 'Y'면 지운 것 (목록·조회에서 빠지고 되살릴 수 있다, 0038)
   delYn String @default("N") @map("del_yn") @db.Char(1)
@@ -862,8 +868,9 @@ model Item {
   rowVersion Int      @default(1) @map("row_version")
 
   // 환산단위 (BOX·CARTON·PLT… + 입수량)
-  units  ItemUnit[]
-  stocks Stock[]
+  units    ItemUnit[]
+  stocks   Stock[]
+  asnLines AsnLine[]
 
   // 논리 삭제: 'Y'면 지운 것 (목록·조회에서 빠지고 되살릴 수 있다, 0038)
   delYn String @default("N") @map("del_yn") @db.Char(1)
@@ -995,7 +1002,8 @@ model Stock {
   // 동시 처리 안전: 재고 변경 함수가 줄을 잠그고 바꾼다. 버전은 화면 확인용
   rowVersion Int      @default(1) @map("row_version")
 
-  txns StockTxn[]
+  txns         StockTxn[]
+  receiptLines InboundReceiptLine[]
 
   @@unique([locationId, itemId, lotNo, expiryOn], map: "tb_stock_address_key")
   @@index([operatorId])
@@ -1053,4 +1061,165 @@ model StockTxn {
   @@index([refType, refId])
   @@index([groupId])
   @@map("tb_stock_txn")
+}
+
+// ─── 입고 (M5, docs/decisions/0047) ─────────────────────────
+// ASN(입고예정) 하나에 검수·입고 확정이 여러 번 나눠 일어날 수 있다 (0003 결정 5)
+// ASN (헤더 + 라인) └ 입고확정 1차 (문서 + 라인) → 입고대기 창고에 재고 생성 └ 적치 …
+
+// 입고 유형: 화주사가 보낸 물건 / 다른 센터에서 이동해 온 물건 (MVP 이후)
+enum InboundType {
+  SHIPPER
+  TRANSFER
+}
+
+// 등록 경로: 화주 포털 / 센터 대리 등록 / 엑셀 업로드
+enum AsnChannel {
+  PORTAL
+  PROXY
+  EXCEL
+}
+
+// 입고 상태: 예정 → 검수중 → 부분확정 → 확정완료, 또는 → 마감
+enum AsnStatus {
+  PLANNED
+  INSPECTING
+  PARTIAL
+  COMPLETED
+  CLOSED
+}
+
+// 적치 상태: 적치대기 → 부분적치 → 적치완료
+enum PutawayStatus {
+  WAITING
+  PARTIAL
+  DONE
+}
+
+// ASN 헤더
+model Asn {
+  id         BigInt   @id @default(autoincrement()) @map("asn_id")
+  operatorId BigInt   @map("operator_id")
+  operator   Operator @relation(fields: [operatorId], references: [id], onDelete: Restrict)
+  centerId   BigInt   @map("center_id")
+  center     Center   @relation(fields: [centerId], references: [id], onDelete: Restrict)
+  shipperId  BigInt   @map("shipper_id")
+  shipper    Shipper  @relation(fields: [shipperId], references: [id], onDelete: Restrict)
+  // ASN 번호 (자동: AS + 등록일 YYMMDD + '-' + 일련번호, 운영사 전체에서 하나)
+  asnNo      String   @unique @map("asn_no") @db.VarChar(20)
+
+  type         InboundType @default(SHIPPER) @map("inbound_type_cd")
+  channel      AsnChannel  @map("reg_channel_cd")
+  // 입고 예정일
+  expectedOn   DateTime    @map("expected_dt") @db.Date
+  // 화주사 쪽 문서 번호 (발주번호 등, 선택)
+  shipperRefNo String?     @map("shipper_ref_no") @db.VarChar(50)
+  remark       String?     @db.VarChar(1000)
+
+  status        AsnStatus     @default(PLANNED) @map("asn_status_cd")
+  putawayStatus PutawayStatus @default(WAITING) @map("putaway_status_cd")
+  // 잔량 마감 (사유 필수, 마감자·일시)
+  closeReason   String?       @map("close_reason") @db.VarChar(200)
+  closedAt      DateTime?     @map("closed_at")
+  closedBy      String?       @map("closed_by") @db.VarChar(50)
+
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
+  createdBy  String   @default("system") @map("created_by") @db.VarChar(50)
+  updatedBy  String   @default("system") @map("updated_by") @db.VarChar(50)
+  rowVersion Int      @default(1) @map("row_version")
+
+  lines    AsnLine[]
+  receipts InboundReceipt[]
+
+  // 논리 삭제: 예정(PLANNED) 상태에서만 지울 수 있다
+  delYn String @default("N") @map("del_yn") @db.Char(1)
+
+  @@index([operatorId])
+  @@index([centerId, status])
+  @@index([shipperId, expectedOn])
+  @@map("tb_asn")
+}
+
+// ASN 라인 (헤더와 통째로 바뀌는 하위 표: 감사 칸은 헤더 이력으로 본다)
+// 수량은 모두 기본단위. 잔량 = max(예정 − 누적 확정, 0), 초과 = max(누적 확정 − 예정, 0) 은 저장하지 않고 계산한다
+model AsnLine {
+  id         BigInt   @id @default(autoincrement()) @map("asn_line_id")
+  operatorId BigInt   @map("operator_id")
+  operator   Operator @relation(fields: [operatorId], references: [id], onDelete: Restrict)
+  asnId      BigInt   @map("asn_id")
+  asn        Asn      @relation(fields: [asnId], references: [id], onDelete: Restrict)
+  lineNo     Int      @map("line_no")
+  itemId     BigInt   @map("item_id")
+  item       Item     @relation(fields: [itemId], references: [id], onDelete: Restrict)
+
+  // 예정 수량 (기본단위)
+  expectedQty Decimal   @map("expected_qty") @db.Decimal(18, 3)
+  // 입력한 단위·수량 (화면 표시용, 예: BOX 3 → 예정 72 EA)
+  entryUnit   String?   @map("entry_unit_cd") @db.VarChar(20)
+  entryQty    Decimal?  @map("entry_qty") @db.Decimal(18, 3)
+  // 화주사가 알려 준 로트·유통기한 (참고용, 검수에서 실제 값을 넣는다)
+  lotNo       String?   @map("lot_no") @db.VarChar(50)
+  expiryOn    DateTime? @map("expiry_dt") @db.Date
+
+  // 누적 수량 (입고 확정·적치·마감 때 함께 바뀐다)
+  confirmedQty Decimal @default(0) @map("confirmed_qty") @db.Decimal(18, 3)
+  putawayQty   Decimal @default(0) @map("putaway_qty") @db.Decimal(18, 3)
+  // 마감 때 남아 있던 잔량 (보고서용)
+  closedQty    Decimal @default(0) @map("closed_qty") @db.Decimal(18, 3)
+  remark       String? @db.VarChar(200)
+
+  receiptLines InboundReceiptLine[]
+
+  @@unique([asnId, lineNo])
+  @@index([itemId])
+  @@index([operatorId])
+  @@map("tb_asn_line")
+}
+
+// 입고확정 문서: 확정할 때마다 하나 (부분 확정이면 ASN 하나에 여러 개)
+model InboundReceipt {
+  id          BigInt   @id @default(autoincrement()) @map("receipt_id")
+  operatorId  BigInt   @map("operator_id")
+  operator    Operator @relation(fields: [operatorId], references: [id], onDelete: Restrict)
+  asnId       BigInt   @map("asn_id")
+  asn         Asn      @relation(fields: [asnId], references: [id], onDelete: Restrict)
+  // 확정 번호 (자동: RC + YYMMDD + '-' + 일련번호)
+  receiptNo   String   @unique @map("receipt_no") @db.VarChar(20)
+  confirmedAt DateTime @default(now()) @map("confirmed_at")
+  confirmedBy String   @default("system") @map("confirmed_by") @db.VarChar(50)
+  remark      String?  @db.VarChar(200)
+
+  lines InboundReceiptLine[]
+
+  @@index([asnId])
+  @@index([operatorId, confirmedAt])
+  @@map("tb_inbound_receipt")
+}
+
+// 입고확정 라인: 확정 수량이 입고대기 창고의 어느 재고 줄이 됐는지 (적치는 이 줄의 재고만)
+model InboundReceiptLine {
+  id         BigInt         @id @default(autoincrement()) @map("receipt_line_id")
+  operatorId BigInt         @map("operator_id")
+  operator   Operator       @relation(fields: [operatorId], references: [id], onDelete: Restrict)
+  receiptId  BigInt         @map("receipt_id")
+  receipt    InboundReceipt @relation(fields: [receiptId], references: [id], onDelete: Restrict)
+  asnLineId  BigInt         @map("asn_line_id")
+  asnLine    AsnLine        @relation(fields: [asnLineId], references: [id], onDelete: Restrict)
+  // 만들어진(또는 더해진) 재고 줄 = 입고대기 창고 로케이션 + 품목 + 로트 + 유통기한
+  stockId    BigInt         @map("stock_id")
+  stock      Stock          @relation(fields: [stockId], references: [id], onDelete: Restrict)
+  stockTxnId BigInt         @map("stock_txn_id")
+  lotNo      String?        @map("lot_no") @db.VarChar(50)
+  expiryOn   DateTime?      @map("expiry_dt") @db.Date
+
+  // 확정 수량 (기본단위)과 그중 적치한 수량
+  qty        Decimal @map("confirm_qty") @db.Decimal(18, 3)
+  putawayQty Decimal @default(0) @map("putaway_qty") @db.Decimal(18, 3)
+
+  @@index([receiptId])
+  @@index([asnLineId])
+  @@index([stockId])
+  @@index([operatorId])
+  @@map("tb_inbound_receipt_line")
 }
