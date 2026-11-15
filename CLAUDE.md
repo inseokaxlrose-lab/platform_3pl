@@ -64,3 +64,4 @@ Next.js (App Router) · TypeScript · PostgreSQL · Prisma · Tailwind + shadcn/
 
 - `/admin` — 운영사 화면 (운영사 관리자, 창고 작업자)
 - `/portal` — 화주 포털 (화주 사용자)
+- `/platform` — 플랫폼 화면 (플랫폼 관리자: 운영사 관리, 운영사를 골라 그 운영사로 작업 — 0039)

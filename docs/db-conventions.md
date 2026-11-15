@@ -68,6 +68,7 @@
 - 고유 규칙은 같은 운영사 안에서만 (`@@unique([operatorId, code], …)`). 로그인 아이디·이메일은 전체에서 하나.
 - **서버 액션 안**: `createAction`이 운영사 출입증(`runInContext`, `src/lib/actor.ts`)을 만들고, `prisma.ts`가 11개 표의 읽기·수정·삭제에 지금 운영사 조건을 붙이고 등록에 운영사를 채운다. 새로 만드는 함수는 `requireOperatorId()`로 운영사를 받는다. 전체 고유 값(아이디·이메일) 중복 검사만 `acrossOperators()`.
 - **서버 액션 밖(화면 조회 함수)**: 자동 거르기가 없다 → `scopeFilter`(운영사 조건 자동)·`isInScope`(줄의 `operatorId` 검사 — `select`에 `operatorId`를 꼭 넣는다)·`operatorFilter(scope)`(센터·화주사로 나누지 않는 데이터)를 쓴다.
+- 플랫폼 관리자(`user_type_cd = PLATFORM`)만 `operator_id`가 비어 있다 (검사 조건). 운영사 상태 `tb_operator.status_cd`가 ACTIVE가 아니면 그 운영사 사용자는 로그인할 수 없다.
 - 주의: 안쪽 관계로 함께 만드는 줄(nested create)은 안전망이 채우지 못한다 → `operatorId`를 직접 넣는다. 범위 검사는 넘겨받은 값(`{ centerId }`)이 아니라 DB에서 읽은 줄로 한다.
 
 ## 표·칸 대응표 (1단계 — 지금 25개 표, 197개 칸)
