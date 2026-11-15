@@ -72,9 +72,14 @@ export function useListQuery<TRow>({
   )
 
   const queryString = searchParams.toString()
+  // 조건 정의 배열은 화면이 그릴 때마다 새로 만들 수 있으므로 키·종류 글자로 비교한다
+  // (배열 자체로 비교하면 매번 새 상태 → 조회가 끝없이 반복된다)
+  const fieldsKey = fields.map((f) => `${f.key}:${f.type}`).join(',')
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const stableFields = useMemo(() => fields, [fieldsKey])
   const { grid, filters } = useMemo(
-    () => parseListUrl(new URLSearchParams(queryString), fields, defaults),
-    [queryString, fields, defaults],
+    () => parseListUrl(new URLSearchParams(queryString), stableFields, defaults),
+    [queryString, stableFields, defaults],
   )
   // [조회]를 누르기 전 (autoSearch=false이고 URL에 조건이 하나도 없을 때)
   const [searchedManually, setSearchedManually] = useState(false)
@@ -126,7 +131,9 @@ export function useListQuery<TRow>({
         }
         setLoading(false)
       })
-  }, [requestKey, searched, grid, filters])
+    // grid·filters는 requestKey(URL)에서 나온 값이라 requestKey로만 다시 읽는다
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [requestKey, searched])
 
   // ── 목록 주소 기억 + 스크롤 위치 기억·복원
   const fullUrl = queryString ? `${pathname}?${queryString}` : pathname
@@ -153,9 +160,9 @@ export function useListQuery<TRow>({
     },
     // 지금 적용된 검색 조건 (검색어는 keyword 칸 키로 함께)
     values: useMemo(() => {
-      const keyword = fields.find((f) => f.type === 'keyword')
+      const keyword = stableFields.find((f) => f.type === 'keyword')
       return keyword && grid.search ? { ...filters, [keyword.key]: grid.search } : filters
-    }, [fields, filters, grid.search]),
+    }, [stableFields, filters, grid.search]),
     // [조회]: 조건을 적용하고 1페이지로
     search(values: SearchValues) {
       const keyword = fields.find((f) => f.type === 'keyword')

@@ -114,11 +114,11 @@ describe('useListQuery', () => {
 
   it('URL의 조건으로 조회하고, 조회하면 1페이지로 URL을 바꾼다', async () => {
     currentQuery = 'q=old&page=3'
-    const fetch = vi.fn(async (_: ListRequest) => ok([{ id: 'a' }]))
+    const fetch = vi.fn(async (request: ListRequest) => ok([{ id: request.search }]))
     const { result } = renderHook(() =>
       useListQuery<Row>({ gridId: 't', fields: FIELDS, fetch, defaultSort: DEFAULTS.sorting }),
     )
-    await waitFor(() => expect(result.current.rows).toEqual([{ id: 'a' }]))
+    await waitFor(() => expect(result.current.rows).toEqual([{ id: 'old' }]))
     expect(fetch).toHaveBeenCalledWith(
       expect.objectContaining({ search: 'old', pageIndex: 2, filters: {} }),
     )
@@ -155,6 +155,18 @@ describe('useListQuery', () => {
     const { result } = renderHook(() => useListQuery<Row>({ gridId: 't', fields: FIELDS, fetch }))
     await waitFor(() => expect(result.current.loading).toBe(false))
     expect(result.current.error).toContain('서버와 통신하지 못했습니다')
+  })
+
+  it('조건 정의 배열을 그릴 때마다 새로 만들어도 한 번만 조회한다', async () => {
+    const fetch = vi.fn(async () => ok([]))
+    const { result, rerender } = renderHook(() =>
+      useListQuery<Row>({ gridId: 't', fields: [...FIELDS], fetch }),
+    )
+    await waitFor(() => expect(result.current.loading).toBe(false))
+    rerender()
+    rerender()
+    await waitFor(() => expect(result.current.loading).toBe(false))
+    expect(fetch).toHaveBeenCalledTimes(1)
   })
 
   it('autoSearch=false면 [조회] 전에는 읽지 않는다', () => {
