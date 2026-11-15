@@ -8,6 +8,7 @@ import {
   FileSpreadsheetIcon,
   HistoryIcon,
   HouseIcon,
+  ListTreeIcon,
   MapIcon,
   MapPinIcon,
   PackageCheckIcon,
@@ -216,6 +217,13 @@ const adminNavigation: NavArea = {
           icon: ShieldIcon,
           ready: true,
           permission: 'system.roles.read',
+        },
+        {
+          title: '공통코드',
+          href: '/admin/system/codes',
+          icon: ListTreeIcon,
+          ready: true,
+          permission: 'system.codes.read',
         },
         {
           title: '자료 추출',

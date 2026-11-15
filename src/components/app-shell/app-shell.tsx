@@ -1,4 +1,5 @@
 import { cookies } from 'next/headers'
+import { CommonCodeProvider } from '@/components/common-code'
 import { GridSettingsProvider } from '@/components/data-grid/grid-settings-provider'
 import type { GridSettings } from '@/components/data-grid/settings'
 import { HelpProvider } from '@/components/help'
@@ -6,6 +7,7 @@ import { PermissionProvider } from '@/components/permission'
 import { SidebarInset, SidebarProvider } from '@/components/ui/sidebar'
 import type { NavAreaKey } from '@/config/navigation'
 import type { PermissionCode } from '@/config/permissions'
+import { loadCodeOptions } from '@/lib/common-code/common-codes'
 import { loadHelpAction } from '@/lib/help/help-actions'
 import { listHelpMenuHrefs } from '@/lib/help/load-help'
 import { setFavoriteMenuAction } from '@/lib/navigation/favorite-actions'
@@ -39,25 +41,29 @@ export async function AppShell({
   const defaultOpen = cookieStore.get('sidebar_state')?.value !== 'false'
   // 사이드바 탭도 마지막으로 연 탭으로 그린다
   const initialTab = parseSidebarTab(cookieStore.get(SIDEBAR_TAB_COOKIE)?.value)
+  // 공통코드 전체 (고르기 목록용, 0030): 수백 개 수준이라 요청마다 한 번에 읽는다
+  const codeOptions = await loadCodeOptions()
 
   return (
     <PermissionProvider codes={permissions}>
       <GridSettingsProvider initial={gridSettings}>
-        {/* 화면 도움말: 도움말 파일이 있는 메뉴 목록 + 불러오기 서버 액션 (0023) */}
-        <HelpProvider menuHrefs={listHelpMenuHrefs()} load={loadHelpAction}>
-          <SidebarProvider defaultOpen={defaultOpen}>
-            <AppSidebar
-              area={area}
-              favorites={favoriteMenus}
-              initialTab={initialTab}
-              onToggleFavorite={setFavoriteMenuAction}
-            />
-            <SidebarInset>
-              <AppHeader area={area} user={user} />
-              <div className="flex-1 p-6">{children}</div>
-            </SidebarInset>
-          </SidebarProvider>
-        </HelpProvider>
+        <CommonCodeProvider options={codeOptions}>
+          {/* 화면 도움말: 도움말 파일이 있는 메뉴 목록 + 불러오기 서버 액션 (0023) */}
+          <HelpProvider menuHrefs={listHelpMenuHrefs()} load={loadHelpAction}>
+            <SidebarProvider defaultOpen={defaultOpen}>
+              <AppSidebar
+                area={area}
+                favorites={favoriteMenus}
+                initialTab={initialTab}
+                onToggleFavorite={setFavoriteMenuAction}
+              />
+              <SidebarInset>
+                <AppHeader area={area} user={user} />
+                <div className="flex-1 p-6">{children}</div>
+              </SidebarInset>
+            </SidebarProvider>
+          </HelpProvider>
+        </CommonCodeProvider>
       </GridSettingsProvider>
     </PermissionProvider>
   )
