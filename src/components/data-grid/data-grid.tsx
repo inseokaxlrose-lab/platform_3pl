@@ -375,6 +375,7 @@ export function DataGrid<TData extends RowData>({
               }
             : undefined
         }
+        totalCount={rowCount}
         selectedCount={Object.values(rowSelection).filter(Boolean).length}
         onClearSelection={() => updateSelection({})}
         density={density}

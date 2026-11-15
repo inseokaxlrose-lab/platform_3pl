@@ -4,6 +4,20 @@
 
 @custom-variant dark (&:is(.dark *));
 
+/* 페이지 틀 간격 토큰 (docs/ui-guidelines.md "페이지 틀") — 목록·편집 화면이 같은 값을 쓴다 */
+@theme {
+  /* 본문·헤더 좌우 여백, 헤더와 본문 사이 */
+  --spacing-page: 1.5rem;
+  /* 카드 사이(검색 영역 ↔ 그리드), 편집 섹션 사이 */
+  --spacing-section: 1.5rem;
+  /* 카드 안쪽 여백 */
+  --spacing-card: 1rem;
+  /* 편집 화면 왼쪽 목차 폭 */
+  --spacing-toc: 12.5rem;
+  /* 편집 화면 본문 최대 폭 (max-w-form) */
+  --container-form: 65rem;
+}
+
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);

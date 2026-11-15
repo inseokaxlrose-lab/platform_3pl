@@ -39,16 +39,15 @@ export function DataGridPagination({
 
   return (
     <div className="flex flex-wrap items-center justify-between gap-3 text-sm">
-      <p className="text-muted-foreground">
-        총{' '}
-        <span className="font-medium text-foreground tabular-nums">{formatNumber(rowCount)}</span>건
-        {/* 지금 보는 범위 (예: 21–40) */}
-        {rowCount > 0 && (
-          <span className="ml-2 tabular-nums">
+      {/* 지금 보는 범위 / 전체 (총 건수는 위 툴바 왼쪽에도) */}
+      <p className="text-muted-foreground tabular-nums">
+        {rowCount > 0 ? (
+          <>
             {formatNumber(pageIndex * pageSize + 1)}–
-            {formatNumber(Math.min(rowCount, (pageIndex + 1) * pageSize))}
-          </span>
-        )}
+            {formatNumber(Math.min(rowCount, (pageIndex + 1) * pageSize))} /{' '}
+          </>
+        ) : null}
+        <span className="font-medium text-foreground">{formatNumber(rowCount)}</span>건
       </p>
       <div className="flex flex-wrap items-center gap-4">
         <Select value={String(pageSize)} onValueChange={(v) => onPageSizeChange(Number(v))}>

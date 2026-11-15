@@ -13,6 +13,7 @@ import {
   XIcon,
 } from 'lucide-react'
 import { useEffect, useEffectEvent, useState } from 'react'
+import { SectionToolbar } from '@/components/app-page/section-toolbar'
 import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
 import {
@@ -61,6 +62,8 @@ type DataGridToolbarProps = {
   actions?: React.ReactNode
   // 엑셀 내보내기 (DataGrid에 exportExcel을 줬을 때만)
   exporting?: ExportOption
+  // 전체 건수 (왼쪽 "총 n건")
+  totalCount: number
 }
 
 // 그리드 위 도구 줄: 검색 · 선택 건수 · 화면별 버튼 · 행 높이 · 컬럼 표시
@@ -73,40 +76,60 @@ export function DataGridToolbar({
   columns,
   actions,
   exporting,
+  totalCount,
 }: DataGridToolbarProps) {
+  // 하위 표와 같은 배치 (SectionToolbar): 왼쪽 검색·건수, 오른쪽 버튼
   return (
-    <div className="flex flex-wrap items-center gap-2">
-      {search && <SearchInput {...search} />}
-
-      {selectedCount > 0 && (
-        <div className="flex items-center gap-1 text-sm">
-          <span className="font-medium tabular-nums">{formatNumber(selectedCount)}건 선택</span>
-          <Button variant="ghost" size="icon-xs" aria-label="선택 해제" onClick={onClearSelection}>
-            <XIcon />
+    <SectionToolbar
+      start={
+        <>
+          {search && <SearchInput {...search} />}
+          <span className="text-muted-foreground">
+            총{' '}
+            <span className="font-medium text-foreground tabular-nums">
+              {formatNumber(totalCount)}
+            </span>
+            건
+          </span>
+          {selectedCount > 0 && (
+            <span className="flex items-center gap-1">
+              <span className="font-medium tabular-nums">
+                {formatNumber(selectedCount)}건 선택됨
+              </span>
+              <Button
+                variant="ghost"
+                size="icon-xs"
+                aria-label="선택 해제"
+                onClick={onClearSelection}
+              >
+                <XIcon />
+              </Button>
+            </span>
+          )}
+        </>
+      }
+      end={
+        <>
+          {exporting?.error && (
+            <p role="alert" className="text-sm text-destructive">
+              {exporting.error}
+            </p>
+          )}
+          {actions}
+          {exporting && <ExportMenu {...exporting} selectedCount={selectedCount} />}
+          <Button
+            variant="outline"
+            size="icon"
+            aria-label={density === 'compact' ? '행 높이 넓게' : '행 높이 촘촘하게'}
+            title={density === 'compact' ? '행 높이 넓게' : '행 높이 촘촘하게'}
+            onClick={() => onDensityChange(density === 'compact' ? 'comfortable' : 'compact')}
+          >
+            {density === 'compact' ? <Rows3Icon /> : <Rows4Icon />}
           </Button>
-        </div>
-      )}
-
-      <div className="ml-auto flex items-center gap-2">
-        {exporting?.error && (
-          <p role="alert" className="text-sm text-destructive">
-            {exporting.error}
-          </p>
-        )}
-        {actions}
-        {exporting && <ExportMenu {...exporting} selectedCount={selectedCount} />}
-        <Button
-          variant="outline"
-          size="icon"
-          aria-label={density === 'compact' ? '행 높이 넓게' : '행 높이 촘촘하게'}
-          title={density === 'compact' ? '행 높이 넓게' : '행 높이 촘촘하게'}
-          onClick={() => onDensityChange(density === 'compact' ? 'comfortable' : 'compact')}
-        >
-          {density === 'compact' ? <Rows3Icon /> : <Rows4Icon />}
-        </Button>
-        {columns && <ColumnMenu {...columns} />}
-      </div>
-    </div>
+          {columns && <ColumnMenu {...columns} />}
+        </>
+      }
+    />
   )
 }
 

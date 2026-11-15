@@ -274,7 +274,7 @@ describe('DataGrid 행 선택', () => {
     fireEvent.click(screen.getByRole('checkbox', { name: '현재 페이지 전체 선택' }))
 
     expect(onSelectionChange.mock.lastCall![0]).toHaveLength(20)
-    expect(screen.getByText('20건 선택')).toBeTruthy()
+    expect(screen.getByText('20건 선택됨')).toBeTruthy()
   })
 
   it('일부만 선택하면 헤더 체크박스가 "일부 선택" 상태가 된다', () => {
@@ -297,7 +297,7 @@ describe('DataGrid 행 선택', () => {
     })
 
     expect(onSelectionChange).toHaveBeenLastCalledWith(['r1', 'r2'])
-    expect(screen.getByText('2건 선택')).toBeTruthy()
+    expect(screen.getByText('2건 선택됨')).toBeTruthy()
   })
 
   it('페이지를 넘겨도 선택이 유지되고, 다른 페이지 선택이 더해진다', () => {
@@ -309,7 +309,7 @@ describe('DataGrid 행 선택', () => {
     fireEvent.click(screen.getAllByRole('checkbox', { name: '행 선택' })[0]) // r21
 
     expect(onSelectionChange).toHaveBeenLastCalledWith(['r1', 'r21'])
-    expect(screen.getByText('2건 선택')).toBeTruthy()
+    expect(screen.getByText('2건 선택됨')).toBeTruthy()
   })
 
   it('[선택 해제]를 누르면 모든 선택이 풀린다', () => {
@@ -430,8 +430,14 @@ describe('DataGrid 목록 공통 기능', () => {
 })
 
 describe('DataGrid 페이지 범위 표시', () => {
-  it('전체 건수와 지금 보는 범위 (예: 21–40)', () => {
+  it('툴바에 총 건수, 아래에 지금 보는 범위 / 전체', () => {
     render(<Harness initial={{ ...createDataGridState(), pageIndex: 2 }} />)
-    expect(screen.getByText('41–45')).toBeTruthy()
+    // 아래: 범위 / 전체, 위 툴바: 총 건수
+    expect(
+      screen.getByText((_, el) => el?.tagName === 'P' && el.textContent === '41–45 / 45건'),
+    ).toBeTruthy()
+    expect(
+      screen.getByText((_, el) => el?.tagName === 'SPAN' && el.textContent === '총 45건'),
+    ).toBeTruthy()
   })
 })
