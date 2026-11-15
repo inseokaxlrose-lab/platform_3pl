@@ -68,10 +68,10 @@ export function OverridePanel({
   }
 
   return (
-    <section className="space-y-4 rounded-lg border p-4">
+    // 섹션 제목·구분선은 사용자 수정 화면(MasterFormPage)이 그린다
+    <div className="space-y-4">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="space-y-1">
-          <h2 className="text-base font-semibold">개별 권한</h2>
           <p className="text-sm text-muted-foreground">
             권한그룹과 다르게 줄 권한만 정합니다. 칸을 누를 때마다{' '}
             <b className="font-medium text-foreground">그룹대로 → ＋추가 → −제외</b> 순서로
@@ -140,7 +140,7 @@ export function OverridePanel({
           includeOperatorOnly={includeOperatorOnly}
         />
       </div>
-    </section>
+    </div>
   )
 }
 

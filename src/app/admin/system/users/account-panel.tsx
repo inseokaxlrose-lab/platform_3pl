@@ -43,9 +43,8 @@ export function AccountPanel({
 
   return (
     <Can permission="system.users.update">
-      <section className="space-y-4 rounded-lg border p-4">
-        <h2 className="text-base font-semibold">계정 관리</h2>
-
+      {/* 섹션 제목·구분선은 사용자 수정 화면(MasterFormPage)이 그린다 */}
+      <div className="space-y-4">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="flex items-center gap-2 text-sm">
             상태
@@ -122,7 +121,7 @@ export function AccountPanel({
             </p>
           )}
         </form>
-      </section>
+      </div>
     </Can>
   )
 }
