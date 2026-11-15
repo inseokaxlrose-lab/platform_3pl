@@ -2,7 +2,7 @@ import 'server-only'
 import { getExternalCodes } from '@/lib/master-code/external-codes'
 import { textIds } from '@/lib/id'
 import { prisma } from '@/lib/prisma'
-import { ACTIVE_ONLY, isActiveStatus, withIsActive } from '@/lib/status'
+import { ACTIVE_ONLY, NOT_DELETED, isActiveStatus, withIsActive } from '@/lib/status'
 import { isInScope, scopeFilter, type DataScope } from '@/lib/scope/data-scope'
 import type { WarehouseUpdateInput } from '@/lib/warehouses/warehouse-schema'
 
@@ -24,8 +24,14 @@ export async function getWarehouseForEdit(id: bigint, scope: DataScope) {
     where: { id },
     include: {
       center: { select: { id: true, code: true, name: true } },
-      locations: { select: { code: true, status: true }, orderBy: { code: 'asc' }, take: 20 },
-      _count: { select: { locations: true } },
+      // 관계 목록·개수는 지운 줄을 직접 뺀다 (NOT_DELETED)
+      locations: {
+        where: NOT_DELETED,
+        select: { code: true, status: true },
+        orderBy: { code: 'asc' },
+        take: 20,
+      },
+      _count: { select: { locations: { where: NOT_DELETED } } },
     },
   })
   if (!warehouse || !isInScope(scope, warehouse, { center: 'centerId' })) return null

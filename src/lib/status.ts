@@ -34,3 +34,10 @@ export function withStatus<T extends { isActive: boolean }>({
 }: T): Omit<T, 'isActive'> & { status: Status } {
   return { ...rest, status: toStatus(isActive) }
 }
+
+// 논리 삭제 (공통 칸 del_yn): include·select 안의 관계 목록·_count에 붙이는 조건
+// (바깥 조회는 prisma.ts가 자동으로 지운 줄을 뺀다)
+// 예) warehouses: { where: NOT_DELETED }, _count: { select: { locations: { where: NOT_DELETED } } }
+export const NOT_DELETED = { delYn: 'N' } as const
+// 지운 것만 (목록 "삭제됨" 보기·되살리기)
+export const DELETED_ONLY = { delYn: 'Y' } as const

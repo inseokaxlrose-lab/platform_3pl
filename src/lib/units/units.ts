@@ -1,11 +1,12 @@
 import 'server-only'
+import { assertAllFound, assertNoCodeConflict } from '@/lib/soft-delete'
 import { ActionError } from '@/lib/actions/action-error'
 import { deleteExternalCodes, saveExternalCodes } from '@/lib/master-code/external-codes'
 import { assertRowVersion, withVersionGuard } from '@/lib/row-version'
 import { prisma } from '@/lib/prisma'
 import { isYes } from '@/lib/yn'
 import type { UnitCreateData, UnitUpdateData } from './unit-schema'
-import { toStatus, withStatus } from '@/lib/status'
+import { DELETED_ONLY, NOT_DELETED, toStatus, withStatus } from '@/lib/status'
 
 // 단위 저장 (docs/decisions/0034). 권한 검사는 서버 액션에서 한다
 // - 코드는 등록 후 바꿀 수 없다
@@ -97,7 +98,35 @@ export async function deleteUnits(ids: bigint[]) {
   }
   return prisma.$transaction(async (tx) => {
     for (const unit of units) await deleteExternalCodes(tx, 'UNIT', unit.id)
-    const { count } = await tx.unit.deleteMany({ where: { id: { in: units.map((u) => u.id) } } })
+    // 논리 삭제 (되살릴 수 있다). 외부 코드는 지운다
+    const { count } = await tx.unit.updateMany({
+      where: { id: { in: units.map((u) => u.id) } },
+      data: DELETED_ONLY,
+    })
+    return { count }
+  })
+}
+
+// 되살리기: 지운 단위를 다시 목록에 (같은 코드가 이미 다시 생겼으면 거부)
+export async function restoreUnits(ids: bigint[]) {
+  return prisma.$transaction(async (tx) => {
+    const units = await tx.unit.findMany({
+      where: { id: { in: ids }, ...DELETED_ONLY },
+      select: { code: true },
+    })
+    assertAllFound(units.length, ids.length, '단위')
+    const taken = await tx.unit.findMany({
+      where: { code: { in: units.map((u) => u.code) } },
+      select: { code: true },
+    })
+    assertNoCodeConflict(
+      taken.map((t) => t.code),
+      '단위 코드',
+    )
+    const { count } = await tx.unit.updateMany({
+      where: { id: { in: ids }, ...DELETED_ONLY },
+      data: NOT_DELETED,
+    })
     return { count }
   })
 }

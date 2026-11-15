@@ -18,7 +18,7 @@ import { prisma } from '@/lib/prisma'
 import { assertInScope, scopeFilter, type DataScope } from '@/lib/scope/data-scope'
 import { rowVersionField } from '@/lib/row-version'
 import { idSchema } from '@/lib/id'
-import { toStatus, withIsActive } from '@/lib/status'
+import { NOT_DELETED, toStatus, withIsActive } from '@/lib/status'
 
 // 센터 관리 서버 액션 (docs/decisions/0026)
 // 데이터 범위: 센터 직원은 소속 센터만 보고 고칠 수 있다. 등록·사용 중지는 전체 범위(운영사)만
@@ -91,7 +91,7 @@ export const listCentersAction = createAction({
           status: true,
           createdAt: true,
           updatedAt: true,
-          _count: { select: { warehouses: true } },
+          _count: { select: { warehouses: { where: NOT_DELETED } } },
         },
       }),
       prisma.center.count({ where }),

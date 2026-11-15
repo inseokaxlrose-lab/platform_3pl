@@ -1,11 +1,12 @@
 import 'server-only'
+import { assertAllFound, assertNoCodeConflict } from '@/lib/soft-delete'
 import { looksLikeSystemCode } from '@/config/master-codes'
 import { ActionError } from '@/lib/actions/action-error'
 import { deleteExternalCodes, saveExternalCodes } from '@/lib/master-code/external-codes'
 import { nextSystemCode } from '@/lib/master-code/system-code'
 import { assertRowVersion, withVersionGuard } from '@/lib/row-version'
 import { prisma, type Db } from '@/lib/prisma'
-import { isActiveStatus } from '@/lib/status'
+import { DELETED_ONLY, NOT_DELETED, isActiveStatus } from '@/lib/status'
 import type { DeliveryZoneData } from './delivery-zone-schema'
 import { regionLabel, regionsOverlap } from './regions'
 
@@ -43,7 +44,10 @@ async function assertRegionsFree(
   exceptZoneId?: bigint,
 ) {
   const taken = await db.deliveryZoneRegion.findMany({
-    where: { zone: { centerId, ...(exceptZoneId ? { id: { not: exceptZoneId } } : {}) } },
+    // 지운 권역의 담당 지역은 비어 있는 것으로 본다
+    where: {
+      zone: { centerId, ...NOT_DELETED, ...(exceptZoneId ? { id: { not: exceptZoneId } } : {}) },
+    },
     select: { regionCode: true, zone: { select: { name: true, code: true } } },
   })
   const conflicts = regionCodes.flatMap((code) =>
@@ -130,7 +134,8 @@ export async function findUsedZoneIds(db: Db, ids: bigint[]): Promise<bigint[]> 
   return []
 }
 
-// 삭제: 쓰인 적 없는 권역만 (쓰인 권역은 사용 중지). 담당 지역·외부 코드도 함께 지운다
+// 삭제: 쓰인 적 없는 권역만 (쓰인 권역은 사용 중지). 논리 삭제(del_yn 'Y')라 되살릴 수 있다
+// 외부 코드는 지운다 (다른 권역이 같은 외부 코드를 쓸 수 있게). 담당 지역은 되살릴 때를 위해 남긴다
 export async function deleteDeliveryZones(ids: bigint[]) {
   return prisma.$transaction(async (tx) => {
     const used = await findUsedZoneIds(tx, ids)
@@ -138,7 +143,42 @@ export async function deleteDeliveryZones(ids: bigint[]) {
       throw new ActionError('CONFLICT', '출고에 쓰인 권역은 지울 수 없습니다. 사용 중지하세요.')
     }
     for (const id of ids) await deleteExternalCodes(tx, 'DELIVERY_ZONE', id)
-    const { count } = await tx.deliveryZone.deleteMany({ where: { id: { in: ids } } })
+    const { count } = await tx.deliveryZone.updateMany({
+      where: { id: { in: ids } },
+      data: DELETED_ONLY,
+    })
+    return { count }
+  })
+}
+
+// 되살리기: 지운 권역을 다시 목록에 (같은 센터에 같은 코드가 생겼거나, 담당 지역을 다른 권역이 이미 맡았으면 거부)
+export async function restoreDeliveryZones(ids: bigint[]) {
+  return prisma.$transaction(async (tx) => {
+    const zones = await tx.deliveryZone.findMany({
+      where: { id: { in: ids }, ...DELETED_ONLY },
+      select: { id: true, centerId: true, code: true, regions: { select: { regionCode: true } } },
+    })
+    assertAllFound(zones.length, ids.length, '배송권역')
+    const taken = await tx.deliveryZone.findMany({
+      where: { OR: zones.map((z) => ({ centerId: z.centerId, code: z.code })) },
+      select: { code: true },
+    })
+    assertNoCodeConflict(
+      taken.map((t) => t.code),
+      '권역 코드',
+    )
+    for (const zone of zones) {
+      await assertRegionsFree(
+        tx,
+        zone.centerId,
+        zone.regions.map((r) => r.regionCode),
+        zone.id,
+      )
+    }
+    const { count } = await tx.deliveryZone.updateMany({
+      where: { id: { in: ids }, ...DELETED_ONLY },
+      data: NOT_DELETED,
+    })
     return { count }
   })
 }

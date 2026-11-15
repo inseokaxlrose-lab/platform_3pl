@@ -1,7 +1,7 @@
 import 'server-only'
 import { ActionError } from '@/lib/actions/action-error'
 import { prisma, type Db } from '@/lib/prisma'
-import { isActiveStatus, withIsActive } from '@/lib/status'
+import { NOT_DELETED, isActiveStatus, withIsActive } from '@/lib/status'
 import type { CodeOptions } from './code-options'
 
 // 공통코드 읽기·검사 (docs/decisions/0030)
@@ -14,6 +14,7 @@ export async function loadCodeOptions(): Promise<CodeOptions> {
     select: {
       code: true,
       items: {
+        where: NOT_DELETED,
         select: { code: true, name: true, status: true },
         orderBy: [{ sortOrder: 'asc' }, { code: 'asc' }],
       },
@@ -34,7 +35,7 @@ export async function assertCodeValues(
   const wanted = [...new Set(values)]
   if (wanted.length === 0) return
   const items = await db.codeItem.findMany({
-    where: { group: { code: groupCode }, code: { in: wanted } },
+    where: { group: { code: groupCode, ...NOT_DELETED }, code: { in: wanted } },
     select: { code: true, status: true, group: { select: { status: true } } },
   })
   const usable = new Set(
