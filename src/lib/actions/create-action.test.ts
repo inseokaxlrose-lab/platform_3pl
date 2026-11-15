@@ -84,20 +84,20 @@ describe('createAction 검사 순서', () => {
       input: z.object({
         contacts: z
           .array(z.object({ phone: z.string().min(1, '연락처를 입력해 주세요.') }))
-          .max(1, '1명까지입니다.'),
+          .refine((rows) => rows.length <= 2, '2명까지입니다.'),
       }),
       handler: async () => null,
     })
-    expect(await saveContacts({ contacts: [{ phone: '' }, { phone: '1' }] })).toMatchObject({
+    expect(await saveContacts({ contacts: [{ phone: '1' }, { phone: '' }] })).toMatchObject({
       ok: false,
       error: {
         code: 'VALIDATION',
-        fieldErrors: {
-          'contacts.0.phone': ['연락처를 입력해 주세요.'],
-          contacts: ['1명까지입니다.'],
-        },
+        fieldErrors: { 'contacts.1.phone': ['연락처를 입력해 주세요.'] },
       },
     })
+    expect(
+      await saveContacts({ contacts: [{ phone: '1' }, { phone: '2' }, { phone: '3' }] }),
+    ).toMatchObject({ ok: false, error: { fieldErrors: { contacts: ['2명까지입니다.'] } } })
   })
 
   it('④ 모두 통과하면 정리된 입력으로 처리하고 결과를 돌려준다', async () => {
