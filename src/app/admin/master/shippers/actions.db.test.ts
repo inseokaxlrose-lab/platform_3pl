@@ -94,10 +94,10 @@ describe('화주사 등록·수정', () => {
       where: { id: BigInt(shipper.id) },
       include: { centers: true, contacts: true },
     })
-    expect(saved).toMatchObject({ businessNumber: '1234567891', phone: '021234567', useLot: true })
+    expect(saved).toMatchObject({ businessNumber: '1234567891', phone: '021234567', useLot: 'Y' })
     expect(saved.centers.map((c) => c.centerId)).toEqual([icnId])
     expect(saved.contacts).toEqual([
-      expect.objectContaining({ duty: 'INBOUND', phone: '01011112222', isPrimary: true }),
+      expect.objectContaining({ duty: 'INBOUND', phone: '01011112222', isPrimary: 'Y' }),
     ])
     expect(await getExternalCodes('SHIPPER', BigInt(shipper.id))).toEqual({ SAP: 'V100', ERP: '' })
     // 담당 업무 코드가 쓰이고 있으면 공통코드에서 지울 수 없다
@@ -166,7 +166,7 @@ describe('화주사 등록·수정', () => {
       where: { id: BigInt(shipper.id) },
       include: { centers: true, contacts: true },
     })
-    expect(saved).toMatchObject({ name: '가나푸드', useLot: false })
+    expect(saved).toMatchObject({ name: '가나푸드', useLot: 'N' })
     expect(saved.centers.map((c) => c.centerId)).toEqual([gmhId])
     expect(saved.contacts).toEqual([])
   })

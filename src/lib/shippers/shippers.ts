@@ -7,6 +7,7 @@ import { CONTACT_DUTY_GROUP } from '@/lib/contacts/contact-schema'
 import { saveExternalCodes } from '@/lib/master-code/external-codes'
 import { nextSystemCode } from '@/lib/master-code/system-code'
 import { prisma } from '@/lib/prisma'
+import { toYn } from '@/lib/yn'
 import type { ShipperData } from './shipper-schema'
 
 type Db = Prisma.TransactionClient
@@ -52,11 +53,17 @@ function fieldsOf(data: ShipperData) {
   void contacts
   void externalCodes
   void code
-  return fields
+  // 예/아니오 칸은 DB에 'Y'/'N'으로
+  return { ...fields, useLot: toYn(fields.useLot), useExpiry: toYn(fields.useExpiry) }
 }
 
 const contactRows = (shipperId: bigint, contacts: ShipperData['contacts']) =>
-  contacts.map((contact, index) => ({ ...contact, shipperId, sortOrder: index }))
+  contacts.map((contact, index) => ({
+    ...contact,
+    isPrimary: toYn(contact.isPrimary),
+    shipperId,
+    sortOrder: index,
+  }))
 
 // 등록 (한 트랜잭션: 시스템 코드 → 화주사 → 이용 센터 → 담당자 → 외부 코드)
 export async function createShipper(data: ShipperData) {

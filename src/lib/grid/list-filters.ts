@@ -1,5 +1,6 @@
 import { digitsOnly } from '@/lib/format'
 import { parseId } from '@/lib/id'
+import type { Yn } from '@/lib/yn'
 
 // 목록 검색 조건 해석 (서버 공용 순수 함수)
 // 화면의 조건 값은 모두 글자라서(URL과 같은 모양) 서버에서 이 함수들로 Prisma 조건으로 바꾼다
@@ -33,10 +34,10 @@ export function codesFilter(filters: Filters, key: string) {
   return codes.length > 0 ? { in: codes } : undefined
 }
 
-// 예/아니오 ('Y' → true, 'N' → false, 그 밖 → 조건 없음)
-export function ynFilter(filters: Filters, key: string) {
+// 예/아니오 칸(_yn, DB에 'Y'/'N'): 'Y'·'N'만 조건으로, 그 밖 → 조건 없음
+export function ynFilter(filters: Filters, key: string): Yn | undefined {
   const value = filters[key]
-  return value === 'Y' ? true : value === 'N' ? false : undefined
+  return value === 'Y' || value === 'N' ? value : undefined
 }
 
 const DATE = /^\d{4}-\d{2}-\d{2}$/

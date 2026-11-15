@@ -2,6 +2,7 @@ import 'server-only'
 import type { z } from 'zod'
 import { ActionError } from '@/lib/actions/action-error'
 import { prisma } from '@/lib/prisma'
+import { isYes } from '@/lib/yn'
 import type {
   codeGroupCreateSchema,
   codeGroupUpdateSchema,
@@ -30,7 +31,7 @@ export async function updateCodeGroup({ id, ...data }: GroupUpdate) {
   const group = await prisma.codeGroup.findUnique({ where: { id }, select: { isSystem: true } })
   if (!group) throw new ActionError('NOT_FOUND', '코드 그룹을 찾을 수 없습니다.')
   // 시스템 그룹은 프로그램이 쓰므로 사용 중지할 수 없다
-  if (group.isSystem && !data.isActive) {
+  if (isYes(group.isSystem) && !data.isActive) {
     throw new ActionError('VALIDATION', '시스템 그룹은 사용 중지할 수 없습니다.')
   }
   return prisma.codeGroup.update({ where: { id }, data, select: { id: true } })
@@ -42,7 +43,7 @@ export async function deleteCodeGroup(id: bigint) {
     select: { code: true, isSystem: true, _count: { select: { items: true } } },
   })
   if (!group) throw new ActionError('NOT_FOUND', '코드 그룹을 찾을 수 없습니다.')
-  if (group.isSystem) {
+  if (isYes(group.isSystem)) {
     throw new ActionError('VALIDATION', `시스템 그룹은 지울 수 없습니다: ${group.code}`)
   }
   if (group._count.items > 0) {

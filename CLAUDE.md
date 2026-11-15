@@ -31,6 +31,7 @@ Next.js (App Router) · TypeScript · PostgreSQL · Prisma · Tailwind + shadcn/
 - **기준정보 코드 3층**: 시스템 코드(`nextSystemCode`, 자동·불변, 라벨·이력용) + 사용자 코드(비우면 시스템 코드, 시스템 코드 모양 금지) + 외부 코드(`ExternalCode` 매핑, `saveExternalCodes`). 새 기준정보도 이 구조를 따른다 (`docs/decisions/0025`).
 - **공통코드**: 분류·표시용 고르기 값은 하드코딩하지 말고 공통코드(그룹 → 코드)로 관리한다. 업무 표에는 코드 글자를 저장하고 저장 전 `assertCodeValues`로 검사, 새로 쓰는 칸은 `code-usage.ts`에 등록한다. 프로그램이 값에 따라 동작을 바꾸는 값은 enum으로 둔다 (`docs/decisions/0030`).
 - **내부 키는 BIGINT**: 서버·DB는 `bigint`, 화면·주소·서버 액션 입출력은 글자. 경계에서만 `src/lib/id.ts`로 바꾼다 — 입력 규칙 `idSchema`/`idField`, 주소 `parseId`, 조회 결과 `textIds`, 검색 조건 `idFilter` (서버 액션 결과는 `createAction`이 자동 변환). DB 이름 규칙은 `docs/db-conventions.md` (`docs/decisions/0037`).
+- **예/아니오 칸(`_yn`)은 DB에 `'Y'`/`'N'`**: 화면·입력 규칙은 true/false, DB에 쓸 때 `toYn`, 읽을 때 `isYes` (`src/lib/yn.ts`). `if (row.xxx)`로 직접 검사 금지 (`'N'`도 참).
 - **번호는 숫자만 저장**: 사업자·법인등록번호, 전화·팩스는 하이픈 없이 저장하고, 화면 표시·입력에서만 `src/lib/format/`의 함수로 하이픈을 붙인다 (`docs/decisions/0029`).
 - **재고는 직접 수정 금지**: 재고 수량은 반드시 재고 변경 공통 함수(이력 기록 포함)로만 바꾼다. 수량 변경과 이력 기록은 하나의 DB 트랜잭션으로 묶는다.
 - **재고는 기본단위로 저장**: 환산단위(BOX, CARTON, PLT)는 화면 표시·입력용이며, 환산은 공통 함수에서만 한다. 수량은 Decimal.

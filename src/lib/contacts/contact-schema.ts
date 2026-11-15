@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { isYes } from '@/lib/yn'
 import {
   exactlyOne,
   optionalEmail,
@@ -44,9 +45,20 @@ export const EMPTY_CONTACT: ContactInput = {
   isPrimary: false,
 }
 
-// 저장한 담당자(빈 칸 null) → 입력값(빈 글자)
-export const toContactInput = (c: ContactData): ContactInput => ({
-  ...c,
-  phone: c.phone ?? '',
-  email: c.email ?? '',
+// 저장한 담당자 줄 (DB: 빈 칸 null, 대표 여부 'Y'/'N')
+type ContactRow = Omit<ContactData, 'isPrimary'> & { isPrimary: string }
+
+// 저장한 담당자 → 입력값 (빈 칸은 빈 글자, 대표 여부는 true/false)
+export const toContactInput = ({
+  duty,
+  name,
+  phone,
+  email,
+  isPrimary,
+}: ContactRow): ContactInput => ({
+  duty,
+  name,
+  phone: phone ?? '',
+  email: email ?? '',
+  isPrimary: isYes(isPrimary),
 })

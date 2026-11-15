@@ -17,8 +17,8 @@ describe('목록 검색 조건 해석', () => {
     expect(digitsFilter(f, 'none')).toBeUndefined()
     expect(codesFilter(f, 'codes')).toEqual({ in: ['A', 'B'] })
     expect(codesFilter(f, 'empty')).toBeUndefined()
-    expect(ynFilter(f, 'yn')).toBe(false)
-    expect(ynFilter({ yn: 'Y' }, 'yn')).toBe(true)
+    expect(ynFilter(f, 'yn')).toBe('N')
+    expect(ynFilter({ yn: 'Y' }, 'yn')).toBe('Y')
     expect(ynFilter({ yn: 'all' }, 'yn')).toBeUndefined()
   })
 

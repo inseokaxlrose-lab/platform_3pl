@@ -93,7 +93,7 @@ describe('단위 등록·수정', () => {
     })
 
     const ea = await prisma.unit.create({
-      data: { code: 'EA', name: '개', kind: 'BASE', isSystem: true },
+      data: { code: 'EA', name: '개', kind: 'BASE', isSystem: 'Y' },
     })
     expect(
       await updateUnitAction({
@@ -127,7 +127,7 @@ describe('목록 · 일괄 처리 · 권한', () => {
   it('일괄 사용 중지·삭제: 시스템 단위가 섞이면 전체 거부, 삭제하면 외부 코드도 지운다', async () => {
     const kg = await create({ externalCodes: { SAP: 'KGM', ERP: '' } })
     const plt = await prisma.unit.create({
-      data: { code: 'PLT', name: '팔레트', kind: 'PACK', isSystem: true },
+      data: { code: 'PLT', name: '팔레트', kind: 'PACK', isSystem: 'Y' },
     })
     expect(
       await setUnitsActiveAction({ ids: [kg.id, String(plt.id)], isActive: false }),

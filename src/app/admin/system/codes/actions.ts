@@ -18,6 +18,7 @@ import {
 } from '@/lib/common-code/code-schema'
 import { dataGridStateSchema, toPrismaQuery } from '@/lib/grid/grid-query'
 import { prisma } from '@/lib/prisma'
+import { isYes } from '@/lib/yn'
 import { idSchema } from '@/lib/id'
 
 // 공통코드 관리 서버 액션 (docs/decisions/0030)
@@ -52,7 +53,12 @@ export const listCodeGroupsAction = createAction({
       prisma.codeGroup.count({ where: query.where }),
     ])
     return {
-      rows: rows.map(({ _count, ...row }) => ({ ...row, itemCount: _count.items })),
+      // 예/아니오 칸은 화면에서 true/false로
+      rows: rows.map(({ _count, ...row }) => ({
+        ...row,
+        isSystem: isYes(row.isSystem),
+        itemCount: _count.items,
+      })),
       rowCount,
     }
   },
