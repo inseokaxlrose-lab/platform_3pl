@@ -73,10 +73,11 @@ describe('ASN 번호', () => {
 })
 
 describe('ASN 규칙', () => {
-  it('기본 상태: 예정·적치대기·화주사입고, 운영사 출입증 안에서는 운영사·등록자 자동', async () => {
+  it('기본 상태: 예정·적치대기·화주사입고, 운영사 출입증 안에서는 등록자 자동', async () => {
     const created = await runInContext({ actor: 'kim', operatorId: TEST_OPERATOR_ID }, () =>
       prisma.asn.create({
         data: {
+          operatorId: TEST_OPERATOR_ID,
           centerId: base.centerId,
           shipperId: base.shipperId,
           asnNo: 'AS261116-00002',
