@@ -181,7 +181,8 @@ export function ExcelUploadDialog({
           </Button>
         )}
       </DialogTrigger>
-      <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-5xl">
+      {/* 대화상자는 세로로만 스크롤, 넓은 미리보기 표는 표 안에서 가로 스크롤 (min-w-0: 격자 칸이 내용만큼 넓어지지 않게) */}
+      <DialogContent className="max-h-[90vh] overflow-x-hidden overflow-y-auto sm:max-w-5xl [&>*]:min-w-0">
         <DialogHeader>
           <DialogTitle>{title}</DialogTitle>
           <DialogDescription>
@@ -233,7 +234,7 @@ export function ExcelUploadDialog({
         )}
 
         {preview && (
-          <div className="space-y-2">
+          <div className="min-w-0 space-y-2">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <p
                 className={

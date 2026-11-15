@@ -3,6 +3,8 @@
 import { z } from 'zod'
 import { createAction } from '@/lib/actions/create-action'
 import { idSchema } from '@/lib/id'
+import { commitAsnUpload, previewAsnUpload } from '@/lib/inbound/asn-upload'
+import { uploadRowsSchema } from '@/lib/excel/upload'
 import { getAsnItemOptions } from '@/lib/inbound/asn-queries'
 import { asnCreateSchema, asnSchema } from '@/lib/inbound/asn-schema'
 import { assertAsnsInScope, createAsn, deleteAsns, updateAsn } from '@/lib/inbound/asns'
@@ -49,4 +51,17 @@ export const deleteAsnsAction = createAction({
   permission: 'inbound.asn.delete',
   input: z.object({ ids: z.array(idSchema).min(1).max(500) }),
   handler: async ({ input, scope }) => deleteAsns(await assertAsnsInScope(input.ids, scope)),
+})
+
+// 엑셀 업로드 (0050): 검증(저장 안 함) → 오류가 없을 때만 등록 (등록 경로 EXCEL)
+export const validateAsnUploadAction = createAction({
+  permission: 'inbound.asn.create',
+  input: uploadRowsSchema,
+  handler: async ({ input, scope }) => previewAsnUpload(input, scope),
+})
+
+export const commitAsnUploadAction = createAction({
+  permission: 'inbound.asn.create',
+  input: uploadRowsSchema,
+  handler: async ({ input, scope }) => commitAsnUpload(input, scope),
 })
