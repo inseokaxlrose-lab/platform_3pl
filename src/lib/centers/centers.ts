@@ -3,6 +3,7 @@ import { looksLikeSystemCode } from '@/config/master-codes'
 import { ActionError } from '@/lib/actions/action-error'
 import { saveExternalCodes } from '@/lib/master-code/external-codes'
 import { nextSystemCode } from '@/lib/master-code/system-code'
+import { assertRowVersion, withVersionGuard } from '@/lib/row-version'
 import { prisma } from '@/lib/prisma'
 import { ensureCenterDefaults } from './center-defaults'
 import type { CenterData } from './center-schema'
@@ -45,7 +46,7 @@ export async function createCenter(data: CenterData) {
     await assertUserCode(code, systemCode)
     const center = await tx.center.create({
       data: { systemCode, code, ...centerFields(data) },
-      select: { id: true, systemCode: true, code: true },
+      select: { id: true, systemCode: true, code: true, rowVersion: true },
     })
     await ensureCenterDefaults(tx, center.id)
     await saveExternalCodes(tx, 'CENTER', center.id, data.externalCodes)
@@ -54,14 +55,24 @@ export async function createCenter(data: CenterData) {
 }
 
 // 수정: 시스템 코드는 바뀌지 않는다. 사용자 코드를 비우면 시스템 코드로
-export async function updateCenter(id: bigint, data: CenterData) {
-  const current = await prisma.center.findUnique({ where: { id }, select: { systemCode: true } })
-  if (!current) throw new ActionError('NOT_FOUND', '센터를 찾을 수 없습니다.')
-  const code = data.code || current.systemCode
-  await assertUserCode(code, current.systemCode, id)
+// rowVersion: 화면이 불러온 버전 (그 사이 다른 사람이 저장했으면 충돌)
+export async function updateCenter(id: bigint, rowVersion: number, data: CenterData) {
+  const current = await prisma.center.findUnique({
+    where: { id },
+    select: { systemCode: true, rowVersion: true },
+  })
+  assertRowVersion(current, rowVersion, '센터를 찾을 수 없습니다.')
+  const code = data.code || current!.systemCode
+  await assertUserCode(code, current!.systemCode, id)
   return prisma.$transaction(async (tx) => {
-    await tx.center.update({ where: { id }, data: { code, ...centerFields(data) } })
+    const saved = await withVersionGuard(() =>
+      tx.center.update({
+        where: { id, rowVersion },
+        data: { code, ...centerFields(data) },
+        select: { rowVersion: true },
+      }),
+    )
     await saveExternalCodes(tx, 'CENTER', id, data.externalCodes)
-    return { id, code }
+    return { id, code, rowVersion: saved.rowVersion }
   })
 }

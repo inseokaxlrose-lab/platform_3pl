@@ -7,6 +7,7 @@ import { listQuerySchema, toPrismaQuery } from '@/lib/grid/grid-query'
 import { normalizeGroupCodes, toPermissionArea } from '@/lib/permissions/normalize-group-codes'
 import { ROLE_AREAS, roleSchema, updateRoleSchema } from '@/lib/permissions/role-schema'
 import { prisma } from '@/lib/prisma'
+import { assertRowVersion, withVersionGuard } from '@/lib/row-version'
 import { idSchema } from '@/lib/id'
 
 // 권한그룹 관리 서버 액션 (docs/decisions/0017-permission-group-admin.md)
@@ -87,28 +88,31 @@ export const updatePermissionGroupAction = createAction({
   handler: async ({ input }) => {
     const group = await prisma.permissionGroup.findUnique({
       where: { id: input.id },
-      select: { area: true },
+      select: { area: true, rowVersion: true },
     })
-    if (!group) throw new ActionError('NOT_FOUND', '권한그룹을 찾을 수 없습니다.')
+    assertRowVersion(group, input.rowVersion, '권한그룹을 찾을 수 없습니다.')
 
-    const { codes } = normalizeGroupCodes(input.permissionCodes, toPermissionArea(group.area))
+    const { codes } = normalizeGroupCodes(input.permissionCodes, toPermissionArea(group!.area))
     try {
-      await prisma.$transaction([
-        prisma.permissionGroup.update({
-          where: { id: input.id },
-          data: { name: input.name, description: input.description || null },
-        }),
+      return await prisma.$transaction(async (tx) => {
+        const saved = await withVersionGuard(() =>
+          tx.permissionGroup.update({
+            where: { id: input.id, rowVersion: input.rowVersion },
+            data: { name: input.name, description: input.description || null },
+            select: { id: true, rowVersion: true },
+          }),
+        )
         // 권한 목록을 통째로 바꾼다 (목록에서 사라진 옛 코드도 이때 정리된다)
-        prisma.permissionGroupPermission.deleteMany({ where: { groupId: input.id } }),
-        prisma.permissionGroupPermission.createMany({
+        await tx.permissionGroupPermission.deleteMany({ where: { groupId: input.id } })
+        await tx.permissionGroupPermission.createMany({
           data: codes.map((permissionCode) => ({ groupId: input.id, permissionCode })),
-        }),
-      ])
+        })
+        return saved
+      })
     } catch (error) {
       if (isUniqueViolation(error)) throw new ActionError('CONFLICT', '이미 있는 이름입니다.')
       throw error
     }
-    return { id: input.id }
   },
 })
 

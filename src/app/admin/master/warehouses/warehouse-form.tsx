@@ -70,10 +70,15 @@ export function WarehouseForm(props: WarehouseFormProps) {
           externalCodes: { ...EMPTY_EXTERNAL_CODES },
         },
     // 등록·수정 모두 같은 규칙 (수정에서는 센터가 이미 정해져 있다)
+    version: editing?.rowVersion,
     schema: createWarehouseSchema,
-    save: ({ centerId, ...data }: WarehouseCreateInput) =>
+    save: ({ centerId, ...data }: WarehouseCreateInput, version) =>
       editing
-        ? updateWarehouseAction({ id: editing.id, ...data })
+        ? updateWarehouseAction({
+            id: editing.id,
+            rowVersion: version ?? editing.rowVersion,
+            ...data,
+          })
         : createWarehouseAction({ centerId, ...data }),
     afterSave: (saved) => ({
       ...saved,

@@ -93,9 +93,16 @@ export function ShipperForm({
   const router = useRouter()
   const form = useMasterForm({
     initial: shipper?.input ?? EMPTY,
+    version: shipper?.rowVersion,
     schema: shipperSchema,
-    save: (value: ShipperInput) =>
-      shipper ? updateShipperAction({ id: shipper.id, ...value }) : createShipperAction(value),
+    save: (value: ShipperInput, version) =>
+      shipper
+        ? updateShipperAction({
+            id: shipper.id,
+            rowVersion: version ?? shipper.rowVersion,
+            ...value,
+          })
+        : createShipperAction(value),
     onSuccess: shipper
       ? undefined
       : (created) => router.push(`${LIST_HREF}/${(created as { id: string }).id}`),

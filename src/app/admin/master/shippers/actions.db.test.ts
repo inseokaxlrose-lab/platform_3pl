@@ -7,7 +7,7 @@ import { prisma } from '@/lib/prisma'
 import type { DataScope } from '@/lib/scope/data-scope'
 import { getCurrentPermissions, getCurrentScope, getCurrentUser } from '@/lib/session'
 import type { ShipperInput } from '@/lib/shippers/shipper-schema'
-import { createTestCenter, createTestCodeGroup } from '@/test/factories'
+import { createTestCenter, createTestCodeGroup, versionOf } from '@/test/factories'
 import { resetDatabase } from '@/test/reset-database'
 import {
   createShipperAction,
@@ -153,6 +153,7 @@ describe('화주사 등록·수정', () => {
     await prisma.center.update({ where: { id: gmhId }, data: { isActive: false } })
     const result = await updateShipperAction({
       id: shipper.id,
+      rowVersion: await versionOf('shipper', shipper.id),
       ...input({
         code: 'GANA',
         name: '가나푸드',

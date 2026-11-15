@@ -10,6 +10,7 @@ import { prisma } from '@/lib/prisma'
 import { assertInScope, scopeFilter } from '@/lib/scope/data-scope'
 import { createWarehouseSchema, updateWarehouseSchema } from '@/lib/warehouses/warehouse-schema'
 import { createWarehouse, setWarehouseActive, updateWarehouse } from '@/lib/warehouses/warehouses'
+import { rowVersionField } from '@/lib/row-version'
 import { idSchema } from '@/lib/id'
 
 // 창고 관리 서버 액션 (docs/decisions/0027)
@@ -121,10 +122,11 @@ export const createWarehouseAction = createAction({
 
 export const updateWarehouseAction = createAction({
   permission: 'master.warehouses.update',
-  input: updateWarehouseSchema.extend({ id: idSchema }),
-  handler: async ({ input: { id, ...data }, scope }) => {
+  // rowVersion: 화면이 불러온 버전 (동시 수정 막기)
+  input: updateWarehouseSchema.extend({ id: idSchema, rowVersion: rowVersionField }),
+  handler: async ({ input: { id, rowVersion, ...data }, scope }) => {
     await findWarehouseInScope(id, scope)
-    return updateWarehouse(id, data)
+    return updateWarehouse(id, rowVersion, data)
   },
 })
 

@@ -1,10 +1,9 @@
 import 'server-only'
-import type { Prisma } from '@/generated/prisma/client'
 import { formatSystemCode, SYSTEM_CODE_TYPES, type SystemCodeType } from '@/config/master-codes'
-import { prisma } from '@/lib/prisma'
+import { prisma, type Db } from '@/lib/prisma'
 
-// DB 연결: 그냥 prisma 또는 트랜잭션 안의 tx (등록과 같은 트랜잭션에서 번호를 받을 수 있게)
-export type Db = typeof prisma | Prisma.TransactionClient
+// DB 연결 타입 (등록과 같은 트랜잭션에서 번호를 받을 수 있게): prisma.ts의 Db
+export type { Db } from '@/lib/prisma'
 
 // 시스템 코드 발급 (docs/decisions/0025): 'CENTER' → 'CT000001'
 // 종류별 DB 시퀀스라 동시에 여러 건을 등록해도 겹치지 않는다

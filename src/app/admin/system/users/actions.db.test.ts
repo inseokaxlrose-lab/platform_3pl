@@ -6,7 +6,7 @@ import { loadUserPermissions } from '@/lib/permissions/load-user-permissions'
 import { prisma } from '@/lib/prisma'
 import { getCurrentPermissions, getCurrentUser } from '@/lib/session'
 import { createUserAccount } from '@/lib/users/create-user-account'
-import { createTestCenter, createTestShipper } from '@/test/factories'
+import { createTestCenter, createTestShipper, versionOf } from '@/test/factories'
 import { resetDatabase } from '@/test/reset-database'
 import {
   createUserAction,
@@ -164,6 +164,7 @@ describe('사용자 수정', () => {
 
     const result = await updateUserAction({
       id,
+      rowVersion: await versionOf('user', id),
       name: '김작업자',
       email: 'kim@example.com',
       centerIds: [String(second.id), String(centerId)],

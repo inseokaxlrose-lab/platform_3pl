@@ -10,6 +10,7 @@ import { ensureCenterDefaults } from '../src/lib/centers/center-defaults'
 import { nextSystemCode } from '../src/lib/master-code/system-code'
 import { prisma } from '../src/lib/prisma'
 import { COMPANY_ID } from '../src/lib/company/company'
+import { runAsActor } from '../src/lib/actor'
 import { toYn } from '../src/lib/yn'
 import { createUserAccount } from '../src/lib/users/create-user-account'
 import { SEED_CODE_GROUPS } from './seed-codes'
@@ -233,7 +234,8 @@ async function main() {
   await seedSampleAccounts(groupIds)
 }
 
-main()
+// 시드가 만든 데이터의 등록·수정자는 'seed'
+runAsActor('seed', main)
   .catch((error) => {
     console.error('시드 실패:', error)
     process.exitCode = 1

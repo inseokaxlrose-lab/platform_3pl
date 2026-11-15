@@ -1,14 +1,12 @@
 import 'server-only'
 import { looksLikeSystemCode } from '@/config/master-codes'
-import type { Prisma } from '@/generated/prisma/client'
 import { ActionError } from '@/lib/actions/action-error'
 import { deleteExternalCodes, saveExternalCodes } from '@/lib/master-code/external-codes'
 import { nextSystemCode } from '@/lib/master-code/system-code'
-import { prisma } from '@/lib/prisma'
+import { assertRowVersion, withVersionGuard } from '@/lib/row-version'
+import { prisma, type Db } from '@/lib/prisma'
 import type { DeliveryZoneData } from './delivery-zone-schema'
 import { regionLabel, regionsOverlap } from './regions'
-
-type Db = Prisma.TransactionClient
 
 // 배송권역 저장 (docs/decisions/0033). 권한·데이터 범위 검사는 서버 액션에서 한다
 
@@ -87,7 +85,7 @@ export async function createDeliveryZone(data: DeliveryZoneData) {
         description: data.description,
         regions: { create: data.regionCodes.map((regionCode) => ({ regionCode })) },
       },
-      select: { id: true, systemCode: true, code: true },
+      select: { id: true, systemCode: true, code: true, rowVersion: true },
     })
     await saveExternalCodes(tx, 'DELIVERY_ZONE', zone.id, data.externalCodes)
     return zone
@@ -95,26 +93,31 @@ export async function createDeliveryZone(data: DeliveryZoneData) {
 }
 
 // 수정: 센터·시스템 코드는 바뀌지 않는다. 담당 지역은 통째로 바꾼다
-export async function updateDeliveryZone(id: bigint, data: DeliveryZoneData) {
+// rowVersion: 화면이 불러온 버전 (그 사이 다른 사람이 저장했으면 충돌)
+export async function updateDeliveryZone(id: bigint, rowVersion: number, data: DeliveryZoneData) {
   return prisma.$transaction(async (tx) => {
-    const current = await tx.deliveryZone.findUnique({
+    const found = await tx.deliveryZone.findUnique({
       where: { id },
-      select: { centerId: true, systemCode: true },
+      select: { centerId: true, systemCode: true, rowVersion: true },
     })
-    if (!current) throw new ActionError('NOT_FOUND', '배송권역을 찾을 수 없습니다.')
+    assertRowVersion(found, rowVersion, '배송권역을 찾을 수 없습니다.')
+    const current = found!
     const code = data.code || current.systemCode
     await assertZoneCode(tx, current.centerId, code, current.systemCode, id)
     await assertRegionsFree(tx, current.centerId, data.regionCodes, id)
-    await tx.deliveryZone.update({
-      where: { id },
-      data: { code, name: data.name, description: data.description },
-    })
+    const saved = await withVersionGuard(() =>
+      tx.deliveryZone.update({
+        where: { id, rowVersion },
+        data: { code, name: data.name, description: data.description },
+        select: { rowVersion: true },
+      }),
+    )
     await tx.deliveryZoneRegion.deleteMany({ where: { zoneId: id } })
     await tx.deliveryZoneRegion.createMany({
       data: data.regionCodes.map((regionCode) => ({ zoneId: id, regionCode })),
     })
     await saveExternalCodes(tx, 'DELIVERY_ZONE', id, data.externalCodes)
-    return { id, code }
+    return { id, code, rowVersion: saved.rowVersion }
   })
 }
 

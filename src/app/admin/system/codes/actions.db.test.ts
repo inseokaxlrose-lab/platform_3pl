@@ -3,6 +3,7 @@ import { createDataGridState } from '@/components/data-grid/state'
 import type { PermissionCode } from '@/config/permissions'
 import { assertCodeValues, loadCodeOptions } from '@/lib/common-code/common-codes'
 import { prisma } from '@/lib/prisma'
+import { versionOf } from '@/test/factories'
 import { getCurrentPermissions, getCurrentScope, getCurrentUser } from '@/lib/session'
 import { resetDatabase } from '@/test/reset-database'
 import {
@@ -116,7 +117,11 @@ describe('공통코드 그룹', () => {
     })
     expect(await deleteCodeGroupAction({ id: String(system.id) })).toMatchObject({ ok: false })
     expect(
-      await updateCodeGroupAction({ id: String(system.id), ...group({ isActive: false }) }),
+      await updateCodeGroupAction({
+        id: String(system.id),
+        rowVersion: await versionOf('codeGroup', String(system.id)),
+        ...group({ isActive: false }),
+      }),
     ).toMatchObject({ ok: false, error: { message: expect.stringContaining('사용 중지') } })
 
     const empty = await createGroup({ code: 'EMPTY' })
@@ -127,6 +132,7 @@ describe('공통코드 그룹', () => {
     const saved = await createGroup()
     await updateCodeGroupAction({
       id: saved.id,
+      rowVersion: await versionOf('codeGroup', saved.id),
       ...group({ code: 'CHANGED', name: '바뀐 이름', sortOrder: 5 }),
     })
     expect(
@@ -165,6 +171,7 @@ describe('공통코드 코드', () => {
     const item = await createItem(BigInt(g.id), 'X')
     await updateCodeItemAction({
       id: item.id,
+      rowVersion: await versionOf('codeItem', item.id),
       name: '엑스',
       description: '',
       sortOrder: 3,

@@ -10,6 +10,7 @@ import { codesFilter, dateRangeFilter, digitsFilter, textFilter } from '@/lib/gr
 import { STORAGE_CONDITIONS } from '@/lib/warehouses/warehouse-labels'
 import { prisma } from '@/lib/prisma'
 import { assertInScope, scopeFilter, type DataScope } from '@/lib/scope/data-scope'
+import { rowVersionField } from '@/lib/row-version'
 import { idSchema } from '@/lib/id'
 
 // 센터 관리 서버 액션 (docs/decisions/0026)
@@ -107,10 +108,11 @@ export const createCenterAction = createAction({
 
 export const updateCenterAction = createAction({
   permission: 'master.centers.update',
-  input: centerSchema.extend({ id: idSchema }),
-  handler: async ({ input: { id, ...data }, scope }) => {
+  // rowVersion: 화면이 불러온 버전 (동시 수정 막기)
+  input: centerSchema.extend({ id: idSchema, rowVersion: rowVersionField }),
+  handler: async ({ input: { id, rowVersion, ...data }, scope }) => {
     assertInScope(scope, { id }, CENTER_SCOPE)
-    return updateCenter(id, data)
+    return updateCenter(id, rowVersion, data)
   },
 })
 

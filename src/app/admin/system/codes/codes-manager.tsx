@@ -27,6 +27,8 @@ type GroupRow = {
   sortOrder: number
   isActive: boolean
   isSystem: boolean
+  // 동시 수정 막기: 팝업을 연 목록의 버전
+  rowVersion: number
   itemCount: number
 }
 
@@ -37,6 +39,7 @@ type ItemRow = {
   description: string | null
   sortOrder: number
   isActive: boolean
+  rowVersion: number
   updatedAt: Date
 }
 
@@ -318,11 +321,19 @@ export function CodesManager() {
             if (dialog.kind === 'group') {
               return dialog.mode === 'create'
                 ? createCodeGroupAction({ code, ...rest })
-                : updateCodeGroupAction({ id: dialog.row.id, ...rest })
+                : updateCodeGroupAction({
+                    id: dialog.row.id,
+                    rowVersion: dialog.row.rowVersion,
+                    ...rest,
+                  })
             }
             return dialog.mode === 'create'
               ? createCodeItemAction({ groupId: activeGroupId!, code, ...rest })
-              : updateCodeItemAction({ id: dialog.row.id, ...rest })
+              : updateCodeItemAction({
+                  id: dialog.row.id,
+                  rowVersion: dialog.row.rowVersion,
+                  ...rest,
+                })
           }}
           onDelete={
             dialog.mode === 'edit' && can('system.codes.delete')

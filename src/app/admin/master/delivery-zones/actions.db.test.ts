@@ -6,7 +6,7 @@ import { getExternalCodes } from '@/lib/master-code/external-codes'
 import { prisma } from '@/lib/prisma'
 import type { DataScope } from '@/lib/scope/data-scope'
 import { getCurrentPermissions, getCurrentScope, getCurrentUser } from '@/lib/session'
-import { createTestCenter } from '@/test/factories'
+import { createTestCenter, versionOf } from '@/test/factories'
 import { resetDatabase } from '@/test/reset-database'
 import {
   createDeliveryZoneAction,
@@ -132,6 +132,7 @@ describe('배송권역 등록·수정', () => {
     const zone = await create({ code: 'SEOUL', regionCodes: ['11'] })
     const result = await updateDeliveryZoneAction({
       id: zone.id,
+      rowVersion: await versionOf('deliveryZone', zone.id),
       ...input({
         centerId: String(gmhId),
         code: 'SEOUL',

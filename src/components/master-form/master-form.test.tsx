@@ -106,8 +106,19 @@ const schema = z
   })
   .superRefine(requireOneOf(['phone', 'email'], '연락처나 이메일을 입력해 주세요.'))
 
-function FormHarness({ save }: { save: () => Promise<{ ok: true; data: null }> }) {
-  const form = useMasterForm({ initial: { name: '원래', phone: '', email: 'a@b.c' }, schema, save })
+function FormHarness({
+  save,
+  version,
+}: {
+  save: (value: unknown, version: number | null) => Promise<{ ok: true; data: unknown }>
+  version?: number
+}) {
+  const form = useMasterForm({
+    initial: { name: '원래', phone: '', email: 'a@b.c' },
+    version,
+    schema,
+    save,
+  })
   return (
     <>
       <a href="/elsewhere">다른 화면</a>
@@ -171,13 +182,28 @@ describe('MasterFormPage + useMasterForm', () => {
     expect(screen.getByLabelText('오류 있음')).toBeTruthy()
   })
 
+  it('동시 수정 막기: 불러온 버전을 보내고, 저장 결과의 새 버전으로 다음 저장을 한다', async () => {
+    const save = vi
+      .fn()
+      .mockResolvedValueOnce({ ok: true, data: { rowVersion: 4 } })
+      .mockResolvedValueOnce({ ok: true, data: { rowVersion: 5 } })
+    render(<FormHarness save={save} version={3} />)
+    fireEvent.change(screen.getByLabelText(/이름/), { target: { value: '한 번' } })
+    await act(async () => fireEvent.click(screen.getByRole('button', { name: '저장' })))
+    fireEvent.change(screen.getByLabelText(/이름/), { target: { value: '두 번' } })
+    await act(async () => fireEvent.click(screen.getByRole('button', { name: '저장' })))
+
+    expect(save.mock.calls.map((call) => call[1])).toEqual([3, 4])
+  })
+
   it('저장에 성공하면 그 값이 새 기준이 되고 화면을 새로 읽는다', async () => {
     const save = vi.fn().mockResolvedValue({ ok: true, data: null })
     render(<FormHarness save={save} />)
     fireEvent.change(screen.getByLabelText(/이름/), { target: { value: '새 이름' } })
     await act(async () => fireEvent.click(screen.getByRole('button', { name: '저장' })))
 
-    expect(save).toHaveBeenCalledWith({ name: '새 이름', phone: '', email: 'a@b.c' })
+    // 두 번째 값은 버전 (등록 화면처럼 버전이 없으면 null)
+    expect(save).toHaveBeenCalledWith({ name: '새 이름', phone: '', email: 'a@b.c' }, null)
     expect(screen.getByRole('status').textContent).toBe('저장했습니다.')
     expect(screen.getByRole('button', { name: '저장' })).toHaveProperty('disabled', true)
     expect(refresh).toHaveBeenCalled()

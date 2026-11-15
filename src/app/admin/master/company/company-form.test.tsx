@@ -44,7 +44,12 @@ const CODES = {
 const renderForm = (initial: CompanyInput = EMPTY, readOnly = false) =>
   render(
     <CommonCodeProvider options={CODES}>
-      <CompanyForm header={{ title: '운영사' }} initial={initial} readOnly={readOnly} />
+      <CompanyForm
+        header={{ title: '운영사' }}
+        initial={initial}
+        version={null}
+        readOnly={readOnly}
+      />
     </CommonCodeProvider>,
   )
 
@@ -56,7 +61,7 @@ const save = () => act(async () => fireEvent.click(screen.getByRole('button', { 
 
 beforeEach(() => {
   vi.mocked(saveCompanyAction).mockReset()
-  vi.mocked(saveCompanyAction).mockResolvedValue({ ok: true, data: { saved: true } })
+  vi.mocked(saveCompanyAction).mockResolvedValue({ ok: true, data: { rowVersion: 1 } })
 })
 
 describe('CompanyForm', () => {

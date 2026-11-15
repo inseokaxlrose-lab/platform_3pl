@@ -2,6 +2,7 @@ import 'server-only'
 import type { z } from 'zod'
 import { ActionError } from '@/lib/actions/action-error'
 import { prisma } from '@/lib/prisma'
+import { assertRowVersion, withVersionGuard } from '@/lib/row-version'
 import { isYes } from '@/lib/yn'
 import type {
   codeGroupCreateSchema,
@@ -27,14 +28,24 @@ export async function createCodeGroup(data: GroupCreate) {
   return prisma.codeGroup.create({ data, select: { id: true, code: true } })
 }
 
-export async function updateCodeGroup({ id, ...data }: GroupUpdate) {
-  const group = await prisma.codeGroup.findUnique({ where: { id }, select: { isSystem: true } })
-  if (!group) throw new ActionError('NOT_FOUND', '코드 그룹을 찾을 수 없습니다.')
+// rowVersion: 팝업을 열 때의 버전 (그 사이 다른 사람이 저장했으면 충돌)
+export async function updateCodeGroup({ id, rowVersion, ...data }: GroupUpdate) {
+  const group = await prisma.codeGroup.findUnique({
+    where: { id },
+    select: { isSystem: true, rowVersion: true },
+  })
+  assertRowVersion(group, rowVersion, '코드 그룹을 찾을 수 없습니다.')
   // 시스템 그룹은 프로그램이 쓰므로 사용 중지할 수 없다
-  if (isYes(group.isSystem) && !data.isActive) {
+  if (isYes(group!.isSystem) && !data.isActive) {
     throw new ActionError('VALIDATION', '시스템 그룹은 사용 중지할 수 없습니다.')
   }
-  return prisma.codeGroup.update({ where: { id }, data, select: { id: true } })
+  return withVersionGuard(() =>
+    prisma.codeGroup.update({
+      where: { id, rowVersion },
+      data,
+      select: { id: true, rowVersion: true },
+    }),
+  )
 }
 
 export async function deleteCodeGroup(id: bigint) {
@@ -67,10 +78,17 @@ export async function createCodeItem(data: ItemCreate) {
   return prisma.codeItem.create({ data, select: { id: true, code: true } })
 }
 
-export async function updateCodeItem({ id, ...data }: ItemUpdate) {
-  const item = await prisma.codeItem.findUnique({ where: { id }, select: { id: true } })
-  if (!item) throw new ActionError('NOT_FOUND', '코드를 찾을 수 없습니다.')
-  return prisma.codeItem.update({ where: { id }, data, select: { id: true } })
+// rowVersion: 팝업을 열 때의 버전 (그 사이 다른 사람이 저장했으면 충돌)
+export async function updateCodeItem({ id, rowVersion, ...data }: ItemUpdate) {
+  const item = await prisma.codeItem.findUnique({ where: { id }, select: { rowVersion: true } })
+  assertRowVersion(item, rowVersion, '코드를 찾을 수 없습니다.')
+  return withVersionGuard(() =>
+    prisma.codeItem.update({
+      where: { id, rowVersion },
+      data,
+      select: { id: true, rowVersion: true },
+    }),
+  )
 }
 
 export async function deleteCodeItem(id: bigint) {

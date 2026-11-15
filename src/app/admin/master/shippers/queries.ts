@@ -49,6 +49,8 @@ export async function getShipperForEdit(id: bigint, scope: DataScope) {
   return textIds({
     id: shipper.id,
     systemCode: shipper.systemCode,
+    // 동시 수정 막기: 저장할 때 이 버전을 함께 보낸다
+    rowVersion: shipper.rowVersion,
     isActive: shipper.isActive,
     input,
     users: shipper.users.map((u) => ({

@@ -11,6 +11,7 @@ export async function getPermissionGroup(id: bigint) {
       name: true,
       area: true,
       description: true,
+      rowVersion: true,
       permissions: { select: { permissionCode: true } },
       _count: { select: { users: true } },
     },
@@ -29,6 +30,8 @@ export async function getPermissionGroup(id: bigint) {
     name: group.name,
     area: group.area,
     description: group.description ?? '',
+    // 동시 수정 막기: 저장할 때 이 버전을 함께 보낸다
+    rowVersion: group.rowVersion,
     userCount: group._count.users,
     permissionCodes: codes.filter(isPermissionCode),
     // 목록에서 사라진 옛 코드: 화면에 "정리 필요"로 알리고, 저장하면 정리된다

@@ -3,6 +3,7 @@ import { createDataGridState } from '@/components/data-grid/state'
 import type { PermissionCode } from '@/config/permissions'
 import { getExternalCodes } from '@/lib/master-code/external-codes'
 import { prisma } from '@/lib/prisma'
+import { versionOf } from '@/test/factories'
 import { getCurrentPermissions, getCurrentScope, getCurrentUser } from '@/lib/session'
 import type { UnitCreateInput } from '@/lib/units/unit-schema'
 import { resetDatabase } from '@/test/reset-database'
@@ -85,7 +86,11 @@ describe('단위 등록·수정', () => {
 
   it('수정: 코드는 그대로, 시스템 단위는 종류 변경·사용 중지 불가', async () => {
     const kg = await create()
-    await updateUnitAction({ id: kg.id, ...input({ code: 'XX', name: '킬로', decimals: 2 }) })
+    await updateUnitAction({
+      id: kg.id,
+      rowVersion: await versionOf('unit', kg.id),
+      ...input({ code: 'XX', name: '킬로', decimals: 2 }),
+    })
     expect(await prisma.unit.findUniqueOrThrow({ where: { id: BigInt(kg.id) } })).toMatchObject({
       code: 'KG',
       name: '킬로',
@@ -98,12 +103,14 @@ describe('단위 등록·수정', () => {
     expect(
       await updateUnitAction({
         id: String(ea.id),
+        rowVersion: await versionOf('unit', String(ea.id)),
         ...input({ name: '개', kind: 'PACK', decimals: 0 }),
       }),
     ).toMatchObject({ ok: false, error: { message: expect.stringContaining('종류') } })
     expect(
       await updateUnitAction({
         id: String(ea.id),
+        rowVersion: await versionOf('unit', String(ea.id)),
         ...input({ name: '개', decimals: 0, isActive: false }),
       }),
     ).toMatchObject({ ok: false, error: { message: expect.stringContaining('사용 중지') } })

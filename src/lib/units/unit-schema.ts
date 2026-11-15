@@ -3,6 +3,7 @@ import { externalCodesSchema } from '@/lib/master-code/external-codes-schema'
 import { requiredText } from '@/lib/validation/common-fields'
 import { UNIT_KINDS } from './unit-labels'
 import { idSchema } from '@/lib/id'
+import { rowVersionField } from '@/lib/row-version'
 
 // 단위 입력 규칙 — 화면·서버 공용 (docs/decisions/0034)
 
@@ -36,7 +37,10 @@ const normalize = <T extends { kind: string; decimals: number }>(data: T): T =>
   data.kind === 'PACK' ? { ...data, decimals: 0 } : data
 
 export const unitCreateSchema = z.object({ code: unitCodeField, ...fields }).transform(normalize)
-export const unitUpdateSchema = z.object({ id: idSchema, ...fields }).transform(normalize)
+// rowVersion: 팝업을 열 때의 버전 (동시 수정 막기)
+export const unitUpdateSchema = z
+  .object({ id: idSchema, rowVersion: rowVersionField, ...fields })
+  .transform(normalize)
 
 export type UnitCreateInput = z.input<typeof unitCreateSchema>
 export type UnitCreateData = z.output<typeof unitCreateSchema>

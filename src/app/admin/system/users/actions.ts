@@ -8,6 +8,7 @@ import { dateRangeFilter, idFilter } from '@/lib/grid/list-filters'
 import { USER_TYPES } from '@/lib/users/user-schema'
 import { overridesIssue } from '@/lib/permissions/override-state'
 import { prisma } from '@/lib/prisma'
+import { assertRowVersion, withVersionGuard } from '@/lib/row-version'
 import type { CurrentUser } from '@/lib/session'
 import { affiliationIssues, internalEmail } from '@/lib/users/affiliation'
 import { createUserAccount } from '@/lib/users/create-user-account'
@@ -165,35 +166,39 @@ export const updateUserAction = createAction({
   input: updateUserSchema,
   handler: async ({ user, input }) => {
     requireOperator(user)
-    const target = await prisma.user.findUnique({
+    const found = await prisma.user.findUnique({
       where: { id: input.id },
-      select: { userType: true, username: true },
+      select: { userType: true, username: true, rowVersion: true },
     })
-    if (!target) throw new ActionError('NOT_FOUND', '사용자를 찾을 수 없습니다.')
+    assertRowVersion(found, input.rowVersion, '사용자를 찾을 수 없습니다.')
+    const target = found!
 
     assertAffiliation(target.userType, input.centerIds, input.shipperId)
     await assertGroupsMatch(input.permissionGroupIds, target.userType)
     const email = input.email?.toLowerCase() ?? internalEmail(target.username ?? String(input.id))
     await assertEmailFree(email, input.id)
 
-    await prisma.$transaction([
-      prisma.user.update({
-        where: { id: input.id },
-        data: { name: input.name, email, shipperId: input.shipperId ?? null },
-      }),
-      prisma.userCenter.deleteMany({ where: { userId: input.id } }),
-      prisma.userCenter.createMany({
+    return prisma.$transaction(async (tx) => {
+      const saved = await withVersionGuard(() =>
+        tx.user.update({
+          where: { id: input.id, rowVersion: input.rowVersion },
+          data: { name: input.name, email, shipperId: input.shipperId ?? null },
+          select: { id: true, rowVersion: true },
+        }),
+      )
+      await tx.userCenter.deleteMany({ where: { userId: input.id } })
+      await tx.userCenter.createMany({
         data: [...new Set(input.centerIds)].map((centerId) => ({ userId: input.id, centerId })),
-      }),
-      prisma.userPermissionGroup.deleteMany({ where: { userId: input.id } }),
-      prisma.userPermissionGroup.createMany({
+      })
+      await tx.userPermissionGroup.deleteMany({ where: { userId: input.id } })
+      await tx.userPermissionGroup.createMany({
         data: [...new Set(input.permissionGroupIds)].map((groupId) => ({
           userId: input.id,
           groupId,
         })),
-      }),
-    ])
-    return { id: input.id }
+      })
+      return saved
+    })
   },
 })
 

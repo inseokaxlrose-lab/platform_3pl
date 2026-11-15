@@ -1,16 +1,14 @@
 import 'server-only'
 import { looksLikeSystemCode } from '@/config/master-codes'
-import type { Prisma } from '@/generated/prisma/client'
 import { ActionError } from '@/lib/actions/action-error'
 import { assertCodeValues } from '@/lib/common-code/common-codes'
 import { CONTACT_DUTY_GROUP } from '@/lib/contacts/contact-schema'
 import { saveExternalCodes } from '@/lib/master-code/external-codes'
 import { nextSystemCode } from '@/lib/master-code/system-code'
-import { prisma } from '@/lib/prisma'
+import { assertRowVersion, withVersionGuard } from '@/lib/row-version'
+import { prisma, type Db } from '@/lib/prisma'
 import { toYn } from '@/lib/yn'
 import type { ShipperData } from './shipper-schema'
-
-type Db = Prisma.TransactionClient
 
 // 화주사 저장 (docs/decisions/0035). 권한·데이터 범위 검사는 서버 액션에서 한다
 
@@ -85,7 +83,7 @@ export async function createShipper(data: ShipperData) {
         code,
         centers: { create: data.centerIds.map((centerId) => ({ centerId })) },
       },
-      select: { id: true, systemCode: true, code: true },
+      select: { id: true, systemCode: true, code: true, rowVersion: true },
     })
     await tx.shipperContact.createMany({ data: contactRows(shipper.id, data.contacts) })
     await saveExternalCodes(tx, 'SHIPPER', shipper.id, data.externalCodes)
@@ -95,17 +93,20 @@ export async function createShipper(data: ShipperData) {
 
 // 수정: 시스템 코드는 바뀌지 않는다. 이용 센터·담당자는 통째로 바꾼다
 // TODO(재고 작업, ROADMAP M4): 이용 센터를 뺄 때 그 센터에 이 화주사 재고가 있으면 막는다
-export async function updateShipper(id: bigint, data: ShipperData) {
+// rowVersion: 화면이 불러온 버전 (그 사이 다른 사람이 저장했으면 충돌)
+export async function updateShipper(id: bigint, rowVersion: number, data: ShipperData) {
   return prisma.$transaction(async (tx) => {
-    const current = await tx.shipper.findUnique({
+    const found = await tx.shipper.findUnique({
       where: { id },
       select: {
+        rowVersion: true,
         systemCode: true,
         centers: { select: { centerId: true } },
         contacts: { select: { duty: true } },
       },
     })
-    if (!current) throw new ActionError('NOT_FOUND', '화주사를 찾을 수 없습니다.')
+    assertRowVersion(found, rowVersion, '화주사를 찾을 수 없습니다.')
+    const current = found!
     const code = data.code || current.systemCode
     await assertShipperCode(tx, code, current.systemCode, id)
     await assertCenters(
@@ -119,7 +120,13 @@ export async function updateShipper(id: bigint, data: ShipperData) {
       data.contacts.map((c) => c.duty),
       { label: '담당 업무', keep: current.contacts.map((c) => c.duty) },
     )
-    await tx.shipper.update({ where: { id }, data: { ...fieldsOf(data), code } })
+    const saved = await withVersionGuard(() =>
+      tx.shipper.update({
+        where: { id, rowVersion },
+        data: { ...fieldsOf(data), code },
+        select: { rowVersion: true },
+      }),
+    )
     await tx.shipperCenter.deleteMany({ where: { shipperId: id } })
     await tx.shipperCenter.createMany({
       data: data.centerIds.map((centerId) => ({ shipperId: id, centerId })),
@@ -127,6 +134,6 @@ export async function updateShipper(id: bigint, data: ShipperData) {
     await tx.shipperContact.deleteMany({ where: { shipperId: id } })
     await tx.shipperContact.createMany({ data: contactRows(id, data.contacts) })
     await saveExternalCodes(tx, 'SHIPPER', id, data.externalCodes)
-    return { id, code }
+    return { id, code, rowVersion: saved.rowVersion }
   })
 }

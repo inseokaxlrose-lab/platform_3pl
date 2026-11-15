@@ -13,8 +13,11 @@ type UseMasterFormOptions<TSchema extends z.ZodType, TResult> = {
   initial: z.input<TSchema>
   // 화면·서버 공용 입력 규칙: 저장 전에 화면에서 먼저 검사한다
   schema: TSchema
+  // 동시 수정 막기: 불러올 때의 버전 (row_version). 등록 화면은 비운다
+  // 저장할 때 save의 두 번째 값으로 넘기고, 저장 결과에 rowVersion이 있으면 새 버전으로 바꾼다
+  version?: number | null
   // 서버 액션 호출 (서버도 같은 규칙으로 다시 검사)
-  save: (value: z.input<TSchema>) => Promise<ActionResult<TResult>>
+  save: (value: z.input<TSchema>, version: number | null) => Promise<ActionResult<TResult>>
   // 저장 성공 후 화면에 다시 채울 값 (예: 저장된 모양으로 정리). 없으면 입력값 그대로
   afterSave?: (saved: z.output<TSchema>) => z.input<TSchema>
   // 저장 성공 후 할 일 (예: 등록 화면 → 만든 항목의 수정 화면으로 이동). 서버 액션의 결과를 받는다
@@ -24,6 +27,7 @@ type UseMasterFormOptions<TSchema extends z.ZodType, TResult> = {
 // 기준정보 입력 화면의 공통 동작: 값·오류·변경 감지·취소·저장 (MasterFormPage와 함께 쓴다)
 export function useMasterForm<TSchema extends z.ZodType, TResult = unknown>({
   initial,
+  version: initialVersion = null,
   schema,
   save,
   afterSave,
@@ -34,6 +38,7 @@ export function useMasterForm<TSchema extends z.ZodType, TResult = unknown>({
   const [value, setValue] = useState<Input>(initial)
   // 변경 감지 기준: 저장에 성공하면 새 값이 기준이 된다
   const [baseline, setBaseline] = useState<Input>(initial)
+  const [version, setVersion] = useState<number | null>(initialVersion)
   const [errors, setErrors] = useState<FormErrors>({})
   const [message, setMessage] = useState<{ ok: boolean; text: string } | null>(null)
   // 저장 시도 횟수: 바뀔 때마다 MasterFormPage가 첫 오류 칸으로 이동한다
@@ -82,7 +87,7 @@ export function useMasterForm<TSchema extends z.ZodType, TResult = unknown>({
       }
       setErrors({})
       startTransition(async () => {
-        const result = await save(value)
+        const result = await save(value, version)
         if (!result.ok) {
           fail(
             Object.fromEntries(
@@ -92,6 +97,9 @@ export function useMasterForm<TSchema extends z.ZodType, TResult = unknown>({
           )
           return
         }
+        // 저장으로 올라간 버전을 들고 있어야 다음 저장이 충돌로 막히지 않는다
+        const savedVersion = (result.data as { rowVersion?: unknown } | null)?.rowVersion
+        if (typeof savedVersion === 'number') setVersion(savedVersion)
         const next = afterSave ? afterSave(parsed.data) : value
         setValue(next)
         setBaseline(next)

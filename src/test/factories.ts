@@ -79,3 +79,27 @@ export function createTestCodeGroup(
     },
   })
 }
+
+// 공통 칸(row_version)이 있는 표의 지금 버전 — 수정 액션 테스트에서 "화면이 불러온 버전" 대신 쓴다
+type VersionedModel =
+  | 'center'
+  | 'warehouse'
+  | 'shipper'
+  | 'deliveryZone'
+  | 'unit'
+  | 'codeGroup'
+  | 'codeItem'
+  | 'permissionGroup'
+  | 'user'
+  | 'company'
+
+export async function versionOf(model: VersionedModel, id: bigint | string): Promise<number> {
+  const delegate = prisma[model] as unknown as {
+    findUniqueOrThrow(args: object): Promise<{ rowVersion: number }>
+  }
+  const row = await delegate.findUniqueOrThrow({
+    where: { id: BigInt(id) },
+    select: { rowVersion: true },
+  })
+  return row.rowVersion
+}

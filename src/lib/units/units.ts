@@ -1,6 +1,7 @@
 import 'server-only'
 import { ActionError } from '@/lib/actions/action-error'
 import { deleteExternalCodes, saveExternalCodes } from '@/lib/master-code/external-codes'
+import { assertRowVersion, withVersionGuard } from '@/lib/row-version'
 import { prisma } from '@/lib/prisma'
 import { isYes } from '@/lib/yn'
 import type { UnitCreateData, UnitUpdateData } from './unit-schema'
@@ -21,12 +22,14 @@ export async function createUnit({ externalCodes, ...data }: UnitCreateData) {
   })
 }
 
-export async function updateUnit({ id, externalCodes, ...data }: UnitUpdateData) {
-  const current = await prisma.unit.findUnique({
+// rowVersion: 팝업을 열 때의 버전 (그 사이 다른 사람이 저장했으면 충돌)
+export async function updateUnit({ id, rowVersion, externalCodes, ...data }: UnitUpdateData) {
+  const found = await prisma.unit.findUnique({
     where: { id },
-    select: { code: true, kind: true, isSystem: true },
+    select: { code: true, kind: true, isSystem: true, rowVersion: true },
   })
-  if (!current) throw new ActionError('NOT_FOUND', '단위를 찾을 수 없습니다.')
+  assertRowVersion(found, rowVersion, '단위를 찾을 수 없습니다.')
+  const current = found!
   if (isYes(current.isSystem)) {
     if (data.kind !== current.kind) {
       throw new ActionError('VALIDATION', `시스템 단위(${current.code})의 종류는 바꿀 수 없습니다.`)
@@ -36,9 +39,11 @@ export async function updateUnit({ id, externalCodes, ...data }: UnitUpdateData)
     }
   }
   return prisma.$transaction(async (tx) => {
-    await tx.unit.update({ where: { id }, data })
+    const saved = await withVersionGuard(() =>
+      tx.unit.update({ where: { id, rowVersion }, data, select: { rowVersion: true } }),
+    )
     await saveExternalCodes(tx, 'UNIT', id, externalCodes)
-    return { id }
+    return { id, rowVersion: saved.rowVersion }
   })
 }
 

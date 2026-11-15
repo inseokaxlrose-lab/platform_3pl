@@ -76,7 +76,8 @@ export function UserForm({ options, user, extraSections = [], header }: UserForm
       unknown,
       UserFormValue
     >,
-    save: (value: UserFormValue) => {
+    version: user?.rowVersion,
+    save: (value: UserFormValue, version) => {
       // 유형에 맞지 않는 소속은 보내지 않는다
       const affiliation = {
         centerIds: value.userType === 'CENTER' ? value.centerIds : [],
@@ -84,7 +85,13 @@ export function UserForm({ options, user, extraSections = [], header }: UserForm
         permissionGroupIds: value.permissionGroupIds,
       }
       return user
-        ? updateUserAction({ id: user.id, name: value.name, email: value.email, ...affiliation })
+        ? updateUserAction({
+            id: user.id,
+            rowVersion: version ?? user.rowVersion,
+            name: value.name,
+            email: value.email,
+            ...affiliation,
+          })
         : createUserAction({ ...value, ...affiliation })
     },
     onSuccess: user

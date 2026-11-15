@@ -40,6 +40,7 @@ export async function getUserForEdit(id: bigint) {
       userType: true,
       isActive: true,
       shipperId: true,
+      rowVersion: true,
       centers: { select: { centerId: true } },
       permissionGroups: { select: { groupId: true } },
     },
@@ -54,6 +55,8 @@ export async function getUserForEdit(id: bigint) {
     email: user.email.endsWith('@users.local') ? '' : user.email,
     userType: user.userType,
     isActive: user.isActive,
+    // 동시 수정 막기: 저장할 때 이 버전을 함께 보낸다
+    rowVersion: user.rowVersion,
     shipperId: user.shipperId === null ? '' : String(user.shipperId),
     centerIds: user.centers.map((c) => c.centerId),
     permissionGroupIds: user.permissionGroups.map((g) => g.groupId),

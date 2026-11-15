@@ -62,6 +62,7 @@ export const listUnitsAction = createAction({
           sortOrder: true,
           isActive: true,
           isSystem: true,
+          rowVersion: true,
           updatedAt: true,
         },
       }),

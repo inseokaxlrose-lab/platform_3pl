@@ -77,9 +77,16 @@ export function DeliveryZoneForm({
         regionCodes: [],
         externalCodes: { ...EMPTY_EXTERNAL_CODES },
       } satisfies DeliveryZoneInput),
+    version: zone?.rowVersion,
     schema: deliveryZoneSchema,
-    save: (value: DeliveryZoneInput) =>
-      zone ? updateDeliveryZoneAction({ id: zone.id, ...value }) : createDeliveryZoneAction(value),
+    save: (value: DeliveryZoneInput, version) =>
+      zone
+        ? updateDeliveryZoneAction({
+            id: zone.id,
+            rowVersion: version ?? zone.rowVersion,
+            ...value,
+          })
+        : createDeliveryZoneAction(value),
     afterSave: (saved) => ({
       ...saved,
       // 검사를 거친 값은 키가 bigint라 화면 값(글자)으로 되돌린다
