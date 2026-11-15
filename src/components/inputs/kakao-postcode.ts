@@ -12,6 +12,8 @@ export type KakaoPostcodeResult = {
   jibunAddress: string
   // 도로명을 고르면 jibunAddress가 비어 있을 수 있어 대신 주는 지번주소
   autoJibunAddress?: string
+  // 법정동코드 10자리 (예: 4113510900)
+  bcode?: string
   userSelectedType: 'R' | 'J'
   buildingName: string
   apartment: 'Y' | 'N'
@@ -66,5 +68,7 @@ export function toAddress(data: KakaoPostcodeResult) {
     address: extras.length > 0 ? `${base} (${extras.join(', ')})` : base,
     // 지번주소 (따로 저장하는 화면만 쓴다, 예: 운영사 addr_jibun)
     jibunAddress: data.jibunAddress || data.autoJibunAddress || '',
+    // 법정동코드 (따로 저장하는 화면만 쓴다, 예: 거래처 region_cd — 배송권역과 맞춰 본다)
+    regionCode: data.bcode ?? '',
   }
 }
