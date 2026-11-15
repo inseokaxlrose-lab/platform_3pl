@@ -3,8 +3,9 @@
 // 데이터 구조 결정: docs/decisions/0003-domain-model.md, 0010-auth-and-permission-model.md
 
 generator client {
-  provider = "prisma-client"
-  output   = "../src/generated/prisma"
+  provider        = "prisma-client"
+  output          = "../src/generated/prisma"
+  previewFeatures = ["partialIndexes"]
 }
 
 // 연결 주소는 prisma.config.ts(명령어용)와 src/lib/prisma.ts(앱 실행용)에서 지정한다
@@ -131,7 +132,7 @@ enum AppArea {
 // 권한그룹: 권한 코드 묶음 (예: "센터 운영자", "화주 담당자")
 model PermissionGroup {
   id          BigInt   @id @default(autoincrement()) @map("perm_group_id")
-  name        String   @unique @map("perm_group_nm")
+  name        String   @map("perm_group_nm")
   // 이 그룹이 다루는 영역: 그 영역의 권한만 담고, 맞는 유형의 사용자에게만 배정한다 (등록 후 변경 불가)
   area        AppArea  @default(ADMIN) @map("app_area_cd")
   description String?
@@ -145,6 +146,11 @@ model PermissionGroup {
   permissions PermissionGroupPermission[]
   users       UserPermissionGroup[]
 
+  // 논리 삭제: 'Y'면 지운 것 (목록·조회에서 빠지고 되살릴 수 있다, 0038)
+  delYn String @default("N") @map("del_yn") @db.Char(1)
+
+  // 이름는 삭제 안 된 것끼리만 겹치면 안 된다 (지운 것은 다시 쓸 수 있다, 0038)
+  @@unique([name], where: raw("del_yn = 'N'"), map: "tb_perm_group_perm_group_nm_key")
   @@map("tb_perm_group")
 }
 
@@ -201,7 +207,7 @@ model Center {
   // 시스템 코드: CT000001 (라벨·문서·이력에 쓰는 불변 코드)
   systemCode    String   @unique @map("sys_cd")
   // 사용자 코드: 화면 검색·표시용 (바꿀 수 있음)
-  code          String   @unique @map("center_cd")
+  code          String   @map("center_cd")
   name          String   @map("center_nm")
   // 전화번호는 하이픈 없이 숫자만 (0029)
   phone         String?  @map("tel_no")
@@ -225,6 +231,11 @@ model Center {
   deliveryZones DeliveryZone[]
   shippers      ShipperCenter[]
 
+  // 논리 삭제: 'Y'면 지운 것 (목록·조회에서 빠지고 되살릴 수 있다, 0038)
+  delYn String @default("N") @map("del_yn") @db.Char(1)
+
+  // 코드는 삭제 안 된 것끼리만 겹치면 안 된다 (지운 것은 다시 쓸 수 있다, 0038)
+  @@unique([code], where: raw("del_yn = 'N'"), map: "tb_center_center_cd_key")
   @@map("tb_center")
 }
 
@@ -266,8 +277,13 @@ model Warehouse {
   center           Center           @relation(fields: [centerId], references: [id], onDelete: Restrict)
   locations        Location[]
 
-  // 센터마다 입고대기 창고 1개: 마이그레이션 SQL의 부분 고유 인덱스 tb_warehouse_one_inbound_per_center
-  @@unique([centerId, code])
+  // 코드는 삭제 안 된 것끼리만 겹치면 안 된다 (지운 코드는 다시 쓸 수 있다, 0038)
+  // 논리 삭제: 'Y'면 지운 것 (목록·조회에서 빠지고 되살릴 수 있다, 0038)
+  delYn String @default("N") @map("del_yn") @db.Char(1)
+
+  @@unique([centerId, code], where: raw("del_yn = 'N'"), map: "tb_warehouse_center_id_warehouse_cd_key")
+  // 센터마다 입고대기 창고 1개 (부분 고유 인덱스)
+  @@unique([centerId], where: raw("warehouse_type_cd = 'INBOUND_STAGING'::\"WarehouseType\""), map: "tb_warehouse_one_inbound_per_center")
   @@index([centerId])
   @@map("tb_warehouse")
 }
@@ -292,7 +308,11 @@ model Location {
   rowVersion  Int       @default(1) @map("row_version")
   warehouse   Warehouse @relation(fields: [warehouseId], references: [id], onDelete: Restrict)
 
-  @@unique([warehouseId, code])
+  // 코드는 삭제 안 된 것끼리만 겹치면 안 된다 (지운 코드는 다시 쓸 수 있다, 0038)
+  // 논리 삭제: 'Y'면 지운 것 (목록·조회에서 빠지고 되살릴 수 있다, 0038)
+  delYn String @default("N") @map("del_yn") @db.Char(1)
+
+  @@unique([warehouseId, code], where: raw("del_yn = 'N'"), map: "tb_location_warehouse_id_location_cd_key")
   @@index([warehouseId, zone])
   @@map("tb_location")
 }
@@ -309,7 +329,7 @@ enum LabelUnit {
 model Shipper {
   id             BigInt    @id @default(autoincrement()) @map("shipper_id")
   systemCode     String    @unique @map("sys_cd")
-  code           String    @unique @map("shipper_cd")
+  code           String    @map("shipper_cd")
   name           String    @map("shipper_nm")
   // 사업자등록번호·전화번호는 하이픈 없이 숫자만 (0029)
   businessNumber String?   @map("biz_reg_no")
@@ -339,6 +359,11 @@ model Shipper {
   centers  ShipperCenter[]
   contacts ShipperContact[]
 
+  // 논리 삭제: 'Y'면 지운 것 (목록·조회에서 빠지고 되살릴 수 있다, 0038)
+  delYn String @default("N") @map("del_yn") @db.Char(1)
+
+  // 코드는 삭제 안 된 것끼리만 겹치면 안 된다 (지운 것은 다시 쓸 수 있다, 0038)
+  @@unique([code], where: raw("del_yn = 'N'"), map: "tb_shipper_shipper_cd_key")
   @@map("tb_shipper")
 }
 
@@ -436,6 +461,9 @@ model Company {
   rowVersion     Int              @default(1) @map("row_version")
   contacts       CompanyContact[]
 
+  // 논리 삭제: 'Y'면 지운 것 (목록·조회에서 빠지고 되살릴 수 있다, 0038)
+  delYn String @default("N") @map("del_yn") @db.Char(1)
+
   @@map("tb_operator")
 }
 
@@ -495,7 +523,7 @@ enum ExternalEntityType {
 model CodeGroup {
   id          BigInt     @id @default(autoincrement()) @map("group_id")
   // 그룹 코드: 영문 대문자·숫자·밑줄 (예: CONTACT_DUTY), 등록 후 변경 불가
-  code        String     @unique @map("group_cd")
+  code        String     @map("group_cd")
   name        String     @map("group_nm")
   description String?
   sortOrder   Int        @default(0) @map("sort_seq")
@@ -510,6 +538,11 @@ model CodeGroup {
   updatedBy   String     @default("system") @map("updated_by") @db.VarChar(50)
   rowVersion  Int        @default(1) @map("row_version")
 
+  // 논리 삭제: 'Y'면 지운 것 (목록·조회에서 빠지고 되살릴 수 있다, 0038)
+  delYn String @default("N") @map("del_yn") @db.Char(1)
+
+  // 코드는 삭제 안 된 것끼리만 겹치면 안 된다 (지운 것은 다시 쓸 수 있다, 0038)
+  @@unique([code], where: raw("del_yn = 'N'"), map: "tb_code_group_group_cd_key")
   @@map("tb_code_group")
 }
 
@@ -531,7 +564,11 @@ model CodeItem {
   updatedBy   String    @default("system") @map("updated_by") @db.VarChar(50)
   rowVersion  Int       @default(1) @map("row_version")
 
-  @@unique([groupId, code])
+  // 코드는 삭제 안 된 것끼리만 겹치면 안 된다 (지운 코드는 다시 쓸 수 있다, 0038)
+  // 논리 삭제: 'Y'면 지운 것 (목록·조회에서 빠지고 되살릴 수 있다, 0038)
+  delYn String @default("N") @map("del_yn") @db.Char(1)
+
+  @@unique([groupId, code], where: raw("del_yn = 'N'"), map: "tb_code_item_group_id_code_item_cd_key")
   @@index([groupId, sortOrder])
   @@map("tb_code_item")
 }
@@ -555,7 +592,11 @@ model DeliveryZone {
   center      Center               @relation(fields: [centerId], references: [id], onDelete: Restrict)
   regions     DeliveryZoneRegion[]
 
-  @@unique([centerId, code])
+  // 코드는 삭제 안 된 것끼리만 겹치면 안 된다 (지운 코드는 다시 쓸 수 있다, 0038)
+  // 논리 삭제: 'Y'면 지운 것 (목록·조회에서 빠지고 되살릴 수 있다, 0038)
+  delYn String @default("N") @map("del_yn") @db.Char(1)
+
+  @@unique([centerId, code], where: raw("del_yn = 'N'"), map: "tb_delivery_zone_center_id_zone_cd_key")
   @@index([centerId])
   @@map("tb_delivery_zone")
 }
@@ -586,7 +627,7 @@ enum UnitKind {
 model Unit {
   id         BigInt   @id @default(autoincrement()) @map("unit_id")
   // 등록 후 바꿀 수 없다 (품목·재고에 이 글자가 저장된다)
-  code       String   @unique @map("unit_cd")
+  code       String   @map("unit_cd")
   name       String   @map("unit_nm")
   kind       UnitKind @map("unit_kind_cd")
   // 소수 자리수: 기본단위의 수량 입력·검사 기준 (EA 0, KG 3). 환산단위는 0
@@ -602,5 +643,10 @@ model Unit {
   updatedBy  String   @default("system") @map("updated_by") @db.VarChar(50)
   rowVersion Int      @default(1) @map("row_version")
 
+  // 논리 삭제: 'Y'면 지운 것 (목록·조회에서 빠지고 되살릴 수 있다, 0038)
+  delYn String @default("N") @map("del_yn") @db.Char(1)
+
+  // 코드는 삭제 안 된 것끼리만 겹치면 안 된다 (지운 코드는 다시 쓸 수 있다, 0038)
+  @@unique([code], where: raw("del_yn = 'N'"), map: "tb_unit_unit_cd_key")
   @@map("tb_unit")
 }
