@@ -57,19 +57,39 @@ describe('운영사 정보 입력 규칙', () => {
     ).toMatchObject({ phone: '021234567', fax: '01012345678' })
   })
 
-  it(`담당자: 업무·이름 필수, 최대 ${MAX_COMPANY_CONTACTS}명`, () => {
-    const contact = { duty: '입고 문의', name: '김담당', phone: '010-1234-5678', email: '' }
+  it(`담당자: 업무·이름 필수, 연락처·이메일 중 하나, 대표 1명, 최대 ${MAX_COMPANY_CONTACTS}명`, () => {
+    const contact = {
+      duty: 'INBOUND',
+      name: '김담당',
+      phone: '010-1234-5678',
+      email: '',
+      isPrimary: true,
+    }
     expect(companySchema.parse(input({ contacts: [contact] })).contacts).toEqual([
-      { duty: '입고 문의', name: '김담당', phone: '01012345678', email: null },
+      { duty: 'INBOUND', name: '김담당', phone: '01012345678', email: null, isPrimary: true },
     ])
 
-    const missing = companySchema.safeParse(input({ contacts: [{ ...contact, name: '' }] }))
-    expect(missing.success).toBe(false)
+    expect(errorsOf(input({ contacts: [{ ...contact, duty: '', name: '', phone: '' }] }))).toEqual({
+      contacts: expect.any(Array),
+    })
+    const issues = companySchema
+      .safeParse(input({ contacts: [{ ...contact, duty: '', name: '', phone: '' }] }))
+      .error!.issues.map((i) => [i.path.join('.'), i.message])
+    expect(issues).toEqual([
+      ['contacts.0.duty', '담당 업무를 골라 주세요.'],
+      ['contacts.0.name', '담당자명을 입력해 주세요.'],
+      ['contacts.0.phone', '연락처와 이메일 중 하나는 입력해 주세요.'],
+    ])
 
+    expect(errorsOf(input({ contacts: [{ ...contact, isPrimary: false }] }))).toEqual({
+      contacts: ['대표 담당자를 1명 정해 주세요.'],
+    })
     expect(
       errorsOf(input({ contacts: Array(MAX_COMPANY_CONTACTS + 1).fill(contact) })),
     ).toMatchObject({
-      contacts: [`담당자는 ${MAX_COMPANY_CONTACTS}명까지 등록할 수 있습니다.`],
+      contacts: expect.arrayContaining([
+        `담당자는 ${MAX_COMPANY_CONTACTS}명까지 등록할 수 있습니다.`,
+      ]),
     })
   })
 })

@@ -1,288 +1,187 @@
 'use client'
 
-import { PlusIcon, SaveIcon, Trash2Icon } from 'lucide-react'
-import { useRouter } from 'next/navigation'
-import { useState, useTransition } from 'react'
-import { FormColumns, FormField, FormRow, FormSection } from '@/components/common'
-import { AddressInput } from '@/components/inputs'
-import { Button } from '@/components/ui/button'
+import { AddressInput, BizNoInput, EmailInput, PhoneInput } from '@/components/inputs'
+import {
+  EditableSubTable,
+  Field,
+  FormGrid,
+  MasterFormPage,
+  useMasterForm,
+  type FieldSpan,
+} from '@/components/master-form'
 import { Input } from '@/components/ui/input'
 import {
   companySchema,
+  CONTACT_DUTY_GROUP,
   EMPTY_CONTACT,
   MAX_COMPANY_CONTACTS,
-  type CompanyContactInput,
   type CompanyData,
   type CompanyInput,
 } from '@/lib/company/company-schema'
-import { formatBusinessNumber, formatPhone } from '@/lib/format'
 import { saveCompanyAction } from './actions'
 
-type CompanyFormProps = {
-  initial: CompanyInput
-  // 수정 권한이 없으면 읽기 전용
-  readOnly: boolean
-}
-
-// 저장할 값(빈 칸 null, 번호는 숫자만) → 입력값(빈 글자, 번호는 하이픈을 붙여서)
+// 저장한 값(빈 칸 null) → 입력값(빈 글자). 번호는 숫자만 그대로 (입력 부품이 하이픈을 붙여 보여준다)
 function toFormValues(data: CompanyData): CompanyInput {
   const text = (value: string | null) => value ?? ''
-  const phone = (value: string | null) => formatPhone(value ?? '')
   return {
     name: data.name,
-    businessNumber: formatBusinessNumber(data.businessNumber),
+    businessNumber: data.businessNumber,
     ceoName: text(data.ceoName),
     businessType: text(data.businessType),
     businessItem: text(data.businessItem),
-    phone: phone(data.phone),
-    fax: phone(data.fax),
+    phone: text(data.phone),
+    fax: text(data.fax),
     email: text(data.email),
     zipCode: text(data.zipCode),
     address: text(data.address),
     addressDetail: text(data.addressDetail),
-    contacts: data.contacts.map((c) => ({ ...c, phone: phone(c.phone), email: text(c.email) })),
+    contacts: data.contacts.map((c) => ({ ...c, phone: text(c.phone), email: text(c.email) })),
   }
 }
 
-// 오류 위치 → 문구 (예: 'businessNumber', 'contacts.0.name')
-type Errors = Record<string, string>
+type TextKey = 'name' | 'ceoName' | 'businessType' | 'businessItem'
 
-// 운영사 정보 입력 폼 (docs/decisions/0024)
-// 저장 전에 화면에서 같은 규칙(companySchema)으로 먼저 검사해 담당자 줄별 오류까지 보여주고,
-// 서버도 같은 규칙으로 다시 검사한다
-export function CompanyForm({ initial, readOnly }: CompanyFormProps) {
-  const router = useRouter()
-  const [form, setForm] = useState<CompanyInput>(initial)
-  const [errors, setErrors] = useState<Errors>({})
-  const [message, setMessage] = useState<{ ok: boolean; text: string } | null>(null)
-  const [pending, startTransition] = useTransition()
+// 운영사 정보 (docs/decisions/0024, 0031): 공통 입력 화면 틀 + 운영사 칸 정의만 둔다
+export function CompanyForm({
+  initial,
+  readOnly,
+}: {
+  initial: CompanyInput
+  // 수정 권한이 없으면 읽기 전용
+  readOnly: boolean
+}) {
+  const form = useMasterForm({
+    initial,
+    schema: companySchema,
+    save: saveCompanyAction,
+    afterSave: toFormValues,
+  })
+  const { value, set, errors } = form
+  const disabled = readOnly || form.pending
+  const id = (key: string) => `company-${key}`
+  // 공통 속성: 칸 id, 오류 표시, 잠금
+  const props = (key: string) => ({
+    id: id(key),
+    disabled,
+    'aria-invalid': Boolean(errors[key]),
+  })
 
-  const set = (patch: Partial<CompanyInput>) => setForm((previous) => ({ ...previous, ...patch }))
-  const setContact = (index: number, patch: Partial<CompanyContactInput>) =>
-    set({ contacts: form.contacts.map((c, i) => (i === index ? { ...c, ...patch } : c)) })
-
-  function submit(event: React.FormEvent) {
-    event.preventDefault()
-    setMessage(null)
-    const parsed = companySchema.safeParse(form)
-    if (!parsed.success) {
-      setErrors(
-        Object.fromEntries(
-          parsed.error.issues.map((issue) => [issue.path.join('.'), issue.message]),
-        ),
-      )
-      setMessage({ ok: false, text: '입력값을 확인해 주세요.' })
-      return
-    }
-    setErrors({})
-    startTransition(async () => {
-      const result = await saveCompanyAction(form)
-      if (!result.ok) {
-        setErrors(
-          Object.fromEntries(
-            Object.entries(result.error.fieldErrors ?? {}).map(([key, list]) => [key, list[0]]),
-          ),
-        )
-        setMessage({ ok: false, text: result.error.message })
-        return
-      }
-      // 저장된 모양(번호는 하이픈을 붙여 다시 표시, 이메일 소문자, 공백 제거)으로 입력값을 맞추고 '마지막 수정'을 새로 읽는다
-      setForm(toFormValues(parsed.data))
-      router.refresh()
-      setMessage({ ok: true, text: '저장했습니다.' })
-    })
-  }
-
-  const disabled = readOnly || pending
-  // 입력 칸 하나 (이름표·오류 포함)
-  const text = (
-    key: Exclude<keyof CompanyInput, 'contacts'>,
-    label: string,
-    options: {
-      required?: boolean
-      placeholder?: string
-      inputMode?: 'tel' | 'email' | 'numeric'
-    } = {},
-  ) => (
-    <FormField
-      label={label}
-      required={options.required}
-      error={errors[key]}
-      htmlFor={`company-${key}`}
-    >
-      <Input
-        id={`company-${key}`}
-        value={form[key]}
-        onChange={(e) => set({ [key]: e.target.value })}
-        disabled={disabled}
-        placeholder={options.placeholder}
-        inputMode={options.inputMode}
-        aria-invalid={Boolean(errors[key])}
-      />
-    </FormField>
+  const text = (key: TextKey, label: string, span: FieldSpan, required = false) => (
+    <Field label={label} span={span} required={required} error={errors[key]} htmlFor={id(key)}>
+      <Input {...props(key)} value={value[key]} onChange={(e) => set({ [key]: e.target.value })} />
+    </Field>
   )
 
   return (
-    <form onSubmit={submit} className="space-y-6">
-      {/* 왼쪽: 회사 정보(기본·연락처·주소) / 오른쪽: 담당자 (최대 5명이라 길어질 수 있어 따로) */}
-      <FormColumns
-        left={
-          <>
-            <FormSection title="기본 정보">
-              {text('name', '회사명', { required: true })}
-              <FormRow>
-                {text('businessNumber', '사업자등록번호', {
+    <MasterFormPage
+      form={form}
+      readOnly={readOnly}
+      sections={[
+        {
+          id: 'basic',
+          title: '기본 정보',
+          content: (
+            <FormGrid>
+              {text('name', '회사명', 8, true)}
+              <Field
+                label="사업자등록번호"
+                span={4}
+                required
+                error={errors.businessNumber}
+                htmlFor={id('businessNumber')}
+              >
+                <BizNoInput
+                  {...props('businessNumber')}
+                  value={value.businessNumber}
+                  onChange={(businessNumber) => set({ businessNumber })}
+                />
+              </Field>
+              {text('ceoName', '대표자', 4)}
+              {text('businessType', '업태', 4)}
+              {text('businessItem', '종목', 4)}
+            </FormGrid>
+          ),
+        },
+        {
+          id: 'contact',
+          title: '연락처·주소',
+          content: (
+            <FormGrid>
+              <Field label="대표 전화" span={4} error={errors.phone} htmlFor={id('phone')}>
+                <PhoneInput
+                  {...props('phone')}
+                  placeholder="02-123-4567"
+                  value={value.phone}
+                  onChange={(phone) => set({ phone })}
+                />
+              </Field>
+              <Field label="팩스" span={4} error={errors.fax} htmlFor={id('fax')}>
+                <PhoneInput
+                  {...props('fax')}
+                  placeholder="02-123-4568"
+                  value={value.fax}
+                  onChange={(fax) => set({ fax })}
+                />
+              </Field>
+              <Field label="대표 이메일" span={8} error={errors.email} htmlFor={id('email')}>
+                <EmailInput
+                  {...props('email')}
+                  value={value.email}
+                  onChange={(e) => set({ email: e.target.value })}
+                />
+              </Field>
+              <Field label="주소" span={12} htmlFor={id('address-address')}>
+                <AddressInput
+                  idPrefix={id('address')}
+                  value={{
+                    zipCode: value.zipCode,
+                    address: value.address,
+                    addressDetail: value.addressDetail,
+                  }}
+                  onChange={(address) => set(address)}
+                  disabled={disabled}
+                  errors={{
+                    zipCode: errors.zipCode,
+                    address: errors.address,
+                    addressDetail: errors.addressDetail,
+                  }}
+                />
+              </Field>
+            </FormGrid>
+          ),
+        },
+        {
+          id: 'contacts',
+          title: `담당자 (${value.contacts.length}/${MAX_COMPANY_CONTACTS})`,
+          description: '연락처와 이메일 중 하나는 필수, 담당자가 있으면 대표 1명을 정합니다.',
+          content: (
+            <EditableSubTable
+              name="contacts"
+              rows={value.contacts}
+              onChange={(contacts) => set({ contacts })}
+              columns={[
+                {
+                  key: 'duty',
+                  label: '담당 업무',
                   required: true,
-                  placeholder: '000-00-00000',
-                  inputMode: 'numeric',
-                })}
-                {text('ceoName', '대표자')}
-              </FormRow>
-              <FormRow>
-                {text('businessType', '업태')}
-                {text('businessItem', '종목')}
-              </FormRow>
-            </FormSection>
-
-            <FormSection title="연락처">
-              <FormRow>
-                {text('phone', '대표 전화', { placeholder: '02-123-4567', inputMode: 'tel' })}
-                {text('fax', '팩스', { placeholder: '02-123-4568', inputMode: 'tel' })}
-              </FormRow>
-              {text('email', '대표 이메일', { inputMode: 'email' })}
-            </FormSection>
-
-            <FormSection title="주소">
-              <AddressInput
-                idPrefix="company-address"
-                value={{
-                  zipCode: form.zipCode,
-                  address: form.address,
-                  addressDetail: form.addressDetail,
-                }}
-                onChange={(address) => set(address)}
-                disabled={disabled}
-                errors={{
-                  zipCode: errors.zipCode,
-                  address: errors.address,
-                  addressDetail: errors.addressDetail,
-                }}
-              />
-            </FormSection>
-          </>
-        }
-        right={
-          <>
-            <FormSection
-              title={`담당자 (${form.contacts.length}/${MAX_COMPANY_CONTACTS})`}
-              action={
-                !readOnly && (
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    disabled={pending || form.contacts.length >= MAX_COMPANY_CONTACTS}
-                    onClick={() => set({ contacts: [...form.contacts, { ...EMPTY_CONTACT }] })}
-                  >
-                    <PlusIcon />
-                    담당자 추가
-                  </Button>
-                )
-              }
-            >
-              {form.contacts.length === 0 ? (
-                <p className="text-sm text-muted-foreground">등록된 담당자가 없습니다.</p>
-              ) : (
-                <ul className="space-y-3">
-                  {form.contacts.map((contact, index) => {
-                    const field = (key: keyof CompanyContactInput) => `contacts.${index}.${key}`
-                    const contactInput = (
-                      key: keyof CompanyContactInput,
-                      label: string,
-                      required = false,
-                      inputMode?: 'tel' | 'email',
-                    ) => (
-                      <FormField
-                        label={label}
-                        required={required}
-                        error={errors[field(key)]}
-                        htmlFor={`company-${field(key)}`}
-                      >
-                        <Input
-                          id={`company-${field(key)}`}
-                          value={contact[key]}
-                          onChange={(e) => setContact(index, { [key]: e.target.value })}
-                          disabled={disabled}
-                          inputMode={inputMode}
-                          aria-invalid={Boolean(errors[field(key)])}
-                        />
-                      </FormField>
-                    )
-                    return (
-                      <li
-                        key={index}
-                        aria-label={`담당자 ${index + 1}`}
-                        className="space-y-3 rounded-md border p-3"
-                      >
-                        {/* 카드 머리: 순번 + 삭제 */}
-                        <div className="flex items-center justify-between">
-                          <span className="text-sm font-medium text-muted-foreground">
-                            담당자 {index + 1}
-                          </span>
-                          {!readOnly && (
-                            <Button
-                              type="button"
-                              variant="ghost"
-                              size="icon-sm"
-                              aria-label={`담당자 ${index + 1} 삭제`}
-                              disabled={pending}
-                              onClick={() => {
-                                set({ contacts: form.contacts.filter((_, i) => i !== index) })
-                                setErrors({})
-                              }}
-                            >
-                              <Trash2Icon />
-                            </Button>
-                          )}
-                        </div>
-                        {/* 반쪽 너비 안이라 두 칸씩: 업무·이름 / 연락처·이메일 */}
-                        <div className="grid items-start gap-3 sm:grid-cols-2">
-                          {contactInput('duty', '담당 업무', true)}
-                          {contactInput('name', '담당자명', true)}
-                          {contactInput('phone', '연락처', false, 'tel')}
-                          {contactInput('email', '이메일', false, 'email')}
-                        </div>
-                      </li>
-                    )
-                  })}
-                </ul>
-              )}
-              {errors.contacts && (
-                <p role="alert" className="text-xs text-destructive">
-                  {errors.contacts}
-                </p>
-              )}
-            </FormSection>
-          </>
-        }
-      />
-
-      <div className="flex items-center justify-end gap-3">
-        {message && (
-          <p
-            role={message.ok ? 'status' : 'alert'}
-            className={message.ok ? 'text-sm text-success' : 'text-sm text-destructive'}
-          >
-            {message.text}
-          </p>
-        )}
-        {!readOnly && (
-          <Button type="submit" disabled={pending}>
-            <SaveIcon />
-            {pending ? '저장 중…' : '저장'}
-          </Button>
-        )}
-      </div>
-    </form>
+                  width: '8.5rem',
+                  input: { codeGroup: CONTACT_DUTY_GROUP },
+                },
+                { key: 'name', label: '담당자명', required: true, width: '8rem' },
+                { key: 'phone', label: '연락처', width: '10rem', input: 'phone' },
+                { key: 'email', label: '이메일', input: 'email' },
+              ]}
+              createRow={() => ({ ...EMPTY_CONTACT })}
+              maxRows={MAX_COMPANY_CONTACTS}
+              primary={{ key: 'isPrimary', label: '대표' }}
+              errors={errors}
+              addLabel="담당자 추가"
+              emptyText="등록된 담당자가 없습니다."
+              disabled={disabled}
+            />
+          ),
+        },
+      ]}
+    />
   )
 }

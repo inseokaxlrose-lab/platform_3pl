@@ -54,3 +54,24 @@ export async function createTestUser(username: string, options: TestUserOptions 
     },
   })
 }
+
+// 공통코드 그룹 + 코드 (DB 테스트는 표를 비우고 시작하므로 필요한 코드를 직접 만든다)
+export function createTestCodeGroup(
+  code: string,
+  items: { code: string; name?: string; isActive?: boolean }[],
+) {
+  return prisma.codeGroup.create({
+    data: {
+      code,
+      name: code,
+      items: {
+        create: items.map((item, index) => ({
+          code: item.code,
+          name: item.name ?? item.code,
+          isActive: item.isActive ?? true,
+          sortOrder: index,
+        })),
+      },
+    },
+  })
+}

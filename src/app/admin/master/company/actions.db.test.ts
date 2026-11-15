@@ -4,7 +4,7 @@ import { COMPANY_ID, getCompany } from '@/lib/company/company'
 import type { CompanyInput } from '@/lib/company/company-schema'
 import { prisma } from '@/lib/prisma'
 import { getCurrentPermissions, getCurrentUser } from '@/lib/session'
-import { createTestUser } from '@/test/factories'
+import { createTestCodeGroup, createTestUser } from '@/test/factories'
 import { resetDatabase } from '@/test/reset-database'
 import { saveCompanyAction } from './actions'
 
@@ -39,8 +39,14 @@ const input = (overrides: Partial<CompanyInput> = {}): CompanyInput => ({
   address: '서울 강남구 테헤란로 1',
   addressDetail: '3층',
   contacts: [
-    { duty: '입고 문의', name: '김입고', phone: '010-1111-2222', email: 'in@example.com' },
-    { duty: '정산', name: '이정산', phone: '', email: '' },
+    {
+      duty: 'INBOUND',
+      name: '김입고',
+      phone: '010-1111-2222',
+      email: 'in@example.com',
+      isPrimary: true,
+    },
+    { duty: 'SETTLEMENT', name: '이정산', phone: '', email: 'pay@example.com', isPrimary: false },
   ],
   ...overrides,
 })
@@ -48,6 +54,12 @@ const input = (overrides: Partial<CompanyInput> = {}): CompanyInput => ({
 beforeEach(async () => {
   await resetDatabase()
   adminId = (await createTestUser('boss', { userType: 'OPERATOR' })).id
+  await createTestCodeGroup('CONTACT_DUTY', [
+    { code: 'INBOUND' },
+    { code: 'OUTBOUND' },
+    { code: 'SETTLEMENT' },
+    { code: 'OLD', isActive: false },
+  ])
   signIn(['master.company.read', 'master.company.update'])
 })
 
@@ -67,9 +79,11 @@ describe('운영사 정보 저장', () => {
       email: null,
       updatedById: adminId,
     })
-    expect(company?.contacts.map((c) => [c.sortOrder, c.name, c.email])).toEqual([
-      [0, '김입고', 'in@example.com'],
-      [1, '이정산', null],
+    expect(
+      company?.contacts.map((c) => [c.sortOrder, c.duty, c.name, c.phone, c.isPrimary]),
+    ).toEqual([
+      [0, 'INBOUND', '김입고', '01011112222', true],
+      [1, 'SETTLEMENT', '이정산', null, false],
     ])
   })
 
@@ -78,7 +92,9 @@ describe('운영사 정보 저장', () => {
     await saveCompanyAction(
       input({
         name: '새이름물류',
-        contacts: [{ duty: '출고 문의', name: '박출고', phone: '', email: '' }],
+        contacts: [
+          { duty: 'OUTBOUND', name: '박출고', phone: '010-1234-5678', email: '', isPrimary: true },
+        ],
       }),
     )
 
@@ -99,6 +115,45 @@ describe('운영사 정보 저장', () => {
       },
     })
     expect(await getCompany()).toBeNull()
+  })
+
+  it('담당 업무: 없는 코드·사용 중지 코드는 거부, 이미 저장돼 있던 사용 중지 코드는 그대로 둘 수 있다', async () => {
+    const contact = { name: '김', phone: '', email: 'a@example.com', isPrimary: true }
+    expect(
+      await saveCompanyAction(input({ contacts: [{ ...contact, duty: 'NOPE' }] })),
+    ).toMatchObject({ ok: false, error: { message: expect.stringContaining('NOPE') } })
+    expect(
+      await saveCompanyAction(input({ contacts: [{ ...contact, duty: 'OLD' }] })),
+    ).toMatchObject({ ok: false, error: { message: expect.stringContaining('OLD') } })
+
+    // 저장한 뒤 코드를 사용 중지해도, 그 담당자를 그대로 두고 다시 저장할 수 있다
+    await saveCompanyAction(input({ contacts: [{ ...contact, duty: 'OUTBOUND' }] }))
+    await prisma.codeItem.updateMany({ where: { code: 'OUTBOUND' }, data: { isActive: false } })
+    expect(
+      await saveCompanyAction(
+        input({ name: '바뀜', contacts: [{ ...contact, duty: 'OUTBOUND' }] }),
+      ),
+    ).toMatchObject({ ok: true })
+  })
+
+  it('담당자 규칙: 연락처·이메일 중 하나, 대표 1명', async () => {
+    const result = await saveCompanyAction(
+      input({
+        contacts: [
+          { duty: 'INBOUND', name: '김', phone: '', email: '', isPrimary: false },
+          { duty: 'INBOUND', name: '이', phone: '', email: 'b@example.com', isPrimary: false },
+        ],
+      }),
+    )
+    expect(result).toMatchObject({
+      ok: false,
+      error: {
+        fieldErrors: {
+          'contacts.0.phone': [expect.stringContaining('하나는')],
+          contacts: ['대표 담당자를 1명 정해 주세요.'],
+        },
+      },
+    })
   })
 
   it('수정 권한이 없으면 거부한다 (조회 권한만으로는 안 됨)', async () => {

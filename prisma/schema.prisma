@@ -365,11 +365,13 @@ model CompanyContact {
   id        String  @id @default(cuid())
   companyId String
   sortOrder Int
-  // 담당 업무 (예: 입고 문의, 정산)
+  // 담당 업무: 공통코드 CONTACT_DUTY의 코드 (예: INBOUND, 0030)
   duty      String
   name      String
   phone     String?
   email     String?
+  // 대표 담당자 (담당자가 있으면 정확히 1명)
+  isPrimary Boolean @default(false)
   company   Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
 
   @@index([companyId, sortOrder])
