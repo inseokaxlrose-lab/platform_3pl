@@ -1,13 +1,13 @@
 import 'server-only'
 import { ActionError } from '@/lib/actions/action-error'
-import { requireOperatorId } from '@/lib/actor'
+import { currentActor, requireOperatorId } from '@/lib/actor'
 import { nextDocumentNumber } from '@/lib/documents/doc-no'
 import { effectiveItemOptions } from '@/lib/items/item-schema'
 import { prisma, type Db } from '@/lib/prisma'
 import { assertRowVersion, withVersionGuard } from '@/lib/row-version'
 import { scopeFilter, type DataScope } from '@/lib/scope/data-scope'
 import { ACTIVE_ONLY, DELETED_ONLY, isActiveStatus } from '@/lib/status'
-import { checkQtyDecimals, toBaseQty } from '@/lib/units/convert'
+import { checkQtyDecimals, parseQty, qtyText, toBaseQty } from '@/lib/units/convert'
 import { isYes } from '@/lib/yn'
 import type { AsnCreateData, AsnData } from './asn-schema'
 
@@ -236,4 +236,53 @@ export async function deleteAsns(ids: bigint[]) {
     data: DELETED_ONLY,
   })
   return { count }
+}
+
+// 잔량 마감 (0052): 더 도착하지 않을 잔량을 사유와 함께 마감한다
+// - 마감할 수 있는 상태: 예정·검수중·부분확정 (확정완료·마감은 불가), 잔량이 하나라도 있어야 한다
+// - 줄마다 지금 잔량(예정 − 누적 확정, 0 이상)을 마감 수량으로 남긴다 (보고서용)
+// - 마감 후에는 검수·확정 불가, 이미 확정된 재고의 적치는 계속 가능 (0003 결정 5)
+export async function closeAsn(id: bigint, rowVersion: number, reason: string) {
+  const text = reason.trim()
+  if (!text) throw new ActionError('VALIDATION', '마감 사유를 입력해 주세요.')
+  if (text.length > 200) throw new ActionError('VALIDATION', '마감 사유는 200자까지입니다.')
+  return prisma.$transaction(async (tx) => {
+    const found = await tx.asn.findUnique({
+      where: { id },
+      select: {
+        rowVersion: true,
+        status: true,
+        lines: { select: { id: true, expectedQty: true, confirmedQty: true } },
+      },
+    })
+    assertRowVersion(found, rowVersion, 'ASN을 찾을 수 없습니다.')
+    const asn = found!
+    if (asn.status === 'CLOSED') throw new ActionError('CONFLICT', '이미 마감된 ASN입니다.')
+    if (asn.status === 'COMPLETED') {
+      throw new ActionError('CONFLICT', '확정완료된 ASN은 마감할 잔량이 없습니다.')
+    }
+    const remains = asn.lines.map((line) => {
+      const left = parseQty(line.expectedQty.toString()) - parseQty(line.confirmedQty.toString())
+      return { id: line.id, closedQty: left > 0n ? qtyText(left) : '0' }
+    })
+    if (remains.every((r) => r.closedQty === '0')) {
+      throw new ActionError('CONFLICT', '마감할 잔량이 없습니다.')
+    }
+    const saved = await withVersionGuard(() =>
+      tx.asn.update({
+        where: { id, rowVersion },
+        data: {
+          status: 'CLOSED',
+          closeReason: text,
+          closedAt: new Date(),
+          closedBy: currentActor(),
+        },
+        select: { id: true, asnNo: true, rowVersion: true },
+      }),
+    )
+    for (const r of remains) {
+      await tx.asnLine.update({ where: { id: r.id }, data: { closedQty: r.closedQty } })
+    }
+    return saved
+  })
 }
