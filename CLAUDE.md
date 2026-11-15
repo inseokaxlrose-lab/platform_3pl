@@ -40,6 +40,7 @@ Next.js (App Router) · TypeScript · PostgreSQL · Prisma · Tailwind + shadcn/
 ## UI 규칙
 
 - 최신 트렌드의 깔끔한 UI: shadcn/ui + Tailwind 디자인 토큰만 사용 (임의 색상값 하드코딩 금지)
+- **목록 화면은 `MasterListPage` + `useListQuery` + 검색 조건 정의(`SearchFieldDef[]`) + 컬럼 정의로 만든다** (`src/components/master-list/`, `docs/ui-guidelines.md` "목록·검색 화면", `docs/decisions/0032`). 서버 액션 입력은 `listQuerySchema`, 조건 해석은 `src/lib/grid/list-filters.ts`. 화면별 페이징·URL 처리·엑셀 구현 금지.
 - **목록 화면은 반드시 공통 `DataGrid`(`src/components/data-grid/`)를 사용**한다. `<table>`이나 TanStack Table을 화면에서 직접 쓰지 않는다.
 - 그리드에 필요한 기능이 없으면 화면에서 우회하지 말고 `DataGrid`에 기능을 추가하고, `/dev/grid` 쇼케이스에도 반영한다.
 - 목록 그리드의 상태는 `useDataGridState('그리드-id')`로 만들고 `<DataGrid id>`에 같은 id를 준다 → 사용자별 설정(숨김·순서·너비·건수·정렬)이 자동 저장된다 (`docs/decisions/0021`)

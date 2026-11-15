@@ -123,3 +123,131 @@ return (
 - 브라우저 **[뒤로]** 버튼은 막지 못한다 (App Router에 이동 직전 알림이 없음). 링크 클릭·새로고침·창 닫기만 확인한다.
 - `DateInput`은 브라우저 기본 날짜 칸이다. 달력 디자인이 필요해지면 shadcn calendar로 바꾼다 (사용법은 그대로).
 - 사용자·권한그룹·센터·창고 화면은 아직 예전 `FormColumns` 배치다. 다음 작업에서 이 틀로 옮긴다.
+
+---
+
+# 목록·검색 화면 가이드
+
+센터·화주사·품목·거래처처럼 **여러 건을 찾아보는 목록 화면**은 모두 이 틀로 만든다.
+
+- 부품 견본: `/dev/components` 아래쪽 "목록·검색 화면 틀"
+- 결정 기록: `docs/decisions/0032-master-list.md`
+- 첫 적용 예: `src/app/admin/master/centers/centers-list.tsx`
+
+## 1. 새 목록 화면을 만드는 순서
+
+1. **서버 액션**: 입력은 `listQuerySchema`, 조건은 `list-filters.ts` 함수로 해석, 페이지·정렬·검색어는 `toPrismaQuery`.
+
+```ts
+export const listCentersAction = createAction({
+  permission: 'master.centers.read',
+  input: listQuerySchema, // { pageIndex, pageSize, sorting, search, filters, exportAll? }
+  handler: async ({ input, scope, permissions }) => {
+    if (input.exportAll && !permissions.has('master.centers.export')) throw new ActionError('FORBIDDEN', '…')
+    const { filters } = input
+    const query = toPrismaQuery(input, { searchFields: ['code', 'name'], sortable: { … }, defaultOrderBy: { code: 'asc' } })
+    const where = {
+      AND: [
+        query.where,
+        scopeFilter(scope, CENTER_SCOPE), // 데이터 범위는 항상
+        filters.status === 'ACTIVE' ? { isActive: true } : {},
+        digitsFilter(filters, 'phone') ? { phone: digitsFilter(filters, 'phone') } : {},
+      ],
+    }
+    // … findMany({ ...query, where }) + count({ where }) → { rows, rowCount }
+  },
+})
+```
+
+2. **화면 파일**(`*-list.tsx`)에는 검색 조건 정의 + 컬럼 정의 + 조회 함수 + 화면 전용 로직(일괄 처리 등)만.
+
+```tsx
+const SEARCH_FIELDS: SearchFieldDef[] = [
+  { key: 'keyword', label: '검색어', type: 'keyword', span: 4 },
+  { key: 'status', label: '상태', type: 'segment', options: [{ value: 'ACTIVE', label: '사용' }, …] },
+  { key: 'createdAt', label: '등록일', type: 'dateRange', span: 6, detail: true },
+]
+const COLUMNS: DataGridColumn<Row>[] = [
+  { id: 'code', header: '센터 코드', accessor: 'code', pinned: true, href: (r) => `/…/${r.id}` },
+  { id: 'phone', header: '대표 전화', accessor: 'phone', format: 'phone' },
+  { id: 'updatedAt', header: '수정일시', accessor: 'updatedAt', format: 'datetime', defaultHidden: true },
+]
+
+export function CentersList({ actions, canExport }) {
+  const list = useListQuery<Row>({ gridId: 'master-centers', fields: SEARCH_FIELDS, fetch: listCentersAction })
+  return (
+    <MasterListPage title="센터" actions={actions} gridId="master-centers" searchFields={SEARCH_FIELDS}
+      list={list} columns={COLUMNS} getRowId={(r) => r.id} rowHref={(r) => `/…/${r.id}`}
+      excelName={canExport ? '센터' : undefined} />
+  )
+}
+```
+
+3. **page.tsx**는 권한을 확인해 버튼·엑셀·일괄 처리 여부만 넘긴다. 상세·수정 화면 머리에는 `<BackToListButton listPath="/admin/master/centers" />`.
+4. 정적 페이지에서 쓰면 `useSearchParams` 때문에 `<Suspense>`로 감싼다 (로그인 화면들은 이미 동적이라 필요 없음).
+
+`MasterListPage`·`useListQuery`가 맡는 것 (화면에서 따로 만들지 않는다):
+
+| 동작 | 내용 |
+| --- | --- |
+| URL 동기화 | `?q=…&status=…&page=2&size=50&sort=name.desc` — 기본값은 넣지 않음. 상세에 갔다 뒤로 와도, 주소를 공유해도 같은 결과 |
+| 조회 | [조회]·Enter로만 적용, 조건이 바뀌면 1페이지로. 마지막 요청의 응답만 쓰고 같은 요청이 진행 중이면 다시 보내지 않음 |
+| 자동 조회 | 기본은 들어오자마자 조회. 건수가 아주 많은 화면은 `autoSearch: false` |
+| 스크롤 | 목록 주소별로 기억했다가 돌아오면 데이터를 그린 뒤 되돌림 |
+| 상태 | 로딩(뼈대), 결과 없음(조건이 있으면 [조건 초기화]), 오류([다시 시도]) |
+| 결과 툴바 | 선택 건수, 일괄 처리 버튼(선택이 없으면 꺼짐), [엑셀], 행 높이, [컬럼] / 아래에 총 건수·범위·건수 선택·페이지 이동 |
+| 컬럼 설정 | 사용자별 숨김·순서·너비·건수·정렬 서버 저장 (0021), [기본값 되돌리기] |
+
+## 2. 검색 조건 종류
+
+| type | 입력 | URL 값 | 서버 해석 |
+| --- | --- | --- | --- |
+| keyword | 통합 검색어 (화면에 하나) | `q` | `toPrismaQuery`의 `searchFields` |
+| text | 글자 | 그대로 | `textFilter` |
+| bizNo / phone | 번호 마스크, 하이픈 넣어도 숫자로 | 숫자 | `digitsFilter` |
+| select / code | 하나 고르기 (code는 공통코드 그룹) | 값 | 그대로 비교 |
+| multi / codeMulti | 여러 개 고르기 | `A,B` | `codesFilter` |
+| segment | 버튼 묶음 (전체 / …) | 값 | 그대로 비교 |
+| yn | 전체 / 예 / 아니오 | `Y`·`N` | `ynFilter` |
+| dateRange | 기간 | `2026-11-01~2026-11-30` | `dateRangeFilter` (한국 날짜, 종료일 하루 포함) |
+| numberRange | 숫자 범위 | `10~100` | `numberRangeFilter` |
+| custom | 화면 전용 입력 (`render`) | 화면이 정함 | 화면이 정함 |
+
+- **기본 조건은 자주 쓰는 3~4개만**(보통 검색어 + 상태 + 1~2개). 나머지는 `detail: true`로 [상세 조건]에. 상세 조건을 쓰고 있으면 펼친 채로 시작하고 개수가 보인다.
+- span: 검색어 4, 나머지 3, 기간·숫자 범위 6. 기본 조건 줄에 남는 칸이 3칸 이상이면 버튼이 그 자리에 붙는다.
+
+## 3. cellType(컬럼 format)과 정렬
+
+| format | 표시 | 기본 정렬 |
+| --- | --- | --- |
+| (없음) / `'text'` | 그대로, 길면 말줄임 + 마우스를 올리면 전체 | 왼쪽 |
+| `{ code: 그룹 }` | 공통코드 → 이름 | 가운데 |
+| `{ status: … }` | 상태 배지 | 가운데 |
+| `'bizNo'` / `'phone'` | 하이픈 | 가운데 |
+| `'date'` / `'datetime'` | 2026-11-15 / 2026-11-15 14:05 | 가운데 |
+| `'number'` / `{ number: { decimals, unit } }` | 쉼표, 소수, 단위 | 오른쪽 |
+| `'yn'` | 예 / 아니오 배지 | 가운데 |
+| `href` (컬럼 속성) | 링크 (코드 → 상세) | — |
+| `cell` (컬럼 속성) | 화면 전용 렌더러 | — |
+
+- 그 밖의 컬럼 속성: `pinned`(왼쪽 고정, 코드·명칭), `defaultHidden`(처음 숨김), `hideable: false`, `width`, `sortable`.
+- 엑셀은 같은 format으로 변환한다 (숫자는 숫자 칸, 코드·상태는 이름, 번호는 하이픈).
+
+## 4. 목록 API 공통 형식
+
+```
+요청 (listQuerySchema): { pageIndex: 0부터, pageSize: 20|50|100, sorting: [{ id, desc }], search, filters: { 키: 글자 }, exportAll?: true }
+응답: { rows: [...], rowCount: 전체 건수 }
+```
+
+- 서버 페이징·서버 정렬이 기본. 정렬은 서버의 `sortable` 목록에 있는 컬럼만 적용된다.
+- **엑셀**: `exportAll: true`면 페이지 대신 조건에 맞는 전체(최대 `EXPORT_LIMIT` = 1만 건)를 준다. 엑셀 권한(`메뉴.export`)을 서버에서 다시 확인한다. 파일은 브라우저가 exceljs로 만든다(`화면명_YYYYMMDD_HHmm.xlsx`).
+- **1만 건이 넘는 엑셀(제안, 아직 안 만듦)**: 서버 작업으로 파일을 만들어 저장소에 두고, 다 되면 알림·내려받기 링크를 주는 방식. 그때는 브라우저에서 행을 받지 않는다.
+- **데이터 범위**: 운영사 1곳 전용이라 tenant 조건은 없다. 센터·화주 범위는 각 서버 액션에서 `scopeFilter`로 반드시 건다 (공통 계층 자동 적용이 아님 — DB 테스트로 확인).
+
+## 5. 하지 말 것
+
+- 화면별 자체 페이징·URL 처리·`useEffect` 조회 (→ `useListQuery`)
+- 전체를 받아 화면에서 거르기 (→ 서버 조건)
+- 화면별 엑셀 구현 (→ `excelName` + `exportAll`)
+- 검색 조건을 기본 영역에 다 늘어놓기 (→ 자주 쓰는 3~4개만, 나머지 `detail`)
