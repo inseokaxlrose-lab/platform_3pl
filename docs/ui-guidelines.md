@@ -53,7 +53,7 @@
 
 - 부품 견본: `/dev/components` (개발 서버에서만)
 - 결정 기록: `docs/decisions/0031-master-form.md`, 번호 저장 `0029`, 공통코드 `0030`
-- 첫 적용 예: `src/app/admin/master/company/company-form.tsx`
+- 적용 예: `src/components/operator/operator-form.tsx` (운영사 — 플랫폼 편집·운영사 자기 화면 공용), `src/app/admin/master/centers/center-form.tsx`
 
 ## 1. 새 화면을 만드는 순서
 
@@ -200,7 +200,8 @@ export const listCentersAction = createAction({
       AND: [
         query.where,
         scopeFilter(scope, CENTER_SCOPE), // 데이터 범위는 항상
-        filters.status === 'ACTIVE' ? { isActive: true } : {},
+        statusWhere(filters), // 상태 status_cd (사용 / 사용 중지, 0038)
+        deletedWhere(filters), // "삭제됨" 보기 (지울 수 있는 목록만)
         digitsFilter(filters, 'phone') ? { phone: digitsFilter(filters, 'phone') } : {},
       ],
     }
@@ -293,7 +294,7 @@ export function CentersList({ actions, canExport }) {
 - 서버 페이징·서버 정렬이 기본. 정렬은 서버의 `sortable` 목록에 있는 컬럼만 적용된다.
 - **엑셀**: `exportAll: true`면 페이지 대신 조건에 맞는 전체(최대 `EXPORT_LIMIT` = 1만 건)를 준다. 엑셀 권한(`메뉴.export`)을 서버에서 다시 확인한다. 파일은 브라우저가 exceljs로 만든다(`화면명_YYYYMMDD_HHmm.xlsx`).
 - **1만 건이 넘는 엑셀(제안, 아직 안 만듦)**: 서버 작업으로 파일을 만들어 저장소에 두고, 다 되면 알림·내려받기 링크를 주는 방식. 그때는 브라우저에서 행을 받지 않는다.
-- **데이터 범위**: 운영사 1곳 전용이라 tenant 조건은 없다. 센터·화주 범위는 각 서버 액션에서 `scopeFilter`로 반드시 건다 (공통 계층 자동 적용이 아님 — DB 테스트로 확인).
+- **데이터 범위**: 각 서버 액션에서 `scopeFilter`(센터·화주로 나누는 데이터) 또는 `operatorFilter`(운영사 공통 데이터: 단위·공통코드·권한그룹·사용자)로 반드시 건다. 운영사 조건은 `scopeFilter`가 자동으로 넣고, 서버 액션 안에서는 Prisma 안전망도 한 번 더 거른다 (멀티테넌트 두 겹, `docs/decisions/0039`). 화면 조회 함수(`queries.ts`)는 안전망 밖이라 범위를 꼭 쓴다 — DB 테스트로 확인.
 
 ## 5. 하지 말 것
 
