@@ -22,36 +22,37 @@ datasource db {
 
 // 사용자 유형: 데이터 범위(볼 수 있는 데이터)를 정하는 기준
 enum UserType {
-  OPERATOR // 운영사 → 전체
+  OPERATOR // 운영사 관리자 → 자기 운영사 전체
   CENTER // 센터 운영자·작업자 → 소속 센터
   SHIPPER // 화주사 사용자 → 자기 화주사
+  PLATFORM // 플랫폼 관리자 → 운영사에 속하지 않음, /platform (운영사를 골라 그 운영사로 작업할 수 있다, 0039)
 }
 
 model User {
-  id              BigInt   @id @default(autoincrement()) @map("user_id")
-  // 운영사 (멀티테넌트: 같은 운영사 사람만 보고 고친다, docs/decisions/0039)
-  operatorId      BigInt   @map("operator_id")
-  operator        Operator @relation(fields: [operatorId], references: [id], onDelete: Restrict)
-  name            String   @map("user_nm")
+  id              BigInt    @id @default(autoincrement()) @map("user_id")
+  // 운영사 (멀티테넌트, 0039). 플랫폼 관리자만 비어 있고 나머지 유형은 반드시 있다 (DB 검사 조건 tb_user_operator_matches_type)
+  operatorId      BigInt?   @map("operator_id")
+  operator        Operator? @relation(fields: [operatorId], references: [id], onDelete: Restrict)
+  name            String    @map("user_nm")
   // 아이디 로그인을 쓰므로 이메일이 없는 사용자는 내부용 주소를 자동으로 채운다 (사용자 관리 작업에서)
   email           String
-  emailVerified   Boolean  @default(false) @map("email_verified")
+  emailVerified   Boolean   @default(false) @map("email_verified")
   image           String?
-  createdAt       DateTime @default(now()) @map("created_at")
-  updatedAt       DateTime @updatedAt @map("updated_at")
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
   // 등록·수정한 사람 아이디(username, 자동: 현재 작업자 / 시드 seed / 기존 데이터 system), 동시 수정 막기용 버전 (docs/db-conventions.md 공통 칸)
-  createdBy       String   @default("system") @map("created_by") @db.VarChar(50)
-  updatedBy       String   @default("system") @map("updated_by") @db.VarChar(50)
-  rowVersion      Int      @default(1) @map("row_version")
+  createdBy       String    @default("system") @map("created_by") @db.VarChar(50)
+  updatedBy       String    @default("system") @map("updated_by") @db.VarChar(50)
+  rowVersion      Int       @default(1) @map("row_version")
   // 로그인 아이디 (username 플러그인)
   username        String?
-  displayUsername String?  @map("display_username")
-  userType        UserType @map("user_type_cd")
+  displayUsername String?   @map("display_username")
+  userType        UserType  @map("user_type_cd")
   // false면 로그인·사용 불가 (퇴사자 등). 기록 보존을 위해 계정을 지우지 않고 막는다
-  status          String   @default("ACTIVE") @map("status_cd") @db.VarChar(10)
+  status          String    @default("ACTIVE") @map("status_cd") @db.VarChar(10)
   // 화주사 사용자의 소속 화주사 (화주사 사용자만, DB 검사 조건으로 강제: tb_user_shipper_matches_type)
-  shipperId       BigInt?  @map("shipper_id")
-  shipper         Shipper? @relation(fields: [shipperId], references: [id], onDelete: Restrict)
+  shipperId       BigInt?   @map("shipper_id")
+  shipper         Shipper?  @relation(fields: [shipperId], references: [id], onDelete: Restrict)
 
   sessions            Session[]
   accounts            Account[]
@@ -478,6 +479,9 @@ model Operator {
   createdBy      String            @default("system") @map("created_by") @db.VarChar(50)
   updatedBy      String            @default("system") @map("updated_by") @db.VarChar(50)
   rowVersion     Int               @default(1) @map("row_version")
+  // 운영사 상태 (공통코드 OPERATOR_STATUS): PENDING 대기 / ACTIVE 운영 / SUSPENDED 정지 / TERMINATED 해지
+  // ACTIVE가 아니면 그 운영사의 사용자는 로그인·사용할 수 없다 (플랫폼 관리자가 바꾼다, 0039)
+  status         String            @default("ACTIVE") @map("status_cd") @db.VarChar(20)
   contacts       OperatorContact[]
 
   // 이 운영사의 데이터 (운영사를 지울 수 없게 Restrict)
