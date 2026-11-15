@@ -25,6 +25,8 @@ type MasterListPageProps<TRow extends RowData> = {
   getRowId: (row: TRow) => string
   // 행을 누르면 갈 주소 (보통 상세·수정 화면)
   rowHref?: (row: TRow) => string
+  // 주소 이동 대신 화면 안에서 처리 (예: 수정 팝업 열기). rowHref보다 우선
+  onRowClick?: (row: TRow) => void
   // 일괄 처리 버튼: 주면 행 체크박스가 생긴다. 선택이 없으면 버튼을 끄고,
   // 처리 뒤 done()을 부르면 선택을 비우고 목록을 다시 읽는다
   bulkActions?: (selection: { ids: string[]; done: () => void }) => React.ReactNode
@@ -46,6 +48,7 @@ export function MasterListPage<TRow extends RowData>({
   columns,
   getRowId,
   rowHref,
+  onRowClick,
   bulkActions,
   excelName,
   emptyTitle = '조회된 데이터가 없습니다',
@@ -101,7 +104,7 @@ export function MasterListPage<TRow extends RowData>({
         enableRowSelection={Boolean(bulkActions)}
         onSelectionChange={setSelectedIds}
         toolbarActions={bulkActions?.({ ids: selectedIds, done })}
-        onRowClick={rowHref ? (row) => router.push(rowHref(row)) : undefined}
+        onRowClick={onRowClick ?? (rowHref ? (row) => router.push(rowHref(row)) : undefined)}
         exportExcel={excelName ? { fileName: excelName, fetchRows: list.fetchAll } : undefined}
         empty={empty}
       />

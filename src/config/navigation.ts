@@ -102,7 +102,7 @@ const adminNavigation: NavArea = {
           title: '단위',
           href: '/admin/master/units',
           icon: RulerIcon,
-          ready: false,
+          ready: true,
           permission: 'master.units.read',
         },
         {
