@@ -2,7 +2,7 @@
 
 - 상태: 1a(이름 바꾸기) **적용 완료** — 마이그레이션 `20261115075033_naming_convention` / 1b(BIGINT 키) **적용 완료** — `20261115083253_bigint_keys` / 1c(Y/N) **적용 완료** — `_yn_char`. 2단계(공통 칸)는 아래 규칙대로 진행 예정
 - 결정: 사용자 결정 2026-11-15 — 정의서 규칙을 모든 표에 적용, `_yn`은 CHAR(1) 'Y'/'N', 내부 키 BIGINT, 코드 쪽 이름은 camelCase 유지
-- 관련: `docs/specs/operator.md`(운영사 컬럼 정의서, 받는 대로 추가), 0037(명명 규칙)·0038(공통 칸)·0039(멀티테넌트) 예정
+- 관련: `docs/specs/operator.md`(운영사 컬럼 정의서), 0037(명명 규칙)·0038(공통 칸)·0039(멀티테넌트)
 
 ## 규칙
 
@@ -36,7 +36,6 @@
   | 폼 `afterSave` | 검사를 거친 값의 키는 bigint라 `String(...)`으로 되돌린다 |
   - Better Auth 표(user·session·account·verification)는 `advanced.database.generateId: 'serial'`로 DB가 키를 만든다. Better Auth가 주는 사용자 키는 글자라 `getCurrentUser`에서 `BigInt`로 바꾼다.
   - 서버 안에서만 부르는 함수(`createUserAccount` 등)는 bigint를 그대로 받는다.
-  - 운영사는 아직 1곳이라 고정 키 `1n`(`COMPANY_ID`) — 3단계 멀티테넌트에서 바뀐다.
 - 길이: 정의서의 VARCHAR(n)·CHAR(n)를 DB에도 `@db.VarChar(n)`로 둔다 (입력 규칙 최대 길이와 같게).
 
 ## 공통 칸 (모든 기준정보, 2단계)
@@ -62,6 +61,14 @@
   - 코드(이름) 고유는 삭제 안 된 것끼리만: Prisma `partialIndexes`(미리보기) `@@unique([...], where: raw("del_yn = 'N'"))`. 지운 코드는 새로 쓸 수 있다.
   - 되살리기: 목록 상태 거르기 "삭제됨"(`DELETED_STATUS_OPTION`, 서버 `deletedWhere`) → [되살리기](`RestoreButton`). 공통코드는 [지운 항목] 팝업. 권한은 삭제 권한과 같다. 같은 코드가 다시 쓰이고 있거나(배송권역은 담당 지역도) 부모(코드 그룹)가 지워졌으면 거부 (`src/lib/soft-delete.ts`). 외부 코드는 되살아나지 않는다.
 - **동시 수정 막기 (2a 적용)**: 수정 화면·팝업은 불러올 때의 `rowVersion`을 들고 있다가 저장 때 보낸다(`useMasterForm`의 `version`, 결과의 새 버전으로 자동 갱신). 서버는 `assertRowVersion` + 수정 조건에 버전(`where: { id, rowVersion }`) + `withVersionGuard`(`src/lib/row-version.ts`). 사용 중지·일괄 처리는 검사 없이 버전만 올린다.
+
+## 운영사 칸 `operator_id` (3단계 멀티테넌트, 0039)
+
+- 대상(11개 표): 사용자·권한그룹·센터·창고·로케이션·화주사·외부 코드·공통코드 그룹·공통코드·배송권역·단위. 하위 표는 부모를 따른다.
+- 고유 규칙은 같은 운영사 안에서만 (`@@unique([operatorId, code], …)`). 로그인 아이디·이메일은 전체에서 하나.
+- **서버 액션 안**: `createAction`이 운영사 출입증(`runInContext`, `src/lib/actor.ts`)을 만들고, `prisma.ts`가 11개 표의 읽기·수정·삭제에 지금 운영사 조건을 붙이고 등록에 운영사를 채운다. 새로 만드는 함수는 `requireOperatorId()`로 운영사를 받는다. 전체 고유 값(아이디·이메일) 중복 검사만 `acrossOperators()`.
+- **서버 액션 밖(화면 조회 함수)**: 자동 거르기가 없다 → `scopeFilter`(운영사 조건 자동)·`isInScope`(줄의 `operatorId` 검사 — `select`에 `operatorId`를 꼭 넣는다)·`operatorFilter(scope)`(센터·화주사로 나누지 않는 데이터)를 쓴다.
+- 주의: 안쪽 관계로 함께 만드는 줄(nested create)은 안전망이 채우지 못한다 → `operatorId`를 직접 넣는다. 범위 검사는 넘겨받은 값(`{ centerId }`)이 아니라 DB에서 읽은 줄로 한다.
 
 ## 표·칸 대응표 (1단계 — 지금 25개 표, 197개 칸)
 
