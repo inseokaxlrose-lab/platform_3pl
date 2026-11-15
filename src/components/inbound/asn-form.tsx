@@ -39,6 +39,7 @@ import {
   type AsnLineInput,
 } from '@/lib/inbound/asn-schema'
 import { formatQty, toBaseQty } from '@/lib/units/convert'
+import { AsnProgressGrid } from './asn-progress-grid'
 
 type SaveResult = { id: string; asnNo: string; rowVersion: number }
 
@@ -424,8 +425,16 @@ export function AsnForm({
     },
   ]
 
-  // 수정 화면에서만: 상태
+  // 수정 화면에서만: 진행 현황 + 상태
   if (asn) {
+    sections.push({
+      id: 'progress',
+      title: '진행 현황',
+      standalone: true,
+      description:
+        '품목별 예정·누적 확정·잔량·초과·적치 수량입니다 (기본단위). 초과는 예정보다 많이 받은 수량입니다.',
+      content: <AsnProgressGrid rows={asn.progress} />,
+    })
     sections.push({
       id: 'status',
       title: '상태',
@@ -441,6 +450,11 @@ export function AsnForm({
           <span className="text-muted-foreground">
             {asn.asnNo} · {ASN_CHANNEL_LABELS[asn.channel]} · {asn.center}
           </span>
+          {asn.status === 'CLOSED' && asn.closeReason && (
+            <span className="w-full text-muted-foreground">
+              마감 사유: {asn.closeReason} ({asn.closedBy})
+            </span>
+          )}
           {editable && canDelete && deleteAction && (
             <ConfirmDialog
               trigger={

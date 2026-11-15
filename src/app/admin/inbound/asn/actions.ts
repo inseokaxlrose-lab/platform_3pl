@@ -1,7 +1,10 @@
 'use server'
 
 import { z } from 'zod'
+import { ActionError } from '@/lib/actions/action-error'
 import { createAction } from '@/lib/actions/create-action'
+import { listQuerySchema } from '@/lib/grid/grid-query'
+import { listAsns } from '@/lib/inbound/asn-list'
 import { idSchema } from '@/lib/id'
 import { commitAsnUpload, previewAsnUpload } from '@/lib/inbound/asn-upload'
 import { uploadRowsSchema } from '@/lib/excel/upload'
@@ -15,6 +18,18 @@ import { assertInScope } from '@/lib/scope/data-scope'
 
 // 운영사 화면 · ASN 서버 액션 (docs/decisions/0048) — 센터 운영자의 대리 등록 (등록 경로 PROXY)
 // 데이터 범위: 운영사 관리자 = 전체, 센터 직원 = 소속 센터의 ASN (화주사는 그 센터를 이용해야 한다)
+
+// 목록 (엑셀 전체는 엑셀 권한 필요)
+export const listAsnsAction = createAction({
+  permission: 'inbound.asn.read',
+  input: listQuerySchema,
+  handler: async ({ input, scope, permissions }) => {
+    if (input.exportAll && !permissions.has('inbound.asn.export')) {
+      throw new ActionError('FORBIDDEN', '엑셀 내려받기 권한이 없습니다.')
+    }
+    return listAsns(input, scope)
+  },
+})
 
 // ASN 라인에서 고를 품목 (화주사를 고르면 불러온다)
 export const listAsnItemOptionsAction = createAction({

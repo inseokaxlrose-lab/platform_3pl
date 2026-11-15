@@ -7,6 +7,7 @@ import { ACTIVE_ONLY } from '@/lib/status'
 import { qtyText, parseQty } from '@/lib/units/convert'
 import { isYes } from '@/lib/yn'
 import type { AsnFormOptions, AsnItemOption } from './asn-options'
+import { lineProgress } from './asn-progress'
 import type { AsnInput } from './asn-schema'
 import { ASN_SCOPE } from './asns'
 
@@ -150,10 +151,8 @@ export async function getAsnForEdit(id: bigint, scope: DataScope) {
       lineNo: line.lineNo,
       item: `${line.item.name} (${line.item.code})`,
       baseUnit: line.item.baseUnit.code,
-      expectedQty: qty(line.expectedQty),
-      confirmedQty: qty(line.confirmedQty),
-      putawayQty: qty(line.putawayQty),
-      closedQty: qty(line.closedQty),
+      lotNo: line.lotNo,
+      ...lineProgress(line),
     })),
   })
 }

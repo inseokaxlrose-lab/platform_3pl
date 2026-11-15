@@ -3,7 +3,9 @@
 import { z } from 'zod'
 import { ActionError } from '@/lib/actions/action-error'
 import { createAction } from '@/lib/actions/create-action'
+import { listQuerySchema } from '@/lib/grid/grid-query'
 import { idSchema } from '@/lib/id'
+import { listAsns } from '@/lib/inbound/asn-list'
 import { commitAsnUpload, previewAsnUpload } from '@/lib/inbound/asn-upload'
 import { uploadRowsSchema } from '@/lib/excel/upload'
 import { asnSchema } from '@/lib/inbound/asn-schema'
@@ -20,6 +22,17 @@ function shipperOf(scope: DataScope): bigint {
     throw new ActionError('FORBIDDEN', '화주사 사용자만 쓸 수 있습니다.')
   return scope.shipperId
 }
+
+export const listPortalAsnsAction = createAction({
+  permission: 'portal.asn.read',
+  input: listQuerySchema,
+  handler: async ({ input, scope }) => {
+    shipperOf(scope)
+    // 포털에는 엑셀 권한이 없다
+    if (input.exportAll) throw new ActionError('FORBIDDEN', '엑셀 내려받기 권한이 없습니다.')
+    return listAsns(input, scope)
+  },
+})
 
 export const createPortalAsnAction = createAction({
   permission: 'portal.asn.create',
