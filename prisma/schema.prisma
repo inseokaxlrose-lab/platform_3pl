@@ -304,8 +304,8 @@ model Shipper {
   address        String?   @map("addr1")
   addressDetail  String?   @map("addr2")
   // 품목 기본값: 품목에서 그대로 쓰거나 개별 지정한다 (0003 결정 2)
-  useLot         Boolean   @default(false) @map("lot_mgmt_yn")
-  useExpiry      Boolean   @default(false) @map("expiry_mgmt_yn")
+  useLot         String    @default("N") @map("lot_mgmt_yn") @db.Char(1)
+  useExpiry      String    @default("N") @map("expiry_mgmt_yn") @db.Char(1)
   labelUnit      LabelUnit @default(PLT) @map("label_unit_cd")
   // false면 데이터 범위에서 빠진다 (소속 사용자도 데이터를 볼 수 없음)
   isActive       Boolean   @default(true) @map("is_active")
@@ -340,7 +340,7 @@ model ShipperContact {
   name      String  @map("contact_nm")
   phone     String? @map("tel_no")
   email     String?
-  isPrimary Boolean @default(false) @map("primary_yn")
+  isPrimary String  @default("N") @map("primary_yn") @db.Char(1)
   shipper   Shipper @relation(fields: [shipperId], references: [id], onDelete: Cascade)
 
   @@index([shipperId, sortOrder])
@@ -426,7 +426,7 @@ model CompanyContact {
   phone     String? @map("tel_no")
   email     String?
   // 대표 담당자 (담당자가 있으면 정확히 1명)
-  isPrimary Boolean @default(false) @map("primary_yn")
+  isPrimary String  @default("N") @map("primary_yn") @db.Char(1)
   company   Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
 
   @@index([companyId, sortOrder])
@@ -477,7 +477,7 @@ model CodeGroup {
   sortOrder   Int        @default(0) @map("sort_seq")
   isActive    Boolean    @default(true) @map("is_active")
   // 시스템 그룹: 프로그램이 직접 쓰는 그룹 (시드가 만들고, 삭제할 수 없다)
-  isSystem    Boolean    @default(false) @map("system_yn")
+  isSystem    String     @default("N") @map("system_yn") @db.Char(1)
   items       CodeItem[]
   createdAt   DateTime   @default(now()) @map("created_at")
   updatedAt   DateTime   @updatedAt @map("updated_at")
@@ -558,7 +558,7 @@ model Unit {
   sortOrder Int      @default(0) @map("sort_seq")
   isActive  Boolean  @default(true) @map("is_active")
   // 시스템 단위: 프로그램이 직접 쓰는 단위 (EA, 라벨 단위 BOX·PLT) — 삭제·사용 중지·종류 변경 불가
-  isSystem  Boolean  @default(false) @map("system_yn")
+  isSystem  String   @default("N") @map("system_yn") @db.Char(1)
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
