@@ -116,7 +116,7 @@ const adminNavigation: NavArea = {
           title: '품목',
           href: '/admin/master/items',
           icon: PackageIcon,
-          ready: false,
+          ready: true,
           permission: 'master.items.read',
         },
         {
