@@ -4,6 +4,7 @@ import type { PermissionCode } from '@/config/permissions'
 import type { CenterInput } from '@/lib/centers/center-schema'
 import { getExternalCodes } from '@/lib/master-code/external-codes'
 import { prisma } from '@/lib/prisma'
+import { versionOf } from '@/test/factories'
 import type { DataScope } from '@/lib/scope/data-scope'
 import { getCurrentPermissions, getCurrentScope, getCurrentUser } from '@/lib/session'
 import { resetDatabase } from '@/test/reset-database'
@@ -99,6 +100,34 @@ describe('센터 등록', () => {
     expect(await getExternalCodes('CENTER', BigInt(center.id))).toEqual({ SAP: '1000', ERP: '' })
   })
 
+  it('등록·수정자는 로그인 사용자 아이디로 남고, 다른 사람이 먼저 고쳤으면 덮어쓰지 않는다', async () => {
+    const center = await create()
+    expect(
+      await prisma.center.findUniqueOrThrow({ where: { id: BigInt(center.id) } }),
+    ).toMatchObject({ createdBy: 'boss', updatedBy: 'boss', rowVersion: 1 })
+    expect(center.rowVersion).toBe(1)
+
+    // 두 사람이 같은 버전(1)을 불러와 차례로 저장: 먼저 저장한 쪽만 반영
+    const first = await updateCenterAction({
+      id: center.id,
+      rowVersion: 1,
+      ...input({ name: '먼저' }),
+    })
+    expect(first).toMatchObject({ ok: true, data: { rowVersion: 2 } })
+    const second = await updateCenterAction({
+      id: center.id,
+      rowVersion: 1,
+      ...input({ name: '나중' }),
+    })
+    expect(second).toMatchObject({
+      ok: false,
+      error: { code: 'CONFLICT', message: expect.stringContaining('다른 사람이 먼저 고쳤습니다') },
+    })
+    expect(
+      await prisma.center.findUniqueOrThrow({ where: { id: BigInt(center.id) } }),
+    ).toMatchObject({ name: '먼저', rowVersion: 2 })
+  })
+
   it('코드 규칙: 중복 거부, 시스템 코드 모양 거부, 형식 오류는 칸별 오류', async () => {
     await create({ code: 'ICN' })
     expect(await createCenterAction(input({ code: 'icn' }))).toMatchObject({
@@ -144,6 +173,7 @@ describe('센터 수정', () => {
     expect(
       await updateCenterAction({
         id: center.id,
+        rowVersion: await versionOf('center', center.id),
         ...input({ code: 'ICN2', name: '이천2센터', externalCodes: { SAP: '', ERP: 'E-ICN' } }),
       }),
     ).toMatchObject({ ok: true })
@@ -151,7 +181,11 @@ describe('센터 수정', () => {
     expect(saved).toMatchObject({ code: 'ICN2', name: '이천2센터', systemCode: center.systemCode })
     expect(await getExternalCodes('CENTER', BigInt(center.id))).toEqual({ SAP: '', ERP: 'E-ICN' })
 
-    await updateCenterAction({ id: center.id, ...input({ code: '' }) })
+    await updateCenterAction({
+      id: center.id,
+      rowVersion: await versionOf('center', center.id),
+      ...input({ code: '' }),
+    })
     saved = await prisma.center.findUniqueOrThrow({ where: { id: BigInt(center.id) } })
     expect(saved.code).toBe(center.systemCode)
   })
@@ -159,7 +193,13 @@ describe('센터 수정', () => {
   it('다른 센터의 코드는 쓸 수 없다', async () => {
     await create({ code: 'ICN' })
     const other = await create({ code: 'GMH' })
-    expect(await updateCenterAction({ id: other.id, ...input({ code: 'ICN' }) })).toMatchObject({
+    expect(
+      await updateCenterAction({
+        id: other.id,
+        rowVersion: await versionOf('center', other.id),
+        ...input({ code: 'ICN' }),
+      }),
+    ).toMatchObject({
       ok: false,
       error: { code: 'CONFLICT' },
     })
@@ -197,11 +237,23 @@ describe('목록 · 데이터 범위 · 권한', () => {
     const result = await listCentersAction(createDataGridState())
     expect(result.ok && result.data.rows.map((r) => r.code)).toEqual(['ICN'])
 
-    expect(await updateCenterAction({ id: gmh.id, ...input({ code: 'GMH' }) })).toMatchObject({
+    expect(
+      await updateCenterAction({
+        id: gmh.id,
+        rowVersion: await versionOf('center', gmh.id),
+        ...input({ code: 'GMH' }),
+      }),
+    ).toMatchObject({
       ok: false,
       error: { code: 'NOT_FOUND' },
     })
-    expect(await updateCenterAction({ id: icn.id, ...input({ code: 'ICN' }) })).toMatchObject({
+    expect(
+      await updateCenterAction({
+        id: icn.id,
+        rowVersion: await versionOf('center', icn.id),
+        ...input({ code: 'ICN' }),
+      }),
+    ).toMatchObject({
       ok: true,
     })
   })

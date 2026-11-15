@@ -10,6 +10,7 @@ import { isYes } from '@/lib/yn'
 import { assertInScope, scopeFilter, type DataScope } from '@/lib/scope/data-scope'
 import { LABEL_UNITS, shipperSchema } from '@/lib/shippers/shipper-schema'
 import { createShipper, updateShipper } from '@/lib/shippers/shippers'
+import { rowVersionField } from '@/lib/row-version'
 import { idSchema } from '@/lib/id'
 
 // 화주사 관리 서버 액션 (docs/decisions/0035)
@@ -112,12 +113,13 @@ export const createShipperAction = createAction({
 
 export const updateShipperAction = createAction({
   permission: 'master.shippers.update',
-  input: shipperSchema.extend({ id: idSchema }),
-  handler: async ({ input: { id, ...data }, scope }) => {
+  // rowVersion: 화면이 불러온 버전 (동시 수정 막기)
+  input: shipperSchema.extend({ id: idSchema, rowVersion: rowVersionField }),
+  handler: async ({ input: { id, rowVersion, ...data }, scope }) => {
     requireAllScope(scope, '화주사 수정')
     const shipper = await prisma.shipper.findUnique({ where: { id }, select: { id: true } })
     assertInScope(scope, shipper, { shipper: 'id' })
-    return updateShipper(id, data)
+    return updateShipper(id, rowVersion, data)
   },
 })
 

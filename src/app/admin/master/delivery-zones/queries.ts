@@ -55,6 +55,8 @@ export async function getDeliveryZoneForEdit(id: bigint, scope: DataScope) {
   return textIds({
     id: zone.id,
     systemCode: zone.systemCode,
+    // 동시 수정 막기: 저장할 때 이 버전을 함께 보낸다
+    rowVersion: zone.rowVersion,
     isActive: zone.isActive,
     center: zone.center,
     input,

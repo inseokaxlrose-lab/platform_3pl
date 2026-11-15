@@ -51,6 +51,15 @@ const input = (overrides: Partial<CompanyInput> = {}): CompanyInput => ({
   ...overrides,
 })
 
+// 저장: 지금 버전(아직 없으면 null)을 붙여 보낸다 — 화면이 불러온 버전 대신
+async function save(value: CompanyInput) {
+  const current = await prisma.company.findUnique({
+    where: { id: COMPANY_ID },
+    select: { rowVersion: true },
+  })
+  return saveCompanyAction({ ...value, rowVersion: current?.rowVersion ?? null })
+}
+
 beforeEach(async () => {
   await resetDatabase()
   adminId = (await createTestUser('boss', { userType: 'OPERATOR' })).id
@@ -70,14 +79,17 @@ afterAll(async () => {
 describe('운영사 정보 저장', () => {
   it('처음 저장하면 만들고, 담당자는 입력 순서대로, 고친 사람을 남긴다', async () => {
     expect(await getCompany()).toBeNull()
-    expect(await saveCompanyAction(input())).toEqual({ ok: true, data: { saved: true } })
+    expect(await save(input())).toEqual({ ok: true, data: { rowVersion: 1 } })
 
     const company = await getCompany()
     expect(company).toMatchObject({
       id: COMPANY_ID,
       businessNumber: '1234567891',
       email: null,
-      updatedById: adminId,
+      // 등록·수정자는 로그인 사용자 아이디로 자동 기록
+      createdBy: 'boss',
+      updatedBy: 'boss',
+      rowVersion: 1,
     })
     expect(
       company?.contacts.map((c) => [c.sortOrder, c.duty, c.name, c.phone, c.isPrimary]),
@@ -89,8 +101,8 @@ describe('운영사 정보 저장', () => {
   })
 
   it('다시 저장하면 같은 한 줄을 고치고, 담당자는 통째로 바뀐다', async () => {
-    await saveCompanyAction(input())
-    await saveCompanyAction(
+    await save(input())
+    await save(
       input({
         name: '새이름물류',
         contacts: [
@@ -107,7 +119,7 @@ describe('운영사 정보 저장', () => {
   })
 
   it('입력 규칙에 맞지 않으면 칸별 오류, 저장하지 않는다', async () => {
-    const result = await saveCompanyAction(input({ businessNumber: '1234567890', fax: 'x' }))
+    const result = await save(input({ businessNumber: '1234567890', fax: 'x' }))
     expect(result).toMatchObject({
       ok: false,
       error: {
@@ -120,25 +132,25 @@ describe('운영사 정보 저장', () => {
 
   it('담당 업무: 없는 코드·사용 중지 코드는 거부, 이미 저장돼 있던 사용 중지 코드는 그대로 둘 수 있다', async () => {
     const contact = { name: '김', phone: '', email: 'a@example.com', isPrimary: true }
-    expect(
-      await saveCompanyAction(input({ contacts: [{ ...contact, duty: 'NOPE' }] })),
-    ).toMatchObject({ ok: false, error: { message: expect.stringContaining('NOPE') } })
-    expect(
-      await saveCompanyAction(input({ contacts: [{ ...contact, duty: 'OLD' }] })),
-    ).toMatchObject({ ok: false, error: { message: expect.stringContaining('OLD') } })
+    expect(await save(input({ contacts: [{ ...contact, duty: 'NOPE' }] }))).toMatchObject({
+      ok: false,
+      error: { message: expect.stringContaining('NOPE') },
+    })
+    expect(await save(input({ contacts: [{ ...contact, duty: 'OLD' }] }))).toMatchObject({
+      ok: false,
+      error: { message: expect.stringContaining('OLD') },
+    })
 
     // 저장한 뒤 코드를 사용 중지해도, 그 담당자를 그대로 두고 다시 저장할 수 있다
-    await saveCompanyAction(input({ contacts: [{ ...contact, duty: 'OUTBOUND' }] }))
+    await save(input({ contacts: [{ ...contact, duty: 'OUTBOUND' }] }))
     await prisma.codeItem.updateMany({ where: { code: 'OUTBOUND' }, data: { isActive: false } })
     expect(
-      await saveCompanyAction(
-        input({ name: '바뀜', contacts: [{ ...contact, duty: 'OUTBOUND' }] }),
-      ),
+      await save(input({ name: '바뀜', contacts: [{ ...contact, duty: 'OUTBOUND' }] })),
     ).toMatchObject({ ok: true })
   })
 
   it('담당자 규칙: 연락처·이메일 중 하나, 대표 1명', async () => {
-    const result = await saveCompanyAction(
+    const result = await save(
       input({
         contacts: [
           { duty: 'INBOUND', name: '김', phone: '', email: '', isPrimary: false },
@@ -159,7 +171,7 @@ describe('운영사 정보 저장', () => {
 
   it('수정 권한이 없으면 거부한다 (조회 권한만으로는 안 됨)', async () => {
     signIn(['master.company.read'])
-    expect(await saveCompanyAction(input())).toMatchObject({
+    expect(await save(input())).toMatchObject({
       ok: false,
       error: { code: 'FORBIDDEN' },
     })

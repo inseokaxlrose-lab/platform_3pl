@@ -46,18 +46,22 @@ type TextKey = 'name' | 'ceoName' | 'businessType' | 'businessItem'
 export function CompanyForm({
   header,
   initial,
+  version,
   readOnly,
 }: {
   // 페이지 헤더 (제목·설명·meta·보조 버튼)
   header: MasterFormHeader
   initial: CompanyInput
+  // 불러올 때의 버전 (아직 등록 전이면 null, 동시 수정 막기)
+  version: number | null
   // 수정 권한이 없으면 읽기 전용
   readOnly: boolean
 }) {
   const form = useMasterForm({
     initial,
+    version,
     schema: companySchema,
-    save: saveCompanyAction,
+    save: (value, rowVersion) => saveCompanyAction({ ...value, rowVersion }),
     afterSave: toFormValues,
   })
   const { value, set, errors } = form

@@ -82,9 +82,12 @@ export function CenterForm({
   const router = useRouter()
   const form = useMasterForm({
     initial: center?.input ?? EMPTY,
+    version: center?.rowVersion,
     schema: centerSchema,
-    save: (value: CenterInput) =>
-      center ? updateCenterAction({ id: center.id, ...value }) : createCenterAction(value),
+    save: (value: CenterInput, version) =>
+      center
+        ? updateCenterAction({ id: center.id, rowVersion: version ?? center.rowVersion, ...value })
+        : createCenterAction(value),
     afterSave: toFormValues,
     onSuccess: center
       ? undefined

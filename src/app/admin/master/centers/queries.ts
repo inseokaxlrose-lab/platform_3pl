@@ -54,6 +54,8 @@ export async function getCenterForEdit(id: bigint, scope: DataScope) {
   return textIds({
     id: center.id,
     systemCode: center.systemCode,
+    // 동시 수정 막기: 저장할 때 이 버전을 함께 보낸다
+    rowVersion: center.rowVersion,
     isActive: center.isActive,
     input,
     warehouses: center.warehouses.map(({ _count, ...w }) => ({

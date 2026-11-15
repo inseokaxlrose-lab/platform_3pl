@@ -36,6 +36,8 @@ export type UnitRow = {
   sortOrder: number
   isActive: boolean
   isSystem: boolean
+  // 동시 수정 막기: 팝업을 연 목록의 버전
+  rowVersion: number
   externalCodes: ExternalCodes
 }
 
@@ -97,7 +99,7 @@ export function UnitDialog({
     event.preventDefault()
     startTransition(async () => {
       const result = unit
-        ? await updateUnitAction({ id: unit.id, ...value })
+        ? await updateUnitAction({ id: unit.id, rowVersion: unit.rowVersion, ...value })
         : await createUnitAction(value)
       if (!result.ok) {
         const fieldErrors = result.error.fieldErrors ?? {}

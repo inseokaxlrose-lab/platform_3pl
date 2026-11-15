@@ -3,6 +3,7 @@ import { looksLikeSystemCode } from '@/config/master-codes'
 import { ActionError } from '@/lib/actions/action-error'
 import { saveExternalCodes } from '@/lib/master-code/external-codes'
 import { nextSystemCode } from '@/lib/master-code/system-code'
+import { assertRowVersion, withVersionGuard } from '@/lib/row-version'
 import { prisma } from '@/lib/prisma'
 import type { WarehouseUpdateData } from './warehouse-schema'
 
@@ -46,7 +47,7 @@ export async function createWarehouse(centerId: bigint, data: WarehouseUpdateDat
         type: 'GENERAL',
         storageCondition: data.storageCondition,
       },
-      select: { id: true, systemCode: true, code: true },
+      select: { id: true, systemCode: true, code: true, rowVersion: true },
     })
     await saveExternalCodes(tx, 'WAREHOUSE', warehouse.id, data.externalCodes)
     return warehouse
@@ -54,12 +55,14 @@ export async function createWarehouse(centerId: bigint, data: WarehouseUpdateDat
 }
 
 // 수정: 센터·유형·시스템 코드는 바뀌지 않는다. 입고대기 창고는 코드도 고정
-export async function updateWarehouse(id: bigint, data: WarehouseUpdateData) {
-  const current = await prisma.warehouse.findUnique({
+// rowVersion: 화면이 불러온 버전 (그 사이 다른 사람이 저장했으면 충돌)
+export async function updateWarehouse(id: bigint, rowVersion: number, data: WarehouseUpdateData) {
+  const found = await prisma.warehouse.findUnique({
     where: { id },
-    select: { centerId: true, systemCode: true, code: true, type: true },
+    select: { centerId: true, systemCode: true, code: true, type: true, rowVersion: true },
   })
-  if (!current) throw new ActionError('NOT_FOUND', '창고를 찾을 수 없습니다.')
+  assertRowVersion(found, rowVersion, '창고를 찾을 수 없습니다.')
+  const current = found!
 
   let code = data.code || current.systemCode
   if (current.type === 'INBOUND_STAGING') {
@@ -71,16 +74,19 @@ export async function updateWarehouse(id: bigint, data: WarehouseUpdateData) {
   await assertWarehouseCode(current.centerId, code, current.systemCode, id)
 
   return prisma.$transaction(async (tx) => {
-    await tx.warehouse.update({
-      where: { id },
-      data: {
-        code,
-        name: data.name,
-        storageCondition: data.storageCondition,
-      },
-    })
+    const saved = await withVersionGuard(() =>
+      tx.warehouse.update({
+        where: { id, rowVersion },
+        data: {
+          code,
+          name: data.name,
+          storageCondition: data.storageCondition,
+        },
+        select: { rowVersion: true },
+      }),
+    )
     await saveExternalCodes(tx, 'WAREHOUSE', id, data.externalCodes)
-    return { id, code }
+    return { id, code, rowVersion: saved.rowVersion }
   })
 }
 

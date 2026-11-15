@@ -13,6 +13,7 @@ import { listQuerySchema, toPrismaQuery } from '@/lib/grid/grid-query'
 import { dateRangeFilter, idFilter } from '@/lib/grid/list-filters'
 import { prisma } from '@/lib/prisma'
 import { assertInScope, scopeFilter, type DataScope } from '@/lib/scope/data-scope'
+import { rowVersionField } from '@/lib/row-version'
 import { idSchema } from '@/lib/id'
 
 // 배송권역 서버 액션 (docs/decisions/0033)
@@ -113,10 +114,11 @@ export const createDeliveryZoneAction = createAction({
 
 export const updateDeliveryZoneAction = createAction({
   permission: 'master.delivery-zones.update',
-  input: deliveryZoneSchema.extend({ id: idSchema }),
-  handler: async ({ input: { id, ...data }, scope }) => {
+  // rowVersion: 화면이 불러온 버전 (동시 수정 막기)
+  input: deliveryZoneSchema.extend({ id: idSchema, rowVersion: rowVersionField }),
+  handler: async ({ input: { id, rowVersion, ...data }, scope }) => {
     await assertZonesInScope([id], scope)
-    return updateDeliveryZone(id, data)
+    return updateDeliveryZone(id, rowVersion, data)
   },
 })
 

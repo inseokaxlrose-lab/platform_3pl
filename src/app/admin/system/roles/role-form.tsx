@@ -43,6 +43,8 @@ type RoleFormProps = {
     name: string
     area: 'ADMIN' | 'PORTAL'
     description: string
+    // 동시 수정 막기: 불러올 때의 버전
+    rowVersion: number
     userCount: number
     permissionCodes: PermissionCode[]
     obsoleteCodes: string[]
@@ -67,11 +69,13 @@ export function RoleForm({ group, header }: RoleFormProps) {
       description: group?.description ?? '',
       permissionCodes: group?.permissionCodes ?? [],
     } as RoleFormValue,
+    version: group?.rowVersion,
     schema: roleSchema,
-    save: (value: RoleFormValue) =>
+    save: (value: RoleFormValue, version) =>
       group
         ? updatePermissionGroupAction({
             id: group.id,
+            rowVersion: version ?? group.rowVersion,
             name: value.name,
             description: value.description,
             permissionCodes: value.permissionCodes,

@@ -1,6 +1,7 @@
 import { z } from 'zod'
 import { optionalText, requiredText } from '@/lib/validation/common-fields'
-import { idSchema, idField } from '@/lib/id'
+import { idField, idSchema } from '@/lib/id'
+import { rowVersionField } from '@/lib/row-version'
 
 // 공통코드 입력 규칙 — 화면·서버 공용 (docs/decisions/0030)
 // 그룹 코드·코드는 등록 후 바꿀 수 없다 (업무 표에 코드 글자가 저장되므로) → 수정 규칙에는 code가 없다
@@ -36,14 +37,23 @@ export const itemCodeField = z
   .regex(/^[A-Z0-9_-]{1,30}$/, '코드는 영문 대문자·숫자·밑줄·하이픈 1~30자입니다.')
 
 export const codeGroupCreateSchema = z.object({ code: groupCodeField, ...common })
-export const codeGroupUpdateSchema = z.object({ id: idSchema, ...common })
+// rowVersion: 팝업을 열 때의 버전 (동시 수정 막기)
+export const codeGroupUpdateSchema = z.object({
+  id: idSchema,
+  rowVersion: rowVersionField,
+  ...common,
+})
 
 export const codeItemCreateSchema = z.object({
   groupId: idField('그룹을 골라 주세요.'),
   code: itemCodeField,
   ...common,
 })
-export const codeItemUpdateSchema = z.object({ id: idSchema, ...common })
+export const codeItemUpdateSchema = z.object({
+  id: idSchema,
+  rowVersion: rowVersionField,
+  ...common,
+})
 
 export type CodeGroupCreateInput = z.input<typeof codeGroupCreateSchema>
 export type CodeItemCreateInput = z.input<typeof codeItemCreateSchema>

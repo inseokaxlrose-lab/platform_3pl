@@ -7,7 +7,7 @@ import { prisma } from '@/lib/prisma'
 import type { DataScope } from '@/lib/scope/data-scope'
 import { getCurrentPermissions, getCurrentScope, getCurrentUser } from '@/lib/session'
 import type { WarehouseCreateInput } from '@/lib/warehouses/warehouse-schema'
-import { createTestCenter } from '@/test/factories'
+import { createTestCenter, versionOf } from '@/test/factories'
 import { resetDatabase } from '@/test/reset-database'
 import {
   createWarehouseAction,
@@ -125,6 +125,7 @@ describe('창고 수정 · 입고대기 보호', () => {
     const created = await create({ code: 'A01' })
     await updateWarehouseAction({
       id: created.id,
+      rowVersion: await versionOf('warehouse', created.id),
       code: 'A02',
       name: '냉동 창고',
       storageCondition: 'FROZEN',
@@ -133,7 +134,11 @@ describe('창고 수정 · 입고대기 보호', () => {
     let saved = await prisma.warehouse.findUniqueOrThrow({ where: { id: BigInt(created.id) } })
     expect(saved).toMatchObject({ code: 'A02', name: '냉동 창고', storageCondition: 'FROZEN' })
 
-    await updateWarehouseAction({ id: created.id, ...input({ code: '' }) })
+    await updateWarehouseAction({
+      id: created.id,
+      rowVersion: await versionOf('warehouse', created.id),
+      ...input({ code: '' }),
+    })
     saved = await prisma.warehouse.findUniqueOrThrow({ where: { id: BigInt(created.id) } })
     expect(saved.code).toBe(saved.systemCode)
   })
@@ -144,6 +149,7 @@ describe('창고 수정 · 입고대기 보호', () => {
     expect(
       await updateWarehouseAction({
         id: String(staging.id),
+        rowVersion: await versionOf('warehouse', String(staging.id)),
         code: '',
         name: '입고대기(냉장)',
         storageCondition: 'CHILLED',
@@ -158,7 +164,11 @@ describe('창고 수정 · 입고대기 보호', () => {
     })
 
     expect(
-      await updateWarehouseAction({ id: String(staging.id), ...input({ code: 'NEWCODE' }) }),
+      await updateWarehouseAction({
+        id: String(staging.id),
+        rowVersion: await versionOf('warehouse', String(staging.id)),
+        ...input({ code: 'NEWCODE' }),
+      }),
     ).toMatchObject({
       ok: false,
       error: { code: 'VALIDATION', message: expect.stringContaining('입고대기') },
@@ -210,7 +220,13 @@ describe('목록 · 데이터 범위 · 권한', () => {
     })
     expect(other.ok && other.data.rows).toEqual([])
 
-    expect(await updateWarehouseAction({ id: gmhWarehouse.id, ...input() })).toMatchObject({
+    expect(
+      await updateWarehouseAction({
+        id: gmhWarehouse.id,
+        rowVersion: await versionOf('warehouse', gmhWarehouse.id),
+        ...input(),
+      }),
+    ).toMatchObject({
       ok: false,
       error: { code: 'NOT_FOUND' },
     })

@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { rowVersionField } from '@/lib/row-version'
 import { affiliationIssues } from './affiliation'
 import { idSchema } from '@/lib/id'
 
@@ -65,6 +66,8 @@ export const createUserSchema = z
 // 수정 (서버): 아이디·유형은 바꿀 수 없다. 소속 규칙은 서버가 저장된 유형으로 확인한다
 export const updateUserSchema = z.object({
   id: idSchema,
+  // 화면이 불러온 버전 (동시 수정 막기)
+  rowVersion: rowVersionField,
   name: nameSchema,
   email: emailSchema,
   ...affiliationShape,

@@ -3,7 +3,7 @@ import { createDataGridState } from '@/components/data-grid/state'
 import type { PermissionCode } from '@/config/permissions'
 import { prisma } from '@/lib/prisma'
 import { getCurrentPermissions, getCurrentUser } from '@/lib/session'
-import { createTestUser } from '@/test/factories'
+import { createTestUser, versionOf } from '@/test/factories'
 import { resetDatabase } from '@/test/reset-database'
 import {
   createPermissionGroupAction,
@@ -85,6 +85,7 @@ describe('권한그룹 서버 액션', () => {
 
     const result = await updatePermissionGroupAction({
       id: String(group.id),
+      rowVersion: await versionOf('permissionGroup', String(group.id)),
       name: '재고 담당자',
       permissionCodes: ['stock.adjustments.confirm', 'portal.stock.read'],
     })
@@ -100,7 +101,12 @@ describe('권한그룹 서버 액션', () => {
 
   it('수정: 없는 그룹은 NOT_FOUND', async () => {
     expect(
-      await updatePermissionGroupAction({ id: '999999', name: 'x', permissionCodes: [] }),
+      await updatePermissionGroupAction({
+        id: '999999',
+        rowVersion: 1,
+        name: 'x',
+        permissionCodes: [],
+      }),
     ).toMatchObject({ ok: false, error: { code: 'NOT_FOUND' } })
   })
 

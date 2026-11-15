@@ -4,6 +4,7 @@ import { AccessDenied } from '@/components/permission'
 import { getCompany, type Company } from '@/lib/company/company'
 import type { CompanyInput } from '@/lib/company/company-schema'
 import { hasPermission } from '@/lib/session'
+import { actorLabel } from '@/lib/users/actor-label'
 import { isYes } from '@/lib/yn'
 import { CompanyForm } from './company-form'
 
@@ -42,8 +43,8 @@ export default async function CompanyPage() {
     getCompany(),
     hasPermission('master.company.update'),
   ])
-  const updated = company?.updatedBy
-    ? `마지막 수정: ${company.updatedBy.name} (${company.updatedBy.username}) · ${formatDate(company.updatedAt, true)}`
+  const updated = company
+    ? `마지막 수정: ${await actorLabel(company.updatedBy)} · ${formatDate(company.updatedAt, true)}`
     : null
 
   return (
@@ -59,6 +60,7 @@ export default async function CompanyPage() {
         meta: updated,
       }}
       initial={toInput(company)}
+      version={company?.rowVersion ?? null}
       readOnly={!canUpdate}
     />
   )

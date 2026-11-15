@@ -1,5 +1,6 @@
 import { z } from 'zod'
 import { idSchema } from '@/lib/id'
+import { rowVersionField } from '@/lib/row-version'
 
 // 권한그룹 입력 규칙 — 화면·서버 공용 (docs/decisions/0017)
 
@@ -20,6 +21,8 @@ export const roleSchema = z.object({
 // 수정 (서버): 영역은 등록 후 바꿀 수 없다
 export const updateRoleSchema = z.object({
   id: idSchema,
+  // 화면이 불러온 버전 (동시 수정 막기)
+  rowVersion: rowVersionField,
   name,
   description,
   permissionCodes,
