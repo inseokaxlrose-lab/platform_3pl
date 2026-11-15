@@ -12,17 +12,17 @@ import {
 } from '@/components/master-form'
 import { Input } from '@/components/ui/input'
 import {
-  companySchema,
+  operatorSchema,
   CONTACT_DUTY_GROUP,
   EMPTY_CONTACT,
-  MAX_COMPANY_CONTACTS,
-  type CompanyData,
-  type CompanyInput,
-} from '@/lib/company/company-schema'
-import { saveCompanyAction } from './actions'
+  MAX_OPERATOR_CONTACTS,
+  type OperatorData,
+  type OperatorInput,
+} from '@/lib/operator/operator-schema'
+import { saveOperatorAction } from './actions'
 
 // 저장한 값(빈 칸 null) → 입력값(빈 글자). 번호는 숫자만 그대로 (입력 부품이 하이픈을 붙여 보여준다)
-function toFormValues(data: CompanyData): CompanyInput {
+function toFormValues(data: OperatorData): OperatorInput {
   const text = (value: string | null) => value ?? ''
   return {
     name: data.name,
@@ -51,17 +51,18 @@ export function CompanyForm({
 }: {
   // 페이지 헤더 (제목·설명·meta·보조 버튼)
   header: MasterFormHeader
-  initial: CompanyInput
-  // 불러올 때의 버전 (아직 등록 전이면 null, 동시 수정 막기)
-  version: number | null
+  initial: OperatorInput
+  // 불러올 때의 버전 (동시 수정 막기)
+  version: number
   // 수정 권한이 없으면 읽기 전용
   readOnly: boolean
 }) {
   const form = useMasterForm({
     initial,
     version,
-    schema: companySchema,
-    save: (value, rowVersion) => saveCompanyAction({ ...value, rowVersion }),
+    schema: operatorSchema,
+    // 수정 전용 화면이라 버전은 항상 있다 (혹시 없으면 0 → 서버가 충돌로 막는다)
+    save: (value, rowVersion) => saveOperatorAction({ ...value, rowVersion: rowVersion ?? 0 }),
     afterSave: toFormValues,
   })
   const { value, set, errors } = form
@@ -181,7 +182,7 @@ export function CompanyForm({
                 { key: 'email', label: '이메일', input: 'email' },
               ]}
               createRow={() => ({ ...EMPTY_CONTACT })}
-              maxRows={MAX_COMPANY_CONTACTS}
+              maxRows={MAX_OPERATOR_CONTACTS}
               primary={{ key: 'isPrimary', label: '대표' }}
               errors={errors}
               addLabel="담당자 추가"

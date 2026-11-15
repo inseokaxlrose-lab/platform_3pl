@@ -1,7 +1,7 @@
 import type { Metadata } from 'next'
 import { BackToListButton } from '@/components/master-list'
 import { AccessDenied } from '@/components/permission'
-import { hasPermission } from '@/lib/session'
+import { getCurrentScope, hasPermission } from '@/lib/session'
 import { getUserFormOptions } from '../queries'
 import { UserForm } from '../user-form'
 
@@ -10,7 +10,7 @@ export const metadata: Metadata = { title: '사용자 등록' }
 // 사용자 등록 화면
 export default async function NewUserPage() {
   if (!(await hasPermission('system.users.create'))) return <AccessDenied />
-  const options = await getUserFormOptions()
+  const options = await getUserFormOptions(await getCurrentScope())
 
   return (
     <UserForm

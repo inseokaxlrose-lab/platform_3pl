@@ -2,22 +2,25 @@ import 'server-only'
 import { isPermissionCode } from '@/config/permissions'
 import { textIds } from '@/lib/id'
 import { prisma } from '@/lib/prisma'
+import { operatorFilter, type DataScope } from '@/lib/scope/data-scope'
 import { isActiveStatus } from '@/lib/status'
 
-// 등록·수정 화면의 선택지: 사용 중인 센터·화주사, 권한그룹(영역 포함)
-export async function getUserFormOptions() {
+// 등록·수정 화면의 선택지: 내 운영사의 사용 중인 센터·화주사, 권한그룹(영역 포함)
+export async function getUserFormOptions(scope: DataScope) {
+  const operator = operatorFilter(scope)
   const [centers, shippers, groups] = await Promise.all([
     prisma.center.findMany({
-      where: { status: 'ACTIVE' },
+      where: { ...operator, status: 'ACTIVE' },
       select: { id: true, code: true, name: true },
       orderBy: { code: 'asc' },
     }),
     prisma.shipper.findMany({
-      where: { status: 'ACTIVE' },
+      where: { ...operator, status: 'ACTIVE' },
       select: { id: true, code: true, name: true },
       orderBy: { code: 'asc' },
     }),
     prisma.permissionGroup.findMany({
+      where: operator,
       select: { id: true, name: true, area: true },
       orderBy: { name: 'asc' },
     }),
@@ -28,10 +31,10 @@ export async function getUserFormOptions() {
 
 export type UserFormOptions = Awaited<ReturnType<typeof getUserFormOptions>>
 
-// 수정 화면용 사용자 한 건
-export async function getUserForEdit(id: bigint) {
+// 수정 화면용 사용자 한 건 (내 운영사 사용자만)
+export async function getUserForEdit(id: bigint, scope: DataScope) {
   const user = await prisma.user.findUnique({
-    where: { id },
+    where: { id, ...operatorFilter(scope) },
     select: {
       id: true,
       username: true,
@@ -68,9 +71,9 @@ export type UserForEdit = NonNullable<Awaited<ReturnType<typeof getUserForEdit>>
 
 // 개별 권한 화면용: 저장된 그룹 권한 코드 + 사용자 추가·제외 목록
 // 목록에 없는 옛 코드는 화면에 보이지 않는다 (계산에서도 무시되고, 다음 저장 때 정리된다)
-export async function getUserOverrides(id: bigint) {
+export async function getUserOverrides(id: bigint, scope: DataScope) {
   const user = await prisma.user.findUnique({
-    where: { id },
+    where: { id, ...operatorFilter(scope) },
     select: {
       permissionGroups: {
         select: { group: { select: { permissions: { select: { permissionCode: true } } } } },

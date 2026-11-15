@@ -1,6 +1,7 @@
 import 'server-only'
 import { looksLikeSystemCode } from '@/config/master-codes'
 import { ActionError } from '@/lib/actions/action-error'
+import { requireOperatorId } from '@/lib/actor'
 import { saveExternalCodes } from '@/lib/master-code/external-codes'
 import { nextSystemCode } from '@/lib/master-code/system-code'
 import { assertRowVersion, withVersionGuard } from '@/lib/row-version'
@@ -41,6 +42,7 @@ export async function createWarehouse(centerId: bigint, data: WarehouseUpdateDat
     await assertWarehouseCode(centerId, code, systemCode)
     const warehouse = await tx.warehouse.create({
       data: {
+        operatorId: requireOperatorId(),
         centerId,
         systemCode,
         code,

@@ -23,7 +23,7 @@ const WAREHOUSE_SCOPE = { center: 'centerId' }
 async function findWarehouseInScope(id: bigint, scope: Parameters<typeof assertInScope>[0]) {
   const warehouse = await prisma.warehouse.findUnique({
     where: { id },
-    select: { id: true, centerId: true },
+    select: { id: true, operatorId: true, centerId: true },
   })
   assertInScope(scope, warehouse, WAREHOUSE_SCOPE)
   return warehouse!
@@ -107,11 +107,12 @@ export const createWarehouseAction = createAction({
   permission: 'master.warehouses.create',
   input: createWarehouseSchema,
   handler: async ({ input: { centerId, ...data }, scope }) => {
-    assertInScope(scope, { centerId }, WAREHOUSE_SCOPE)
+    // 범위 검사는 DB에서 읽은 센터로 (운영사·소속 센터)
     const center = await prisma.center.findUnique({
       where: { id: centerId },
-      select: { status: true },
+      select: { id: true, operatorId: true, status: true },
     })
+    assertInScope(scope, center, { center: 'id' })
     if (!center) throw new ActionError('NOT_FOUND', '센터를 찾을 수 없습니다.')
     if (!isActiveStatus(center.status)) {
       throw new ActionError('CONFLICT', '사용 중지된 센터에는 창고를 추가할 수 없습니다.')

@@ -6,6 +6,7 @@ import {
   type ExternalSystemKey,
 } from '@/config/external-systems'
 import { ActionError } from '@/lib/actions/action-error'
+import { requireOperatorId } from '@/lib/actor'
 import { prisma } from '@/lib/prisma'
 import { EMPTY_EXTERNAL_CODES, type ExternalCodes } from './external-codes-schema'
 import type { Db } from './system-code'
@@ -27,13 +28,14 @@ export async function getExternalCodes(
 }
 
 // 한 대상의 외부 코드 저장: 채운 칸은 넣거나 고치고, 빈 칸은 지운다
-// 다른 대상이 이미 쓰는 외부 코드면 어느 연동 상대의 무슨 코드인지 알려 주고 거부한다
+// 같은 운영사의 다른 대상이 이미 쓰는 외부 코드면 어느 연동 상대의 무슨 코드인지 알려 주고 거부한다 (0039)
 export async function saveExternalCodes(
   db: Db,
   entityType: ExternalEntityType,
   entityId: bigint,
   codes: Partial<ExternalCodes>,
 ) {
+  const operatorId = requireOperatorId()
   for (const system of EXTERNAL_SYSTEM_KEYS) {
     const code = codes[system]?.trim() ?? ''
     if (!code) {
@@ -41,7 +43,7 @@ export async function saveExternalCodes(
       continue
     }
     const owner = await db.externalCode.findUnique({
-      where: { system_entityType_code: { system, entityType, code } },
+      where: { operatorId_system_entityType_code: { operatorId, system, entityType, code } },
       select: { entityId: true },
     })
     if (owner && owner.entityId !== entityId) {
@@ -52,7 +54,7 @@ export async function saveExternalCodes(
     }
     await db.externalCode.upsert({
       where: { system_entityType_entityId: { system, entityType, entityId } },
-      create: { system, entityType, entityId, code },
+      create: { operatorId, system, entityType, entityId, code },
       update: { code },
     })
   }
@@ -68,14 +70,18 @@ export async function deleteExternalCodes(
 }
 
 // 외부 코드로 우리 대상 찾기 (I/F 수신 때 사용): 없으면 null
+// I/F는 로그인 사용자가 없으므로 어느 운영사의 코드인지 직접 받는다
 export async function findByExternalCode(
+  operatorId: bigint,
   system: ExternalSystemKey,
   entityType: ExternalEntityType,
   code: string,
   db: Db = prisma,
 ) {
   const row = await db.externalCode.findUnique({
-    where: { system_entityType_code: { system, entityType, code: code.trim() } },
+    where: {
+      operatorId_system_entityType_code: { operatorId, system, entityType, code: code.trim() },
+    },
     select: { entityId: true },
   })
   return row?.entityId ?? null

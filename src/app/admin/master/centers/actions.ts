@@ -119,7 +119,12 @@ export const updateCenterAction = createAction({
   // rowVersion: 화면이 불러온 버전 (동시 수정 막기)
   input: centerSchema.extend({ id: idSchema, rowVersion: rowVersionField }),
   handler: async ({ input: { id, rowVersion, ...data }, scope }) => {
-    assertInScope(scope, { id }, CENTER_SCOPE)
+    // 범위 검사는 DB에서 읽은 센터로 (운영사·소속 센터)
+    const center = await prisma.center.findUnique({
+      where: { id },
+      select: { id: true, operatorId: true },
+    })
+    assertInScope(scope, center, CENTER_SCOPE)
     return updateCenter(id, rowVersion, data)
   },
 })

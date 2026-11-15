@@ -3,11 +3,13 @@
 import { z } from 'zod'
 import { ActionError } from '@/lib/actions/action-error'
 import { createAction } from '@/lib/actions/create-action'
+import { requireOperatorId } from '@/lib/actor'
 import { listQuerySchema, toPrismaQuery } from '@/lib/grid/grid-query'
 import { normalizeGroupCodes, toPermissionArea } from '@/lib/permissions/normalize-group-codes'
 import { ROLE_AREAS, roleSchema, updateRoleSchema } from '@/lib/permissions/role-schema'
 import { deletedWhere } from '@/lib/grid/list-filters'
 import { prisma } from '@/lib/prisma'
+import { operatorFilter } from '@/lib/scope/data-scope'
 import { assertAllFound, assertNoCodeConflict } from '@/lib/soft-delete'
 import { DELETED_ONLY, NOT_DELETED } from '@/lib/status'
 import { assertRowVersion, withVersionGuard } from '@/lib/row-version'
@@ -24,7 +26,7 @@ function isUniqueViolation(error: unknown) {
 export const listPermissionGroupsAction = createAction({
   permission: 'system.roles.read',
   input: listQuerySchema,
-  handler: async ({ input }) => {
+  handler: async ({ input, scope }) => {
     const query = toPrismaQuery(input, {
       searchFields: ['name', 'description'],
       sortable: { name: 'name', area: 'area', updatedAt: 'updatedAt' },
@@ -35,7 +37,9 @@ export const listPermissionGroupsAction = createAction({
       ? (input.filters.area as (typeof ROLE_AREAS)[number])
       : undefined
     // '삭제됨'을 고르면 지운 것만 (아니면 prisma.ts가 지운 것을 뺀다)
-    const where = { AND: [query.where, area ? { area } : {}, deletedWhere(input.filters)] }
+    const where = {
+      AND: [operatorFilter(scope), query.where, area ? { area } : {}, deletedWhere(input.filters)],
+    }
     const [rows, rowCount] = await prisma.$transaction([
       prisma.permissionGroup.findMany({
         ...query,
@@ -70,6 +74,7 @@ export const createPermissionGroupAction = createAction({
     try {
       const group = await prisma.permissionGroup.create({
         data: {
+          operatorId: requireOperatorId(),
           name: input.name,
           area: input.area,
           description: input.description || null,

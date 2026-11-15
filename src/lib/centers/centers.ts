@@ -1,6 +1,7 @@
 import 'server-only'
 import { looksLikeSystemCode } from '@/config/master-codes'
 import { ActionError } from '@/lib/actions/action-error'
+import { requireOperatorId } from '@/lib/actor'
 import { saveExternalCodes } from '@/lib/master-code/external-codes'
 import { nextSystemCode } from '@/lib/master-code/system-code'
 import { assertRowVersion, withVersionGuard } from '@/lib/row-version'
@@ -10,7 +11,7 @@ import type { CenterData } from './center-schema'
 
 // 센터 저장 (docs/decisions/0026). 권한·데이터 범위 검사는 서버 액션에서 한다
 
-// 사용자 코드 검사: 시스템 코드 모양 금지(자기 것 제외), 다른 센터와 중복 금지
+// 사용자 코드 검사: 시스템 코드 모양 금지(자기 것 제외), 같은 운영사의 다른 센터와 중복 금지
 async function assertUserCode(code: string, ownSystemCode: string, exceptId?: bigint) {
   if (code !== ownSystemCode && looksLikeSystemCode('CENTER', code)) {
     throw new ActionError(
@@ -18,7 +19,10 @@ async function assertUserCode(code: string, ownSystemCode: string, exceptId?: bi
       `'${code}'는 시스템 코드 모양이라 센터 코드로 쓸 수 없습니다.`,
     )
   }
-  const owner = await prisma.center.findUnique({ where: { code }, select: { id: true } })
+  const owner = await prisma.center.findFirst({
+    where: { operatorId: requireOperatorId(), code },
+    select: { id: true },
+  })
   if (owner && owner.id !== exceptId) {
     throw new ActionError('CONFLICT', `이미 사용 중인 센터 코드입니다: ${code}`)
   }
@@ -45,7 +49,7 @@ export async function createCenter(data: CenterData) {
     const code = data.code || systemCode
     await assertUserCode(code, systemCode)
     const center = await tx.center.create({
-      data: { systemCode, code, ...centerFields(data) },
+      data: { operatorId: requireOperatorId(), systemCode, code, ...centerFields(data) },
       select: { id: true, systemCode: true, code: true, rowVersion: true },
     })
     await ensureCenterDefaults(tx, center.id)

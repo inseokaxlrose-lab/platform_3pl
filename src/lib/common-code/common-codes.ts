@@ -8,9 +8,11 @@ import type { CodeOptions } from './code-options'
 
 // 화면에 나눠 줄 전체 목록: 사용 중인 그룹의 코드 (사용 중지된 코드도 표시용으로 포함)
 // 코드 수가 수백 개 수준이라 화면 틀(AppShell)이 요청마다 한 번에 읽는다
-export async function loadCodeOptions(): Promise<CodeOptions> {
+// 공통코드는 운영사마다 따로 → 내 운영사 것만 (운영사가 없으면 빈 목록, 0039)
+export async function loadCodeOptions(operatorId: bigint | undefined): Promise<CodeOptions> {
+  if (operatorId === undefined) return {}
   const groups = await prisma.codeGroup.findMany({
-    where: { status: 'ACTIVE' },
+    where: { operatorId, status: 'ACTIVE' },
     select: {
       code: true,
       items: {

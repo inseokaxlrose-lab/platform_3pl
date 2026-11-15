@@ -1,11 +1,12 @@
 import 'server-only'
 import { ALL_PERMISSION_CODES, isPermissionCode } from '@/config/permissions'
 import { prisma } from '@/lib/prisma'
+import { operatorFilter, type DataScope } from '@/lib/scope/data-scope'
 
-// 수정 화면용: 권한그룹 한 건 (화면에서 hasPermission으로 확인한 뒤 호출)
-export async function getPermissionGroup(id: bigint) {
+// 수정 화면용: 권한그룹 한 건 (화면에서 hasPermission으로 확인한 뒤 호출, 내 운영사 것만)
+export async function getPermissionGroup(id: bigint, scope: DataScope) {
   const group = await prisma.permissionGroup.findUnique({
-    where: { id },
+    where: { id, ...operatorFilter(scope) },
     select: {
       id: true,
       name: true,

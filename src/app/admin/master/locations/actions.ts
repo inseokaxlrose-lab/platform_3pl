@@ -32,7 +32,7 @@ const LOCATION_SCOPE = { center: 'warehouse.centerId' }
 async function findWarehouseInScope(warehouseId: bigint, scope: DataScope) {
   const warehouse = await prisma.warehouse.findUnique({
     where: { id: warehouseId },
-    select: { id: true, centerId: true, type: true, status: true },
+    select: { id: true, operatorId: true, centerId: true, type: true, status: true },
   })
   assertInScope(scope, warehouse, { center: 'centerId' })
   return warehouse!

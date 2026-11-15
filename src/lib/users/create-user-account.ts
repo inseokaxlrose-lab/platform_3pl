@@ -12,6 +12,8 @@ export { passwordSchema, usernameSchema } from './user-schema'
 // 서버 안에서만 부르므로 키는 bigint 그대로 받는다
 const createUserAccountSchema = z
   .object({
+    // 소속 운영사 (아이디는 운영사와 상관없이 전체에서 하나, 0039)
+    operatorId: z.bigint(),
     username: usernameSchema,
     password: passwordSchema,
     name: z.string().trim().min(1, '이름을 입력해 주세요.').max(50),
@@ -46,6 +48,7 @@ export async function createUserAccount(input: CreateUserAccountInput) {
   return prisma.$transaction(async (tx) => {
     const user = await tx.user.create({
       data: {
+        operatorId: data.operatorId,
         name: data.name,
         email: data.email ? data.email.toLowerCase() : internalEmail(username),
         username,

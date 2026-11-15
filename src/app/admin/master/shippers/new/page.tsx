@@ -12,7 +12,7 @@ export default async function NewShipperPage() {
   const allowed =
     (await hasPermission('master.shippers.create')) && (await getCurrentScope()).kind === 'ALL'
   if (!allowed) return <AccessDenied />
-  const centers = await getCenterChoices()
+  const centers = await getCenterChoices(await getCurrentScope())
 
   return (
     <ShipperForm

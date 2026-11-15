@@ -3,7 +3,7 @@ import { parseId } from '@/lib/id'
 import { notFound } from 'next/navigation'
 import { BackToListButton } from '@/components/master-list'
 import { AccessDenied } from '@/components/permission'
-import { hasPermission } from '@/lib/session'
+import { getCurrentScope, hasPermission } from '@/lib/session'
 import { getPermissionGroup } from '../queries'
 import { RoleForm } from '../role-form'
 
@@ -16,7 +16,7 @@ export default async function EditRolePage({ params }: PageProps<'/admin/system/
   // 주소의 키가 숫자 모양이 아니면 바로 "찾을 수 없음"
   const id = parseId((await params).id)
   if (id === null) notFound()
-  const group = await getPermissionGroup(id)
+  const group = await getPermissionGroup(id, await getCurrentScope())
   if (!group) notFound()
 
   return (

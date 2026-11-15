@@ -11,7 +11,7 @@ import { loadCodeOptions } from '@/lib/common-code/common-codes'
 import { loadHelpAction } from '@/lib/help/help-actions'
 import { listHelpMenuHrefs } from '@/lib/help/load-help'
 import { setFavoriteMenuAction } from '@/lib/navigation/favorite-actions'
-import type { CurrentUser } from '@/lib/session'
+import { getCurrentScope, type CurrentUser } from '@/lib/session'
 import { AppHeader } from './app-header'
 import { AppSidebar } from './app-sidebar'
 import { parseSidebarTab, SIDEBAR_TAB_COOKIE } from './sidebar-tab'
@@ -42,7 +42,7 @@ export async function AppShell({
   // 사이드바 탭도 마지막으로 연 탭으로 그린다
   const initialTab = parseSidebarTab(cookieStore.get(SIDEBAR_TAB_COOKIE)?.value)
   // 공통코드 전체 (고르기 목록용, 0030): 수백 개 수준이라 요청마다 한 번에 읽는다
-  const codeOptions = await loadCodeOptions()
+  const codeOptions = await loadCodeOptions((await getCurrentScope()).operatorId)
 
   return (
     <PermissionProvider codes={permissions}>

@@ -6,6 +6,7 @@ import { listQuerySchema, toPrismaQuery } from '@/lib/grid/grid-query'
 import { getExternalCodes } from '@/lib/master-code/external-codes'
 import { deletedWhere, statusWhere } from '@/lib/grid/list-filters'
 import { prisma } from '@/lib/prisma'
+import { operatorFilter } from '@/lib/scope/data-scope'
 import { withIsActive } from '@/lib/status'
 import { isYes } from '@/lib/yn'
 import { UNIT_KINDS } from '@/lib/units/unit-labels'
@@ -28,7 +29,7 @@ const idsSchema = z.array(idSchema).min(1).max(200)
 export const listUnitsAction = createAction({
   permission: 'master.units.read',
   input: listQuerySchema,
-  handler: async ({ input }) => {
+  handler: async ({ input, scope }) => {
     const { filters } = input
     const query = toPrismaQuery(input, {
       searchFields: ['code', 'name'],
@@ -46,7 +47,13 @@ export const listUnitsAction = createAction({
       : undefined
     const where = {
       // '삭제됨'을 고르면 지운 것만 (아니면 prisma.ts가 지운 것을 뺀다)
-      AND: [query.where, kind ? { kind } : {}, statusWhere(filters), deletedWhere(filters)],
+      AND: [
+        operatorFilter(scope),
+        query.where,
+        kind ? { kind } : {},
+        statusWhere(filters),
+        deletedWhere(filters),
+      ],
     }
     const [rows, rowCount] = await prisma.$transaction([
       prisma.unit.findMany({
