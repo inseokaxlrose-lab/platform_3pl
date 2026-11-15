@@ -4,6 +4,8 @@ import { z } from 'zod'
 import { ActionError } from '@/lib/actions/action-error'
 import { createAction } from '@/lib/actions/create-action'
 import { idSchema } from '@/lib/id'
+import { commitAsnUpload, previewAsnUpload } from '@/lib/inbound/asn-upload'
+import { uploadRowsSchema } from '@/lib/excel/upload'
 import { asnSchema } from '@/lib/inbound/asn-schema'
 import { assertAsnsInScope, createAsn, deleteAsns, updateAsn } from '@/lib/inbound/asns'
 import { rowVersionField } from '@/lib/row-version'
@@ -43,4 +45,17 @@ export const deletePortalAsnsAction = createAction({
     shipperOf(scope)
     return deleteAsns(await assertAsnsInScope(input.ids, scope))
   },
+})
+
+// 엑셀 업로드 (0050): 화주사 칸 없이 자기 화주사
+export const validatePortalAsnUploadAction = createAction({
+  permission: 'portal.asn.create',
+  input: uploadRowsSchema,
+  handler: async ({ input, scope }) => previewAsnUpload(input, scope, shipperOf(scope)),
+})
+
+export const commitPortalAsnUploadAction = createAction({
+  permission: 'portal.asn.create',
+  input: uploadRowsSchema,
+  handler: async ({ input, scope }) => commitAsnUpload(input, scope, shipperOf(scope)),
 })
