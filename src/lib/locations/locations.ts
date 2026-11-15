@@ -97,11 +97,16 @@ function assertNoneProtected(locations: LocationWithWarehouse[], what: string) {
   }
 }
 
-// 쓰인 적 있는 로케이션 id (재고·이력이 있음)
-// TODO(재고 작업, ROADMAP M4 재고 기반): 재고·재고 이력 표가 생기면 여기서 검사한다. 지금은 쓰일 곳이 없어 빈 목록
+// 쓰인 적 있는 로케이션 id (재고 줄이 있음 = 재고 이력이 있음, 수량이 0이어도 기록은 남는다)
+// 재고 줄은 재고 변경 공통 함수가 이력과 함께 만들고 지우지 않는다 (docs/decisions/0045)
 export async function findUsedLocationIds(ids: bigint[]): Promise<bigint[]> {
-  void ids // 재고 표가 생기면 이 id들로 검사한다
-  return []
+  if (ids.length === 0) return []
+  const rows = await prisma.stock.findMany({
+    where: { locationId: { in: ids } },
+    distinct: ['locationId'],
+    select: { locationId: true },
+  })
+  return rows.map((r) => r.locationId)
 }
 
 export async function setLocationsActive(

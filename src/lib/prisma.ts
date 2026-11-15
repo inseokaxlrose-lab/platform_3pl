@@ -1,6 +1,7 @@
 import { PrismaPg } from '@prisma/adapter-pg'
 import { PrismaClient } from '@/generated/prisma/client'
 import { currentActor, currentOperatorId } from './actor'
+import { assertStockWrite } from './stock/stock-write-guard'
 
 // 앱 전체에서 DB 연결 통로(PrismaClient)를 하나만 쓰기 위한 파일
 // 개발 모드에서는 코드를 고칠 때마다 모듈이 다시 불러와지므로,
@@ -124,6 +125,7 @@ function createPrismaClient() {
   }
   const adapter = new PrismaPg({ connectionString })
   // 공통 칸 자동 채우기: 화면·기능 코드에서 따로 넣지 않는다
+  // 재고 표 쓰기는 재고 변경 공통 함수 안에서만 (assertStockWrite, docs/decisions/0045)
   // (안쪽 관계로 함께 만드는 줄은 채워지지 않으므로, 공통 칸이 있는 표는 바깥에서 직접 만든다)
   return new PrismaClient({ adapter }).$extends({
     name: 'audit-tenant-columns',
@@ -155,30 +157,46 @@ function createPrismaClient() {
           return query(scoped(model, args))
         },
         create({ model, args, query }) {
+          assertStockWrite(model, 'create')
           args.data = forCreate(model, args.data as Data) as never
           return query(args)
         },
         createMany({ model, args, query }) {
+          assertStockWrite(model, 'createMany')
           const rows = Array.isArray(args.data) ? args.data : [args.data]
           args.data = rows.map((row) => forCreate(model, row as Data)) as never
           return query(args)
         },
         // 실제 지우기(외부 코드 등 공통 칸이 없는 표)도 지금 운영사의 줄만
         delete({ model, args, query }) {
+          assertStockWrite(model, 'delete')
           return query(inTenant(model, args))
         },
         deleteMany({ model, args, query }) {
+          assertStockWrite(model, 'deleteMany')
           return query(inTenant(model, args))
         },
         update({ model, args, query }) {
+          assertStockWrite(model, 'update')
           if (AUDITED_MODELS.has(model)) args.data = forUpdate(args.data as Data) as never
           return query(scoped(model, args))
         },
         updateMany({ model, args, query }) {
+          assertStockWrite(model, 'updateMany')
           if (AUDITED_MODELS.has(model)) args.data = forUpdate(args.data as Data) as never
           return query(scoped(model, args))
         },
+        // 아래 둘은 공통 칸·운영사 자동 채우기를 하지 않는다 (지금 쓰는 곳 없음). 재고 표만 막는다
+        createManyAndReturn({ model, args, query }) {
+          assertStockWrite(model, 'createManyAndReturn')
+          return query(args)
+        },
+        updateManyAndReturn({ model, args, query }) {
+          assertStockWrite(model, 'updateManyAndReturn')
+          return query(args)
+        },
         upsert({ model, args, query }) {
+          assertStockWrite(model, 'upsert')
           args.create = forCreate(model, args.create as Data) as never
           if (AUDITED_MODELS.has(model)) args.update = forUpdate(args.update as Data) as never
           // 지운 줄은 찾지 않는다 → 없으면 새로 만든다 (부분 고유 조건과도 맞다)
