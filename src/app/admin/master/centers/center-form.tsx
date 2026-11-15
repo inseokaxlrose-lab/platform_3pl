@@ -5,7 +5,6 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useState, useTransition } from 'react'
 import {
-  AddressFields,
   ConfirmDialog,
   ExternalCodesFields,
   FormColumns,
@@ -14,6 +13,7 @@ import {
   FormSection,
   StatusBadge,
 } from '@/components/common'
+import { AddressInput } from '@/components/inputs'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { unwrap } from '@/lib/actions'
@@ -148,7 +148,7 @@ export function CenterForm({
       </FormSection>
 
       <FormSection title="주소">
-        <AddressFields
+        <AddressInput
           idPrefix="center-address"
           value={{
             zipCode: form.zipCode,

@@ -11,29 +11,30 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
-import { FormField } from './form-field'
 import { loadKakaoPostcode, toAddress } from './kakao-postcode'
 
 export type AddressValue = { zipCode: string; address: string; addressDetail: string }
 
-type AddressFieldsProps = {
+type AddressInputProps = {
+  // 저장 형식 그대로 (운영사·센터 등 기존 API 칸 이름 유지)
   value: AddressValue
   onChange: (value: AddressValue) => void
   disabled?: boolean
   errors?: Partial<Record<keyof AddressValue, string>>
-  // 입력칸 id 앞부분 (한 화면에 주소가 여러 개일 때 구분)
+  // 입력칸 id 앞부분 (한 화면에 주소가 여러 개일 때 구분). 기본주소 칸 id = `${idPrefix}-address`
   idPrefix?: string
 }
 
-// 주소 입력: [주소 검색](카카오 우편번호) → 우편번호·주소 채움, 상세주소만 직접 입력 (docs/decisions/0024)
+// 주소 입력 (권장 span 12): [우편번호][주소 검색] 한 줄 → 기본주소 → 상세주소 (docs/decisions/0024)
+// 카카오 우편번호로 우편번호·기본주소를 채우고, 상세주소만 직접 입력한다
 // 검색 서비스를 불러오지 못하면 우편번호·주소도 직접 입력할 수 있게 연다
-export function AddressFields({
+export function AddressInput({
   value,
   onChange,
   disabled,
   errors = {},
   idPrefix = 'address',
-}: AddressFieldsProps) {
+}: AddressInputProps) {
   const [open, setOpen] = useState(false)
   const [manual, setManual] = useState(false)
   const [loadError, setLoadError] = useState<string | null>(null)
@@ -41,57 +42,55 @@ export function AddressFields({
   // 주소를 골라서 닫혔는지 (그렇다면 닫힐 때 초점을 상세주소로)
   const selected = useRef(false)
   const set = (patch: Partial<AddressValue>) => onChange({ ...value, ...patch })
+  const error = errors.zipCode ?? errors.address ?? errors.addressDetail ?? loadError
 
   return (
-    <div className="grid gap-4 sm:grid-cols-[10rem_1fr]">
-      <FormField label="우편번호" error={errors.zipCode} htmlFor={`${idPrefix}-zip`}>
+    <div className="grid gap-2">
+      <div className="flex gap-2">
         <Input
           id={`${idPrefix}-zip`}
+          aria-label="우편번호"
+          className="w-28"
           value={value.zipCode}
           readOnly={!manual}
           disabled={disabled}
           inputMode="numeric"
+          placeholder="우편번호"
+          aria-invalid={Boolean(errors.zipCode)}
           onChange={(e) => set({ zipCode: e.target.value })}
         />
-      </FormField>
-      <FormField label="주소" error={errors.address} htmlFor={`${idPrefix}-address`}>
-        <div className="flex gap-2">
-          <Input
-            id={`${idPrefix}-address`}
-            value={value.address}
-            readOnly={!manual}
-            disabled={disabled}
-            placeholder={manual ? '주소를 직접 입력하세요' : '[주소 검색]으로 입력합니다'}
-            onChange={(e) => set({ address: e.target.value })}
-          />
-          {!disabled && (
-            <Button type="button" variant="outline" onClick={() => setOpen(true)}>
-              <MapPinIcon />
-              주소 검색
-            </Button>
-          )}
-        </div>
-        {loadError && (
-          <p role="alert" className="text-xs text-destructive">
-            {loadError}
-          </p>
+        {!disabled && (
+          <Button type="button" variant="outline" onClick={() => setOpen(true)}>
+            <MapPinIcon />
+            주소 검색
+          </Button>
         )}
-      </FormField>
-      <FormField
-        label="상세주소"
-        error={errors.addressDetail}
-        htmlFor={`${idPrefix}-detail`}
-        className="sm:col-span-2"
-      >
-        <Input
-          ref={detailInput}
-          id={`${idPrefix}-detail`}
-          value={value.addressDetail}
-          disabled={disabled}
-          placeholder="동·층·호수 등"
-          onChange={(e) => set({ addressDetail: e.target.value })}
-        />
-      </FormField>
+      </div>
+      <Input
+        id={`${idPrefix}-address`}
+        aria-label="주소"
+        value={value.address}
+        readOnly={!manual}
+        disabled={disabled}
+        placeholder={manual ? '주소를 직접 입력하세요' : '[주소 검색]으로 입력합니다'}
+        aria-invalid={Boolean(errors.address)}
+        onChange={(e) => set({ address: e.target.value })}
+      />
+      <Input
+        ref={detailInput}
+        id={`${idPrefix}-detail`}
+        aria-label="상세주소"
+        value={value.addressDetail}
+        disabled={disabled}
+        placeholder="상세주소 (동·층·호수 등)"
+        aria-invalid={Boolean(errors.addressDetail)}
+        onChange={(e) => set({ addressDetail: e.target.value })}
+      />
+      {error && (
+        <p role="alert" className="text-xs text-destructive">
+          {error}
+        </p>
+      )}
 
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent

@@ -32,7 +32,7 @@ export const optionalEmail = z
   .refine((value) => value === '' || z.email().safeParse(value).success, '이메일 형식이 아닙니다.')
   .transform((value) => value.toLowerCase() || null)
 
-// 주소 3칸 (카카오 주소 검색 공통 부품 AddressFields와 같은 모양)
+// 주소 3칸 (카카오 주소 검색 공통 부품 AddressInput와 같은 모양)
 export const addressShape = {
   zipCode: z
     .string()

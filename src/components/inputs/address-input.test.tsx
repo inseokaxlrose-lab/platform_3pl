@@ -1,7 +1,7 @@
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { useState } from 'react'
 import { afterEach, describe, expect, it } from 'vitest'
-import { AddressFields, type AddressValue } from './address-fields'
+import { AddressInput, type AddressValue } from './address-input'
 import { toAddress, type KakaoPostcodeResult } from './kakao-postcode'
 
 const RESULT: KakaoPostcodeResult = {
@@ -31,7 +31,7 @@ function Harness() {
   const [value, setValue] = useState<AddressValue>({ zipCode: '', address: '', addressDetail: '' })
   return (
     <>
-      <AddressFields value={value} onChange={setValue} />
+      <AddressInput value={value} onChange={setValue} />
       <output data-testid="value">{JSON.stringify(value)}</output>
     </>
   )
@@ -61,7 +61,7 @@ describe('toAddress (검색 결과 → 저장할 주소)', () => {
   })
 })
 
-describe('AddressFields', () => {
+describe('AddressInput', () => {
   it('[주소 검색]에서 고르면 우편번호·주소가 채워지고 상세주소로 초점이 간다', async () => {
     installFakePostcode()
     render(<Harness />)

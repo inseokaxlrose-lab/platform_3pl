@@ -3,7 +3,8 @@
 import { PlusIcon, SaveIcon, Trash2Icon } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { useState, useTransition } from 'react'
-import { AddressFields, FormColumns, FormField, FormRow, FormSection } from '@/components/common'
+import { FormColumns, FormField, FormRow, FormSection } from '@/components/common'
+import { AddressInput } from '@/components/inputs'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import {
@@ -152,7 +153,7 @@ export function CompanyForm({ initial, readOnly }: CompanyFormProps) {
             </FormSection>
 
             <FormSection title="주소">
-              <AddressFields
+              <AddressInput
                 idPrefix="company-address"
                 value={{
                   zipCode: form.zipCode,
