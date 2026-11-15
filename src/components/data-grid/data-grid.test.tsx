@@ -428,3 +428,10 @@ describe('DataGrid 목록 공통 기능', () => {
     expect(screen.getByText('품목1').closest('td')!.className).not.toContain('text-center')
   })
 })
+
+describe('DataGrid 페이지 범위 표시', () => {
+  it('전체 건수와 지금 보는 범위 (예: 21–40)', () => {
+    render(<Harness initial={{ ...createDataGridState(), pageIndex: 2 }} />)
+    expect(screen.getByText('41–45')).toBeTruthy()
+  })
+})

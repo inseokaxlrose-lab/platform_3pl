@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { Suspense, useState } from 'react'
 import { z } from 'zod'
 import { CommonCodeProvider } from '@/components/common-code'
 import {
@@ -23,6 +23,7 @@ import {
   useMasterForm,
 } from '@/components/master-form'
 import { Input } from '@/components/ui/input'
+import { ListShowcase } from './list-showcase'
 import type { CodeOptions } from '@/lib/common-code'
 import { isValidBusinessNumber } from '@/lib/format'
 import {
@@ -271,6 +272,15 @@ export function ComponentsShowcase() {
         </a>
         <div className="rounded-lg border p-6">
           <FormSample />
+        </div>
+      </section>
+      <section className="mt-10 space-y-4">
+        <h2 className="text-lg font-semibold">목록·검색 화면 틀 (MasterListPage)</h2>
+        <div className="rounded-lg border p-6">
+          {/* 주소창(useSearchParams)을 읽는 부품은 Suspense로 감싼다 (정적 페이지 빌드 규칙) */}
+          <Suspense>
+            <ListShowcase />
+          </Suspense>
         </div>
       </section>
     </CommonCodeProvider>
