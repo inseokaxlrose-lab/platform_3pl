@@ -47,7 +47,8 @@ export default async function CompanyPage() {
     : null
 
   return (
-    <div className="space-y-6">
+    // 제목도 본문과 같은 제한 폭으로 가운데 (MasterFormPage와 줄 맞춤)
+    <div className="mx-auto w-full max-w-5xl space-y-6">
       <PageHeader
         title="운영사"
         description={

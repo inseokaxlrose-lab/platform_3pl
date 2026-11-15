@@ -13,7 +13,7 @@
    - 번호·이메일·주소는 `src/lib/validation/common-fields.ts`의 `optionalPhone`, `optionalEmail`, `addressShape`를 쓴다.
    - 여러 칸 규칙: `requireOneOf(['phone','email'], 문구)`, 목록 안 하나만 `exactlyOne('isPrimary', 문구)`.
 2. **서버 액션**은 `createAction`으로 만든다. 입력 오류는 `contacts.0.phone`처럼 전체 위치로 돌아와 화면의 그 칸에 표시된다.
-3. **화면 파일**에는 섹션·필드 정의와 그 화면 전용 로직만 둔다.
+3. **화면 파일**에는 섹션·필드 정의와 그 화면 전용 로직만 둔다. `page.tsx`는 `PageHeader`와 폼을 `mx-auto w-full max-w-5xl`로 감싸 제목도 본문과 같은 폭에 둔다.
 
 ```tsx
 const form = useMasterForm({ initial, schema: centerSchema, save: updateCenterAction })
