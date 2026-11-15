@@ -46,8 +46,9 @@ export function requireOperatorId(): bigint {
 }
 
 // 운영사 거르기를 잠깐 끄고 실행 (작업자 기록은 그대로)
-// 운영사와 상관없이 전체에서 하나여야 하는 값(로그인 아이디·이메일)의 중복 검사에만 쓴다
-// 결과로 "있다/없다"만 돌려주고, 다른 운영사의 데이터를 화면으로 보내지 않는다
+// 쓰는 곳은 두 가지뿐이다:
+// - 운영사와 상관없이 전체에서 하나여야 하는 값(로그인 아이디·이메일)의 중복 검사 — 결과로 "있다/없다"만 쓴다
+// - 플랫폼의 운영사 등록 — 새 운영사의 키를 직접 넣어 만든다 (작업 중인 운영사와 섞이지 않게)
 export async function acrossOperators<T>(fn: () => T | PromiseLike<T>): Promise<T> {
   return runInContext({ actor: currentActor() }, fn)
 }
