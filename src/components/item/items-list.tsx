@@ -13,12 +13,10 @@ import {
 } from '@/components/master-list'
 import { Button } from '@/components/ui/button'
 import { unwrap } from '@/lib/actions'
-import {
-  deleteItemsAction,
-  listItemsAction,
-  restoreItemsAction,
-  setItemsActiveAction,
-} from './actions'
+import type { ActionResult } from '@/lib/actions/result'
+import type { ListFetcher } from '@/components/master-list/use-list-query'
+
+export type ItemRow = Row
 
 type Row = {
   id: string
@@ -40,7 +38,8 @@ type Row = {
   updatedAt: Date
 }
 
-const COLUMNS: DataGridColumn<Row>[] = [
+// 칸 정의 (basePath: 수정 화면 주소 앞부분, withShipper: 화주사 칸을 보일지 — 화주 포털은 자기 화주사뿐이라 숨김)
+const columnsOf = (basePath: string, withShipper: boolean): DataGridColumn<Row>[] => [
   {
     id: 'code',
     header: '품목코드',
@@ -48,10 +47,19 @@ const COLUMNS: DataGridColumn<Row>[] = [
     sortable: true,
     hideable: false,
     pinned: true,
-    href: (row) => `/admin/master/items/${row.id}`,
+    href: (row) => `${basePath}/${row.id}`,
   },
   { id: 'name', header: '품목명', accessor: 'name', sortable: true, pinned: true },
-  { id: 'shipper', header: '화주사', accessor: 'shipper', sortable: true },
+  ...(withShipper
+    ? [
+        {
+          id: 'shipper',
+          header: '화주사',
+          accessor: 'shipper',
+          sortable: true,
+        } satisfies DataGridColumn<Row>,
+      ]
+    : []),
   { id: 'spec', header: '규격', accessor: 'spec' },
   { id: 'barcode', header: '바코드', accessor: 'barcode', defaultHidden: true },
   { id: 'systemCode', header: '시스템 코드', accessor: 'systemCode', defaultHidden: true },
@@ -104,16 +112,32 @@ const COLUMNS: DataGridColumn<Row>[] = [
   },
 ]
 
-// 품목 목록 (docs/decisions/0041): 행을 누르면 수정 화면
+type Ids = { ids: string[] }
+
+// 품목 목록 (docs/decisions/0041): 행을 누르면 수정 화면 — 운영사 화면·화주 포털 공용 (서버 액션은 각자 넘긴다)
 export function ItemsList({
+  gridId,
+  basePath,
   shippers,
   can,
   actions,
+  listAction,
+  setActiveAction,
+  deleteAction,
+  restoreAction,
 }: {
-  // 화주사 고르기 선택지 (범위 안의 화주사)
-  shippers: { id: string; code: string; name: string }[]
+  // 그리드 이름 (사용자별 설정 저장 키)
+  gridId: string
+  // 수정 화면 주소 앞부분 ('/admin/master/items', '/portal/items')
+  basePath: string
+  // 화주사 고르기 선택지 (범위 안의 화주사). null이면 화주사 칸·조건을 숨긴다 (화주 포털)
+  shippers: { id: string; code: string; name: string }[] | null
   can: { update: boolean; delete: boolean; export: boolean }
   actions?: React.ReactNode
+  listAction: ListFetcher<Row>
+  setActiveAction: (input: Ids & { isActive: boolean }) => Promise<ActionResult<unknown>>
+  deleteAction: (input: Ids) => Promise<ActionResult<unknown>>
+  restoreAction: (input: Ids) => Promise<ActionResult<{ count: number }>>
 }) {
   const searchFields: SearchFieldDef[] = [
     {
@@ -121,14 +145,18 @@ export function ItemsList({
       label: '검색어',
       type: 'keyword',
       span: 4,
-      placeholder: '품목코드·품목명·바코드·화주사',
+      placeholder: shippers ? '품목코드·품목명·바코드·화주사' : '품목코드·품목명·바코드',
     },
-    {
-      key: 'shipper',
-      label: '화주사',
-      type: 'select',
-      options: shippers.map((s) => ({ value: s.id, label: `${s.name} (${s.code})` })),
-    },
+    ...(shippers
+      ? [
+          {
+            key: 'shipper',
+            label: '화주사',
+            type: 'select',
+            options: shippers.map((s) => ({ value: s.id, label: `${s.name} (${s.code})` })),
+          } satisfies SearchFieldDef,
+        ]
+      : []),
     {
       key: 'status',
       label: '상태',
@@ -144,11 +172,7 @@ export function ItemsList({
     { key: 'expiry', label: '유통기한 사용', type: 'yn', detail: true },
     { key: 'createdAt', label: '등록일', type: 'dateRange', span: 6, detail: true },
   ]
-  const list = useListQuery<Row>({
-    gridId: 'master-items',
-    fields: searchFields,
-    fetch: listItemsAction,
-  })
+  const list = useListQuery<Row>({ gridId, fields: searchFields, fetch: listAction })
 
   const bulk = (ids: string[], done: () => void, kind: 'deactivate' | 'activate' | 'delete') => {
     const label = { deactivate: '사용 중지', activate: '다시 사용', delete: '삭제' }[kind]
@@ -183,8 +207,8 @@ export function ItemsList({
         confirmLabel={label}
         destructive={kind !== 'activate'}
         onConfirm={async () => {
-          if (kind === 'delete') unwrap(await deleteItemsAction({ ids }))
-          else unwrap(await setItemsActiveAction({ ids, isActive: kind === 'activate' }))
+          if (kind === 'delete') unwrap(await deleteAction({ ids }))
+          else unwrap(await setActiveAction({ ids, isActive: kind === 'activate' }))
           done()
         }}
       />
@@ -196,13 +220,13 @@ export function ItemsList({
       title="품목"
       description="화주사가 맡긴 상품입니다. 단위·환산단위와 로트·유통기한 관리 여부를 정합니다."
       actions={actions}
-      gridId="master-items"
+      gridId={gridId}
       searchFields={searchFields}
       list={list}
-      columns={COLUMNS}
+      columns={columnsOf(basePath, shippers !== null)}
       getRowId={(row) => row.id}
       // "삭제됨" 보기: 수정 화면 대신 골라서 [되살리기]
-      rowHref={isDeletedView(list.values) ? undefined : (row) => `/admin/master/items/${row.id}`}
+      rowHref={isDeletedView(list.values) ? undefined : (row) => `${basePath}/${row.id}`}
       excelName={can.export ? '품목' : undefined}
       bulkActions={
         isDeletedView(list.values)
@@ -211,7 +235,7 @@ export function ItemsList({
                 <RestoreButton
                   ids={ids}
                   noun="품목"
-                  restore={(restoreIds) => restoreItemsAction({ ids: restoreIds })}
+                  restore={(restoreIds) => restoreAction({ ids: restoreIds })}
                   done={done}
                 />
               )

@@ -102,6 +102,8 @@ type ItemFormProps = {
   // 화주 포털: 화주사를 고르지 않는다 (자기 화주사로 고정)
   fixedShipperId?: string
   canToggleActive?: boolean
+  // false: 외부 코드 섹션을 숨긴다 (화주 포털 — 운영사 내부 연동용 코드라서, 0041)
+  showExternalCodes?: boolean
   createAction: (input: ItemCreateInput) => Promise<ActionResult<SaveResult>>
   updateAction: (
     input: ItemInput & { id: string; rowVersion: number },
@@ -119,6 +121,7 @@ export function ItemForm({
   basePath,
   fixedShipperId,
   canToggleActive = false,
+  showExternalCodes = true,
   createAction,
   updateAction,
   setActiveAction,
@@ -418,7 +421,10 @@ export function ItemForm({
         </div>
       ),
     },
-    {
+  ]
+
+  if (showExternalCodes) {
+    sections.push({
       id: 'external',
       title: '외부 코드',
       description: 'SAP·ERP 등과 연동할 때 그쪽의 품목 코드를 적습니다.',
@@ -433,8 +439,8 @@ export function ItemForm({
           />
         </FormGrid>
       ),
-    },
-  ]
+    })
+  }
 
   // 수정 화면에서만: 상태 (바로 처리)
   if (item) {

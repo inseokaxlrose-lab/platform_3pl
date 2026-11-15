@@ -7,10 +7,9 @@ import { prisma } from '@/lib/prisma'
 import { isInScope, operatorFilter, scopeFilter, type DataScope } from '@/lib/scope/data-scope'
 import { ACTIVE_ONLY, isActiveStatus } from '@/lib/status'
 import { isYes } from '@/lib/yn'
+import { ITEM_SCOPE, SHIPPER_SCOPE } from './item-list'
 
-// 품목 화면 조회 함수 (docs/decisions/0041) — 서버 액션 밖이라 데이터 범위를 직접 건다
-
-const ITEM_SCOPE = { center: 'shipper.centers.some.centerId', shipper: 'shipperId' }
+// 품목 화면 조회 함수 (docs/decisions/0041) — 운영사 화면·화주 포털 공용. 서버 액션 밖이라 데이터 범위를 직접 건다
 
 // 등록·수정 화면의 선택지: 범위 안의 사용 중인 화주사(품목 기본값 포함) + 단위(종류·소수 자리수)
 // 단위는 사용 중지된 것도 넣는다 (이미 저장된 값을 이름으로 보여주기 위해, 새로 고를 때는 화면이 숨긴다)
@@ -18,7 +17,7 @@ export async function getItemFormOptions(scope: DataScope): Promise<ItemFormOpti
   const [shippers, units] = await Promise.all([
     prisma.shipper.findMany({
       where: {
-        AND: [scopeFilter(scope, { center: 'centers.some.centerId', shipper: 'id' }), ACTIVE_ONLY],
+        AND: [scopeFilter(scope, SHIPPER_SCOPE), ACTIVE_ONLY],
       },
       select: {
         id: true,

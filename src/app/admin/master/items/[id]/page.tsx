@@ -9,7 +9,7 @@ import { prisma } from '@/lib/prisma'
 import { getCurrentScope, hasPermission } from '@/lib/session'
 import { actorLabel } from '@/lib/users/actor-label'
 import { createItemAction, setItemsActiveAction, updateItemAction } from '../actions'
-import { getItemForEdit, getItemFormOptions } from '../queries'
+import { getItemForEdit, getItemFormOptions } from '@/lib/items/item-queries'
 
 export const metadata: Metadata = { title: '품목 수정' }
 
