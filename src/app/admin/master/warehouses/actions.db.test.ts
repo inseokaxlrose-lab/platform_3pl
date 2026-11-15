@@ -12,6 +12,7 @@ import { resetDatabase } from '@/test/reset-database'
 import {
   createWarehouseAction,
   listWarehousesAction,
+  setWarehousesActiveAction,
   setWarehouseActiveAction,
   updateWarehouseAction,
 } from './actions'
@@ -177,7 +178,10 @@ describe('목록 · 데이터 범위 · 권한', () => {
     await create({ code: 'A01' })
     await create({ centerId: gmhId, code: 'B01', name: '김해 1창고' })
 
-    const icnOnly = await listWarehousesAction({ ...createDataGridState(), centerId: icnId })
+    const icnOnly = await listWarehousesAction({
+      ...createDataGridState(),
+      filters: { center: icnId },
+    })
     expect(icnOnly.ok && icnOnly.data.rows.map((r) => r.code)).toEqual(['A01', 'INBOUND'])
 
     const searched = await listWarehousesAction(createDataGridState({ search: '김해 1' }))
@@ -193,7 +197,10 @@ describe('목록 · 데이터 범위 · 권한', () => {
     const result = await listWarehousesAction(createDataGridState())
     expect(result.ok && result.data.rows.map((r) => r.center)).toEqual(['ICN 센터 (ICN)'])
     // 다른 센터를 골라도 범위 밖은 나오지 않는다
-    const other = await listWarehousesAction({ ...createDataGridState(), centerId: gmhId })
+    const other = await listWarehousesAction({
+      ...createDataGridState(),
+      filters: { center: gmhId },
+    })
     expect(other.ok && other.data.rows).toEqual([])
 
     expect(await updateWarehouseAction({ id: gmhWarehouse.id, ...input() })).toMatchObject({
@@ -214,5 +221,47 @@ describe('목록 · 데이터 범위 · 권한', () => {
       ok: false,
       error: { code: 'FORBIDDEN' },
     })
+  })
+})
+
+describe('목록 검색 조건 · 일괄 처리 · 엑셀', () => {
+  const codes = async (filters: Record<string, string>) => {
+    const result = await listWarehousesAction({ ...createDataGridState(), filters })
+    return result.ok ? result.data.rows.map((r) => r.code).sort() : result.error
+  }
+
+  it('유형·보관 조건·상태로 거른다 (모르는 값은 조건 없음)', async () => {
+    await create({ code: 'A01', storageCondition: 'FROZEN' })
+    expect(await codes({ center: icnId, type: 'INBOUND_STAGING' })).toEqual(['INBOUND'])
+    expect(await codes({ center: icnId, storage: 'FROZEN' })).toEqual(['A01'])
+    expect(await codes({ center: icnId, type: 'HOT' })).toEqual(['A01', 'INBOUND'])
+    expect(await codes({ center: icnId, status: 'INACTIVE' })).toEqual([])
+  })
+
+  it('일괄 사용 중지: 입고대기 창고가 섞이면 전체 거부, 범위 밖이 섞여도 전체 거부', async () => {
+    const a = await create({ code: 'A01' })
+    const staging = await prisma.warehouse.findFirstOrThrow({
+      where: { centerId: icnId, type: 'INBOUND_STAGING' },
+    })
+    expect(
+      await setWarehousesActiveAction({ ids: [a.id, staging.id], isActive: false }),
+    ).toMatchObject({ ok: false, error: { code: 'CONFLICT' } })
+    expect(await setWarehousesActiveAction({ ids: [a.id], isActive: false })).toEqual({
+      ok: true,
+      data: { count: 1 },
+    })
+
+    const b = await create({ centerId: gmhId, code: 'B01' })
+    signIn({ kind: 'CENTERS', centerIds: [icnId] })
+    expect(await setWarehousesActiveAction({ ids: [a.id, b.id], isActive: true })).toMatchObject({
+      ok: false,
+      error: { code: 'NOT_FOUND' },
+    })
+  })
+
+  it('엑셀 전체 읽기는 엑셀 권한이 필요하다', async () => {
+    expect(await listWarehousesAction({ ...createDataGridState(), exportAll: true })).toMatchObject(
+      { ok: false, error: { code: 'FORBIDDEN' } },
+    )
   })
 })

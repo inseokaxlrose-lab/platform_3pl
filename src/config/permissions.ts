@@ -43,7 +43,12 @@ export const PERMISSION_MENUS = {
     area: 'admin',
     actions: [...CRUD, 'export'],
   },
-  'master.warehouses': { label: '창고', group: '기준정보', area: 'admin', actions: CRUD },
+  'master.warehouses': {
+    label: '창고',
+    group: '기준정보',
+    area: 'admin',
+    actions: [...CRUD, 'export'],
+  },
   'master.locations': { label: '로케이션', group: '기준정보', area: 'admin', actions: CRUD },
   'master.delivery-zones': { label: '배송권역', group: '기준정보', area: 'admin', actions: CRUD },
   'master.units': { label: '단위', group: '기준정보', area: 'admin', actions: CRUD },
