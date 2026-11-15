@@ -74,7 +74,7 @@ const FIELDS: SearchFieldDef[] = [
       { value: 'INACTIVE', label: '중지' },
     ],
   },
-  { key: 'duty', label: '업무 (codeMulti)', type: 'codeMulti', codeGroup: 'CONTACT_DUTY' },
+  { key: 'duty', label: '업무 (codeMulti)', type: 'codeMulti', codeGroup: 'CONTACT_ROLE' },
   { key: 'vip', label: '중요 (yn)', type: 'yn', detail: true },
   { key: 'bizNo', label: '사업자번호 (bizNo)', type: 'bizNo', detail: true },
   { key: 'phone', label: '전화 (phone)', type: 'phone', detail: true },
@@ -94,7 +94,7 @@ const COLUMNS: DataGridColumn<DemoRow>[] = [
   { id: 'name', header: '이름 (고정)', accessor: 'name', sortable: true, pinned: true },
   { id: 'bizNo', header: '사업자번호', accessor: 'bizNo', format: 'bizNo' },
   { id: 'phone', header: '전화', accessor: 'phone', format: 'phone' },
-  { id: 'duty', header: '업무 (code)', accessor: 'duty', format: { code: 'CONTACT_DUTY' } },
+  { id: 'duty', header: '업무 (code)', accessor: 'duty', format: { code: 'CONTACT_ROLE' } },
   {
     id: 'isActive',
     header: '상태 (status)',

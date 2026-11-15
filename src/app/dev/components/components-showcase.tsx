@@ -35,7 +35,7 @@ import {
 
 // 견본용 공통코드 (실제 화면은 AppShell이 DB에서 읽어 넣는다)
 const SAMPLE_CODES: CodeOptions = {
-  CONTACT_DUTY: [
+  CONTACT_ROLE: [
     { code: 'INBOUND', name: '입고', isActive: true },
     { code: 'OUTBOUND', name: '출고', isActive: true },
     { code: 'SETTLEMENT', name: '정산', isActive: true },
@@ -105,7 +105,7 @@ function InputSamples() {
         note="group만 넘기면 공통코드 목록 (사용 중지 코드는 현재 값일 때만)"
         value={duty}
       >
-        <CodeSelect group="CONTACT_DUTY" value={duty} onChange={setDuty} />
+        <CodeSelect group="CONTACT_ROLE" value={duty} onChange={setDuty} />
       </Sample>
       <Sample title="NumberInput" note="쉼표, 소수 2자리, 0~10,000, 단위 kg" value={weight}>
         <NumberInput
@@ -241,7 +241,7 @@ function FormSample() {
                   label: '담당 업무',
                   required: true,
                   width: '8rem',
-                  input: { codeGroup: 'CONTACT_DUTY' },
+                  input: { codeGroup: 'CONTACT_ROLE' },
                 },
                 { key: 'name', label: '담당자명', required: true, width: '8rem' },
                 { key: 'phone', label: '연락처', width: '10rem', input: 'phone' },

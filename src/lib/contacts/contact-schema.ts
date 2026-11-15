@@ -8,12 +8,12 @@ import {
 } from '@/lib/validation/common-fields'
 
 // 담당자 입력 규칙 — 운영사·화주사(·거래처) 공용 (docs/decisions/0031, 0035)
-// 담당 업무는 공통코드 CONTACT_DUTY, 연락처·이메일 중 하나 필수, 최대 5명, 대표 1명
+// 담당 업무는 공통코드 CONTACT_ROLE, 연락처·이메일 중 하나 필수, 최대 5명, 대표 1명
 
 export const MAX_CONTACTS = 5
 
 // 담당 업무 공통코드 그룹 (0030). 코드가 실제로 있는지는 저장할 때 서버가 확인한다
-export const CONTACT_DUTY_GROUP = 'CONTACT_DUTY'
+export const CONTACT_ROLE_GROUP = 'CONTACT_ROLE'
 
 export const contactSchema = z
   .object({

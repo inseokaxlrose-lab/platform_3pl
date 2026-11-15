@@ -19,7 +19,7 @@ const common = {
   isActive: z.boolean(),
 }
 
-// 그룹 코드: 영문 대문자로 시작, 대문자·숫자·밑줄 2~30자 (예: CONTACT_DUTY)
+// 그룹 코드: 영문 대문자로 시작, 대문자·숫자·밑줄 2~30자 (예: CONTACT_ROLE)
 export const groupCodeField = z
   .string()
   .trim()
