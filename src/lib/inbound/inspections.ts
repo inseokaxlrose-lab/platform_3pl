@@ -10,7 +10,7 @@ import type { InspectionData } from './inspection-schema'
 // - ASN 줄 하나에 여러 건 (로트가 다르면 나눠서), 수량은 입력 단위 → 기본단위
 // - 로트·유통기한: 품목 설정에 따라 필수 또는 비움 (CLAUDE.md)
 // - 마감된 ASN은 검수할 수 없다. 첫 검수가 들어오면 ASN은 예정 → 검수중
-// - 확정하지 않은 검수만 지울 수 있다 (실수 정정)
+// - 확정하지 않고 라벨을 인쇄하지 않은 검수만 지울 수 있다 (실수 정정)
 
 export async function addInspection(data: InspectionData) {
   const operatorId = requireOperatorId()
@@ -90,6 +90,14 @@ export async function deleteInspection(id: bigint) {
     if (found.asn.status === 'CLOSED') {
       throw new ActionError('CONFLICT', '마감된 ASN의 검수는 지울 수 없습니다.')
     }
+    // 라벨: 인쇄한 라벨이 있으면 지울 수 없다 (붙인 라벨이 가리키는 기록이 사라지지 않게), 인쇄 전 라벨은 함께 지운다
+    const printed = await tx.inboundLabel.count({
+      where: { inspectionId: id, printCount: { gt: 0 } },
+    })
+    if (printed > 0) {
+      throw new ActionError('CONFLICT', '라벨을 인쇄한 검수는 지울 수 없습니다.')
+    }
+    await tx.inboundLabel.deleteMany({ where: { inspectionId: id } })
     await tx.inboundInspection.delete({ where: { id } })
     const left = await tx.inboundInspection.count({ where: { asnId: found.asnId } })
     if (left === 0 && found.asn.status === 'INSPECTING') {
