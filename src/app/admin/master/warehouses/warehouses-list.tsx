@@ -124,6 +124,8 @@ export function WarehousesList({
       options: [
         { value: 'GENERAL', label: '일반' },
         { value: 'INBOUND_STAGING', label: '입고대기' },
+        { value: 'OUTBOUND_STAGING', label: '출고대기' },
+        { value: 'RETURN_STAGING', label: '반품대기' },
       ],
     },
     {
@@ -144,7 +146,7 @@ export function WarehousesList({
     fetch: listWarehousesAction,
   })
 
-  // 일괄 사용 중지 / 다시 사용: 실행 전 대상 건수 확인 (입고대기 창고가 섞이면 서버가 거부)
+  // 일괄 사용 중지 / 다시 사용: 실행 전 대상 건수 확인 (대기 창고가 섞이면 서버가 거부)
   const bulkButton = (ids: string[], done: () => void, isActive: boolean) => (
     <ConfirmDialog
       trigger={
@@ -162,7 +164,7 @@ export function WarehousesList({
       description={
         isActive
           ? '이 창고들을 다시 쓸 수 있게 됩니다.'
-          : '이 창고와 로케이션에 새로 적치할 수 없게 됩니다. 입고대기 창고는 사용 중지할 수 없습니다.'
+          : '이 창고와 로케이션에 새로 적치할 수 없게 됩니다. 대기 창고(입고·출고·반품)는 사용 중지할 수 없습니다.'
       }
       confirmLabel={isActive ? '다시 사용' : '사용 중지'}
       destructive={!isActive}
@@ -176,7 +178,7 @@ export function WarehousesList({
   return (
     <MasterListPage
       title="창고"
-      description="센터 안의 보관 구역을 관리합니다. 입고대기 창고는 센터마다 자동으로 하나씩 있습니다."
+      description="센터 안의 보관 구역을 관리합니다. 입고·출고·반품 대기 창고는 센터마다 자동으로 하나씩 있습니다."
       actions={actions}
       gridId="master-warehouses"
       searchFields={fields}
