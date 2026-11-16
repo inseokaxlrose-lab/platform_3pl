@@ -2,6 +2,7 @@
 
 import { useRouter } from 'next/navigation'
 import { useEffect, useRef, useState } from 'react'
+import { setLeaveRequest, setPageDirty } from '@/lib/navigation/page-dirty'
 
 // 저장하지 않은 변경이 있을 때 화면을 떠나지 못하게 한 번 묻는다
 // - 새로고침·창 닫기·주소 직접 입력: 브라우저 기본 확인 창 (beforeunload — 문구는 브라우저가 정한다)
@@ -15,7 +16,18 @@ export function useDirtyGuard(dirty: boolean) {
   const dirtyRef = useRef(dirty)
   useEffect(() => {
     dirtyRef.current = dirty
+    // 메뉴 탭의 ● 표시 (0069)
+    setPageDirty(dirty)
   }, [dirty])
+
+  // 메뉴 탭 [×]로 이 화면을 닫을 때도 같은 확인 창을 쓰게 (0069). 화면을 떠나면 표시를 지운다
+  useEffect(() => {
+    setLeaveRequest((href) => setPendingHref(href))
+    return () => {
+      setLeaveRequest(null)
+      setPageDirty(false)
+    }
+  }, [])
 
   useEffect(() => {
     function onBeforeUnload(event: BeforeUnloadEvent) {
