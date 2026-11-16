@@ -28,7 +28,7 @@
 | 영역 | 모양 |
 | --- | --- |
 | 검색 영역, 결과 그리드 | 카드: `rounded-lg border bg-card` (검색 영역 안쪽 `p-card`) |
-| 편집 폼 섹션 | 테두리 없이 제목 + 위쪽 구분선 `border-t`, 간격 `section` |
+| 편집 폼 섹션 | 테두리 없이 제목(앞에 `bg-primary` 세로 막대, `text-lg`) + 위쪽 구분선 `border-t border-foreground/15`, 간격 `section` |
 | 하위 표·그리드 툴바 | `SectionToolbar`: 왼쪽 건수(총 n건 / 2 / 5명), 오른쪽 버튼 — 표 위 |
 
 - 테두리 색은 `border` 토큰, 모서리는 `--radius`(rounded-lg)만 쓴다.
