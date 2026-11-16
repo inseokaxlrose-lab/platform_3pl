@@ -64,7 +64,9 @@ export function MenuTabs({ area }: { area: NavAreaKey }) {
   return (
     <nav
       aria-label="열린 메뉴"
-      className="flex h-10 shrink-0 items-end gap-1 overflow-x-auto border-b bg-background px-2"
+      // 탭 줄 바탕은 본문보다 살짝 어둡게 → 본문과 같은 바탕인 선택된 탭이 튀어나와 보인다
+      // 아래 선은 안쪽 그림자로 → 선택된 탭의 바탕이 그 선을 덮어 본문과 이어진다
+      className="flex h-10 shrink-0 items-end gap-1 overflow-x-auto bg-muted px-2 shadow-[inset_0_-1px_0_var(--border)]"
     >
       <TabLink
         href={homeHref}
@@ -111,11 +113,12 @@ function TabLink({
     <div
       className={cn(
         // 고정 폭: 이름 길이와 상관없이 같은 크기 (메뉴 탭 176px, 닫기 없는 홈 탭 96px), 넘치면 … 처리
-        'group flex h-8 shrink-0 items-center rounded-t-md border border-b-0 text-sm transition-colors',
+        'group relative flex h-8 shrink-0 items-center rounded-t-md border border-b-0 text-sm transition-colors',
         onClose ? 'w-44' : 'w-24',
+        // 선택된 탭: 위쪽 브랜드 색 띠 + 본문과 같은 바탕(탭 줄 아래 선을 덮어 본문과 이어진 것처럼)
         active
-          ? 'border-border bg-card font-medium text-foreground'
-          : 'border-transparent text-muted-foreground hover:bg-muted hover:text-foreground',
+          ? 'border-t-2 border-border border-t-primary bg-background font-semibold text-foreground [&_a>svg]:text-primary'
+          : 'border-transparent text-muted-foreground hover:bg-background/60 hover:text-foreground',
       )}
     >
       <Link
