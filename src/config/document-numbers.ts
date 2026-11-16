@@ -6,6 +6,7 @@ export const DOCUMENT_NUMBER_TYPES = {
   ASN: { prefix: 'AS', sequence: 'doc_no_asn_seq', label: 'ASN' },
   RECEIPT: { prefix: 'RC', sequence: 'doc_no_receipt_seq', label: '입고확정' },
   LABEL: { prefix: 'LB', sequence: 'doc_no_label_seq', label: '관리 라벨' },
+  ADJUST: { prefix: 'AJ', sequence: 'doc_no_adjust_seq', label: '실사·조정' },
 } as const
 
 export type DocumentNumberType = keyof typeof DOCUMENT_NUMBER_TYPES
