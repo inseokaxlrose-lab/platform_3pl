@@ -213,6 +213,7 @@ export const listCentersAction = createAction({
 ```
 
 2. **화면 파일**(`*-list.tsx`)에는 검색 조건 정의 + 컬럼 정의 + 조회 함수 + 화면 전용 로직(일괄 처리 등)만.
+   - 고정(`pinned`)한 코드·번호 컬럼(id가 `code`·`…Code`·`…No`)은 `width`를 주지 않으면 **내용 너비로 좁혀진다** (표가 화면 폭을 채우며 남는 폭을 나눠 가져 넓어지는 것을 막는다). 직접 조절한 너비가 있으면 그것을 따른다.
 
 ```tsx
 const SEARCH_FIELDS: SearchFieldDef[] = [
