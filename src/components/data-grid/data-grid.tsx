@@ -103,6 +103,10 @@ function resolve<T>(updater: Updater<T>, previous: T): T {
 }
 
 // 공통 목록 그리드: 모든 목록 화면은 이 컴포넌트를 쓴다 (docs/decisions/0002-ui-and-datagrid.md)
+// 내용 너비로 좁힐 컬럼: 고정(pinned)된 코드·번호 컬럼 (id가 code·…Code·…No로 끝남, 예: code, asnNo)
+const isFitColumn = (def: { id: string; pinned?: boolean }) =>
+  Boolean(def.pinned) && /(^code|Code|No)$/.test(def.id)
+
 export function DataGrid<TData extends RowData>({
   id,
   columns,
@@ -449,6 +453,9 @@ export function DataGrid<TData extends RowData>({
                       'relative',
                       stickyClass(column.id, true),
                       fixedLayout && 'truncate',
+                      // 고정(pinned)된 코드·번호 컬럼은 너비를 정하지 않았으면 내용에 맞게 좁힌다
+                      // 표가 화면 폭을 채우며 남는 폭을 나눠 가져 코드 칸이 넓어지는 것을 막는다 (w-px = 내용 너비까지만)
+                      !fixedLayout && isFitColumn(def) && !widthOf(column.id) && 'w-px',
                       align === 'right' && 'text-right',
                       align === 'center' && 'text-center',
                     )}
