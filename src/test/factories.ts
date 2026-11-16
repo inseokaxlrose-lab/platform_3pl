@@ -110,6 +110,7 @@ type VersionedModel =
   | 'item'
   | 'customer'
   | 'asn'
+  | 'location'
 
 export async function versionOf(model: VersionedModel, id: bigint | string): Promise<number> {
   const delegate = prisma[model] as unknown as {

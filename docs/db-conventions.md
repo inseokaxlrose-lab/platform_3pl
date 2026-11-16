@@ -210,6 +210,8 @@
 | `id` | `id` | `location_id` | TEXT(cuid) → BIGINT |
 | `warehouseId` | `warehouseId` | `warehouse_id` | TEXT(cuid) → BIGINT |
 | `code` | `code` | `location_cd` |  |
+| `name` | (0071 추가) | `location_nm` | VARCHAR(100), 필수 — 기존 줄·일괄 생성은 코드와 같게 |
+| `remark` | (0071 추가) | `remark` | VARCHAR(1000), 선택 |
 | `zone` | `zone` | `zone_cd` |  |
 | `aisle` | `aisle` | `aisle_cd` |  |
 | `level` | `level` | `level_cd` |  |

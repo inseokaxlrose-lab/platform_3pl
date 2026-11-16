@@ -18,6 +18,10 @@ export const locationCodeField = z
     '로케이션 코드는 영문·숫자·하이픈 1~30자입니다.',
   )
 
+// 로케이션 명칭·비고 (0071): 명칭은 한글 가능, 비우면 저장할 때 코드와 같게
+export const locationNameField = z.string().trim().max(100, '명칭은 100자 이하입니다.')
+export const locationRemarkField = z.string().trim().max(1000, '비고는 1000자 이하입니다.')
+
 const letter = z
   .string()
   .trim()

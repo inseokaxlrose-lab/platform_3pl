@@ -316,6 +316,9 @@ model Location {
   warehouseId BigInt    @map("warehouse_id")
   // 같은 창고 안에서 중복 금지 (예: A-01-01, DEFAULT)
   code        String    @map("location_cd")
+  // 로케이션 명칭 (한글 가능, 0071): 비우면 코드와 같게 — 일괄 생성·기존 줄도 코드와 같다
+  name        String    @map("location_nm") @db.VarChar(100)
+  remark      String?   @db.VarChar(1000)
   // 일괄 생성으로 만들면 함께 저장: 구역(A) / 열(01) / 단(02) — 구역별 거르기·정렬용 (docs/decisions/0028)
   zone        String?   @map("zone_cd")
   aisle       String?   @map("aisle_cd")

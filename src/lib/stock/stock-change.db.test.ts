@@ -39,7 +39,9 @@ beforeEach(async () => {
     },
   })
   const location = (warehouseId: bigint, code: string) =>
-    prisma.location.create({ data: { operatorId: TEST_OPERATOR_ID, warehouseId, code } })
+    prisma.location.create({
+      data: { operatorId: TEST_OPERATOR_ID, warehouseId, code, name: code },
+    })
   const firstLocation = (warehouseId: bigint) =>
     prisma.location.findFirstOrThrow({ where: { warehouseId } })
 

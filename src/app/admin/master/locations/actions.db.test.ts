@@ -6,7 +6,7 @@ import { nextSystemCode } from '@/lib/master-code/system-code'
 import { prisma } from '@/lib/prisma'
 import type { DataScope } from '@/lib/scope/data-scope'
 import { getCurrentPermissions, getCurrentScope, getCurrentUser } from '@/lib/session'
-import { createTestCenter } from '@/test/factories'
+import { createTestCenter, versionOf } from '@/test/factories'
 import { resetDatabase, TEST_OPERATOR_ID } from '@/test/reset-database'
 import {
   bulkCreateLocationsAction,
@@ -15,6 +15,7 @@ import {
   listLocationsAction,
   previewBulkLocationsAction,
   setLocationsActiveAction,
+  updateLocationAction,
 } from './actions'
 import { getWarehouseOptions } from './queries'
 
@@ -129,6 +130,68 @@ describe('한 칸 등록', () => {
   })
 })
 
+describe('명칭·비고 (0071)', () => {
+  it('명칭을 비우면 코드와 같게, 넣으면 그대로 (한글 가능) · 비고는 선택', async () => {
+    const a = await createLocationAction({ warehouseId: String(icnWarehouseId), code: 'f1-07' })
+    const b = await createLocationAction({
+      warehouseId: String(icnWarehouseId),
+      code: 'DOCK-01',
+      name: ' 1번 도크 ',
+      remark: '냉동실 입구 옆',
+    })
+    expect(a.ok && b.ok).toBe(true)
+    const rows = await prisma.location.findMany({
+      where: { warehouseId: icnWarehouseId, code: { in: ['F1-07', 'DOCK-01'] } },
+      orderBy: { code: 'asc' },
+      select: { code: true, name: true, remark: true },
+    })
+    expect(rows).toEqual([
+      { code: 'DOCK-01', name: '1번 도크', remark: '냉동실 입구 옆' },
+      { code: 'F1-07', name: 'F1-07', remark: null },
+    ])
+
+    // 목록 검색어로 명칭도 찾는다
+    const found = await listLocationsAction({ ...createDataGridState(), search: '도크' })
+    expect(found.ok && found.data.rows.map((r) => r.code)).toEqual(['DOCK-01'])
+  })
+
+  it('명칭·비고 수정: 비우면 명칭은 코드로, 버전이 다르면 거부, 범위 밖은 찾을 수 없음', async () => {
+    const created = await createLocationAction({
+      warehouseId: String(icnWarehouseId),
+      code: 'R-01',
+      name: '랙1',
+    })
+    if (!created.ok) throw new Error(created.error.message)
+    const id = created.data.id
+    const version = await versionOf('location', id)
+
+    expect(
+      await updateLocationAction({ id, rowVersion: version, name: '', remark: '수리 중' }),
+    ).toMatchObject({ ok: true })
+    expect(
+      await prisma.location.findUniqueOrThrow({
+        where: { id: BigInt(id) },
+        select: { name: true, remark: true },
+      }),
+    ).toEqual({ name: 'R-01', remark: '수리 중' })
+
+    // 예전 버전으로 다시 저장 → 다른 사람이 먼저 고친 것으로 보고 거부
+    expect(
+      await updateLocationAction({ id, rowVersion: version, name: 'X', remark: '' }),
+    ).toMatchObject({ ok: false, error: { code: 'CONFLICT' } })
+
+    signIn({ kind: 'CENTERS', operatorId: TEST_OPERATOR_ID, centerIds: [] })
+    expect(
+      await updateLocationAction({
+        id,
+        rowVersion: await versionOf('location', id),
+        name: 'X',
+        remark: '',
+      }),
+    ).toMatchObject({ ok: false, error: { code: 'NOT_FOUND' } })
+  })
+})
+
 describe('일괄 생성', () => {
   it('미리보기는 만들지 않고 개수·처음·마지막을 알려준다', async () => {
     const preview = await previewBulkLocationsAction({
@@ -148,7 +211,7 @@ describe('일괄 생성', () => {
     expect(await prisma.location.count({ where: { warehouseId: icnWarehouseId } })).toBe(0)
   })
 
-  it('없는 코드만 만들고 구역·열·단을 함께 저장, 다시 실행하면 전부 건너뛴다', async () => {
+  it('없는 코드만 만들고 구역·열·단을 함께 저장(명칭 = 코드), 다시 실행하면 전부 건너뛴다', async () => {
     await createLocationAction({ warehouseId: String(icnWarehouseId), code: 'A-01-02' })
 
     expect(
@@ -160,7 +223,7 @@ describe('일괄 생성', () => {
     const located = await prisma.location.findUniqueOrThrow({
       where: { warehouseId_code: { warehouseId: icnWarehouseId, code: 'B-02-03' } },
     })
-    expect(located).toMatchObject({ zone: 'B', aisle: '02', level: '03' })
+    expect(located).toMatchObject({ zone: 'B', aisle: '02', level: '03', name: 'B-02-03' })
 
     expect(
       await bulkCreateLocationsAction({ warehouseId: String(icnWarehouseId), range: RANGE }),

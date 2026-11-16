@@ -59,7 +59,12 @@ export async function createInboundFixture() {
       ids.push(
         (
           await prisma.location.create({
-            data: { operatorId: TEST_OPERATOR_ID, warehouseId: warehouse.id, code: location },
+            data: {
+              operatorId: TEST_OPERATOR_ID,
+              warehouseId: warehouse.id,
+              code: location,
+              name: location,
+            },
           })
         ).id,
       )

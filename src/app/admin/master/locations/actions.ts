@@ -6,7 +6,9 @@ import { createAction } from '@/lib/actions/create-action'
 import { listQuerySchema, toPrismaQuery } from '@/lib/grid/grid-query'
 import {
   locationCodeField,
+  locationNameField,
   locationRangeSchema,
+  locationRemarkField,
   MAX_BULK_LOCATIONS,
 } from '@/lib/locations/location-range'
 import {
@@ -16,7 +18,9 @@ import {
   previewBulkLocations,
   restoreLocations,
   setLocationsActive,
+  updateLocation,
 } from '@/lib/locations/locations'
+import { rowVersionField } from '@/lib/row-version'
 import { prisma } from '@/lib/prisma'
 import { DELETED_ONLY, withIsActive } from '@/lib/status'
 import { assertInScope, scopeFilter, type DataScope } from '@/lib/scope/data-scope'
@@ -64,11 +68,12 @@ export const listLocationsAction = createAction({
     }
     const { filters } = input
     const query = toPrismaQuery(input, {
-      searchFields: ['code'],
+      searchFields: ['code', 'name'],
       sortable: {
         center: 'warehouse.center.code',
         warehouse: 'warehouse.code',
         code: 'code',
+        name: 'name',
         zone: 'zone',
         aisle: 'aisle',
         level: 'level',
@@ -105,6 +110,9 @@ export const listLocationsAction = createAction({
         select: {
           id: true,
           code: true,
+          name: true,
+          remark: true,
+          rowVersion: true,
           zone: true,
           aisle: true,
           level: true,
@@ -140,10 +148,27 @@ export const createLocationAction = createAction({
   input: z.object({
     warehouseId: idField('창고를 골라 주세요.'),
     code: locationCodeField,
+    name: locationNameField.default(''),
+    remark: locationRemarkField.default(''),
   }),
   handler: async ({ input, scope }) => {
     const warehouse = await findWarehouseInScope(input.warehouseId, scope)
-    return createLocation(warehouse, input.code)
+    return createLocation(warehouse, input)
+  },
+})
+
+// 명칭·비고 수정 (0071): 범위 안의 로케이션만, 동시 수정은 버전으로 막는다
+export const updateLocationAction = createAction({
+  permission: 'master.locations.update',
+  input: z.object({
+    id: idSchema,
+    rowVersion: rowVersionField,
+    name: locationNameField,
+    remark: locationRemarkField,
+  }),
+  handler: async ({ input, scope }) => {
+    await findLocationsInScope([input.id], scope)
+    return updateLocation(input)
   },
 })
 

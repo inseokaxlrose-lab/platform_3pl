@@ -3,6 +3,7 @@ import { assertAllFound, assertNoCodeConflict } from '@/lib/soft-delete'
 import { ActionError } from '@/lib/actions/action-error'
 import { requireOperatorId } from '@/lib/actor'
 import { DEFAULT_LOCATION_CODE } from '@/lib/centers/center-defaults'
+import { assertRowVersion, withVersionGuard } from '@/lib/row-version'
 import { prisma } from '@/lib/prisma'
 import { expandLocationRange, type GeneratedLocation, type LocationRange } from './location-range'
 import { DELETED_ONLY, isActiveStatus, NOT_DELETED, toStatus } from '@/lib/status'
@@ -27,8 +28,13 @@ function assertCanAddTo(warehouse: TargetWarehouse) {
   }
 }
 
-// 한 칸 등록
-export async function createLocation(warehouse: TargetWarehouse, code: string) {
+// 한 칸 등록 (명칭을 비우면 코드와 같게, 0071)
+export type LocationEntry = { code: string; name?: string; remark?: string }
+
+export async function createLocation(
+  warehouse: TargetWarehouse,
+  { code, name, remark }: LocationEntry,
+) {
   assertCanAddTo(warehouse)
   const exists = await prisma.location.findUnique({
     where: { warehouseId_code: { warehouseId: warehouse.id, code } },
@@ -36,9 +42,37 @@ export async function createLocation(warehouse: TargetWarehouse, code: string) {
   })
   if (exists) throw new ActionError('CONFLICT', `이 창고에 이미 있는 로케이션입니다: ${code}`)
   return prisma.location.create({
-    data: { operatorId: requireOperatorId(), warehouseId: warehouse.id, code },
+    data: {
+      operatorId: requireOperatorId(),
+      warehouseId: warehouse.id,
+      code,
+      name: name?.trim() || code,
+      remark: remark?.trim() || null,
+    },
     select: { id: true, code: true },
   })
+}
+
+// 명칭·비고 수정 (코드는 바꾸지 않는다). 명칭을 비우면 코드와 같게
+export async function updateLocation(input: {
+  id: bigint
+  rowVersion: number
+  name: string
+  remark: string
+}) {
+  const found = await prisma.location.findUnique({
+    where: { id: input.id },
+    select: { code: true, rowVersion: true },
+  })
+  assertRowVersion(found, input.rowVersion, '로케이션을 찾을 수 없습니다.')
+  const saved = await withVersionGuard(() =>
+    prisma.location.update({
+      where: { id: input.id, rowVersion: input.rowVersion },
+      data: { name: input.name.trim() || found!.code, remark: input.remark.trim() || null },
+      select: { id: true, rowVersion: true },
+    }),
+  )
+  return saved
 }
 
 // 일괄 생성 계산: 범위의 코드 중 이미 있는 것은 건너뛴다
@@ -79,7 +113,8 @@ export async function bulkCreateLocations(warehouse: TargetWarehouse, range: Loc
   const plan = await planBulk(warehouse.id, range)
   const operatorId = requireOperatorId()
   const { count } = await prisma.location.createMany({
-    data: plan.toCreate.map((l) => ({ operatorId, warehouseId: warehouse.id, ...l })),
+    // 명칭은 코드와 같게 (0071)
+    data: plan.toCreate.map((l) => ({ operatorId, warehouseId: warehouse.id, name: l.code, ...l })),
     // 미리 거른 뒤에도 동시에 누가 만들었을 수 있어 한 번 더 건너뛴다
     skipDuplicates: true,
   })

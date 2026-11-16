@@ -21,7 +21,7 @@ beforeEach(async () => {
   const inbound = await ensureCenterDefaults(prisma, center.id)
   const a = await prisma.location.findFirstOrThrow({ where: { warehouseId: inbound.id } })
   const b = await prisma.location.create({
-    data: { operatorId: TEST_OPERATOR_ID, warehouseId: inbound.id, code: 'B' },
+    data: { operatorId: TEST_OPERATOR_ID, warehouseId: inbound.id, code: 'B', name: 'B' },
   })
   const shipper = await createTestShipper('GANA')
   await prisma.shipper.update({
