@@ -247,3 +247,56 @@ describe('데이터 범위 · 삭제', () => {
     })
   })
 })
+
+describe('배송 센터 (0072)', () => {
+  const GANGNAM = '1168010100' // 서울 강남구
+  const GANGDONG = '1174010100' // 서울 강동구
+
+  it('배송 센터는 그 화주사의 이용 센터만 저장되고, 비우면 null', async () => {
+    // 가나식품은 이천센터만 이용
+    expect(await createCustomerAction(input({ deliveryCenterId: String(gmh) }))).toMatchObject({
+      ok: false,
+      error: { code: 'VALIDATION', message: expect.stringContaining('이용하는 센터') },
+    })
+    const fixed = await create({ code: 'C1', deliveryCenterId: String(icn) })
+    const free = await create({ code: 'C2', deliveryCenterId: '' })
+    const centerOf = async (id: string) =>
+      (await prisma.customer.findUniqueOrThrow({ where: { id: BigInt(id) } })).deliveryCenterId
+    expect(await centerOf(fixed.id)).toBe(icn)
+    expect(await centerOf(free.id)).toBeNull()
+  })
+
+  it('목록의 배송 센터: 지정 → 더 구체적인 지역(자동) → 같으면 배정 대기', async () => {
+    // 다라상사는 이천·김해 이용. 이천 = 서울 전체, 김해 = 경기 + 서울 강남구
+    await createZone(icn, '서울권', ['11'])
+    const gmhZone = await createZone(gmh, '서울남부', ['41', '11680'])
+    await create({ code: 'GD', shipperId: String(dara), regionCode: GANGDONG })
+    await create({ code: 'GN', shipperId: String(dara), regionCode: GANGNAM })
+    await create({
+      code: 'GN-FIX',
+      shipperId: String(dara),
+      regionCode: GANGNAM,
+      deliveryCenterId: String(icn),
+    })
+
+    const centers = async () => {
+      const result = await listCustomersAction(createDataGridState())
+      return Object.fromEntries(
+        (result.ok ? result.data.rows : []).map((r) => [r.code, r.deliveryCenter]),
+      )
+    }
+    expect(await centers()).toEqual({
+      GD: '이천센터 (자동)',
+      GN: '김해센터 (자동)',
+      'GN-FIX': '이천센터 (지정)',
+    })
+
+    // 김해 권역을 서울 전체로 바꾸면 같은 수준·같은 우선순위 → 배정 대기
+    await prisma.deliveryZoneRegion.deleteMany({ where: { zoneId: gmhZone } })
+    await prisma.deliveryZoneRegion.create({ data: { zoneId: gmhZone, regionCode: '11' } })
+    expect((await centers()).GN).toBe('배정 대기 (2곳)')
+    // 우선순위를 낮추면(작은 번호) 김해로
+    await prisma.deliveryZone.update({ where: { id: gmhZone }, data: { priority: 10 } })
+    expect((await centers()).GN).toBe('김해센터 (자동)')
+  })
+})

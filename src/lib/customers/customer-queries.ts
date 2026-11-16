@@ -3,7 +3,7 @@ import { toContactInput } from '@/lib/contacts/contact-schema'
 import { textIds } from '@/lib/id'
 import { prisma } from '@/lib/prisma'
 import { isInScope, scopeFilter, type DataScope } from '@/lib/scope/data-scope'
-import { ACTIVE_ONLY, isActiveStatus } from '@/lib/status'
+import { ACTIVE_ONLY, NOT_DELETED, isActiveStatus } from '@/lib/status'
 import { CUSTOMER_SCOPE, SHIPPER_SCOPE } from './customer-list'
 import type { CustomerInput } from './customer-schema'
 
@@ -13,10 +13,25 @@ import type { CustomerInput } from './customer-schema'
 export async function getCustomerShipperOptions(scope: DataScope) {
   const shippers = await prisma.shipper.findMany({
     where: { AND: [scopeFilter(scope, SHIPPER_SCOPE), ACTIVE_ONLY] },
-    select: { id: true, code: true, name: true },
+    select: {
+      id: true,
+      code: true,
+      name: true,
+      // 배송 센터 고르기 (0072): 이 화주사가 이용하는 사용 중인 센터
+      centers: {
+        where: { center: { ...ACTIVE_ONLY, ...NOT_DELETED } },
+        select: { center: { select: { id: true, code: true, name: true } } },
+        orderBy: { center: { code: 'asc' } },
+      },
+    },
     orderBy: { code: 'asc' },
   })
-  return textIds(shippers)
+  return textIds(
+    shippers.map(({ centers, ...shipper }) => ({
+      ...shipper,
+      centers: centers.map((c) => c.center),
+    })),
+  )
 }
 
 export type CustomerShipperOption = Awaited<ReturnType<typeof getCustomerShipperOptions>>[number]
@@ -26,7 +41,18 @@ export async function getCustomerForEdit(id: bigint, scope: DataScope) {
   const customer = await prisma.customer.findUnique({
     where: { id },
     include: {
-      shipper: { select: { code: true, name: true, centers: { select: { centerId: true } } } },
+      shipper: {
+        select: {
+          code: true,
+          name: true,
+          centers: {
+            select: {
+              centerId: true,
+              center: { select: { id: true, code: true, name: true, status: true, delYn: true } },
+            },
+          },
+        },
+      },
       contacts: { orderBy: { sortOrder: 'asc' } },
     },
   })
@@ -46,6 +72,7 @@ export async function getCustomerForEdit(id: bigint, scope: DataScope) {
     receiverName: text(customer.receiverName),
     receiverPhone: text(customer.receiverPhone),
     deliveryMemo: text(customer.deliveryMemo),
+    deliveryCenterId: customer.deliveryCenterId ? String(customer.deliveryCenterId) : '',
     remark: text(customer.remark),
     contacts: customer.contacts.map(toContactInput),
   }
@@ -56,6 +83,12 @@ export async function getCustomerForEdit(id: bigint, scope: DataScope) {
     isActive: isActiveStatus(customer.status),
     shipperId: customer.shipperId,
     shipper: `${customer.shipper.name} (${customer.shipper.code})`,
+    // 배송 센터로 고를 수 있는 센터 (0072): 이 화주사가 이용하는 사용 중인 센터
+    deliveryCenters: customer.shipper.centers
+      .map((c) => c.center)
+      .filter((c) => isActiveStatus(c.status) && c.delYn === 'N')
+      .map(({ id, code, name }) => ({ id, code, name }))
+      .sort((a, b) => a.code.localeCompare(b.code)),
     updatedBy: customer.updatedBy,
     updatedAt: customer.updatedAt,
     input,

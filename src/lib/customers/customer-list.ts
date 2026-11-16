@@ -4,7 +4,8 @@ import { toPrismaQuery, type ListQuery } from '@/lib/grid/grid-query'
 import { dateRangeFilter, deletedWhere, idFilter, statusWhere } from '@/lib/grid/list-filters'
 import { prisma } from '@/lib/prisma'
 import { scopeFilter, type DataScope } from '@/lib/scope/data-scope'
-import { ACTIVE_ONLY, DELETED_ONLY, NOT_DELETED, withIsActive } from '@/lib/status'
+import { matchRegion, pickDeliveryZone, type ZoneCandidate } from '@/lib/delivery-zones/routing'
+import { ACTIVE_ONLY, DELETED_ONLY, NOT_DELETED, isActiveStatus, withIsActive } from '@/lib/status'
 
 // 거래처 목록·범위 검사 (docs/decisions/0043)
 // 데이터 범위: 운영사 관리자 = 운영사 전체, 센터 직원 = 소속 센터를 이용하는 화주사의 거래처, 화주사 사용자 = 자기 화주사
@@ -36,29 +37,82 @@ export const regionPrefixes = (regionCode: string) => [
   regionCode.slice(0, 5),
 ]
 
-// 거래처들이 드는 배송권역: 화주사가 이용하는 센터의 사용 중인 권역 중 지역이 맞는 것 ('이천센터: 경기남부권')
-async function zonesOf(rows: { regionCode: string | null; centerIds: bigint[] }[]) {
+// 거래처들이 드는 배송권역과 배송 센터 (0043, 0072)
+// - 배송권역: 화주사가 이용하는 센터의 사용 중인 권역 중 지역이 맞는 것 ('이천센터: 경기남부권')
+// - 배송 센터: 거래처 지정 → 더 구체적인 지역 → 우선순위 → 배정 대기 (resolveDeliveryCenter와 같은 규칙)
+type ZoneRow = {
+  regionCode: string | null
+  centerIds: bigint[]
+  deliveryCenter: { id: bigint; name: string; status: string; delYn: string } | null
+}
+
+async function zonesOf(rows: ZoneRow[]) {
   const prefixes = [
     ...new Set(rows.flatMap((r) => (r.regionCode ? regionPrefixes(r.regionCode) : []))),
   ]
-  if (prefixes.length === 0) return rows.map(() => [] as string[])
-  const regions = await prisma.deliveryZoneRegion.findMany({
-    where: { regionCode: { in: prefixes }, zone: { ...NOT_DELETED, ...ACTIVE_ONLY } },
-    select: {
-      regionCode: true,
-      zone: { select: { name: true, centerId: true, center: { select: { name: true } } } },
-    },
-  })
+  const regions =
+    prefixes.length === 0
+      ? []
+      : await prisma.deliveryZoneRegion.findMany({
+          where: {
+            regionCode: { in: prefixes },
+            zone: {
+              ...NOT_DELETED,
+              ...ACTIVE_ONLY,
+              center: { ...NOT_DELETED, ...ACTIVE_ONLY },
+            },
+          },
+          select: {
+            regionCode: true,
+            zone: {
+              select: {
+                id: true,
+                name: true,
+                priority: true,
+                centerId: true,
+                center: { select: { name: true } },
+              },
+            },
+          },
+        })
   return rows.map((row) => {
-    if (!row.regionCode) return []
+    // 거래처 지정 배송 센터 (이용 센터·사용 중일 때만)
+    const fixed =
+      row.deliveryCenter &&
+      row.centerIds.includes(row.deliveryCenter.id) &&
+      isActiveStatus(row.deliveryCenter.status) &&
+      row.deliveryCenter.delYn === 'N'
+        ? `${row.deliveryCenter.name} (지정)`
+        : null
+    if (!row.regionCode) return { zones: [] as string[], center: fixed }
     const wanted = regionPrefixes(row.regionCode)
-    return [
-      ...new Set(
-        regions
-          .filter((r) => wanted.includes(r.regionCode) && row.centerIds.includes(r.zone.centerId))
-          .map((r) => `${r.zone.center.name}: ${r.zone.name}`),
-      ),
-    ]
+    const matched = regions.filter(
+      (r) => wanted.includes(r.regionCode) && row.centerIds.includes(r.zone.centerId),
+    )
+    const zones = [...new Set(matched.map((r) => `${r.zone.center.name}: ${r.zone.name}`))]
+    if (fixed) return { zones, center: fixed }
+    // 권역 하나에 한 후보 (가장 구체적인 지역으로)
+    const byZone = new Map<bigint, ZoneCandidate>()
+    for (const r of matched) {
+      const regionOfZone = matched.filter((m) => m.zone.id === r.zone.id).map((m) => m.regionCode)
+      const region = matchRegion(regionOfZone, row.regionCode)
+      if (!region) continue
+      byZone.set(r.zone.id, {
+        zoneId: String(r.zone.id),
+        zoneName: r.zone.name,
+        centerId: String(r.zone.centerId),
+        centerName: r.zone.center.name,
+        matchedRegion: region,
+        priority: r.zone.priority,
+      })
+    }
+    const { picked, tied } = pickDeliveryZone([...byZone.values()])
+    const center = picked
+      ? `${picked.centerName} (자동)`
+      : tied.length > 0
+        ? `배정 대기 (${tied.length}곳)`
+        : null
+    return { zones, center }
   })
 }
 
@@ -112,6 +166,7 @@ export async function listCustomers(input: ListQuery, scope: DataScope) {
         address: true,
         addressDetail: true,
         regionCode: true,
+        deliveryCenter: { select: { id: true, name: true, status: true, delYn: true } },
         receiverName: true,
         receiverPhone: true,
         status: true,
@@ -128,19 +183,23 @@ export async function listCustomers(input: ListQuery, scope: DataScope) {
     rows.map((r) => ({
       regionCode: r.regionCode,
       centerIds: r.shipper.centers.map((c) => c.centerId),
+      deliveryCenter: r.deliveryCenter,
     })),
   )
   return {
     rows: rows
       .map(withIsActive)
-      .map(({ shipper, address, addressDetail, regionCode, ...row }, i) => {
+      .map(({ shipper, address, addressDetail, regionCode, deliveryCenter, ...row }, i) => {
         void regionCode
+        void deliveryCenter
         return {
           ...row,
           shipper: `${shipper.name} (${shipper.code})`,
           address: [address, addressDetail].filter(Boolean).join(' ') || null,
           // 이 거래처가 드는 배송권역 (화주사가 이용하는 센터별)
-          zones: zones[i].join(', ') || null,
+          zones: zones[i].zones.join(', ') || null,
+          // 출고 때 배송할 센터 (0072): '서울센터 (지정)' / '경기센터 (자동)' / '배정 대기 (2곳)'
+          deliveryCenter: zones[i].center,
         }
       }),
     rowCount,

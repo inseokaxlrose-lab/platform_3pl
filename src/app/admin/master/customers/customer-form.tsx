@@ -53,6 +53,7 @@ const EMPTY: CustomerCreateInput = {
   receiverName: '',
   receiverPhone: '',
   deliveryMemo: '',
+  deliveryCenterId: '',
   remark: '',
   contacts: [],
 }
@@ -75,12 +76,16 @@ function toFormValues(data: CustomerCreateData): CustomerCreateInput {
     receiverName: text(data.receiverName),
     receiverPhone: text(data.receiverPhone),
     deliveryMemo: text(data.deliveryMemo),
+    deliveryCenterId: data.deliveryCenterId ? String(data.deliveryCenterId) : '',
     remark: text(data.remark),
     contacts: data.contacts.map((c) => toContactInput({ ...c, isPrimary: toYn(c.isPrimary) })),
   }
 }
 
 type TextKey = 'code' | 'name' | 'ceoName' | 'receiverName'
+
+// 배송 센터 '지정 안 함' (Select는 빈 값을 쓸 수 없어 따로 둔다)
+const NO_CENTER = '__none__'
 
 // 거래처 등록·수정 (docs/decisions/0043, 입력 화면 틀 0031)
 // 배송지 주소를 검색하면 법정동코드가 자동으로 저장된다 (배송권역과 맞춰 보는 데 쓴다, 화면 미노출)
@@ -119,6 +124,9 @@ export function CustomerForm({
   })
   const { value, set, errors } = form
   const disabled = readOnly || form.pending
+  // 배송 센터로 고를 수 있는 센터: 수정은 그 거래처의 화주사, 등록은 고른 화주사의 이용 센터 (0072)
+  const deliveryCenters =
+    customer?.deliveryCenters ?? shippers.find((s) => s.id === value.shipperId)?.centers ?? []
   const id = (key: string) => `customer-${key}`
   const props = (key: string) => ({ id: id(key), disabled, 'aria-invalid': Boolean(errors[key]) })
 
@@ -174,7 +182,8 @@ export function CustomerForm({
             ) : (
               <Select
                 value={value.shipperId}
-                onValueChange={(shipperId) => set({ shipperId })}
+                // 화주사를 바꾸면 배송 센터는 다시 고른다 (이용 센터가 다르다)
+                onValueChange={(shipperId) => set({ shipperId, deliveryCenterId: '' })}
                 disabled={disabled}
               >
                 <SelectTrigger
@@ -266,7 +275,36 @@ export function CustomerForm({
               }}
             />
           </Field>
-          {text('receiverName', '받는 사람', 4)}
+          <Field
+            label="배송 센터"
+            span={4}
+            error={errors.deliveryCenterId}
+            htmlFor={id('deliveryCenterId')}
+            hint="배송권역이 겹칠 때 이 센터로 배송합니다. 비우면 권역 규칙으로"
+          >
+            <Select
+              value={value.deliveryCenterId || NO_CENTER}
+              onValueChange={(v) => set({ deliveryCenterId: v === NO_CENTER ? '' : v })}
+              disabled={disabled || deliveryCenters.length === 0}
+            >
+              <SelectTrigger
+                id={id('deliveryCenterId')}
+                className="w-full"
+                aria-invalid={Boolean(errors.deliveryCenterId)}
+              >
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value={NO_CENTER}>지정 안 함 (권역 규칙)</SelectItem>
+                {deliveryCenters.map((c) => (
+                  <SelectItem key={c.id} value={c.id}>
+                    {c.name} ({c.code})
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </Field>
+          {text('receiverName', '받는 사람', 4, { newRow: true })}
           {phone('receiverPhone', '받는 사람 연락처')}
           <Field
             label="배송 메모"

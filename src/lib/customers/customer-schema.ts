@@ -1,6 +1,6 @@
 import { z } from 'zod'
 import { contactsSchema } from '@/lib/contacts/contact-schema'
-import { idField } from '@/lib/id'
+import { idField, optionalIdSchema } from '@/lib/id'
 import {
   addressShape,
   optionalBusinessNumber,
@@ -48,6 +48,8 @@ const customerShape = {
   receiverName: optionalText(50),
   receiverPhone: optionalPhone,
   deliveryMemo: optionalText(200),
+  // 배송 센터 (0072): 배송권역이 겹칠 때 맨 먼저 따르는 지정. 화주사 이용 센터 중 하나, 비우면 권역 규칙으로
+  deliveryCenterId: optionalIdSchema.default(null),
   remark: optionalText(1000),
   contacts: contactsSchema,
 }

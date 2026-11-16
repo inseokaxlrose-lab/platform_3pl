@@ -37,6 +37,18 @@ async function assertCustomerCode(
   }
 }
 
+// 배송 센터는 그 화주사가 이용하는 센터만 (0072)
+async function assertDeliveryCenter(db: Db, shipperId: bigint, centerId: bigint | null) {
+  if (centerId === null) return
+  const link = await db.shipperCenter.findUnique({
+    where: { shipperId_centerId: { shipperId, centerId } },
+    select: { centerId: true },
+  })
+  if (!link) {
+    throw new ActionError('VALIDATION', '배송 센터는 이 화주사가 이용하는 센터 중에서 골라 주세요.')
+  }
+}
+
 // DB 칸으로 옮길 값 (담당자·코드 제외)
 function fieldsOf(data: CustomerData) {
   const { contacts, code, ...fields } = data
@@ -67,6 +79,7 @@ export async function createCustomer(data: CustomerCreateData) {
     const systemCode = await nextSystemCode('CUSTOMER', tx)
     const code = data.code || systemCode
     await assertCustomerCode(tx, data.shipperId, code, systemCode)
+    await assertDeliveryCenter(tx, data.shipperId, data.deliveryCenterId)
     await assertCodeValues(
       tx,
       CONTACT_ROLE_GROUP,
@@ -106,6 +119,7 @@ export async function updateCustomer(id: bigint, rowVersion: number, data: Custo
     const current = found!
     const code = data.code || current.systemCode
     await assertCustomerCode(tx, current.shipperId, code, current.systemCode, id)
+    await assertDeliveryCenter(tx, current.shipperId, data.deliveryCenterId)
     await assertCodeValues(
       tx,
       CONTACT_ROLE_GROUP,
