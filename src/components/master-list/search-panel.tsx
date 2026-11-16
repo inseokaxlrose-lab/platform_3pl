@@ -57,14 +57,17 @@ function Segment({
   value,
   onChange,
   options,
+  allLabel = '전체',
 }: {
   id: string
   label: string
   value: string
   onChange: (value: string) => void
   options: readonly { value: string; label: string }[]
+  // 값이 비었을 때의 첫 버튼 이름
+  allLabel?: string
 }) {
-  const choices = [{ value: '', label: '전체' }, ...options]
+  const choices = [{ value: '', label: allLabel }, ...options]
   return (
     <div id={id} role="radiogroup" aria-label={label} className="flex h-9 rounded-md border p-0.5">
       {choices.map((choice) => (
@@ -140,7 +143,14 @@ function SearchInput({
       )
     case 'segment':
       return (
-        <Segment id={id} label={field.label} value={value} onChange={onChange} options={options} />
+        <Segment
+          id={id}
+          label={field.label}
+          value={value}
+          onChange={onChange}
+          options={options}
+          allLabel={field.allLabel}
+        />
       )
     case 'yn': {
       const [yes, no] = field.ynLabels ?? ['예', '아니오']
