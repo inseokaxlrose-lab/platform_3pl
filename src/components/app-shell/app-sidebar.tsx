@@ -24,13 +24,21 @@ import { favoriteNavigation, filterNavigation } from './filter-navigation'
 import { findActiveHref } from './find-active-href'
 import { searchNavigation } from './search-navigation'
 import { SidebarNavList } from './sidebar-nav-list'
-import { SIDEBAR_TAB_COOKIE, SIDEBAR_TAB_COOKIE_MAX_AGE, type SidebarTab } from './sidebar-tab'
+import {
+  formatClosedGroups,
+  SIDEBAR_CLOSED_GROUPS_COOKIE,
+  SIDEBAR_TAB_COOKIE,
+  SIDEBAR_TAB_COOKIE_MAX_AGE,
+  type SidebarTab,
+} from './sidebar-tab'
 
 type AppSidebarProps = {
   area: NavAreaKey
   // 즐겨찾기 메뉴 주소 (추가한 순서)
   favorites: string[]
   initialTab: SidebarTab
+  // 접어 둔 대메뉴 묶음 이름 (쿠키에서 읽은 값, 0070)
+  initialClosedGroups?: string[]
   // 즐겨찾기 켜기/끄기 서버 액션 (레이아웃이 넘겨준다 → 이 부품은 서버 코드를 직접 부르지 않음)
   onToggleFavorite: (input: { href: string; favorite: boolean }) => Promise<ActionResult<unknown>>
 }
@@ -41,6 +49,7 @@ export function AppSidebar({
   area,
   favorites: initialFavorites,
   initialTab,
+  initialClosedGroups = [],
   onToggleFavorite,
 }: AppSidebarProps) {
   const pathname = usePathname()
@@ -52,6 +61,7 @@ export function AppSidebar({
   const [tab, setTab] = useState<SidebarTab>(initialTab)
   const [favorites, setFavorites] = useState(initialFavorites)
   const [favoriteError, setFavoriteError] = useState<string | null>(null)
+  const [closedGroups, setClosedGroups] = useState<string[]>(initialClosedGroups)
 
   // 권한 없는 메뉴·빈 묶음은 숨긴다
   const allowed = filterNavigation(navigation[area], codes)
@@ -77,6 +87,16 @@ export function AppSidebar({
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
   }, [isMobile, state, setOpen, setOpenMobile])
+
+  // 대메뉴 접기·펴기: 화면을 바꾸고 쿠키에 기억 (다음 접속에도 같은 모양으로 그린다)
+  function toggleGroup(label: string) {
+    const next = closedGroups.includes(label)
+      ? closedGroups.filter((name) => name !== label)
+      : [...closedGroups, label]
+    setClosedGroups(next)
+    document.cookie = `${SIDEBAR_CLOSED_GROUPS_COOKIE}=${formatClosedGroups(next)}; path=/; max-age=${SIDEBAR_TAB_COOKIE_MAX_AGE}`
+  }
+  const collapse = { closed: new Set(closedGroups), onToggle: toggleGroup }
 
   function changeTab(next: SidebarTab) {
     setTab(next)
@@ -183,6 +203,7 @@ export function AppSidebar({
               activeHref={activeHref}
               favorites={favoriteSet}
               onToggleFavorite={toggleFavorite}
+              collapse={collapse}
             />
           ) : (
             <SidebarMessage>
@@ -195,6 +216,7 @@ export function AppSidebar({
             activeHref={activeHref}
             favorites={favoriteSet}
             onToggleFavorite={toggleFavorite}
+            collapse={collapse}
           />
         )}
       </SidebarContent>
