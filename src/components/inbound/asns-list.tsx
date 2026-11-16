@@ -118,7 +118,12 @@ export function AsnsList({
   canExport,
   actions,
   listAction,
+  title = 'ASN 조회',
+  description = '입고예정과 입고·적치 진행 상태입니다. ASN 번호를 누르면 품목별 잔량·초과 수량을 봅니다.',
 }: {
+  // 다른 작업 화면(검수·확정 등)에서 ASN을 고를 때 제목·설명을 바꾼다
+  title?: string
+  description?: string
   gridId: string
   // ASN 화면 주소 앞부분 ('/admin/inbound/asn', '/portal/asn')
   basePath: string
@@ -179,8 +184,8 @@ export function AsnsList({
 
   return (
     <MasterListPage
-      title="ASN 조회"
-      description="입고예정과 입고·적치 진행 상태입니다. ASN 번호를 누르면 품목별 잔량·초과 수량을 봅니다."
+      title={title}
+      description={description}
       actions={actions}
       gridId={gridId}
       searchFields={searchFields}
