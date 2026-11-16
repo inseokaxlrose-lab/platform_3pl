@@ -131,7 +131,7 @@ describe('화주사 등록·수정', () => {
     ).toMatchObject({ ok: false, error: { message: expect.stringContaining('NOPE') } })
   })
 
-  it('코드 중복·시스템 코드 모양 거부, 사용 중지 센터는 새로 붙일 수 없다', async () => {
+  it('코드 중복·시스템 코드 모양 거부, 일시중지·폐쇄 센터는 새로 붙일 수 없다', async () => {
     await create({ code: 'GANA' })
     expect(await createShipperAction(input({ code: 'gana' }))).toMatchObject({
       ok: false,
@@ -141,7 +141,10 @@ describe('화주사 등록·수정', () => {
       ok: false,
       error: { message: expect.stringContaining('시스템 코드 모양') },
     })
-    await prisma.center.update({ where: { id: gmhId }, data: { status: 'INACTIVE' } })
+    await prisma.center.update({
+      where: { id: gmhId },
+      data: { status: 'SUSPENDED', statusReason: '점검' },
+    })
     expect(
       await createShipperAction(input({ code: 'NEW', centerIds: [String(gmhId)] })),
     ).toMatchObject({
@@ -150,9 +153,12 @@ describe('화주사 등록·수정', () => {
     })
   })
 
-  it('수정: 이용 센터·담당자를 통째로 바꾼다 (이미 연결된 사용 중지 센터는 그대로 둘 수 있다)', async () => {
+  it('수정: 이용 센터·담당자를 통째로 바꾼다 (이미 연결된 일시중지 센터는 그대로 둘 수 있다)', async () => {
     const shipper = await create({ code: 'GANA', centerIds: [String(icnId), String(gmhId)] })
-    await prisma.center.update({ where: { id: gmhId }, data: { status: 'INACTIVE' } })
+    await prisma.center.update({
+      where: { id: gmhId },
+      data: { status: 'SUSPENDED', statusReason: '점검' },
+    })
     const result = await updateShipperAction({
       id: shipper.id,
       rowVersion: await versionOf('shipper', shipper.id),

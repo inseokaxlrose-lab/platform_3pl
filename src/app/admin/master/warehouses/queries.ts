@@ -1,14 +1,16 @@
 import 'server-only'
 import { textIds } from '@/lib/id'
 import { prisma } from '@/lib/prisma'
-import { ACTIVE_ONLY, NOT_DELETED, isActiveStatus, withIsActive } from '@/lib/status'
+import { NOT_DELETED, isActiveStatus, withIsActive } from '@/lib/status'
 import { isInScope, scopeFilter, type DataScope } from '@/lib/scope/data-scope'
 import type { WarehouseUpdateInput } from '@/lib/warehouses/warehouse-schema'
+import { CENTER_SETUP_ONLY } from '@/lib/centers/center-status'
 
 // 고를 수 있는 센터: 데이터 범위 안 + 사용 중 (등록 화면·목록 센터 고르기, 키는 글자)
 export async function getCenterOptions(scope: DataScope) {
   const centers = await prisma.center.findMany({
-    where: { AND: [scopeFilter(scope, { center: 'id' }), ACTIVE_ONLY] },
+    // 기준정보 준비: 준비중·운영중 센터 (0073)
+    where: { AND: [scopeFilter(scope, { center: 'id' }), CENTER_SETUP_ONLY] },
     select: { id: true, code: true, name: true },
     orderBy: { code: 'asc' },
   })

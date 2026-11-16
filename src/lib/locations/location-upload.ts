@@ -17,6 +17,7 @@ import {
   UPLOAD_NUMBER_PATTERN,
   UPLOAD_ZONE_PATTERN,
 } from './location-upload-template'
+import { isStagingWarehouse } from '@/lib/warehouses/warehouse-labels'
 
 // 로케이션 엑셀 일괄 업로드 검증·등록 (docs/decisions/0071)
 // 검증: 줄마다 문제를 모은다 (저장 안 함). 등록: 다시 검증하고, 문제가 없을 때만 한 번에 만든다
@@ -73,8 +74,8 @@ export async function checkLocationUpload(
       add(row, 'warehouseCode', '이 센터에 없는 창고입니다.')
       continue
     }
-    if (warehouse.type === 'INBOUND_STAGING') {
-      add(row, 'warehouseCode', '입고대기 창고에는 로케이션을 추가할 수 없습니다.')
+    if (isStagingWarehouse(warehouse.type)) {
+      add(row, 'warehouseCode', '대기 창고(입고·출고·반품)에는 로케이션을 추가할 수 없습니다.')
       continue
     }
     if (!isActiveStatus(warehouse.status)) {

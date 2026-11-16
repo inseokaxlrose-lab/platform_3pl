@@ -45,11 +45,17 @@ describe('데이터 범위 (DB)', () => {
     expect(await visibleCenterCodes(manager.id)).toEqual(['ICN', 'PUS'])
   })
 
-  it('사용 중지된 센터는 소속이어도 보이지 않는다', async () => {
+  it('일시중지 센터는 소속 직원이 계속 보고, 폐쇄된 센터는 소속이어도 보이지 않는다 (0073)', async () => {
     const gmp = await prisma.center.findUniqueOrThrow({
       where: { operatorId_code: { operatorId: TEST_OPERATOR_ID, code: 'GMP' } },
     })
     const worker = await createTestUser('gmp.worker', { centerIds: [gmp.id, icn] })
+    // GMP는 일시중지 (createTestCenter isActive: false)
+    expect(await visibleCenterCodes(worker.id)).toEqual(['GMP', 'ICN'])
+    await prisma.center.update({
+      where: { id: gmp.id },
+      data: { status: 'CLOSED', statusReason: '이전', closedOn: new Date('2026-01-01') },
+    })
     expect(await visibleCenterCodes(worker.id)).toEqual(['ICN'])
   })
 

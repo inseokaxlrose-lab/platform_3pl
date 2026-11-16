@@ -7,9 +7,9 @@ import { CONTACT_ROLE_GROUP } from '@/lib/contacts/contact-schema'
 import { nextSystemCode } from '@/lib/master-code/system-code'
 import { assertRowVersion, withVersionGuard } from '@/lib/row-version'
 import { prisma, type Db } from '@/lib/prisma'
-import { isActiveStatus } from '@/lib/status'
 import { toYn } from '@/lib/yn'
 import type { ShipperData } from './shipper-schema'
+import { isCenterSetupStatus } from '@/lib/centers/center-status'
 
 // 화주사 저장 (docs/decisions/0035). 권한·데이터 범위 검사는 서버 액션에서 한다
 
@@ -39,7 +39,8 @@ async function assertCenters(db: Db, centerIds: bigint[], keep: bigint[] = []) {
   if (centers.length !== centerIds.length) {
     throw new ActionError('NOT_FOUND', '찾을 수 없는 센터가 섞여 있습니다.')
   }
-  const inactive = centers.filter((c) => !isActiveStatus(c.status) && !keep.includes(c.id))
+  // 이용 센터로 새로 고를 수 있는 센터: 준비중·운영중 (0073)
+  const inactive = centers.filter((c) => !isCenterSetupStatus(c.status) && !keep.includes(c.id))
   if (inactive.length > 0) {
     throw new ActionError(
       'CONFLICT',

@@ -2,6 +2,7 @@ import 'server-only'
 import { prisma } from '@/lib/prisma'
 import { isActiveStatus, withIsActive } from '@/lib/status'
 import { computeScope, type DataScope } from './data-scope'
+import { isCenterInScopeStatus } from '@/lib/centers/center-status'
 
 // 사용자의 데이터 범위를 DB에서 읽어 계산한다 (사용자가 없으면 NONE)
 export async function loadDataScope(userId: bigint): Promise<DataScope> {
@@ -22,7 +23,11 @@ export async function loadDataScope(userId: bigint): Promise<DataScope> {
     operatorId: user.operatorId,
     userType: user.userType,
     isActive: isActiveStatus(user.status),
-    centers: user.centers.map(({ center }) => withIsActive(center)),
+    // 소속 센터: 폐쇄만 범위에서 뺀다 (준비중·일시중지는 기준정보 정리를 위해 보인다, 0073)
+    centers: user.centers.map(({ center }) => ({
+      id: center.id,
+      isActive: isCenterInScopeStatus(center.status),
+    })),
     shipper: user.shipper && withIsActive(user.shipper),
   })
 }

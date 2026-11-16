@@ -120,7 +120,7 @@ describe('한 칸 등록', () => {
       await createLocationAction({ warehouseId: String(icnStagingId), code: 'S-01' }),
     ).toMatchObject({
       ok: false,
-      error: { code: 'CONFLICT', message: expect.stringContaining('입고대기') },
+      error: { code: 'CONFLICT', message: expect.stringContaining('대기 창고') },
     })
     await prisma.warehouse.update({ where: { id: icnWarehouseId }, data: { status: 'INACTIVE' } })
     expect(
@@ -321,10 +321,10 @@ describe('목록 · 데이터 범위 · 권한', () => {
     expect(inactive.ok && inactive.data.rowCount).toBe(0)
 
     const all = await listLocationsAction(createDataGridState({ pageSize: 50 }))
-    expect(all.ok && all.data.rows.filter((r) => r.protected).map((r) => r.code)).toEqual([
-      'DEFAULT',
-      'DEFAULT',
-    ])
+    // 센터 2곳 × 대기 창고 3개(입고·출고·반품)의 DEFAULT
+    expect(all.ok && all.data.rows.filter((r) => r.protected).map((r) => r.code)).toEqual(
+      Array(6).fill('DEFAULT'),
+    )
   })
 
   it('센터 직원: 소속 센터 로케이션만, 다른 센터 창고·로케이션은 다룰 수 없다', async () => {
@@ -451,7 +451,7 @@ describe('엑셀 일괄 업로드 (0071)', () => {
       preview.data.rows.find((r) => r.rowNo === rowNo)?.errors.join(' / ') ?? ''
     expect(errorsOf(2)).toContain('센터')
     expect(errorsOf(3)).toContain('없는 창고')
-    expect(errorsOf(4)).toContain('입고대기')
+    expect(errorsOf(4)).toContain('대기 창고')
     expect(errorsOf(5)).toContain('영문·숫자·하이픈')
     expect(errorsOf(6)).toMatch(/구역.*열.*단/)
     expect(errorsOf(7)).toBe('')

@@ -28,6 +28,7 @@ import { DELETED_ONLY, withIsActive } from '@/lib/status'
 import { assertInScope, scopeFilter, type DataScope } from '@/lib/scope/data-scope'
 import { idField, idSchema } from '@/lib/id'
 import { deletedWhere, idFilter, statusWhere } from '@/lib/grid/list-filters'
+import { isStagingWarehouse } from '@/lib/warehouses/warehouse-labels'
 
 // 로케이션 관리 서버 액션 (docs/decisions/0028)
 // 데이터 범위: 센터 직원은 소속 센터 창고의 로케이션만
@@ -137,8 +138,8 @@ export const listLocationsAction = createAction({
         ...row,
         center: `${warehouse.center.name} (${warehouse.center.code})`,
         warehouse: `${warehouse.name} (${warehouse.code})`,
-        // 입고대기 창고의 기본 로케이션: 사용 중지·삭제 불가
-        protected: warehouse.type === 'INBOUND_STAGING',
+        // 대기 창고(입고·출고·반품)의 기본 로케이션: 사용 중지·삭제 불가
+        protected: isStagingWarehouse(warehouse.type),
       })),
       rowCount,
     }
