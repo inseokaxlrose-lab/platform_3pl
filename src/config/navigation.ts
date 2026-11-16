@@ -189,7 +189,7 @@ const adminNavigation: NavArea = {
           title: '실사·조정',
           href: '/admin/stock/adjustments',
           icon: ScaleIcon,
-          ready: false,
+          ready: true,
           permission: 'stock.adjustments.read',
         },
         {
