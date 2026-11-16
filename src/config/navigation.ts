@@ -156,7 +156,7 @@ const adminNavigation: NavArea = {
           title: '라벨 인쇄',
           href: '/admin/inbound/labels',
           icon: PrinterIcon,
-          ready: false,
+          ready: true,
           permission: 'inbound.labels.read',
         },
         {
