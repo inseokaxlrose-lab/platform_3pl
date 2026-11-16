@@ -15,7 +15,12 @@ import { getCurrentScope, type CurrentUser } from '@/lib/session'
 import { ActingOperatorBanner } from './acting-operator-banner'
 import { AppHeader } from './app-header'
 import { AppSidebar } from './app-sidebar'
-import { parseSidebarTab, SIDEBAR_TAB_COOKIE } from './sidebar-tab'
+import {
+  parseClosedGroups,
+  parseSidebarTab,
+  SIDEBAR_CLOSED_GROUPS_COOKIE,
+  SIDEBAR_TAB_COOKIE,
+} from './sidebar-tab'
 
 // 운영사 화면 · 화주 포털 · 플랫폼 공통 뼈대: 사이드바 + 상단 바 + 본문
 export async function AppShell({
@@ -45,6 +50,8 @@ export async function AppShell({
   const defaultOpen = cookieStore.get('sidebar_state')?.value !== 'false'
   // 사이드바 탭도 마지막으로 연 탭으로 그린다
   const initialTab = parseSidebarTab(cookieStore.get(SIDEBAR_TAB_COOKIE)?.value)
+  // 접어 둔 대메뉴 묶음도 (0070)
+  const closedGroups = parseClosedGroups(cookieStore.get(SIDEBAR_CLOSED_GROUPS_COOKIE)?.value)
   // 공통코드 전체 (고르기 목록용, 0030): 수백 개 수준이라 요청마다 한 번에 읽는다
   const codeOptions = await loadCodeOptions((await getCurrentScope()).operatorId)
 
@@ -59,6 +66,7 @@ export async function AppShell({
                 area={area}
                 favorites={favoriteMenus}
                 initialTab={initialTab}
+                initialClosedGroups={closedGroups}
                 onToggleFavorite={setFavoriteMenuAction}
               />
               <SidebarInset>

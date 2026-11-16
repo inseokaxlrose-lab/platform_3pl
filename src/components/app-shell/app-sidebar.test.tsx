@@ -31,10 +31,12 @@ const CODES: PermissionCode[] = ['master.items.read', 'stock.history.read', 'sys
 function renderSidebar({
   favorites = [],
   initialTab = 'all',
+  initialClosedGroups = [],
   onToggleFavorite = vi.fn(async () => ({ ok: true as const, data: null })),
 }: {
   favorites?: string[]
   initialTab?: SidebarTab
+  initialClosedGroups?: string[]
   onToggleFavorite?: Parameters<typeof AppSidebar>[0]['onToggleFavorite']
 } = {}) {
   render(
@@ -45,6 +47,7 @@ function renderSidebar({
             area="admin"
             favorites={favorites}
             initialTab={initialTab}
+            initialClosedGroups={initialClosedGroups}
             onToggleFavorite={onToggleFavorite}
           />
         </SidebarProvider>
@@ -64,6 +67,7 @@ const menuTitles = () =>
 beforeEach(() => {
   push.mockClear()
   document.cookie = 'sidebar_tab=; max-age=0; path=/'
+  document.cookie = 'sidebar_closed_groups=; max-age=0; path=/'
 })
 
 describe('사이드바 메뉴 검색', () => {
@@ -148,5 +152,35 @@ describe('사이드바 즐겨찾기', () => {
   it('즐겨찾기가 비어 있으면 추가 방법을 안내한다', () => {
     renderSidebar({ initialTab: 'favorites' })
     expect(screen.getByText(/메뉴 옆 ☆를 눌러 추가하세요/)).toBeTruthy()
+  })
+})
+
+describe('대메뉴 접기 (0070)', () => {
+  const groupButton = (name: string) =>
+    screen.getByRole('button', { name: new RegExp(`^${name}$`) })
+  const listOf = (name: string) =>
+    document.getElementById(groupButton(name).getAttribute('aria-controls')!)!
+
+  it('제목을 누르면 접히고 쿠키에 기억, 다시 누르면 펼친다', () => {
+    renderSidebar()
+    expect(groupButton('재고').getAttribute('aria-expanded')).toBe('true')
+    expect(listOf('재고').hidden).toBe(false)
+
+    fireEvent.click(groupButton('재고'))
+    expect(groupButton('재고').getAttribute('aria-expanded')).toBe('false')
+    expect(listOf('재고').hidden).toBe(true)
+    expect(decodeURIComponent(document.cookie)).toContain('sidebar_closed_groups=재고')
+
+    fireEvent.click(groupButton('재고'))
+    expect(listOf('재고').hidden).toBe(false)
+  })
+
+  it('쿠키에서 읽은 묶음은 처음부터 접혀 있고, 메뉴 검색 중에는 모두 펼쳐 보인다', () => {
+    renderSidebar({ initialClosedGroups: ['시스템'] })
+    expect(listOf('시스템').hidden).toBe(true)
+
+    fireEvent.change(search(), { target: { value: '사용자' } })
+    expect(screen.queryByRole('button', { name: /^시스템$/ })).toBeNull()
+    expect(menuTitles()).toEqual(['사용자'])
   })
 })

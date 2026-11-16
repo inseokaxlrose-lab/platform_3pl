@@ -11,3 +11,25 @@ export const SIDEBAR_TAB_COOKIE_MAX_AGE = 60 * 60 * 24 * 365
 export function parseSidebarTab(value: string | undefined): SidebarTab {
   return value === 'favorites' ? 'favorites' : 'all'
 }
+
+// 접어 둔 대메뉴 묶음 (묶음 이름 목록, 0070) — 서버가 처음부터 접힌 채로 그리도록 쿠키에 둔다
+export const SIDEBAR_CLOSED_GROUPS_COOKIE = 'sidebar_closed_groups'
+
+// 쿠키 값 → 묶음 이름 목록 ('|'로 이어 붙인 글자, 망가진 값이면 빈 목록)
+export function parseClosedGroups(value: string | undefined): string[] {
+  if (!value) return []
+  try {
+    return decodeURIComponent(value)
+      .split('|')
+      .map((name) => name.trim())
+      .filter((name) => name.length > 0 && name.length <= 30)
+      .slice(0, 50)
+  } catch {
+    return []
+  }
+}
+
+// 묶음 이름 목록 → 쿠키 값
+export function formatClosedGroups(names: readonly string[]): string {
+  return encodeURIComponent(names.join('|'))
+}
