@@ -1,13 +1,17 @@
+import { ensureCenterDefaults } from '@/lib/centers/center-defaults'
 import { prisma } from '@/lib/prisma'
 import { createTestCenter, createTestShipper } from './factories'
 import { TEST_OPERATOR_ID } from './reset-database'
 
 // 입고 테스트 공통 준비 데이터 (resetDatabase 다음에 부른다)
-// 이천센터(ICN)·김해센터(GMH) / 화주사 가나(이천 이용)·다라(김해 이용)
+// 이천센터(ICN)·김해센터(GMH) (각각 입고대기 창고) / 화주사 가나(이천 이용)·다라(김해 이용)
 // 가나 품목: WATER(EA 정수, BOX 24) · MILK(로트·유통기한 관리) · RICE(KG 소수 3자리) / 다라 품목: DARA1
 export async function createInboundFixture() {
   const icn = await createTestCenter('ICN', { name: '이천센터' })
   const gmh = await createTestCenter('GMH', { name: '김해센터' })
+  // 센터마다 입고대기 창고 + 기본 로케이션 (입고 확정 재고가 들어가는 곳)
+  const icnStaging = await ensureCenterDefaults(prisma, icn.id)
+  await ensureCenterDefaults(prisma, gmh.id)
   const gana = await createTestShipper('GANA')
   const dara = await createTestShipper('DARA')
   await prisma.shipper.update({
@@ -36,8 +40,12 @@ export async function createInboundFixture() {
         ...data,
       },
     })
+  const stagingLocation = await prisma.location.findFirstOrThrow({
+    where: { warehouseId: icnStaging.id },
+  })
   return {
     icn: icn.id,
+    icnStaging: stagingLocation.id,
     gmh: gmh.id,
     gana: gana.id,
     dara: dara.id,

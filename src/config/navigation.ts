@@ -163,7 +163,7 @@ const adminNavigation: NavArea = {
           title: '입고 확정',
           href: '/admin/inbound/confirm',
           icon: PackageCheckIcon,
-          ready: false,
+          ready: true,
           permission: 'inbound.confirm.read',
         },
         {
