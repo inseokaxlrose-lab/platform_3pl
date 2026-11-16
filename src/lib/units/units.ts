@@ -2,7 +2,7 @@ import 'server-only'
 import { assertAllFound, assertNoCodeConflict } from '@/lib/soft-delete'
 import { ActionError } from '@/lib/actions/action-error'
 import { requireOperatorId } from '@/lib/actor'
-import { deleteExternalCodes, saveExternalCodes } from '@/lib/master-code/external-codes'
+import { deleteExternalCodes } from '@/lib/master-code/external-codes'
 import { assertRowVersion, withVersionGuard } from '@/lib/row-version'
 import { prisma } from '@/lib/prisma'
 import { isYes } from '@/lib/yn'
@@ -14,23 +14,19 @@ import { DELETED_ONLY, NOT_DELETED, toStatus, withStatus } from '@/lib/status'
 // - 시스템 단위(EA·BOX·PLT): 삭제·사용 중지·종류 변경 불가
 // - 삭제는 품목에서 쓰지 않는 단위만 (사용 검사는 품목 작업 때 채운다)
 
-export async function createUnit({ externalCodes, ...data }: UnitCreateData) {
+export async function createUnit(data: UnitCreateData) {
   const operatorId = requireOperatorId()
   if (await prisma.unit.findFirst({ where: { operatorId, code: data.code } })) {
     throw new ActionError('CONFLICT', `이미 있는 단위 코드입니다: ${data.code}`)
   }
-  return prisma.$transaction(async (tx) => {
-    const unit = await tx.unit.create({
-      data: { ...withStatus(data), operatorId },
-      select: { id: true, code: true },
-    })
-    await saveExternalCodes(tx, 'UNIT', unit.id, externalCodes)
-    return unit
+  return prisma.unit.create({
+    data: { ...withStatus(data), operatorId },
+    select: { id: true, code: true },
   })
 }
 
 // rowVersion: 팝업을 열 때의 버전 (그 사이 다른 사람이 저장했으면 충돌)
-export async function updateUnit({ id, rowVersion, externalCodes, ...data }: UnitUpdateData) {
+export async function updateUnit({ id, rowVersion, ...data }: UnitUpdateData) {
   const found = await prisma.unit.findUnique({
     where: { id },
     select: { code: true, kind: true, isSystem: true, rowVersion: true },
@@ -53,7 +49,6 @@ export async function updateUnit({ id, rowVersion, externalCodes, ...data }: Uni
         select: { rowVersion: true },
       }),
     )
-    await saveExternalCodes(tx, 'UNIT', id, externalCodes)
     return { id, rowVersion: saved.rowVersion }
   })
 }

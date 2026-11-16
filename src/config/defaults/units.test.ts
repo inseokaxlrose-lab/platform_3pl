@@ -9,7 +9,6 @@ describe('시드 기본 단위', () => {
         ...unit,
         sortOrder: 0,
         isActive: true,
-        externalCodes: {},
       })
       expect(parsed.success, unit.code).toBe(true)
     }

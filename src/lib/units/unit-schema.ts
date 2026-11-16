@@ -1,5 +1,4 @@
 import { z } from 'zod'
-import { externalCodesSchema } from '@/lib/master-code/external-codes-schema'
 import { requiredText } from '@/lib/validation/common-fields'
 import { UNIT_KINDS } from './unit-labels'
 import { idSchema } from '@/lib/id'
@@ -29,7 +28,6 @@ const fields = {
     .max(MAX_UNIT_DECIMALS, `${MAX_UNIT_DECIMALS} 이하로 입력해 주세요.`),
   sortOrder: z.number().int().min(0).max(9999, '9999 이하로 입력해 주세요.'),
   isActive: z.boolean(),
-  externalCodes: externalCodesSchema,
 }
 
 // 환산단위는 소수 자리수가 의미 없으므로 0으로 맞춘다 (입수량은 품목에서 기본단위로 정한다)

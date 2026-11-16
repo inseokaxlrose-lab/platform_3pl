@@ -73,7 +73,6 @@ const unitInput = (code: string) => ({
   decimals: 0,
   sortOrder: 0,
   isActive: true,
-  externalCodes: { SAP: '', ERP: '' },
 })
 const groupInput = (code: string) => ({
   code,

@@ -1,7 +1,6 @@
 import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { createDataGridState } from '@/components/data-grid/state'
 import type { PermissionCode } from '@/config/permissions'
-import { getExternalCodes } from '@/lib/master-code/external-codes'
 import { prisma } from '@/lib/prisma'
 import { versionOf } from '@/test/factories'
 import { getCurrentPermissions, getCurrentScope, getCurrentUser } from '@/lib/session'
@@ -47,7 +46,6 @@ const input = (overrides: Partial<UnitCreateInput> = {}): UnitCreateInput => ({
   decimals: 3,
   sortOrder: 10,
   isActive: true,
-  externalCodes: { SAP: '', ERP: '' },
   ...overrides,
 })
 
@@ -67,10 +65,9 @@ afterAll(async () => {
 })
 
 describe('단위 등록·수정', () => {
-  it('코드는 대문자로, 중복 거부, 환산단위는 소수 자리수 0, 외부 코드 함께 저장', async () => {
-    const kg = await create({ externalCodes: { SAP: 'KGM', ERP: '' } })
+  it('코드는 대문자로, 중복 거부, 환산단위는 소수 자리수 0', async () => {
+    const kg = await create()
     expect(kg.code).toBe('KG')
-    expect(await getExternalCodes('UNIT', BigInt(kg.id))).toEqual({ SAP: 'KGM', ERP: '' })
     expect(await createUnitAction(input({ code: 'KG' }))).toMatchObject({
       ok: false,
       error: { code: 'CONFLICT' },
@@ -119,21 +116,30 @@ describe('단위 등록·수정', () => {
 })
 
 describe('목록 · 일괄 처리 · 권한', () => {
-  it('종류·상태로 거르고, 기본 정렬은 기본단위 → 환산단위, 외부 코드를 함께 준다', async () => {
+  it('종류·상태로 거르고, 기본 정렬은 기본단위 → 환산단위', async () => {
     await create({ code: 'BOX', name: '박스', kind: 'PACK', sortOrder: 1 })
-    await create({ code: 'KG', sortOrder: 5, externalCodes: { SAP: 'KGM', ERP: '' } })
+    await create({ code: 'KG', sortOrder: 5 })
     await create({ code: 'EA', name: '개', decimals: 0, sortOrder: 1 })
 
     const all = await listUnitsAction(createDataGridState())
     expect(all.ok && all.data.rows.map((u) => u.code)).toEqual(['EA', 'KG', 'BOX'])
-    expect(all.ok && all.data.rows[1].externalCodes).toEqual({ SAP: 'KGM', ERP: '' })
 
     const pack = await listUnitsAction({ ...createDataGridState(), filters: { kind: 'PACK' } })
     expect(pack.ok && pack.data.rows.map((u) => u.code)).toEqual(['BOX'])
   })
 
   it('일괄 사용 중지·삭제: 시스템 단위가 섞이면 전체 거부, 삭제하면 외부 코드도 지운다', async () => {
-    const kg = await create({ externalCodes: { SAP: 'KGM', ERP: '' } })
+    const kg = await create()
+    // 외부 코드는 외부코드 매핑 메뉴에서 넣는다 (0068) — 단위를 지우면 함께 지운다
+    await prisma.externalCode.create({
+      data: {
+        operatorId: TEST_OPERATOR_ID,
+        system: 'SAP',
+        entityType: 'UNIT',
+        entityId: BigInt(kg.id),
+        code: 'KGM',
+      },
+    })
     const plt = await prisma.unit.create({
       data: {
         operatorId: TEST_OPERATOR_ID,
