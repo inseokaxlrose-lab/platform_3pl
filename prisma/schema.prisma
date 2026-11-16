@@ -593,6 +593,7 @@ model Operator {
   receipts         InboundReceipt[]
   receiptLines     InboundReceiptLine[]
   inspections      InboundInspection[]
+  labels           InboundLabel[]
 
   // 논리 삭제: 'Y'면 지운 것 (목록·조회에서 빠지고 되살릴 수 있다, 0038)
   delYn String @default("N") @map("del_yn") @db.Char(1)
@@ -1262,9 +1263,41 @@ model InboundInspection {
   inspectedBy String   @default("system") @map("inspected_by") @db.VarChar(50)
 
   receiptLines InboundReceiptLine[]
+  labels       InboundLabel[]
 
   @@index([asnId])
   @@index([asnLineId])
   @@index([operatorId])
   @@map("tb_inbound_inspection")
+}
+
+// 관리 라벨 (docs/decisions/0054): 검수 결과 하나 → 라벨 여러 장 (라벨 단위 입수량으로 나누고 마지막 장은 나머지, 0003 결정 6)
+// 라벨 번호는 하나뿐이고, 같은 라벨을 다시 인쇄(재발행)하면 인쇄 횟수만 는다
+model InboundLabel {
+  id            BigInt            @id @default(autoincrement()) @map("label_id")
+  operatorId    BigInt            @map("operator_id")
+  operator      Operator          @relation(fields: [operatorId], references: [id], onDelete: Restrict)
+  // 라벨 번호 (자동: LB + YYMMDD + '-' + 일련번호)
+  labelNo       String            @unique @map("label_no") @db.VarChar(20)
+  inspectionId  BigInt            @map("inspection_id")
+  inspection    InboundInspection @relation(fields: [inspectionId], references: [id], onDelete: Restrict)
+  // 몇 번째 장 / 모두 몇 장 (예: 2 / 3)
+  seq           Int               @map("label_seq")
+  total         Int               @map("label_cnt")
+  // 라벨 단위(PLT·BOX)와 이 장의 수량 (기본단위)
+  labelUnit     LabelUnit         @map("label_unit_cd")
+  qty           Decimal           @map("label_qty") @db.Decimal(18, 3)
+  // 2D 코드에 담은 글자와 그 형식 버전 (항목이 늘어도 스캐너가 구분하게, 0003)
+  formatVersion Int               @map("format_ver")
+  payload       String            @db.VarChar(500)
+
+  printCount    Int       @default(0) @map("print_cnt")
+  lastPrintedAt DateTime? @map("last_printed_at")
+  lastPrintedBy String?   @map("last_printed_by") @db.VarChar(50)
+  createdAt     DateTime  @default(now()) @map("created_at")
+  createdBy     String    @default("system") @map("created_by") @db.VarChar(50)
+
+  @@unique([inspectionId, seq])
+  @@index([operatorId])
+  @@map("tb_inbound_label")
 }
