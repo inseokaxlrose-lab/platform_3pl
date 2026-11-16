@@ -170,7 +170,7 @@ const adminNavigation: NavArea = {
           title: '적치',
           href: '/admin/inbound/putaway',
           icon: MapPinIcon,
-          ready: false,
+          ready: true,
           permission: 'inbound.putaway.read',
         },
       ],

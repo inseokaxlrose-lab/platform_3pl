@@ -43,9 +43,37 @@ export async function createInboundFixture() {
   const stagingLocation = await prisma.location.findFirstOrThrow({
     where: { warehouseId: icnStaging.id },
   })
+  // 보관 창고(일반) + 로케이션 A-01·A-02 (이천), B-01 (김해)
+  const storage = async (centerId: bigint, code: string, locations: string[]) => {
+    const warehouse = await prisma.warehouse.create({
+      data: {
+        operatorId: TEST_OPERATOR_ID,
+        centerId,
+        systemCode: `WH-T-${code}`,
+        code,
+        name: code,
+      },
+    })
+    const ids: bigint[] = []
+    for (const location of locations) {
+      ids.push(
+        (
+          await prisma.location.create({
+            data: { operatorId: TEST_OPERATOR_ID, warehouseId: warehouse.id, code: location },
+          })
+        ).id,
+      )
+    }
+    return ids
+  }
+  const [a01, a02] = await storage(icn.id, 'GEN', ['A-01', 'A-02'])
+  const [b01] = await storage(gmh.id, 'GMHGEN', ['B-01'])
   return {
     icn: icn.id,
     icnStaging: stagingLocation.id,
+    a01,
+    a02,
+    b01,
     gmh: gmh.id,
     gana: gana.id,
     dara: dara.id,

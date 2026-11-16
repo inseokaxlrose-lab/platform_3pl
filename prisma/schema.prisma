@@ -608,6 +608,7 @@ model Operator {
   receiptLines     InboundReceiptLine[]
   inspections      InboundInspection[]
   labels           InboundLabel[]
+  putaways         Putaway[]
 
   // 논리 삭제: 'Y'면 지운 것 (목록·조회에서 빠지고 되살릴 수 있다, 0038)
   delYn String @default("N") @map("del_yn") @db.Char(1)
@@ -1239,6 +1240,8 @@ model InboundReceiptLine {
   qty        Decimal @map("confirm_qty") @db.Decimal(18, 3)
   putawayQty Decimal @default(0) @map("putaway_qty") @db.Decimal(18, 3)
 
+  putaways Putaway[]
+
   @@index([receiptId])
   @@index([asnLineId])
   @@index([inspectionId])
@@ -1314,4 +1317,30 @@ model InboundLabel {
   @@unique([inspectionId, seq])
   @@index([operatorId])
   @@map("tb_inbound_label")
+}
+
+// 적치 기록 (docs/decisions/0058): 입고확정 라인의 재고를 입고대기 창고 → 보관 로케이션으로 옮긴 한 번
+// 실제 재고 이동은 재고 변경 공통 함수(moveStock)가 하고, 여기는 어느 확정분을 어디로 얼마나 옮겼는지 남긴다
+model Putaway {
+  id             BigInt             @id @default(autoincrement()) @map("putaway_id")
+  operatorId     BigInt             @map("operator_id")
+  operator       Operator           @relation(fields: [operatorId], references: [id], onDelete: Restrict)
+  receiptLineId  BigInt             @map("receipt_line_id")
+  receiptLine    InboundReceiptLine @relation(fields: [receiptLineId], references: [id], onDelete: Restrict)
+  asnId          BigInt             @map("asn_id")
+  itemId         BigInt             @map("item_id")
+  fromLocationId BigInt             @map("from_location_id")
+  toLocationId   BigInt             @map("to_location_id")
+  lotNo          String?            @map("lot_no") @db.VarChar(50)
+  expiryOn       DateTime?          @map("expiry_dt") @db.Date
+  qty            Decimal            @map("putaway_qty") @db.Decimal(18, 3)
+  // 재고 이력의 묶음 번호 (나감·들어옴 두 줄)
+  txnGroupId     BigInt             @map("txn_group_id")
+  createdAt      DateTime           @default(now()) @map("created_at")
+  createdBy      String             @default("system") @map("created_by") @db.VarChar(50)
+
+  @@index([receiptLineId])
+  @@index([asnId])
+  @@index([operatorId, createdAt])
+  @@map("tb_putaway")
 }
