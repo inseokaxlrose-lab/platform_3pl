@@ -12,6 +12,10 @@
 
 # testing
 /coverage
+# 브라우저 테스트(Playwright) 결과·빌드 폴더
+/test-results/
+/playwright-report/
+/.next-e2e/
 
 # next.js
 /.next/

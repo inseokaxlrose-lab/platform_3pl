@@ -1,5 +1,8 @@
 # 빌드 결과물·의존성
 .next
+.next-e2e
+test-results
+playwright-report
 out
 build
 node_modules
