@@ -1,9 +1,12 @@
 import type { Metadata } from 'next'
+import { PrinterIcon } from 'lucide-react'
+import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { AppPage } from '@/components/app-page'
 import { StatusBadge } from '@/components/common'
 import { InspectionWorkPanel } from '@/components/inbound'
 import { BackToListButton } from '@/components/master-list'
+import { Button } from '@/components/ui/button'
 import { AccessDenied } from '@/components/permission'
 import { parseId } from '@/lib/id'
 import { ASN_STATUS_LABELS } from '@/lib/inbound/asn-schema'
@@ -20,9 +23,10 @@ export default async function InspectionWorkPage({
   if (!(await hasPermission('inbound.inspection.read'))) return <AccessDenied />
   const id = parseId((await params).asnId)
   if (id === null) notFound()
-  const [work, canUpdate] = await Promise.all([
+  const [work, canUpdate, canLabels] = await Promise.all([
     getInspectionWork(id, await getCurrentScope()),
     hasPermission('inbound.inspection.update'),
+    hasPermission('inbound.labels.read'),
   ])
   if (!work) notFound()
   return (
@@ -34,7 +38,19 @@ export default async function InspectionWorkPage({
           {ASN_STATUS_LABELS[work.status]}
         </StatusBadge>
       }
-      actions={<BackToListButton listPath="/admin/inbound/inspection" />}
+      actions={
+        <>
+          <BackToListButton listPath="/admin/inbound/inspection" />
+          {canLabels && work.inspections.length > 0 && (
+            <Button asChild variant="outline">
+              <Link href={`/admin/inbound/labels/${work.id}`}>
+                <PrinterIcon />
+                라벨 인쇄
+              </Link>
+            </Button>
+          )}
+        </>
+      }
     >
       <InspectionWorkPanel
         work={work}

@@ -13,6 +13,8 @@ export function LocalDataGrid<TData extends object>({
   rows,
   getRowId,
   empty,
+  enableRowSelection,
+  onSelectionChange,
 }: {
   // 그리드 이름 (사용자별 칸 설정 저장 키)
   id: string
@@ -20,6 +22,9 @@ export function LocalDataGrid<TData extends object>({
   rows: TData[]
   getRowId: (row: TData) => string
   empty?: { title: string; description?: React.ReactNode }
+  // 행 고르기 (예: 라벨을 인쇄할 검수 기록)
+  enableRowSelection?: boolean
+  onSelectionChange?: (ids: string[]) => void
 }) {
   const [state, setState] = useState(() => createDataGridState())
   const page = rows.slice(state.pageIndex * state.pageSize, (state.pageIndex + 1) * state.pageSize)
@@ -34,6 +39,8 @@ export function LocalDataGrid<TData extends object>({
       getRowId={getRowId}
       searchable={false}
       empty={empty}
+      enableRowSelection={enableRowSelection}
+      onSelectionChange={onSelectionChange}
     />
   )
 }

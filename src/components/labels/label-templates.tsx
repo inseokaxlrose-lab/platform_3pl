@@ -195,6 +195,7 @@ export function LabelSheet({
   return (
     <div
       className="label-sheet overflow-hidden bg-white text-black"
+      data-template={template}
       style={{ width: `${size.width}mm`, height: `${size.height}mm` }}
     >
       {template === 'PLT_A' && <LargeLabel label={label} codeType={codeType} wide={false} />}
@@ -205,16 +206,24 @@ export function LabelSheet({
   )
 }
 
-// 인쇄용 CSS: 용지 크기 = 양식 크기, 여백 0, 라벨마다 새 페이지, 라벨 말고는 인쇄하지 않는다
-export function LabelPrintStyle({ template }: { template: LabelTemplateId }) {
-  const size = LABEL_TEMPLATES[template]
+// 인쇄용 CSS: 양식마다 이름 붙인 용지(@page)를 두고 라벨이 자기 양식의 용지에 찍히게 한다
+// → PLT·BOX 라벨을 한 번에 인쇄해도 장마다 크기가 맞다 (여백 0, 1장 = 1페이지)
+// 라벨 말고는 인쇄하지 않는다 (.label-print-area 안만)
+export function LabelPrintStyle() {
+  const pages = (Object.keys(LABEL_TEMPLATES) as LabelTemplateId[])
+    .map((id) => {
+      const { width, height } = LABEL_TEMPLATES[id]
+      return `@page ${id} { size: ${width}mm ${height}mm; margin: 0; }
+  .label-print-area .label-sheet[data-template="${id}"] { page: ${id}; }`
+    })
+    .join('\n  ')
   return (
     <style>{`
 @media print {
-  @page { size: ${size.width}mm ${size.height}mm; margin: 0; }
+  ${pages}
   body * { visibility: hidden; }
   .label-print-area, .label-print-area * { visibility: visible; }
-  .label-print-area { position: absolute; left: 0; top: 0; }
+  .label-print-area { position: absolute; left: 0; top: 0; display: block !important; }
   .label-print-area .label-sheet { break-after: page; box-shadow: none; border: 0; margin: 0; }
 }
 `}</style>
