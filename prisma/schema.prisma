@@ -609,6 +609,8 @@ model Operator {
   inspections      InboundInspection[]
   labels           InboundLabel[]
   putaways         Putaway[]
+  stockAdjusts     StockAdjust[]
+  stockAdjustLines StockAdjustLine[]
 
   // 논리 삭제: 'Y'면 지운 것 (목록·조회에서 빠지고 되살릴 수 있다, 0038)
   delYn String @default("N") @map("del_yn") @db.Char(1)
@@ -1022,6 +1024,7 @@ model Stock {
 
   txns         StockTxn[]
   receiptLines InboundReceiptLine[]
+  adjustLines  StockAdjustLine[]
 
   @@unique([locationId, itemId, lotNo, expiryOn], map: "tb_stock_address_key")
   @@index([operatorId])
@@ -1343,4 +1346,72 @@ model Putaway {
   @@index([asnId])
   @@index([operatorId, createdAt])
   @@map("tb_putaway")
+}
+
+// ─── 재고 실사·조정 (M6, docs/decisions/0061) ─────────────────
+// 작업자가 등록하고(등록) 관리자가 확정하면(확정) 재고가 바뀐다 (권한 stock.adjustments.create / confirm)
+
+// 실사: 센 수량을 적고 확정 때 (센 수량 − 그때 재고)만큼 바꾼다 / 조정: 늘리거나 줄일 수량(±)을 적는다
+enum StockAdjustType {
+  COUNT
+  ADJUST
+}
+
+enum StockAdjustStatus {
+  DRAFT
+  CONFIRMED
+  CANCELED
+}
+
+model StockAdjust {
+  id         BigInt            @id @default(autoincrement()) @map("adjust_id")
+  operatorId BigInt            @map("operator_id")
+  operator   Operator          @relation(fields: [operatorId], references: [id], onDelete: Restrict)
+  // 번호 (자동: AJ + YYMMDD + '-' + 일련번호)
+  adjustNo   String            @unique @map("adjust_no") @db.VarChar(20)
+  type       StockAdjustType   @map("adjust_type_cd")
+  centerId   BigInt            @map("center_id")
+  status     StockAdjustStatus @default(DRAFT) @map("adjust_status_cd")
+  // 사유 (필수)
+  reason     String            @db.VarChar(200)
+  remark     String?           @db.VarChar(500)
+
+  createdAt   DateTime  @default(now()) @map("created_at")
+  createdBy   String    @default("system") @map("created_by") @db.VarChar(50)
+  confirmedAt DateTime? @map("confirmed_at")
+  confirmedBy String?   @map("confirmed_by") @db.VarChar(50)
+  canceledAt  DateTime? @map("canceled_at")
+  canceledBy  String?   @map("canceled_by") @db.VarChar(50)
+
+  lines StockAdjustLine[]
+
+  @@index([operatorId, createdAt])
+  @@index([centerId, status])
+  @@map("tb_stock_adjust")
+}
+
+// 실사·조정 줄: 재고 줄 하나 (로케이션 + 품목 + 로트 + 유통기한)
+model StockAdjustLine {
+  id         BigInt      @id @default(autoincrement()) @map("adjust_line_id")
+  operatorId BigInt      @map("operator_id")
+  operator   Operator    @relation(fields: [operatorId], references: [id], onDelete: Restrict)
+  adjustId   BigInt      @map("adjust_id")
+  adjust     StockAdjust @relation(fields: [adjustId], references: [id], onDelete: Cascade)
+  lineNo     Int         @map("line_no")
+  stockId    BigInt      @map("stock_id")
+  stock      Stock       @relation(fields: [stockId], references: [id], onDelete: Restrict)
+
+  // 등록 때 재고 (참고) / 실사: 센 수량 / 조정: 바꿀 수량(±)
+  systemQty  Decimal  @map("system_qty") @db.Decimal(18, 3)
+  countedQty Decimal? @map("counted_qty") @db.Decimal(18, 3)
+  changeQty  Decimal? @map("chg_qty") @db.Decimal(18, 3)
+  // 확정 때 실제로 바꾼 수량과 재고 이력 (0이면 바꾸지 않음 → 이력 없음)
+  appliedQty Decimal? @map("applied_qty") @db.Decimal(18, 3)
+  stockTxnId BigInt?  @map("stock_txn_id")
+
+  @@unique([adjustId, lineNo])
+  @@unique([adjustId, stockId])
+  @@index([stockId])
+  @@index([operatorId])
+  @@map("tb_stock_adjust_line")
 }
