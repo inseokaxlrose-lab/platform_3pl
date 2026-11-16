@@ -592,6 +592,7 @@ model Operator {
   asnLines         AsnLine[]
   receipts         InboundReceipt[]
   receiptLines     InboundReceiptLine[]
+  inspections      InboundInspection[]
 
   // 논리 삭제: 'Y'면 지운 것 (목록·조회에서 빠지고 되살릴 수 있다, 0038)
   delYn String @default("N") @map("del_yn") @db.Char(1)
@@ -868,9 +869,10 @@ model Item {
   rowVersion Int      @default(1) @map("row_version")
 
   // 환산단위 (BOX·CARTON·PLT… + 입수량)
-  units    ItemUnit[]
-  stocks   Stock[]
-  asnLines AsnLine[]
+  units       ItemUnit[]
+  stocks      Stock[]
+  asnLines    AsnLine[]
+  inspections InboundInspection[]
 
   // 논리 삭제: 'Y'면 지운 것 (목록·조회에서 빠지고 되살릴 수 있다, 0038)
   delYn String @default("N") @map("del_yn") @db.Char(1)
@@ -1129,8 +1131,9 @@ model Asn {
   updatedBy  String   @default("system") @map("updated_by") @db.VarChar(50)
   rowVersion Int      @default(1) @map("row_version")
 
-  lines    AsnLine[]
-  receipts InboundReceipt[]
+  lines       AsnLine[]
+  receipts    InboundReceipt[]
+  inspections InboundInspection[]
 
   // 논리 삭제: 예정(PLANNED) 상태에서만 지울 수 있다
   delYn String @default("N") @map("del_yn") @db.Char(1)
@@ -1170,6 +1173,7 @@ model AsnLine {
   remark       String? @db.VarChar(200)
 
   receiptLines InboundReceiptLine[]
+  inspections  InboundInspection[]
 
   @@unique([asnId, lineNo])
   @@index([itemId])
@@ -1199,19 +1203,22 @@ model InboundReceipt {
 
 // 입고확정 라인: 확정 수량이 입고대기 창고의 어느 재고 줄이 됐는지 (적치는 이 줄의 재고만)
 model InboundReceiptLine {
-  id         BigInt         @id @default(autoincrement()) @map("receipt_line_id")
-  operatorId BigInt         @map("operator_id")
-  operator   Operator       @relation(fields: [operatorId], references: [id], onDelete: Restrict)
-  receiptId  BigInt         @map("receipt_id")
-  receipt    InboundReceipt @relation(fields: [receiptId], references: [id], onDelete: Restrict)
-  asnLineId  BigInt         @map("asn_line_id")
-  asnLine    AsnLine        @relation(fields: [asnLineId], references: [id], onDelete: Restrict)
+  id           BigInt            @id @default(autoincrement()) @map("receipt_line_id")
+  operatorId   BigInt            @map("operator_id")
+  operator     Operator          @relation(fields: [operatorId], references: [id], onDelete: Restrict)
+  receiptId    BigInt            @map("receipt_id")
+  receipt      InboundReceipt    @relation(fields: [receiptId], references: [id], onDelete: Restrict)
+  asnLineId    BigInt            @map("asn_line_id")
+  asnLine      AsnLine           @relation(fields: [asnLineId], references: [id], onDelete: Restrict)
+  // 어느 검수 결과를 확정했는지 (확정은 검수된 수량에서만)
+  inspectionId BigInt            @map("inspection_id")
+  inspection   InboundInspection @relation(fields: [inspectionId], references: [id], onDelete: Restrict)
   // 만들어진(또는 더해진) 재고 줄 = 입고대기 창고 로케이션 + 품목 + 로트 + 유통기한
-  stockId    BigInt         @map("stock_id")
-  stock      Stock          @relation(fields: [stockId], references: [id], onDelete: Restrict)
-  stockTxnId BigInt         @map("stock_txn_id")
-  lotNo      String?        @map("lot_no") @db.VarChar(50)
-  expiryOn   DateTime?      @map("expiry_dt") @db.Date
+  stockId      BigInt            @map("stock_id")
+  stock        Stock             @relation(fields: [stockId], references: [id], onDelete: Restrict)
+  stockTxnId   BigInt            @map("stock_txn_id")
+  lotNo        String?           @map("lot_no") @db.VarChar(50)
+  expiryOn     DateTime?         @map("expiry_dt") @db.Date
 
   // 확정 수량 (기본단위)과 그중 적치한 수량
   qty        Decimal @map("confirm_qty") @db.Decimal(18, 3)
@@ -1219,7 +1226,45 @@ model InboundReceiptLine {
 
   @@index([receiptId])
   @@index([asnLineId])
+  @@index([inspectionId])
   @@index([stockId])
   @@index([operatorId])
   @@map("tb_inbound_receipt_line")
+}
+
+// 입고 검수 결과 (docs/decisions/0053): ASN 라인 하나에 여러 건 (로트·유통기한이 다르게 도착하면 나눠 적는다)
+// 검수 수량(정상)만 입고 확정할 수 있고, 불량 수량은 기록만 한다. 수량은 모두 기본단위
+model InboundInspection {
+  id         BigInt   @id @default(autoincrement()) @map("inspection_id")
+  operatorId BigInt   @map("operator_id")
+  operator   Operator @relation(fields: [operatorId], references: [id], onDelete: Restrict)
+  asnId      BigInt   @map("asn_id")
+  asn        Asn      @relation(fields: [asnId], references: [id], onDelete: Restrict)
+  asnLineId  BigInt   @map("asn_line_id")
+  asnLine    AsnLine  @relation(fields: [asnLineId], references: [id], onDelete: Restrict)
+  itemId     BigInt   @map("item_id")
+  item       Item     @relation(fields: [itemId], references: [id], onDelete: Restrict)
+
+  // 로트·유통기한: 품목 설정에 따라 필수 또는 null
+  lotNo    String?   @map("lot_no") @db.VarChar(50)
+  expiryOn DateTime? @map("expiry_dt") @db.Date
+
+  // 검수 수량(정상, 확정 가능) · 불량 수량 · 그중 확정한 수량
+  inspectedQty Decimal  @map("inspect_qty") @db.Decimal(18, 3)
+  defectQty    Decimal  @default(0) @map("defect_qty") @db.Decimal(18, 3)
+  confirmedQty Decimal  @default(0) @map("confirmed_qty") @db.Decimal(18, 3)
+  // 입력한 단위·수량 (화면 표시용, 예: BOX 5)
+  entryUnit    String?  @map("entry_unit_cd") @db.VarChar(20)
+  entryQty     Decimal? @map("entry_qty") @db.Decimal(18, 3)
+  remark       String?  @db.VarChar(200)
+
+  inspectedAt DateTime @default(now()) @map("inspected_at")
+  inspectedBy String   @default("system") @map("inspected_by") @db.VarChar(50)
+
+  receiptLines InboundReceiptLine[]
+
+  @@index([asnId])
+  @@index([asnLineId])
+  @@index([operatorId])
+  @@map("tb_inbound_inspection")
 }
