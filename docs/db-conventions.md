@@ -372,6 +372,7 @@
 | `code` | `code` | `zone_cd` |  |
 | `name` | `name` | `zone_nm` |  |
 | `description` | `description` | `description` |  |
+| `priority` | (0072 추가) | `priority_no` | INT 1~999, 기본 100 — 다른 센터 권역과 같은 수준으로 겹칠 때 작은 번호가 먼저 |
 | `isActive` | `isActive` | `status_cd` | Boolean → status_cd (2단계, ACTIVE/INACTIVE) |
 | `createdAt` | `createdAt` | `created_at` |  |
 | `updatedAt` | `updatedAt` | `updated_at` |  |

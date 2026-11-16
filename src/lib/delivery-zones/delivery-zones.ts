@@ -90,6 +90,7 @@ export async function createDeliveryZone(data: DeliveryZoneData) {
         code,
         name: data.name,
         description: data.description,
+        priority: data.priority,
         regions: { create: data.regionCodes.map((regionCode) => ({ regionCode })) },
       },
       select: { id: true, systemCode: true, code: true, rowVersion: true },
@@ -114,7 +115,7 @@ export async function updateDeliveryZone(id: bigint, rowVersion: number, data: D
     const saved = await withVersionGuard(() =>
       tx.deliveryZone.update({
         where: { id, rowVersion },
-        data: { code, name: data.name, description: data.description },
+        data: { code, name: data.name, description: data.description, priority: data.priority },
         select: { rowVersion: true },
       }),
     )

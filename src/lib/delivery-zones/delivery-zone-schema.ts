@@ -14,6 +14,13 @@ export const deliveryZoneSchema = z.object({
   code: userCodeField('권역 코드'),
   name: requiredText('권역명을 입력해 주세요.', 50),
   description: optionalText(200),
+  // 우선순위 (0072): 다른 센터 권역과 같은 수준으로 겹칠 때 작은 번호가 먼저
+  priority: z
+    .number({ error: '우선순위를 입력해 주세요.' })
+    .int('정수로 입력해 주세요.')
+    .min(1, '1 이상입니다.')
+    .max(999, '999 이하입니다.')
+    .default(100),
   regionCodes: z
     .array(z.string())
     .min(1, '담당 지역을 1곳 이상 골라 주세요.')

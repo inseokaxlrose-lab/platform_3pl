@@ -5,7 +5,7 @@ import { AccessDenied } from '@/components/permission'
 import { parseId } from '@/lib/id'
 import { getCurrentScope, hasPermission } from '@/lib/session'
 import { DeliveryZoneForm } from '../delivery-zone-form'
-import { getDeliveryZoneForEdit, getTakenRegions } from '../queries'
+import { getDeliveryZoneForEdit, getOtherZoneRegions, getTakenRegions } from '../queries'
 
 export const metadata: Metadata = { title: '배송권역 수정' }
 
@@ -18,10 +18,11 @@ export default async function EditDeliveryZonePage({
   const id = parseId((await params).id)
   if (id === null) notFound()
   const scope = await getCurrentScope()
-  const [zone, taken, canUpdate] = await Promise.all([
+  const [zone, taken, others, canUpdate] = await Promise.all([
     getDeliveryZoneForEdit(id, scope),
     // 자기 권역의 지역은 "다른 권역이 쓰는 지역"에서 뺀다
     getTakenRegions(scope, id),
+    getOtherZoneRegions(scope, id),
     hasPermission('master.delivery-zones.update'),
   ])
   if (!zone) notFound()
@@ -35,6 +36,7 @@ export default async function EditDeliveryZonePage({
       }}
       zone={zone}
       taken={taken}
+      others={others}
       readOnly={!canUpdate}
       canToggleActive={canUpdate}
     />

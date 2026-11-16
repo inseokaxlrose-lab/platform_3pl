@@ -237,12 +237,14 @@ model Center {
   updatedBy     String   @default("system") @map("updated_by") @db.VarChar(50)
   rowVersion    Int      @default(1) @map("row_version")
 
-  users         UserCenter[]
-  warehouses    Warehouse[]
-  deliveryZones DeliveryZone[]
-  shippers      ShipperCenter[]
-  stocks        Stock[]
-  asns          Asn[]
+  users             UserCenter[]
+  warehouses        Warehouse[]
+  deliveryZones     DeliveryZone[]
+  shippers          ShipperCenter[]
+  stocks            Stock[]
+  asns              Asn[]
+  // 이 센터를 배송 센터로 지정한 거래처 (0072)
+  deliveryCustomers Customer[]
 
   // 논리 삭제: 'Y'면 지운 것 (목록·조회에서 빠지고 되살릴 수 있다, 0038)
   delYn String @default("N") @map("del_yn") @db.Char(1)
@@ -775,6 +777,8 @@ model DeliveryZone {
   code        String               @map("zone_cd")
   name        String               @map("zone_nm")
   description String?
+  // 우선순위 (0072): 다른 센터 권역과 같은 수준으로 겹칠 때 작은 번호가 먼저 (1~999, 기본 100)
+  priority    Int                  @default(100) @map("priority_no")
   status      String               @default("ACTIVE") @map("status_cd") @db.VarChar(10)
   createdAt   DateTime             @default(now()) @map("created_at")
   updatedAt   DateTime             @updatedAt @map("updated_at")
@@ -943,15 +947,18 @@ model Customer {
   email          String?  @db.VarChar(100)
 
   // ── 배송지: 카카오 우편번호 서비스로 검색해 채우고, 상세주소만 직접 입력
-  zipCode       String? @map("zip_cd") @db.VarChar(10)
-  address       String? @map("addr1") @db.VarChar(200)
-  addressDetail String? @map("addr2") @db.VarChar(200)
+  zipCode          String? @map("zip_cd") @db.VarChar(10)
+  address          String? @map("addr1") @db.VarChar(200)
+  addressDetail    String? @map("addr2") @db.VarChar(200)
   // 법정동코드 10자리 (주소 검색 결과를 자동 저장, 화면 미노출) — 배송권역(앞 2·5자리)과 맞춰 본다
-  regionCode    String? @map("region_cd") @db.Char(10)
-  receiverName  String? @map("receiver_nm") @db.VarChar(50)
-  receiverPhone String? @map("receiver_tel_no") @db.VarChar(15)
+  regionCode       String? @map("region_cd") @db.Char(10)
+  receiverName     String? @map("receiver_nm") @db.VarChar(50)
+  receiverPhone    String? @map("receiver_tel_no") @db.VarChar(15)
   // 배송 메모 (예: 정문 경비실에 맡겨 주세요)
-  deliveryMemo  String? @map("delivery_memo") @db.VarChar(200)
+  deliveryMemo     String? @map("delivery_memo") @db.VarChar(200)
+  // 배송 센터 (0072): 배송권역이 겹칠 때 맨 먼저 따르는 지정. 화주사 이용 센터 중 하나, 비우면 권역 규칙으로
+  deliveryCenterId BigInt? @map("delivery_center_id")
+  deliveryCenter   Center? @relation(fields: [deliveryCenterId], references: [id], onDelete: Restrict)
 
   remark     String?  @db.VarChar(1000)
   status     String   @default("ACTIVE") @map("status_cd") @db.VarChar(10)
@@ -971,6 +978,7 @@ model Customer {
   @@unique([shipperId, code], where: raw("del_yn = 'N'"), map: "tb_customer_shipper_id_customer_cd_key")
   @@index([operatorId])
   @@index([regionCode])
+  @@index([deliveryCenterId])
   @@map("tb_customer")
 }
 
