@@ -81,6 +81,13 @@ export const PERMISSION_MENUS = {
     area: 'admin',
     actions: [...CRUD, 'export'],
   },
+  // 외부코드 매핑 (0068): 대상은 각 기준정보 화면에서 만들고, 여기서는 SAP·ERP 코드만 고친다
+  'master.external-codes': {
+    label: '외부코드 매핑',
+    group: '기준정보',
+    area: 'admin',
+    actions: ['read', 'update', 'export'],
+  },
 
   // ── 운영사 화면 · 입고
   'inbound.asn': {
