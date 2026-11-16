@@ -6,7 +6,9 @@ import { createAction } from '@/lib/actions/create-action'
 import { listQuerySchema, toPrismaQuery } from '@/lib/grid/grid-query'
 import {
   locationCodeField,
+  locationNameField,
   locationRangeSchema,
+  locationRemarkField,
   MAX_BULK_LOCATIONS,
 } from '@/lib/locations/location-range'
 import {
@@ -16,7 +18,11 @@ import {
   previewBulkLocations,
   restoreLocations,
   setLocationsActive,
+  updateLocation,
 } from '@/lib/locations/locations'
+import { rowVersionField } from '@/lib/row-version'
+import { uploadRowsSchema } from '@/lib/excel/upload'
+import { commitLocationUpload, previewLocationUpload } from '@/lib/locations/location-upload'
 import { prisma } from '@/lib/prisma'
 import { DELETED_ONLY, withIsActive } from '@/lib/status'
 import { assertInScope, scopeFilter, type DataScope } from '@/lib/scope/data-scope'
@@ -64,11 +70,12 @@ export const listLocationsAction = createAction({
     }
     const { filters } = input
     const query = toPrismaQuery(input, {
-      searchFields: ['code'],
+      searchFields: ['code', 'name'],
       sortable: {
         center: 'warehouse.center.code',
         warehouse: 'warehouse.code',
         code: 'code',
+        name: 'name',
         zone: 'zone',
         aisle: 'aisle',
         level: 'level',
@@ -105,6 +112,9 @@ export const listLocationsAction = createAction({
         select: {
           id: true,
           code: true,
+          name: true,
+          remark: true,
+          rowVersion: true,
           zone: true,
           aisle: true,
           level: true,
@@ -140,10 +150,27 @@ export const createLocationAction = createAction({
   input: z.object({
     warehouseId: idField('창고를 골라 주세요.'),
     code: locationCodeField,
+    name: locationNameField.default(''),
+    remark: locationRemarkField.default(''),
   }),
   handler: async ({ input, scope }) => {
     const warehouse = await findWarehouseInScope(input.warehouseId, scope)
-    return createLocation(warehouse, input.code)
+    return createLocation(warehouse, input)
+  },
+})
+
+// 명칭·비고 수정 (0071): 범위 안의 로케이션만, 동시 수정은 버전으로 막는다
+export const updateLocationAction = createAction({
+  permission: 'master.locations.update',
+  input: z.object({
+    id: idSchema,
+    rowVersion: rowVersionField,
+    name: locationNameField,
+    remark: locationRemarkField,
+  }),
+  handler: async ({ input, scope }) => {
+    await findLocationsInScope([input.id], scope)
+    return updateLocation(input)
   },
 })
 
@@ -203,4 +230,17 @@ export const restoreLocationsAction = createAction({
     }
     return restoreLocations(ids)
   },
+})
+
+// 엑셀 일괄 업로드 (0071): 검증(저장 안 함) → 오류가 없을 때만 등록 (이미 있는 코드는 건너뜀)
+export const validateLocationUploadAction = createAction({
+  permission: 'master.locations.create',
+  input: uploadRowsSchema,
+  handler: async ({ input, scope }) => previewLocationUpload(input, scope),
+})
+
+export const commitLocationUploadAction = createAction({
+  permission: 'master.locations.create',
+  input: uploadRowsSchema,
+  handler: async ({ input, scope }) => commitLocationUpload(input, scope),
 })

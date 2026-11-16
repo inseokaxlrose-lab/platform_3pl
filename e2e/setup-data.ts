@@ -55,7 +55,12 @@ async function main() {
       }))
     await prisma.location.upsert({
       where: { warehouseId_code: { warehouseId: warehouse.id, code: E2E_LOCATION.code } },
-      create: { operatorId: operator.id, warehouseId: warehouse.id, code: E2E_LOCATION.code },
+      create: {
+        operatorId: operator.id,
+        warehouseId: warehouse.id,
+        code: E2E_LOCATION.code,
+        name: E2E_LOCATION.code,
+      },
       update: {},
     })
   })

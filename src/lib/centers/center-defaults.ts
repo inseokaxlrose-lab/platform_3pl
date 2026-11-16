@@ -35,7 +35,13 @@ export async function ensureCenterDefaults(db: Db, centerId: bigint) {
   }
   await db.location.upsert({
     where: { warehouseId_code: { warehouseId: warehouse.id, code: DEFAULT_LOCATION_CODE } },
-    create: { operatorId, warehouseId: warehouse.id, code: DEFAULT_LOCATION_CODE },
+    // 명칭은 코드와 같게 (0071)
+    create: {
+      operatorId,
+      warehouseId: warehouse.id,
+      code: DEFAULT_LOCATION_CODE,
+      name: DEFAULT_LOCATION_CODE,
+    },
     update: {},
   })
   return warehouse
