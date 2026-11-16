@@ -149,7 +149,7 @@ const adminNavigation: NavArea = {
           title: '입고 검수',
           href: '/admin/inbound/inspection',
           icon: ClipboardCheckIcon,
-          ready: false,
+          ready: true,
           permission: 'inbound.inspection.read',
         },
         {

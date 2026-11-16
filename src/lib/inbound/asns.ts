@@ -73,35 +73,34 @@ export type AsnLineItem = {
 
 type AsnLineValue = AsnData['lines'][number]
 
-// 라인 하나 → 저장할 값 (문제가 있으면 그 문구로 ActionError — 줄 번호는 부르는 쪽이 붙인다)
-// 품목은 그 화주사의 사용 중인 품목, 단위는 기본단위 또는 품목의 환산단위
-// 기본단위로 바꾼 수량이 기본단위 소수 자리를 넘으면 거부 (예: EA 정수인데 BOX 0.3 × 24 = 7.2)
-export function resolveAsnLine(item: AsnLineItem | undefined, line: AsnLineValue) {
+// 입력 단위·수량 → 기본단위 수량 (단위는 품목의 기본단위 또는 환산단위, 소수 자리 검사 두 번)
+// 예: BOX 3 (입수량 24) → 72 EA. 기본단위로 바꾼 수가 기본단위 소수 자리를 넘으면 거부 (EA인데 BOX 0.3 = 7.2)
+// 결과의 entryUnit·entryQty는 환산단위로 넣었을 때만 (화면 표시용)
+export function entryToBase(item: AsnLineItem, unit: string, qty: string) {
   const fail = (message: string): never => {
     throw new ActionError('VALIDATION', message)
   }
-  if (!item) return fail('이 화주사의 품목이 아닙니다.')
-  if (!isActiveStatus(item.status)) fail(`사용 중지된 품목입니다 (${item.code}).`)
-
-  // 입력 단위 → 입수량
-  const isBase = line.unit === item.baseUnit.code
-  const pack = item.units.find((u) => u.unit.code === line.unit)
-  if (!isBase && !pack) fail(`${item.code}에 없는 단위입니다 (${line.unit}).`)
+  const isBase = unit === item.baseUnit.code
+  const pack = item.units.find((u) => u.unit.code === unit)
+  if (!isBase && !pack) fail(`${item.code}에 없는 단위입니다 (${unit}).`)
   const unitDecimals = isBase ? item.baseUnit.decimals : pack!.unit.decimals
-  if (!checkQtyDecimals(line.qty, unitDecimals)) {
+  if (!checkQtyDecimals(qty, unitDecimals)) {
     fail(
       unitDecimals === 0
-        ? `${line.unit} 수량은 정수만 넣을 수 있습니다.`
-        : `${line.unit} 수량은 소수 ${unitDecimals}자리까지입니다.`,
+        ? `${unit} 수량은 정수만 넣을 수 있습니다.`
+        : `${unit} 수량은 소수 ${unitDecimals}자리까지입니다.`,
     )
   }
-  const expectedQty = isBase ? line.qty : toBaseQty(line.qty, pack!.convQty.toString())
-  if (!checkQtyDecimals(expectedQty, item.baseUnit.decimals)) {
-    fail(`기본단위로 바꾸면 ${expectedQty} ${item.baseUnit.code}라 소수 자리가 맞지 않습니다.`)
+  const baseQty = isBase ? qty : toBaseQty(qty, pack!.convQty.toString())
+  if (!checkQtyDecimals(baseQty, item.baseUnit.decimals)) {
+    fail(`기본단위로 바꾸면 ${baseQty} ${item.baseUnit.code}라 소수 자리가 맞지 않습니다.`)
   }
+  return { baseQty, entryUnit: isBase ? null : unit, entryQty: isBase ? null : qty }
+}
 
-  // 로트·유통기한: 관리하지 않는 품목은 비워야 한다 (관리 품목은 ASN에서는 선택 — 실제 값은 검수에서)
-  const options = effectiveItemOptions(
+// 품목에 실제로 적용되는 로트·유통기한 관리 여부 (품목이 비어 있으면 화주사 기본값)
+export function itemLotOptions(item: AsnLineItem) {
+  return effectiveItemOptions(
     {
       useLot: item.useLot as 'Y' | 'N' | null,
       useExpiry: item.useExpiry as 'Y' | 'N' | null,
@@ -113,6 +112,22 @@ export function resolveAsnLine(item: AsnLineItem | undefined, line: AsnLineValue
       labelUnit: item.shipper.labelUnit,
     },
   )
+}
+
+// 라인 하나 → 저장할 값 (문제가 있으면 그 문구로 ActionError — 줄 번호는 부르는 쪽이 붙인다)
+// 품목은 그 화주사의 사용 중인 품목, 단위는 기본단위 또는 품목의 환산단위
+// 기본단위로 바꾼 수량이 기본단위 소수 자리를 넘으면 거부 (예: EA 정수인데 BOX 0.3 × 24 = 7.2)
+export function resolveAsnLine(item: AsnLineItem | undefined, line: AsnLineValue) {
+  const fail = (message: string): never => {
+    throw new ActionError('VALIDATION', message)
+  }
+  if (!item) return fail('이 화주사의 품목이 아닙니다.')
+  if (!isActiveStatus(item.status)) fail(`사용 중지된 품목입니다 (${item.code}).`)
+
+  const { baseQty: expectedQty, entryUnit, entryQty } = entryToBase(item, line.unit, line.qty)
+
+  // 로트·유통기한: 관리하지 않는 품목은 비워야 한다 (관리 품목은 ASN에서는 선택 — 실제 값은 검수에서)
+  const options = itemLotOptions(item)
   if (!options.useLot && line.lotNo) fail(`로트를 관리하지 않는 품목입니다 (${item.code}).`)
   if (!options.useExpiry && line.expiryOn) {
     fail(`유통기한을 관리하지 않는 품목입니다 (${item.code}).`)
@@ -121,8 +136,8 @@ export function resolveAsnLine(item: AsnLineItem | undefined, line: AsnLineValue
   return {
     itemId: item.id,
     expectedQty,
-    entryUnit: isBase ? null : line.unit,
-    entryQty: isBase ? null : line.qty,
+    entryUnit,
+    entryQty,
     lotNo: line.lotNo,
     expiryOn: line.expiryOn ? new Date(`${line.expiryOn}T00:00:00.000Z`) : null,
     remark: line.remark,

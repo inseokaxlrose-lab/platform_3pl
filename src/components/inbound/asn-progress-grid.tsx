@@ -1,7 +1,6 @@
 'use client'
 
-import { useState } from 'react'
-import { createDataGridState, DataGrid, type DataGridColumn } from '@/components/data-grid'
+import { LocalDataGrid, type DataGridColumn } from '@/components/data-grid'
 import type { AsnForEdit } from '@/lib/inbound/asn-queries'
 import { formatQty } from '@/lib/units/convert'
 
@@ -48,18 +47,12 @@ const COLUMNS: DataGridColumn<ProgressRow>[] = [
 
 // ASN 라인별 진행 현황 (0051): 예정 / 누적 확정 / 잔량 / 초과 / 적치 — 모두 기본단위
 export function AsnProgressGrid({ rows }: { rows: ProgressRow[] }) {
-  const [state, setState] = useState(() => createDataGridState())
-  const page = rows.slice(state.pageIndex * state.pageSize, (state.pageIndex + 1) * state.pageSize)
   return (
-    <DataGrid
+    <LocalDataGrid
       id="inbound-asn-progress"
       columns={COLUMNS}
-      data={page}
-      rowCount={rows.length}
-      state={state}
-      onStateChange={setState}
+      rows={rows}
       getRowId={(row) => String(row.lineNo)}
-      searchable={false}
     />
   )
 }
