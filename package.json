@@ -14,7 +14,9 @@
     "db:studio": "prisma studio",
     "test": "vitest run",
     "test:watch": "vitest",
-    "db:seed": "prisma db seed"
+    "db:seed": "prisma db seed",
+    "e2e:prepare": "bash scripts/e2e-prepare.sh",
+    "e2e": "playwright test"
   },
   "dependencies": {
     "@prisma/adapter-pg": "^7.10.1",
@@ -41,6 +43,7 @@
     "zod": "^4.6.7"
   },
   "devDependencies": {
+    "@playwright/test": "1.64.1",
     "@tailwindcss/turbopack": "4.3.3",
     "@testing-library/dom": "^10.4.2",
     "@testing-library/react": "^16.3.3",
