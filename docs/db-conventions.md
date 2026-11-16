@@ -169,24 +169,70 @@
 | `effect` | `effect` | `effect_cd` |  |
 | `createdAt` | `createdAt` | `created_at` |  |
 
-### tb_center ← `center` (코드 모델 `Center`)
+### tb_center ← `center` (코드 모델 `Center`, 0026·0073)
 
-| 코드(그대로) | 지금 DB | 새 DB | 비고 |
+1차 = DB·API·화면, 2차 = DB·API만 (화면은 나중에). 상속 = NULL이면 운영사 값 (`getEffectiveSetting`, 0073).
+
+| 코드 | DB | 형식 | 구분 | 비고 |
+| --- | --- | --- | --- | --- |
+| `id` | `center_id` | BIGINT | | |
+| `operatorId` | `operator_id` | BIGINT | | 운영사 (0039) |
+| `systemCode` | `sys_cd` | VARCHAR | 1차 | 자동·불변 `CT000001` |
+| `code` | `center_cd` | VARCHAR(20) | 1차 | **필수·불변**, 영문 대문자·숫자 |
+| `name` | `center_nm` | VARCHAR(100) | 1차 | 필수 |
+| `nameEn` | `center_nm_en` | VARCHAR(100) | 1차 | |
+| `shortName` | `center_short_nm` | VARCHAR(30) | 1차 | |
+| `type` | `center_type_cd` | VARCHAR(20) | 1차 | OWN·LEASE·PARTNER·VIRTUAL, 기본 LEASE |
+| `status` | `status_cd` | VARCHAR(20) | 1차 | PREPARING·ACTIVE·SUSPENDED·CLOSED, 기본 PREPARING |
+| `statusReason` | `status_reason` | VARCHAR(200) | 1차 | 일시중지·폐쇄면 필수 |
+| `openedOn` / `closedOn` | `open_dt` / `close_dt` | DATE | 1차 | 폐쇄면 `close_dt` 필수 |
+| `businessNumber` / `subBizNo` | `biz_reg_no` / `sub_biz_no` | CHAR(10) / CHAR(4) | 1차 | 숫자만 |
+| `sortOrder` | `sort_seq` | INT | 1차 | 목록 기본 정렬 |
+| `remark` | `remark` | VARCHAR(1000) | 1차 | |
+| `extAttr` | `ext_attr` | JSONB | 2차 | 확장 속성 |
+| `countryCode` | `country_cd` | CHAR(2) | 2차 | 기본 KR |
+| `zipCode` / `address` / `addressDetail` | `zip_cd` / `addr1` / `addr2` | VARCHAR(10/200/200) | 1차 | 주소 필수(화면·서버) |
+| `addressJibun` / `regionName` | `addr_jibun` / `region_nm` | VARCHAR(200/50) | 1차 | 주소 검색으로 자동 |
+| `latitude` / `longitude` | `latitude` / `longitude` | DECIMAL(10,7) | 2차 | 아직 비움 |
+| `phone` / `fax` | `tel_no` / `fax_no` | VARCHAR(15) | 1차 | 숫자만 |
+| `email` / `directions` | `email` / `directions` | VARCHAR(100/1000) | 1차 | |
+| `managerName` / `managerPhone` | `manager_nm` / `manager_tel_no` | VARCHAR | — | 예전 칸 (담당자 표로 대체, 목록에서 대표 담당자 없을 때만) |
+| `floorAreaM2` / `storageAreaM2` | `floor_area_m2` / `storage_area_m2` | DECIMAL(12,2) | 1차 | ≥ 0 |
+| `dockCount` | `dock_cnt` | INT | 1차 | ≥ 0 |
+| `landAreaM2` / `floorCount` / `ceilingHeightM` / `palletCapacity` | `land_area_m2` / `floor_cnt` / `ceiling_height_m` / `pallet_capa_cnt` | | 2차 | ≥ 0 |
+| `bondedYn` | `bonded_yn` | CHAR(1) | 1차 | 'Y'/'N' |
+| `bondedType` / `bondedLicenseNo` / `bondedAreaCode` / `customsOfficeCode` | `bonded_type_cd` / `bonded_license_no` / `bonded_area_cd` / `customs_office_cd` | | 2차 | 보세가 아니면 비움 (검사 조건) |
+| `warehouseRegNo` / `glnCode` | `warehouse_reg_no` / `gln_cd` | VARCHAR(30) / VARCHAR(13) | 2차 | GLN 숫자 13자리 |
+| `hazmatYn` / `foodStorageYn` / `pharmaYn` | `hazmat_yn` / `food_storage_yn` / `pharma_yn` | CHAR(1) | 2차 | 기본 'N' |
+| `workStartTime` / `workEndTime` | `work_start_time` / `work_end_time` | TIME(0) | 1차 | 화면 'HH:MM' |
+| `workDays` | `work_days` | CHAR(7) | 1차 | 월~일 Y/N, 기본 `YYYYYNN` |
+| `inboundCutoffTime` | `inbound_cutoff_time` | TIME(0) | 1차 | |
+| `shipCutoffTime` | `ship_cutoff_time` | TIME(0) | 1차·상속 | |
+| `defaultInboundLocId` / `defaultOutboundLocId` / `defaultReturnLocId` | `default_inbound_loc_id` / `default_outbound_loc_id` / `default_return_loc_id` | BIGINT → `tb_location` | 1차 | 대기 창고 DEFAULT로 자동, 이 센터 로케이션만, 입고 필수 |
+| `timezone` / `allocRule` | `timezone` / `alloc_rule_cd` | VARCHAR(50/10) | 2차·상속 | |
+| `useLot` / `useExpiry` / `useSerial` | `lot_mgmt_yn` / `expiry_mgmt_yn` / `serial_mgmt_yn` | CHAR(1) NULL | 2차·상속 | |
+| 공통 칸 | `created_at`·`updated_at`·`created_by`·`updated_by`·`row_version`·`del_yn` | | | 0038 |
+
+### tb_center_contact ← 센터 담당자 (코드 모델 `CenterContact`, 0073)
+
+| 코드 | DB | 형식 | 비고 |
 | --- | --- | --- | --- |
-| `id` | `id` | `center_id` | TEXT(cuid) → BIGINT |
-| `systemCode` | `systemCode` | `sys_cd` |  |
-| `code` | `code` | `center_cd` |  |
-| `name` | `name` | `center_nm` |  |
-| `phone` | `phone` | `tel_no` |  |
-| `fax` | `fax` | `fax_no` |  |
-| `managerName` | `managerName` | `manager_nm` |  |
-| `managerPhone` | `managerPhone` | `manager_tel_no` |  |
-| `zipCode` | `zipCode` | `zip_cd` |  |
-| `address` | `address` | `addr1` |  |
-| `addressDetail` | `addressDetail` | `addr2` |  |
-| `isActive` | `isActive` | `status_cd` | Boolean → status_cd (2단계, ACTIVE/INACTIVE) |
-| `createdAt` | `createdAt` | `created_at` |  |
-| `updatedAt` | `updatedAt` | `updated_at` |  |
+| `id` | `contact_id` | BIGINT | 줄 키 (화면이 들고 있다가 그 줄을 고친다) |
+| `centerId` | `center_id` | BIGINT | 센터 지우면 함께 (CASCADE) |
+| `sortOrder` | `sort_seq` | INT | 화면 순서 |
+| `duty` | `role_cd` | VARCHAR(20) | 공통코드 `CENTER_CONTACT_ROLE` |
+| `name` / `phone` / `email` | `contact_nm` / `tel_no` / `email` | | 연락처·이메일 중 하나 필수 |
+| `isPrimary` | `primary_yn` | CHAR(1) | 센터당 대표 1명 (부분 고유 인덱스) |
+| `deptName` / `positionName` / `notifyYn` | `dept_nm` / `position_nm` / `notify_yn` | | 2차 |
+| 등록·수정 | `created_at`·`updated_at`·`created_by`·`updated_by` | | |
+
+### tb_center_temp_zone ← 센터 취급 온도대 (코드 모델 `CenterTempZone`, 0073)
+
+| 코드 | DB | 형식 | 비고 |
+| --- | --- | --- | --- |
+| `centerId` + `tempZoneCd` | `center_id` + `temp_zone_cd` | 기본 키 | AMBIENT·CHILLED·FROZEN·CONSTANT |
+| `areaM2` / `minTemp` / `maxTemp` | `area_m2` / `min_temp` / `max_temp` | DECIMAL | 2차 |
+| 등록·수정 | `created_at`·`updated_at`·`created_by`·`updated_by` | | |
 
 ### tb_warehouse ← `warehouse` (코드 모델 `Warehouse`)
 
@@ -197,7 +243,7 @@
 | `systemCode` | `systemCode` | `sys_cd` |  |
 | `code` | `code` | `warehouse_cd` |  |
 | `name` | `name` | `warehouse_nm` |  |
-| `type` | `type` | `warehouse_type_cd` |  |
+| `type` | `type` | `warehouse_type_cd` | GENERAL / 대기 창고 INBOUND·OUTBOUND·RETURN_STAGING (센터마다 유형별 1개, 0073) |
 | `storageCondition` | `storageCondition` | `temp_zone_cd` |  |
 | `isActive` | `isActive` | `status_cd` | Boolean → status_cd (2단계, ACTIVE/INACTIVE) |
 | `createdAt` | `createdAt` | `created_at` |  |
