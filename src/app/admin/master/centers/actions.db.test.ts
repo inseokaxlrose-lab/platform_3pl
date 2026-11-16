@@ -52,7 +52,6 @@ const input = (overrides: Partial<CenterInput> = {}): CenterInput => ({
   zipCode: '',
   address: '',
   addressDetail: '',
-  externalCodes: { SAP: '', ERP: '' },
   ...overrides,
 })
 
@@ -97,10 +96,9 @@ describe('센터 등록', () => {
     })
   })
 
-  it('사용자 코드는 대문자로 저장, 외부 코드도 함께 저장', async () => {
-    const center = await create({ code: 'icn-1', externalCodes: { SAP: '1000', ERP: '' } })
+  it('사용자 코드는 대문자로 저장', async () => {
+    const center = await create({ code: 'icn-1' })
     expect(center.code).toBe('ICN-1')
-    expect(await getExternalCodes('CENTER', BigInt(center.id))).toEqual({ SAP: '1000', ERP: '' })
   })
 
   it('등록·수정자는 로그인 사용자 아이디로 남고, 다른 사람이 먼저 고쳤으면 덮어쓰지 않는다', async () => {
@@ -149,40 +147,32 @@ describe('센터 등록', () => {
       },
     })
   })
-
-  it('외부 코드가 다른 센터와 겹치면 전체를 취소한다 (센터·창고가 남지 않음)', async () => {
-    await create({ code: 'ICN', externalCodes: { SAP: '1000', ERP: '' } })
-    const before = {
-      centers: await prisma.center.count(),
-      warehouses: await prisma.warehouse.count(),
-    }
-
-    expect(
-      await createCenterAction(input({ code: 'GMH', externalCodes: { SAP: '1000', ERP: '' } })),
-    ).toMatchObject({
-      ok: false,
-      error: { code: 'CONFLICT', message: expect.stringContaining('SAP') },
-    })
-
-    expect(await prisma.center.count()).toBe(before.centers)
-    expect(await prisma.warehouse.count()).toBe(before.warehouses)
-  })
 })
 
 describe('센터 수정', () => {
-  it('정보·코드·외부 코드를 고치고, 코드를 비우면 시스템 코드로 돌아간다 (시스템 코드는 그대로)', async () => {
-    const center = await create({ code: 'ICN', externalCodes: { SAP: '1000', ERP: '' } })
+  it('정보·코드를 고치고, 코드를 비우면 시스템 코드로 돌아간다 (시스템 코드·외부 코드는 그대로)', async () => {
+    const center = await create({ code: 'ICN' })
+    // 외부 코드는 외부코드 매핑 메뉴에서 넣는다 (0068) — 센터를 고쳐도 지워지지 않아야 한다
+    await prisma.externalCode.create({
+      data: {
+        operatorId: TEST_OPERATOR_ID,
+        system: 'SAP',
+        entityType: 'CENTER',
+        entityId: BigInt(center.id),
+        code: '1000',
+      },
+    })
 
     expect(
       await updateCenterAction({
         id: center.id,
         rowVersion: await versionOf('center', center.id),
-        ...input({ code: 'ICN2', name: '이천2센터', externalCodes: { SAP: '', ERP: 'E-ICN' } }),
+        ...input({ code: 'ICN2', name: '이천2센터' }),
       }),
     ).toMatchObject({ ok: true })
     let saved = await prisma.center.findUniqueOrThrow({ where: { id: BigInt(center.id) } })
     expect(saved).toMatchObject({ code: 'ICN2', name: '이천2센터', systemCode: center.systemCode })
-    expect(await getExternalCodes('CENTER', BigInt(center.id))).toEqual({ SAP: '', ERP: 'E-ICN' })
+    expect(await getExternalCodes('CENTER', BigInt(center.id))).toEqual({ SAP: '1000', ERP: '' })
 
     await updateCenterAction({
       id: center.id,

@@ -2,7 +2,6 @@ import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { createDataGridState } from '@/components/data-grid/state'
 import type { PermissionCode } from '@/config/permissions'
 import type { DeliveryZoneInput } from '@/lib/delivery-zones/delivery-zone-schema'
-import { getExternalCodes } from '@/lib/master-code/external-codes'
 import { prisma } from '@/lib/prisma'
 import type { DataScope } from '@/lib/scope/data-scope'
 import { getCurrentPermissions, getCurrentScope, getCurrentUser } from '@/lib/session'
@@ -51,7 +50,6 @@ const input = (overrides: Partial<DeliveryZoneInput> = {}): DeliveryZoneInput =>
   name: '서울 권역',
   description: '',
   regionCodes: ['11'],
-  externalCodes: { SAP: '', ERP: '' },
   ...overrides,
 })
 
@@ -76,16 +74,11 @@ describe('배송권역 등록·수정', () => {
   it('시스템 코드 자동, 코드를 비우면 시스템 코드, 담당 지역·외부 코드 함께 저장', async () => {
     const zone = await create({
       regionCodes: ['11', '41130', '11'],
-      externalCodes: { SAP: 'Z100', ERP: '' },
     })
     expect(zone.systemCode).toMatch(/^DZ\d{6}$/)
     expect(zone.code).toBe(zone.systemCode)
     const regions = await prisma.deliveryZoneRegion.findMany({ where: { zoneId: BigInt(zone.id) } })
     expect(regions.map((r) => r.regionCode).sort()).toEqual(['11', '41130'])
-    expect(await getExternalCodes('DELIVERY_ZONE', BigInt(zone.id))).toEqual({
-      SAP: 'Z100',
-      ERP: '',
-    })
   })
 
   it('입력 규칙: 지역 1곳 이상, 모르는 지역 거부, 같은 권역 안 겹침 거부, 시스템 코드 모양 거부', async () => {
@@ -209,7 +202,17 @@ describe('목록 · 범위 · 일괄 처리', () => {
   })
 
   it('삭제는 논리 삭제: 목록에서 빠지고, 외부 코드는 지우고, 담당 지역은 비게 된다 / 엑셀 전체는 엑셀 권한 필요', async () => {
-    const zone = await create({ externalCodes: { SAP: 'Z1', ERP: '' } })
+    const zone = await create()
+    // 외부 코드는 외부코드 매핑 메뉴에서 넣는다 (0068)
+    await prisma.externalCode.create({
+      data: {
+        operatorId: TEST_OPERATOR_ID,
+        system: 'SAP',
+        entityType: 'DELIVERY_ZONE',
+        entityId: BigInt(zone.id),
+        code: 'Z1',
+      },
+    })
     expect(await deleteDeliveryZonesAction({ ids: [zone.id] })).toEqual({
       ok: true,
       data: { count: 1 },

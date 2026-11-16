@@ -1,5 +1,4 @@
 import { z } from 'zod'
-import { externalCodesSchema } from '@/lib/master-code/external-codes-schema'
 import { requiredText, userCodeField } from '@/lib/validation/common-fields'
 import { STORAGE_CONDITIONS } from './warehouse-labels'
 import { idField } from '@/lib/id'
@@ -12,7 +11,6 @@ const warehouseFields = {
   code: userCodeField('창고 코드'),
   name: requiredText('창고명을 입력해 주세요.', 50),
   storageCondition: z.enum(STORAGE_CONDITIONS, '보관 조건을 골라 주세요.'),
-  externalCodes: externalCodesSchema,
 }
 
 // 등록: 어느 센터의 창고인지 함께 (등록 후에는 센터를 바꿀 수 없다)

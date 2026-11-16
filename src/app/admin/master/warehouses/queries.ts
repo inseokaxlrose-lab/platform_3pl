@@ -1,5 +1,4 @@
 import 'server-only'
-import { getExternalCodes } from '@/lib/master-code/external-codes'
 import { textIds } from '@/lib/id'
 import { prisma } from '@/lib/prisma'
 import { ACTIVE_ONLY, NOT_DELETED, isActiveStatus, withIsActive } from '@/lib/status'
@@ -39,7 +38,6 @@ export async function getWarehouseForEdit(id: bigint, scope: DataScope) {
     code: warehouse.code,
     name: warehouse.name,
     storageCondition: warehouse.storageCondition,
-    externalCodes: await getExternalCodes('WAREHOUSE', id),
   }
   // 화면으로 보낼 값이라 키는 글자로
   return textIds({

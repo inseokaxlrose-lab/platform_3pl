@@ -1,7 +1,6 @@
 // 공통 컴포넌트: 바깥에서는 이 파일로 공개된 것만 사용한다
 export { ConfirmDialog } from './confirm-dialog'
 export { EmptyState } from './empty-state'
-export { ExternalCodesFields } from './external-codes-fields'
 export { FormSection } from './form-layout'
 export { PageHeader } from './page-header'
 export { StatusBadge, type StatusTone } from './status-badge'

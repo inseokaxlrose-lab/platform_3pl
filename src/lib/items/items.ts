@@ -3,7 +3,7 @@ import { Prisma } from '@/generated/prisma/client'
 import { looksLikeSystemCode } from '@/config/master-codes'
 import { ActionError } from '@/lib/actions/action-error'
 import { requireOperatorId } from '@/lib/actor'
-import { deleteExternalCodes, saveExternalCodes } from '@/lib/master-code/external-codes'
+import { deleteExternalCodes } from '@/lib/master-code/external-codes'
 import { nextSystemCode } from '@/lib/master-code/system-code'
 import { prisma, type Db } from '@/lib/prisma'
 import { assertRowVersion, withVersionGuard } from '@/lib/row-version'
@@ -13,12 +13,9 @@ import { checkQtyDecimals } from '@/lib/units/convert'
 import { isYes } from '@/lib/yn'
 import { effectiveItemOptions, type ItemCreateData, type ItemData } from './item-schema'
 
-// 외부 코드는 선택: 화주 포털은 외부 코드를 보내지 않는다 → 운영사가 넣은 값을 그대로 둔다 (0041)
-type WithoutExternal<T extends { externalCodes: unknown }> = Omit<T, 'externalCodes'> & {
-  externalCodes?: T['externalCodes']
-}
-type SaveItemData = WithoutExternal<ItemData>
-type CreateItemData = WithoutExternal<ItemCreateData>
+// 외부 코드는 외부코드 매핑 메뉴에서 (0068) — 품목 저장은 매핑을 건드리지 않는다
+type SaveItemData = ItemData
+type CreateItemData = ItemCreateData
 
 // 품목 저장 (docs/decisions/0041). 권한·데이터 범위 검사는 서버 액션에서 한다
 // - 화주사는 등록 후 바꿀 수 없다 (재고·이력이 화주사에 묶인다)
@@ -148,7 +145,6 @@ export async function createItem(data: CreateItemData) {
       select: { id: true, systemCode: true, code: true, rowVersion: true },
     })
     await tx.itemUnit.createMany({ data: unitRows(item.id, data.units) })
-    if (data.externalCodes) await saveExternalCodes(tx, 'ITEM', item.id, data.externalCodes)
     return item
   })
 }
@@ -184,7 +180,6 @@ export async function updateItem(id: bigint, rowVersion: number, data: SaveItemD
     )
     await tx.itemUnit.deleteMany({ where: { itemId: id } })
     await tx.itemUnit.createMany({ data: unitRows(id, data.units) })
-    if (data.externalCodes) await saveExternalCodes(tx, 'ITEM', id, data.externalCodes)
     return saved
   })
 }

@@ -3,7 +3,6 @@ import { createDataGridState } from '@/components/data-grid/state'
 import type { PermissionCode } from '@/config/permissions'
 import { runInContext } from '@/lib/actor'
 import { countCodeUsage } from '@/lib/common-code/code-usage'
-import { getExternalCodes } from '@/lib/master-code/external-codes'
 import { prisma } from '@/lib/prisma'
 import type { DataScope } from '@/lib/scope/data-scope'
 import { getCurrentPermissions, getCurrentScope, getCurrentUser } from '@/lib/session'
@@ -64,7 +63,6 @@ const input = (overrides: Partial<ShipperInput> = {}): ShipperInput => ({
   contacts: [
     { duty: 'INBOUND', name: '김입고', phone: '010-1111-2222', email: '', isPrimary: true },
   ],
-  externalCodes: { SAP: '', ERP: '' },
   ...overrides,
 })
 
@@ -88,7 +86,7 @@ afterAll(async () => {
 
 describe('화주사 등록·수정', () => {
   it('시스템 코드 자동, 번호는 숫자만, 이용 센터·담당자·외부 코드 함께 저장', async () => {
-    const shipper = await create({ externalCodes: { SAP: 'V100', ERP: '' } })
+    const shipper = await create()
     expect(shipper.systemCode).toMatch(/^SH\d{6}$/)
     expect(shipper.code).toBe(shipper.systemCode)
     const saved = await prisma.shipper.findUniqueOrThrow({
@@ -100,7 +98,6 @@ describe('화주사 등록·수정', () => {
     expect(saved.contacts).toEqual([
       expect.objectContaining({ duty: 'INBOUND', phone: '01011112222', isPrimary: 'Y' }),
     ])
-    expect(await getExternalCodes('SHIPPER', BigInt(shipper.id))).toEqual({ SAP: 'V100', ERP: '' })
     // 담당 업무 코드가 쓰이고 있으면 공통코드에서 지울 수 없다
     // (사용 수는 운영사마다 센다 → 테스트 운영사 출입증 안에서)
     const usage = await runInContext({ actor: 'system', operatorId: TEST_OPERATOR_ID }, () =>

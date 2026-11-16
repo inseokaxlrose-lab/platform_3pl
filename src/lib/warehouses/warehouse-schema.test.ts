@@ -8,7 +8,6 @@ const input = (overrides: Partial<WarehouseCreateInput> = {}): WarehouseCreateIn
   code: '',
   name: '상온 1창고',
   storageCondition: 'AMBIENT',
-  externalCodes: { SAP: '', ERP: '' },
   ...overrides,
 })
 

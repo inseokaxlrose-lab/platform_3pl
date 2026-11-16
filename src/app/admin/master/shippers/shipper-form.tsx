@@ -3,7 +3,7 @@
 import { PowerIcon, UserPlusIcon } from 'lucide-react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { ConfirmDialog, ExternalCodesFields, StatusBadge } from '@/components/common'
+import { ConfirmDialog, StatusBadge } from '@/components/common'
 import {
   AddressInput,
   BizNoInput,
@@ -33,7 +33,6 @@ import {
 } from '@/components/ui/select'
 import { unwrap } from '@/lib/actions'
 import { CONTACT_ROLE_GROUP, EMPTY_CONTACT, MAX_CONTACTS } from '@/lib/contacts/contact-schema'
-import { EMPTY_EXTERNAL_CODES } from '@/lib/master-code/external-codes-schema'
 import {
   LABEL_UNITS,
   shipperSchema,
@@ -61,7 +60,6 @@ const EMPTY: ShipperInput = {
   useExpiry: false,
   labelUnit: 'PLT',
   contacts: [],
-  externalCodes: { ...EMPTY_EXTERNAL_CODES },
 }
 
 type ShipperFormProps = {
@@ -330,22 +328,6 @@ export function ShipperForm({
           emptyText="등록된 담당자가 없습니다."
           disabled={disabled}
         />
-      ),
-    },
-    {
-      id: 'external',
-      title: '외부 코드',
-      description: 'SAP·ERP 등과 연동할 때 그쪽의 거래처(화주) 코드를 적습니다.',
-      content: (
-        <FormGrid>
-          <ExternalCodesFields
-            idPrefix="shipper"
-            value={{ ...EMPTY_EXTERNAL_CODES, ...value.externalCodes }}
-            onChange={(externalCodes) => set({ externalCodes })}
-            disabled={disabled}
-            errors={{ SAP: errors['externalCodes.SAP'], ERP: errors['externalCodes.ERP'] }}
-          />
-        </FormGrid>
       ),
     },
   ]

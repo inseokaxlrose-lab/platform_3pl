@@ -3,7 +3,6 @@ import { createDataGridState } from '@/components/data-grid/state'
 import { ALL_PERMISSION_CODES, type PermissionCode } from '@/config/permissions'
 import { getCustomerForEdit } from '@/lib/customers/customer-queries'
 import type { CustomerCreateInput } from '@/lib/customers/customer-schema'
-import { getExternalCodes } from '@/lib/master-code/external-codes'
 import { prisma } from '@/lib/prisma'
 import type { DataScope } from '@/lib/scope/data-scope'
 import { getCurrentPermissions, getCurrentScope, getCurrentUser } from '@/lib/session'
@@ -68,7 +67,6 @@ const input = (overrides: Partial<CustomerCreateInput> = {}): CustomerCreateInpu
   deliveryMemo: '',
   remark: '',
   contacts: [],
-  externalCodes: { SAP: '', ERP: '' },
   ...overrides,
 })
 
@@ -119,7 +117,6 @@ describe('거래처 등록 · 수정', () => {
   it('시스템 코드 자동, 번호는 숫자만, 법정동코드·담당자·외부 코드 함께, 운영사 자동', async () => {
     const created = await create({
       contacts: [{ duty: 'OUTBOUND', name: '박담당', phone: '', email: 'a@b.co', isPrimary: true }],
-      externalCodes: { SAP: 'C-100', ERP: '' },
     })
     const saved = await prisma.customer.findUniqueOrThrow({
       where: { id: BigInt(created.id) },
@@ -138,10 +135,6 @@ describe('거래처 등록 · 수정', () => {
     expect(saved.contacts.map((c) => [c.duty, c.name, c.isPrimary])).toEqual([
       ['OUTBOUND', '박담당', 'Y'],
     ])
-    expect(await getExternalCodes('CUSTOMER', BigInt(created.id))).toEqual({
-      SAP: 'C-100',
-      ERP: '',
-    })
   })
 
   it('거래처코드는 같은 화주사 안에서만 겹칠 수 없다, 없는 담당 업무 코드는 거부', async () => {

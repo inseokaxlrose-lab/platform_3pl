@@ -3,7 +3,7 @@
 import { PlusIcon, PowerIcon } from 'lucide-react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { ConfirmDialog, ExternalCodesFields, StatusBadge } from '@/components/common'
+import { ConfirmDialog, StatusBadge } from '@/components/common'
 import { AddressInput, PhoneInput } from '@/components/inputs'
 import {
   Field,
@@ -19,7 +19,6 @@ import { Input } from '@/components/ui/input'
 import { unwrap } from '@/lib/actions'
 import { centerSchema, type CenterData, type CenterInput } from '@/lib/centers/center-schema'
 import { summarizeRegions } from '@/lib/delivery-zones/regions'
-import { EMPTY_EXTERNAL_CODES } from '@/lib/master-code/external-codes-schema'
 import { createCenterAction, setCenterActiveAction, updateCenterAction } from './actions'
 import type { CenterForEdit } from './queries'
 import { AddWarehouseButton, WarehouseSummary } from './warehouse-summary'
@@ -34,7 +33,6 @@ const EMPTY: CenterInput = {
   zipCode: '',
   address: '',
   addressDetail: '',
-  externalCodes: { ...EMPTY_EXTERNAL_CODES },
 }
 
 // 저장한 값(빈 칸 null, 코드 대문자) → 입력값
@@ -50,7 +48,6 @@ function toFormValues(data: CenterData): CenterInput {
     zipCode: text(data.zipCode),
     address: text(data.address),
     addressDetail: text(data.addressDetail),
-    externalCodes: { ...EMPTY_EXTERNAL_CODES, ...data.externalCodes },
   }
 }
 
@@ -185,22 +182,6 @@ export function CenterForm({
               }}
             />
           </Field>
-        </FormGrid>
-      ),
-    },
-    {
-      id: 'external',
-      title: '외부 코드',
-      description: 'SAP·ERP 등과 연동할 때 그쪽의 센터 코드를 적습니다.',
-      content: (
-        <FormGrid>
-          <ExternalCodesFields
-            idPrefix="center"
-            value={{ ...EMPTY_EXTERNAL_CODES, ...value.externalCodes }}
-            onChange={(externalCodes) => set({ externalCodes })}
-            disabled={disabled}
-            errors={{ SAP: errors['externalCodes.SAP'], ERP: errors['externalCodes.ERP'] }}
-          />
         </FormGrid>
       ),
     },

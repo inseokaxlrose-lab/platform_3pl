@@ -39,7 +39,6 @@ export default async function PortalItemPage({ params }: PageProps<'/portal/item
       readOnly={!canUpdate}
       basePath="/portal/items"
       canToggleActive={canUpdate}
-      showExternalCodes={false}
       createAction={createPortalItemAction}
       updateAction={updatePortalItemAction}
       setActiveAction={setPortalItemsActiveAction}

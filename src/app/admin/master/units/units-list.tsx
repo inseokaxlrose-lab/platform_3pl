@@ -73,18 +73,6 @@ const COLUMNS: DataGridColumn<UnitRow>[] = [
     accessor: (row) => (row.kind === 'BASE' ? row.decimals : null),
     format: 'number',
   },
-  {
-    id: 'sapCode',
-    header: 'SAP 코드',
-    accessor: (row) => row.externalCodes.SAP || null,
-    defaultHidden: true,
-  },
-  {
-    id: 'erpCode',
-    header: 'ERP 코드',
-    accessor: (row) => row.externalCodes.ERP || null,
-    defaultHidden: true,
-  },
   { id: 'sortOrder', header: '정렬 순서', accessor: 'sortOrder', format: 'number', sortable: true },
   {
     id: 'isActive',

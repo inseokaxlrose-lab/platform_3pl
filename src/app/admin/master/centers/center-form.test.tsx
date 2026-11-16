@@ -46,7 +46,6 @@ const CENTER: CenterForEdit = {
     zipCode: '',
     address: '',
     addressDetail: '',
-    externalCodes: { SAP: '', ERP: '' },
   },
   warehouses: [],
 } as unknown as CenterForEdit

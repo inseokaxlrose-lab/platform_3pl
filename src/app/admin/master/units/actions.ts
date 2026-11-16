@@ -3,7 +3,6 @@
 import { z } from 'zod'
 import { createAction } from '@/lib/actions/create-action'
 import { listQuerySchema, toPrismaQuery } from '@/lib/grid/grid-query'
-import { getExternalCodes } from '@/lib/master-code/external-codes'
 import { deletedWhere, statusWhere } from '@/lib/grid/list-filters'
 import { prisma } from '@/lib/prisma'
 import { operatorFilter } from '@/lib/scope/data-scope'
@@ -79,16 +78,9 @@ export const listUnitsAction = createAction({
       }),
       prisma.unit.count({ where }),
     ])
-    // 외부 코드도 목록에 (수정 팝업을 채우고 숨김 컬럼으로 보여준다)
-    const withCodes = await Promise.all(
-      rows.map(async (row) => ({
-        ...row,
-        // 예/아니오 칸은 화면에서 true/false로
-        isSystem: isYes(row.isSystem),
-        externalCodes: await getExternalCodes('UNIT', row.id),
-      })),
-    )
-    return { rows: withCodes.map(withIsActive), rowCount }
+    // 예/아니오 칸은 화면에서 true/false로
+    const shaped = rows.map((row) => ({ ...row, isSystem: isYes(row.isSystem) }))
+    return { rows: shaped.map(withIsActive), rowCount }
   },
 })
 

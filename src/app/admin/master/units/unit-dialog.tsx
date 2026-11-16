@@ -19,8 +19,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { EXTERNAL_SYSTEMS, EXTERNAL_SYSTEM_KEYS } from '@/config/external-systems'
-import { EMPTY_EXTERNAL_CODES, type ExternalCodes } from '@/lib/master-code/external-codes-schema'
 import { UNIT_KIND_LABELS, UNIT_KINDS, type UnitKindValue } from '@/lib/units/unit-labels'
 import type { UnitCreateInput } from '@/lib/units/unit-schema'
 import { createUnitAction, updateUnitAction } from './actions'
@@ -38,7 +36,6 @@ export type UnitRow = {
   isSystem: boolean
   // 동시 수정 막기: 팝업을 연 목록의 버전
   rowVersion: number
-  externalCodes: ExternalCodes
 }
 
 type UnitDialogProps = {
@@ -59,7 +56,6 @@ const EMPTY: UnitCreateInput = {
   decimals: 0,
   sortOrder: 0,
   isActive: true,
-  externalCodes: { ...EMPTY_EXTERNAL_CODES },
 }
 
 // 단위 등록·수정 팝업 (docs/decisions/0034): 칸이 적어 별도 화면 대신 팝업
@@ -72,9 +68,7 @@ export function UnitDialog({
   readOnly,
   onSaved,
 }: UnitDialogProps) {
-  const initial: UnitCreateInput = unit
-    ? { ...unit, externalCodes: { ...EMPTY_EXTERNAL_CODES, ...unit.externalCodes } }
-    : { ...EMPTY, sortOrder: nextSortOrder }
+  const initial: UnitCreateInput = unit ? { ...unit } : { ...EMPTY, sortOrder: nextSortOrder }
   const [value, setValue] = useState(initial)
   const [errors, setErrors] = useState<Record<string, string>>({})
   const [message, setMessage] = useState<string | null>(null)
@@ -124,7 +118,7 @@ export function UnitDialog({
             <DialogDescription>
               {unit
                 ? locked
-                  ? '시스템 단위입니다. 이름·정렬 순서·외부 코드만 고칠 수 있습니다.'
+                  ? '시스템 단위입니다. 이름·정렬 순서만 고칠 수 있습니다.'
                   : '코드는 바꿀 수 없습니다.'
                 : '코드는 등록 후 바꿀 수 없습니다 (품목·재고에 이 글자가 저장됩니다).'}
             </DialogDescription>
@@ -190,33 +184,6 @@ export function UnitDialog({
             기본단위: 재고를 세는 단위 (EA 0자리, KG 3자리처럼 수량 입력의 소수 자리수) · 환산단위:
             기본단위를 묶은 단위 (입수량은 품목에서 정함)
           </p>
-          <FormGrid>
-            {EXTERNAL_SYSTEM_KEYS.map((system) => (
-              <Field
-                span={6}
-                key={system}
-                label={`${EXTERNAL_SYSTEMS[system].label} 코드`}
-                error={errors[`externalCodes.${system}`]}
-                htmlFor={id(`external-${system}`)}
-              >
-                <Input
-                  id={id(`external-${system}`)}
-                  value={value.externalCodes?.[system] ?? ''}
-                  onChange={(e) =>
-                    set({
-                      externalCodes: {
-                        ...EMPTY_EXTERNAL_CODES,
-                        ...value.externalCodes,
-                        [system]: e.target.value,
-                      },
-                    })
-                  }
-                  disabled={disabled}
-                  placeholder="연동하지 않으면 비워 두세요"
-                />
-              </Field>
-            ))}
-          </FormGrid>
           <FormGrid>
             <Field span={6} label="정렬 순서" error={errors.sortOrder} htmlFor={id('sortOrder')}>
               <NumberInput

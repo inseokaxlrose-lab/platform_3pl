@@ -20,7 +20,6 @@ const input = (overrides: Partial<ItemInput> = {}): ItemInput => ({
   expiryAlertDays: '30',
   remark: '',
   units: [{ unitId: '2', convQty: '24' }],
-  externalCodes: { SAP: '', ERP: '' },
   ...overrides,
 })
 

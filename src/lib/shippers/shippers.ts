@@ -4,7 +4,6 @@ import { ActionError } from '@/lib/actions/action-error'
 import { requireOperatorId } from '@/lib/actor'
 import { assertCodeValues } from '@/lib/common-code/common-codes'
 import { CONTACT_ROLE_GROUP } from '@/lib/contacts/contact-schema'
-import { saveExternalCodes } from '@/lib/master-code/external-codes'
 import { nextSystemCode } from '@/lib/master-code/system-code'
 import { assertRowVersion, withVersionGuard } from '@/lib/row-version'
 import { prisma, type Db } from '@/lib/prisma'
@@ -49,12 +48,11 @@ async function assertCenters(db: Db, centerIds: bigint[], keep: bigint[] = []) {
   }
 }
 
-// 화주사 본문 칸 (이용 센터·담당자·외부 코드 제외)
+// 화주사 본문 칸 (이용 센터·담당자 제외)
 function fieldsOf(data: ShipperData) {
-  const { centerIds, contacts, externalCodes, code, ...fields } = data
+  const { centerIds, contacts, code, ...fields } = data
   void centerIds
   void contacts
-  void externalCodes
   void code
   // 예/아니오 칸은 DB에 'Y'/'N'으로
   return { ...fields, useLot: toYn(fields.useLot), useExpiry: toYn(fields.useExpiry) }
@@ -92,7 +90,6 @@ export async function createShipper(data: ShipperData) {
       select: { id: true, systemCode: true, code: true, rowVersion: true },
     })
     await tx.shipperContact.createMany({ data: contactRows(shipper.id, data.contacts) })
-    await saveExternalCodes(tx, 'SHIPPER', shipper.id, data.externalCodes)
     return shipper
   })
 }
@@ -139,7 +136,6 @@ export async function updateShipper(id: bigint, rowVersion: number, data: Shippe
     })
     await tx.shipperContact.deleteMany({ where: { shipperId: id } })
     await tx.shipperContact.createMany({ data: contactRows(id, data.contacts) })
-    await saveExternalCodes(tx, 'SHIPPER', id, data.externalCodes)
     return { id, code, rowVersion: saved.rowVersion }
   })
 }

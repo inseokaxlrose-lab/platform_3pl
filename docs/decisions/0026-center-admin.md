@@ -42,7 +42,7 @@
 ### 함께 만든 공통 장치
 
 - `src/lib/validation/common-fields.ts`: 전화·이메일·주소·선택/필수 글자 규칙 (운영사·센터 공용, 이후 기준정보 재사용)
-- `ExternalCodesFields`: 연동 상대마다 한 칸, 한 줄 2칸
+- ~~`ExternalCodesFields`: 연동 상대마다 한 칸, 한 줄 2칸~~ → 0068에서 외부코드 매핑 메뉴로 옮기며 지움
 - `ACTIVE_STATUS`: 사용 / 사용 중지 배지 공통
 
 ## 확인

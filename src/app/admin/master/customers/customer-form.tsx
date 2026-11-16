@@ -2,7 +2,7 @@
 
 import { PowerIcon } from 'lucide-react'
 import { useRouter } from 'next/navigation'
-import { ConfirmDialog, ExternalCodesFields, StatusBadge } from '@/components/common'
+import { ConfirmDialog, StatusBadge } from '@/components/common'
 import { AddressInput, BizNoInput, EmailInput, PhoneInput } from '@/components/inputs'
 import {
   EditableSubTable,
@@ -35,7 +35,6 @@ import {
   type CustomerCreateData,
   type CustomerCreateInput,
 } from '@/lib/customers/customer-schema'
-import { EMPTY_EXTERNAL_CODES } from '@/lib/master-code/external-codes-schema'
 import { toYn } from '@/lib/yn'
 import { createCustomerAction, setCustomersActiveAction, updateCustomerAction } from './actions'
 
@@ -56,7 +55,6 @@ const EMPTY: CustomerCreateInput = {
   deliveryMemo: '',
   remark: '',
   contacts: [],
-  externalCodes: { ...EMPTY_EXTERNAL_CODES },
 }
 
 // 저장한 값(키 bigint, 빈 칸 null) → 입력값(글자)
@@ -79,7 +77,6 @@ function toFormValues(data: CustomerCreateData): CustomerCreateInput {
     deliveryMemo: text(data.deliveryMemo),
     remark: text(data.remark),
     contacts: data.contacts.map((c) => toContactInput({ ...c, isPrimary: toYn(c.isPrimary) })),
-    externalCodes: { ...EMPTY_EXTERNAL_CODES, ...data.externalCodes },
   }
 }
 
@@ -317,22 +314,6 @@ export function CustomerForm({
           emptyText="등록된 담당자가 없습니다."
           disabled={disabled}
         />
-      ),
-    },
-    {
-      id: 'external',
-      title: '외부 코드',
-      description: 'SAP·ERP 등과 연동할 때 그쪽의 거래처 코드를 적습니다.',
-      content: (
-        <FormGrid>
-          <ExternalCodesFields
-            idPrefix="customer"
-            value={{ ...EMPTY_EXTERNAL_CODES, ...value.externalCodes }}
-            onChange={(externalCodes) => set({ externalCodes })}
-            disabled={disabled}
-            errors={{ SAP: errors['externalCodes.SAP'], ERP: errors['externalCodes.ERP'] }}
-          />
-        </FormGrid>
       ),
     },
   ]

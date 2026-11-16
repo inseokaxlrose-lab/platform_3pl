@@ -3,7 +3,6 @@ import { createDataGridState } from '@/components/data-grid/state'
 import { ALL_PERMISSION_CODES, type PermissionCode } from '@/config/permissions'
 import { deleteUnitsAction } from '@/app/admin/master/units/actions'
 import type { ItemCreateInput } from '@/lib/items/item-schema'
-import { getExternalCodes } from '@/lib/master-code/external-codes'
 import { prisma } from '@/lib/prisma'
 import type { DataScope } from '@/lib/scope/data-scope'
 import { getCurrentPermissions, getCurrentScope, getCurrentUser } from '@/lib/session'
@@ -73,7 +72,6 @@ const input = (overrides: Partial<ItemCreateInput> = {}): ItemCreateInput => ({
   expiryAlertDays: '30',
   remark: '',
   units: [{ unitId: String(unitIds.BOX), convQty: '24' }],
-  externalCodes: { SAP: '', ERP: '' },
   ...overrides,
 })
 
@@ -122,7 +120,7 @@ afterAll(async () => {
 
 describe('품목 등록', () => {
   it('시스템 코드 자동, 품목코드 비우면 시스템 코드, 환산단위·외부 코드 함께, 운영사 자동', async () => {
-    const created = await create({ externalCodes: { SAP: 'M-100', ERP: '' } })
+    const created = await create()
     const saved = await prisma.item.findUniqueOrThrow({
       where: { id: BigInt(created.id) },
       include: { units: true },
@@ -139,7 +137,6 @@ describe('품목 등록', () => {
       createdBy: 'boss',
     })
     expect(saved.units.map((u) => [u.unitId, u.convQty.toString()])).toEqual([[unitIds.BOX, '24']])
-    expect(await getExternalCodes('ITEM', BigInt(created.id))).toEqual({ SAP: 'M-100', ERP: '' })
   })
 
   it('품목코드·바코드는 같은 화주사 안에서만 겹칠 수 없다 (다른 화주사는 같은 코드 가능)', async () => {

@@ -1,7 +1,6 @@
 import { z } from 'zod'
 import { contactsSchema } from '@/lib/contacts/contact-schema'
 import { idField } from '@/lib/id'
-import { externalCodesSchema } from '@/lib/master-code/external-codes-schema'
 import {
   addressShape,
   optionalBusinessNumber,
@@ -51,7 +50,6 @@ const customerShape = {
   deliveryMemo: optionalText(200),
   remark: optionalText(1000),
   contacts: contactsSchema,
-  externalCodes: externalCodesSchema,
 }
 
 // 수정: 화주사는 바꿀 수 없다
