@@ -21,6 +21,8 @@ import {
   updateLocation,
 } from '@/lib/locations/locations'
 import { rowVersionField } from '@/lib/row-version'
+import { uploadRowsSchema } from '@/lib/excel/upload'
+import { commitLocationUpload, previewLocationUpload } from '@/lib/locations/location-upload'
 import { prisma } from '@/lib/prisma'
 import { DELETED_ONLY, withIsActive } from '@/lib/status'
 import { assertInScope, scopeFilter, type DataScope } from '@/lib/scope/data-scope'
@@ -228,4 +230,17 @@ export const restoreLocationsAction = createAction({
     }
     return restoreLocations(ids)
   },
+})
+
+// 엑셀 일괄 업로드 (0071): 검증(저장 안 함) → 오류가 없을 때만 등록 (이미 있는 코드는 건너뜀)
+export const validateLocationUploadAction = createAction({
+  permission: 'master.locations.create',
+  input: uploadRowsSchema,
+  handler: async ({ input, scope }) => previewLocationUpload(input, scope),
+})
+
+export const commitLocationUploadAction = createAction({
+  permission: 'master.locations.create',
+  input: uploadRowsSchema,
+  handler: async ({ input, scope }) => commitLocationUpload(input, scope),
 })

@@ -13,13 +13,17 @@ import {
   type SearchFieldDef,
   useListQuery,
 } from '@/components/master-list'
+import { ExcelUploadDialog } from '@/components/excel-upload'
 import { Button } from '@/components/ui/button'
 import { unwrap } from '@/lib/actions'
+import { locationUploadTemplate } from '@/lib/locations/location-upload-template'
 import {
   deleteLocationsAction,
+  commitLocationUploadAction,
   listLocationsAction,
   restoreLocationsAction,
   setLocationsActiveAction,
+  validateLocationUploadAction,
 } from './actions'
 import { AddLocationDialog } from './add-location-dialog'
 import { EditLocationDialog } from './edit-location-dialog'
@@ -209,6 +213,15 @@ export function LocationsList({
                 warehouses={warehouses}
                 initialWarehouseId={warehouseId}
                 onAdded={list.refresh}
+              />
+              {/* 범위 규칙에 맞지 않는 창고: 엑셀로 한 줄씩 (0071) */}
+              <ExcelUploadDialog
+                template={locationUploadTemplate}
+                title="로케이션 엑셀 업로드"
+                description="한 줄이 로케이션 하나입니다. 이미 있는 코드는 건너뛰고, 오류가 하나라도 있으면 파일 전체가 등록되지 않습니다."
+                validate={validateLocationUploadAction}
+                commit={commitLocationUploadAction}
+                onDone={list.refresh}
               />
               <Button asChild>
                 <Link
