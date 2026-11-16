@@ -2,7 +2,6 @@ import 'server-only'
 import { textIds } from '@/lib/id'
 import type { ItemFormOptions } from '@/lib/items/item-form-options'
 import type { ItemInput } from '@/lib/items/item-schema'
-import { getExternalCodes } from '@/lib/master-code/external-codes'
 import { prisma } from '@/lib/prisma'
 import { isInScope, operatorFilter, scopeFilter, type DataScope } from '@/lib/scope/data-scope'
 import { ACTIVE_ONLY, isActiveStatus } from '@/lib/status'
@@ -72,7 +71,6 @@ export async function getItemForEdit(id: bigint, scope: DataScope) {
       // Decimal → 글자 (끝의 0은 뺀다: 24.000 → '24', 단위 환산 공통 함수로 정확하게)
       convQty: qtyText(parseQty(u.convQty.toString())),
     })),
-    externalCodes: await getExternalCodes('ITEM', id),
   }
   return textIds({
     id: item.id,

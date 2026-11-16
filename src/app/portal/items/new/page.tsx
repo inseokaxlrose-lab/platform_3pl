@@ -30,7 +30,6 @@ export default async function PortalNewItemPage() {
       readOnly={false}
       basePath="/portal/items"
       fixedShipperId={String(scope.shipperId)}
-      showExternalCodes={false}
       createAction={createPortalItemAction}
       updateAction={updatePortalItemAction}
       setActiveAction={setPortalItemsActiveAction}

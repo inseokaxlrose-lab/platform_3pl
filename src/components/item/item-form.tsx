@@ -2,7 +2,7 @@
 
 import { PowerIcon } from 'lucide-react'
 import { useRouter } from 'next/navigation'
-import { ConfirmDialog, ExternalCodesFields, StatusBadge } from '@/components/common'
+import { ConfirmDialog, StatusBadge } from '@/components/common'
 import { NumberInput } from '@/components/inputs'
 import {
   EditableSubTable,
@@ -36,7 +36,6 @@ import {
   type ItemCreateInput,
   type ItemInput,
 } from '@/lib/items/item-schema'
-import { EMPTY_EXTERNAL_CODES } from '@/lib/master-code/external-codes-schema'
 
 // 고르기에서 "선택 안 함"을 나타내는 값 (Radix Select는 빈 글자를 값으로 못 쓴다)
 const NONE = '__none__'
@@ -56,7 +55,6 @@ function toFormValues(data: ItemCreateData): ItemCreateInput {
     expiryAlertDays: data.expiryAlertDays === null ? '' : String(data.expiryAlertDays),
     remark: data.remark ?? '',
     units: data.units.map((u) => ({ unitId: String(u.unitId), convQty: u.convQty })),
-    externalCodes: { ...EMPTY_EXTERNAL_CODES, ...data.externalCodes },
   }
 }
 
@@ -73,7 +71,6 @@ const EMPTY: ItemCreateInput = {
   expiryAlertDays: '',
   remark: '',
   units: [],
-  externalCodes: { ...EMPTY_EXTERNAL_CODES },
 }
 
 // 저장 결과 (등록·수정 모두 키와 새 버전을 돌려준다)
@@ -102,8 +99,6 @@ type ItemFormProps = {
   // 화주 포털: 화주사를 고르지 않는다 (자기 화주사로 고정)
   fixedShipperId?: string
   canToggleActive?: boolean
-  // false: 외부 코드 섹션을 숨긴다 (화주 포털 — 운영사 내부 연동용 코드라서, 0041)
-  showExternalCodes?: boolean
   createAction: (input: ItemCreateInput) => Promise<ActionResult<SaveResult>>
   updateAction: (
     input: ItemInput & { id: string; rowVersion: number },
@@ -121,7 +116,6 @@ export function ItemForm({
   basePath,
   fixedShipperId,
   canToggleActive = false,
-  showExternalCodes = true,
   createAction,
   updateAction,
   setActiveAction,
@@ -422,25 +416,6 @@ export function ItemForm({
       ),
     },
   ]
-
-  if (showExternalCodes) {
-    sections.push({
-      id: 'external',
-      title: '외부 코드',
-      description: 'SAP·ERP 등과 연동할 때 그쪽의 품목 코드를 적습니다.',
-      content: (
-        <FormGrid>
-          <ExternalCodesFields
-            idPrefix="item"
-            value={{ ...EMPTY_EXTERNAL_CODES, ...value.externalCodes }}
-            onChange={(externalCodes) => set({ externalCodes })}
-            disabled={disabled}
-            errors={{ SAP: errors['externalCodes.SAP'], ERP: errors['externalCodes.ERP'] }}
-          />
-        </FormGrid>
-      ),
-    })
-  }
 
   // 수정 화면에서만: 상태 (바로 처리)
   if (item) {

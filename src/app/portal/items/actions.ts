@@ -30,8 +30,8 @@ function shipperOf(scope: DataScope): bigint {
   return scope.shipperId
 }
 
-// 포털 입력 규칙: 외부 코드 칸 없음 (보내도 버려진다)
-const portalItemSchema = itemSchema.omit({ externalCodes: true })
+// 포털 입력 규칙: 운영사 화면과 같다 (외부 코드는 입력 규칙에 없다, 0068)
+const portalItemSchema = itemSchema
 const idsSchema = z.array(idSchema).min(1).max(500)
 
 export const listPortalItemsAction = createAction({

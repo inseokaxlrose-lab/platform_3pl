@@ -1,5 +1,4 @@
 import { z } from 'zod'
-import { externalCodesSchema } from '@/lib/master-code/external-codes-schema'
 import { idField } from '@/lib/id'
 import { LABEL_UNITS, type LabelUnitValue } from '@/lib/shippers/shipper-schema'
 import { optionalText, requiredText } from '@/lib/validation/common-fields'
@@ -84,7 +83,6 @@ const itemShape = {
         seen.add(unit.unitId.toString())
       })
     }),
-  externalCodes: externalCodesSchema,
 }
 
 // 수정: 화주사는 바꿀 수 없다 (재고·이력이 화주사에 묶인다)
