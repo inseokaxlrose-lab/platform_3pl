@@ -282,7 +282,7 @@ const portalNavigation: NavArea = {
           title: '내 재고',
           href: '/portal/stock',
           icon: BoxesIcon,
-          ready: false,
+          ready: true,
           permission: 'portal.stock.read',
         },
       ],
