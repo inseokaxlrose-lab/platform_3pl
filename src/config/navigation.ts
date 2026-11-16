@@ -229,7 +229,7 @@ const adminNavigation: NavArea = {
           title: '자료 추출',
           href: '/admin/system/exports',
           icon: FileSpreadsheetIcon,
-          ready: false,
+          ready: true,
           permission: 'system.exports.read',
         },
       ],
