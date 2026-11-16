@@ -2,7 +2,6 @@ import 'server-only'
 import { looksLikeSystemCode } from '@/config/master-codes'
 import { ActionError } from '@/lib/actions/action-error'
 import { requireOperatorId } from '@/lib/actor'
-import { saveExternalCodes } from '@/lib/master-code/external-codes'
 import { nextSystemCode } from '@/lib/master-code/system-code'
 import { assertRowVersion, withVersionGuard } from '@/lib/row-version'
 import { prisma } from '@/lib/prisma'
@@ -53,7 +52,6 @@ export async function createCenter(data: CenterData) {
       select: { id: true, systemCode: true, code: true, rowVersion: true },
     })
     await ensureCenterDefaults(tx, center.id)
-    await saveExternalCodes(tx, 'CENTER', center.id, data.externalCodes)
     return center
   })
 }
@@ -76,7 +74,6 @@ export async function updateCenter(id: bigint, rowVersion: number, data: CenterD
         select: { rowVersion: true },
       }),
     )
-    await saveExternalCodes(tx, 'CENTER', id, data.externalCodes)
     return { id, code, rowVersion: saved.rowVersion }
   })
 }

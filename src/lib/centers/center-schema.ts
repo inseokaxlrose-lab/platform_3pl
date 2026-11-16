@@ -1,5 +1,4 @@
 import { z } from 'zod'
-import { externalCodesSchema } from '@/lib/master-code/external-codes-schema'
 import {
   addressShape,
   optionalPhone,
@@ -19,7 +18,6 @@ export const centerSchema = z.object({
   managerName: optionalText(30),
   managerPhone: optionalPhone,
   ...addressShape,
-  externalCodes: externalCodesSchema,
 })
 
 export type CenterInput = z.input<typeof centerSchema>

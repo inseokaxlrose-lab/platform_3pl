@@ -3,7 +3,7 @@
 import { LayersIcon, PowerIcon } from 'lucide-react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { ConfirmDialog, ExternalCodesFields, StatusBadge } from '@/components/common'
+import { ConfirmDialog, StatusBadge } from '@/components/common'
 import {
   Field,
   FormGrid,
@@ -23,7 +23,6 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { unwrap } from '@/lib/actions'
-import { EMPTY_EXTERNAL_CODES } from '@/lib/master-code/external-codes-schema'
 import {
   STORAGE_CONDITION_LABELS,
   STORAGE_CONDITIONS,
@@ -67,7 +66,6 @@ export function WarehouseForm(props: WarehouseFormProps) {
           code: '',
           name: '',
           storageCondition: 'AMBIENT' as StorageCondition,
-          externalCodes: { ...EMPTY_EXTERNAL_CODES },
         },
     // 등록·수정 모두 같은 규칙 (수정에서는 센터가 이미 정해져 있다)
     version: editing?.rowVersion,
@@ -84,7 +82,6 @@ export function WarehouseForm(props: WarehouseFormProps) {
       ...saved,
       // 검사를 거친 값은 키가 bigint라 화면 값(글자)으로 되돌린다
       centerId: String(saved.centerId),
-      externalCodes: { ...EMPTY_EXTERNAL_CODES, ...saved.externalCodes },
     }),
     onSuccess: editing
       ? undefined
@@ -224,22 +221,6 @@ export function WarehouseForm(props: WarehouseFormProps) {
               </SelectContent>
             </Select>
           </Field>
-        </FormGrid>
-      ),
-    },
-    {
-      id: 'external',
-      title: '외부 코드',
-      description: 'SAP·ERP 등과 연동할 때 그쪽의 창고 코드를 적습니다.',
-      content: (
-        <FormGrid>
-          <ExternalCodesFields
-            idPrefix="warehouse"
-            value={{ ...EMPTY_EXTERNAL_CODES, ...value.externalCodes }}
-            onChange={(externalCodes) => set({ externalCodes })}
-            disabled={disabled}
-            errors={{ SAP: errors['externalCodes.SAP'], ERP: errors['externalCodes.ERP'] }}
-          />
         </FormGrid>
       ),
     },

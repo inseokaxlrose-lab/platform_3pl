@@ -1,6 +1,5 @@
 import 'server-only'
 import type { CenterInput } from '@/lib/centers/center-schema'
-import { getExternalCodes } from '@/lib/master-code/external-codes'
 import { textIds } from '@/lib/id'
 import { prisma } from '@/lib/prisma'
 import { NOT_DELETED, isActiveStatus, withIsActive } from '@/lib/status'
@@ -52,7 +51,6 @@ export async function getCenterForEdit(id: bigint, scope: DataScope) {
     zipCode: text(center.zipCode),
     address: text(center.address),
     addressDetail: text(center.addressDetail),
-    externalCodes: await getExternalCodes('CENTER', id),
   }
   // 화면으로 보낼 값이라 키는 글자로
   return textIds({

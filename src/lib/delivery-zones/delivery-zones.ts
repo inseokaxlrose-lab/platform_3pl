@@ -3,7 +3,7 @@ import { assertAllFound, assertNoCodeConflict } from '@/lib/soft-delete'
 import { looksLikeSystemCode } from '@/config/master-codes'
 import { ActionError } from '@/lib/actions/action-error'
 import { requireOperatorId } from '@/lib/actor'
-import { deleteExternalCodes, saveExternalCodes } from '@/lib/master-code/external-codes'
+import { deleteExternalCodes } from '@/lib/master-code/external-codes'
 import { nextSystemCode } from '@/lib/master-code/system-code'
 import { assertRowVersion, withVersionGuard } from '@/lib/row-version'
 import { prisma, type Db } from '@/lib/prisma'
@@ -94,7 +94,6 @@ export async function createDeliveryZone(data: DeliveryZoneData) {
       },
       select: { id: true, systemCode: true, code: true, rowVersion: true },
     })
-    await saveExternalCodes(tx, 'DELIVERY_ZONE', zone.id, data.externalCodes)
     return zone
   })
 }
@@ -123,7 +122,6 @@ export async function updateDeliveryZone(id: bigint, rowVersion: number, data: D
     await tx.deliveryZoneRegion.createMany({
       data: data.regionCodes.map((regionCode) => ({ zoneId: id, regionCode })),
     })
-    await saveExternalCodes(tx, 'DELIVERY_ZONE', id, data.externalCodes)
     return { id, code, rowVersion: saved.rowVersion }
   })
 }

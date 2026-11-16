@@ -1,5 +1,4 @@
 import { z } from 'zod'
-import { externalCodesSchema } from '@/lib/master-code/external-codes-schema'
 import { optionalText, requiredText, userCodeField } from '@/lib/validation/common-fields'
 import { isRegionCode, overlapsWithin, regionLabel } from './regions'
 import { idField } from '@/lib/id'
@@ -31,7 +30,6 @@ export const deliveryZoneSchema = z.object({
       }
     })
     .transform((codes) => [...new Set(codes)]),
-  externalCodes: externalCodesSchema,
 })
 
 export type DeliveryZoneInput = z.input<typeof deliveryZoneSchema>

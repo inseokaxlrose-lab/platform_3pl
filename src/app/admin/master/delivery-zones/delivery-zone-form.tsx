@@ -2,7 +2,7 @@
 
 import { PowerIcon } from 'lucide-react'
 import { useRouter } from 'next/navigation'
-import { ConfirmDialog, ExternalCodesFields, StatusBadge } from '@/components/common'
+import { ConfirmDialog, StatusBadge } from '@/components/common'
 import {
   Field,
   FormGrid,
@@ -26,7 +26,6 @@ import {
   deliveryZoneSchema,
   type DeliveryZoneInput,
 } from '@/lib/delivery-zones/delivery-zone-schema'
-import { EMPTY_EXTERNAL_CODES } from '@/lib/master-code/external-codes-schema'
 import {
   createDeliveryZoneAction,
   setDeliveryZonesActiveAction,
@@ -75,7 +74,6 @@ export function DeliveryZoneForm({
         name: '',
         description: '',
         regionCodes: [],
-        externalCodes: { ...EMPTY_EXTERNAL_CODES },
       } satisfies DeliveryZoneInput),
     version: zone?.rowVersion,
     schema: deliveryZoneSchema,
@@ -92,7 +90,6 @@ export function DeliveryZoneForm({
       // 검사를 거친 값은 키가 bigint라 화면 값(글자)으로 되돌린다
       centerId: String(saved.centerId),
       description: saved.description ?? '',
-      externalCodes: { ...EMPTY_EXTERNAL_CODES, ...saved.externalCodes },
     }),
     onSuccess: zone
       ? undefined
@@ -212,22 +209,6 @@ export function DeliveryZoneForm({
             </p>
           )}
         </>
-      ),
-    },
-    {
-      id: 'external',
-      title: '외부 코드',
-      description: 'SAP·ERP 등과 연동할 때 그쪽의 권역 코드를 적습니다.',
-      content: (
-        <FormGrid>
-          <ExternalCodesFields
-            idPrefix="zone"
-            value={{ ...EMPTY_EXTERNAL_CODES, ...value.externalCodes }}
-            onChange={(externalCodes) => set({ externalCodes })}
-            disabled={disabled}
-            errors={{ SAP: errors['externalCodes.SAP'], ERP: errors['externalCodes.ERP'] }}
-          />
-        </FormGrid>
       ),
     },
   ]

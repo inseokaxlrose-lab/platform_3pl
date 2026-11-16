@@ -2,7 +2,6 @@ import 'server-only'
 import { looksLikeSystemCode } from '@/config/master-codes'
 import { ActionError } from '@/lib/actions/action-error'
 import { requireOperatorId } from '@/lib/actor'
-import { saveExternalCodes } from '@/lib/master-code/external-codes'
 import { nextSystemCode } from '@/lib/master-code/system-code'
 import { assertRowVersion, withVersionGuard } from '@/lib/row-version'
 import { prisma } from '@/lib/prisma'
@@ -52,7 +51,6 @@ export async function createWarehouse(centerId: bigint, data: WarehouseUpdateDat
       },
       select: { id: true, systemCode: true, code: true, rowVersion: true },
     })
-    await saveExternalCodes(tx, 'WAREHOUSE', warehouse.id, data.externalCodes)
     return warehouse
   })
 }
@@ -88,7 +86,6 @@ export async function updateWarehouse(id: bigint, rowVersion: number, data: Ware
         select: { rowVersion: true },
       }),
     )
-    await saveExternalCodes(tx, 'WAREHOUSE', id, data.externalCodes)
     return { id, code, rowVersion: saved.rowVersion }
   })
 }

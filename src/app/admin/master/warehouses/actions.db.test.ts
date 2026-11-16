@@ -2,7 +2,6 @@ import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { createDataGridState } from '@/components/data-grid/state'
 import type { PermissionCode } from '@/config/permissions'
 import { ensureCenterDefaults } from '@/lib/centers/center-defaults'
-import { getExternalCodes } from '@/lib/master-code/external-codes'
 import { prisma } from '@/lib/prisma'
 import type { DataScope } from '@/lib/scope/data-scope'
 import { getCurrentPermissions, getCurrentScope, getCurrentUser } from '@/lib/session'
@@ -48,7 +47,6 @@ const input = (overrides: Partial<WarehouseCreateInput> = {}): WarehouseCreateIn
   code: '',
   name: '상온 1창고',
   storageCondition: 'AMBIENT',
-  externalCodes: { SAP: '', ERP: '' },
   ...overrides,
 })
 
@@ -80,15 +78,10 @@ describe('창고 등록', () => {
     const created = await create({
       code: 'a01',
       storageCondition: 'CHILLED',
-      externalCodes: { SAP: 'W100', ERP: '' },
     })
     const saved = await prisma.warehouse.findUniqueOrThrow({ where: { id: BigInt(created.id) } })
     expect(saved).toMatchObject({ code: 'A01', type: 'GENERAL', storageCondition: 'CHILLED' })
     expect(saved.systemCode).toMatch(/^WH\d{6}$/)
-    expect(await getExternalCodes('WAREHOUSE', BigInt(created.id))).toEqual({
-      SAP: 'W100',
-      ERP: '',
-    })
   })
 
   it('코드는 같은 센터 안에서만 중복 금지 (다른 센터는 같은 코드 가능)', async () => {
@@ -129,7 +122,6 @@ describe('창고 수정 · 입고대기 보호', () => {
       code: 'A02',
       name: '냉동 창고',
       storageCondition: 'FROZEN',
-      externalCodes: { SAP: '', ERP: 'E-1' },
     })
     let saved = await prisma.warehouse.findUniqueOrThrow({ where: { id: BigInt(created.id) } })
     expect(saved).toMatchObject({ code: 'A02', name: '냉동 창고', storageCondition: 'FROZEN' })
@@ -153,7 +145,6 @@ describe('창고 수정 · 입고대기 보호', () => {
         code: '',
         name: '입고대기(냉장)',
         storageCondition: 'CHILLED',
-        externalCodes: { SAP: '', ERP: '' },
       }),
     ).toMatchObject({ ok: true })
     expect(await prisma.warehouse.findUniqueOrThrow({ where: { id: staging.id } })).toMatchObject({

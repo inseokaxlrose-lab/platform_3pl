@@ -164,7 +164,6 @@ describe('다른 운영사의 것은 고치거나 지울 수 없다 ("찾을 수
       zipCode: '',
       address: '',
       addressDetail: '',
-      externalCodes: { SAP: '', ERP: '' },
     })
     expect(result).toMatchObject({ ok: false, error: { code: 'NOT_FOUND' } })
     expect(await prisma.center.findUniqueOrThrow({ where: { id: b.center.id } })).toMatchObject({

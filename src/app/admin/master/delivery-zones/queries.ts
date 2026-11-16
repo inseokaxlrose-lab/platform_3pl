@@ -1,6 +1,5 @@
 import 'server-only'
 import type { DeliveryZoneInput } from '@/lib/delivery-zones/delivery-zone-schema'
-import { getExternalCodes } from '@/lib/master-code/external-codes'
 import { textIds } from '@/lib/id'
 import { prisma } from '@/lib/prisma'
 import { NOT_DELETED, isActiveStatus } from '@/lib/status'
@@ -52,7 +51,6 @@ export async function getDeliveryZoneForEdit(id: bigint, scope: DataScope) {
     name: zone.name,
     description: zone.description ?? '',
     regionCodes: zone.regions.map((r) => r.regionCode).sort(),
-    externalCodes: await getExternalCodes('DELIVERY_ZONE', id),
   }
   // 화면으로 보낼 값이라 키는 글자로
   return textIds({
