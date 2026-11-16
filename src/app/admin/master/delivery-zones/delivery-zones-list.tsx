@@ -27,6 +27,7 @@ type Row = {
   systemCode: string
   code: string
   name: string
+  priority: number
   isActive: boolean
   createdAt: Date
   updatedAt: Date
@@ -66,6 +67,8 @@ const COLUMNS: DataGridColumn<Row>[] = [
     ),
   },
   { id: 'regionCount', header: '지역 수', accessor: 'regionCount', format: 'number' },
+  // 다른 센터 권역과 같은 수준으로 겹칠 때 작은 번호가 먼저 (0072)
+  { id: 'priority', header: '우선순위', accessor: 'priority', format: 'number', sortable: true },
   {
     id: 'isActive',
     header: '상태',

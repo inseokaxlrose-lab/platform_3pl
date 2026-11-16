@@ -15,7 +15,7 @@ import {
   setDeliveryZonesActiveAction,
   updateDeliveryZoneAction,
 } from './actions'
-import { getTakenRegions } from './queries'
+import { getOtherZoneRegions, getTakenRegions } from './queries'
 
 vi.mock('@/lib/session', () => ({
   getCurrentUser: vi.fn(),
@@ -142,6 +142,52 @@ describe('배송권역 등록·수정', () => {
     expect(saved.centerId).toBe(icnId)
     expect(saved.name).toBe('서울·인천')
     expect(saved.regions.map((r) => r.regionCode).sort()).toEqual(['11', '28'])
+  })
+})
+
+describe('우선순위 · 다른 센터 겹침 (0072)', () => {
+  it('우선순위는 기본 100, 등록·수정 때 저장 / 다른 센터 권역 정보(센터명·우선순위)를 사용 중인 것만 준다', async () => {
+    const seoul = await create({ code: 'SEOUL', regionCodes: ['11'] })
+    const gangnam = await create({
+      centerId: String(gmhId),
+      code: 'GANGNAM',
+      name: '서울남부',
+      regionCodes: ['41', '11680'],
+      priority: 30,
+    })
+    const priorityOf = async (id: string) =>
+      (await prisma.deliveryZone.findUniqueOrThrow({ where: { id: BigInt(id) } })).priority
+    expect(await priorityOf(seoul.id)).toBe(100)
+    expect(await priorityOf(gangnam.id)).toBe(30)
+
+    expect(
+      await updateDeliveryZoneAction({
+        id: seoul.id,
+        rowVersion: await versionOf('deliveryZone', seoul.id),
+        ...input({ code: 'SEOUL', priority: 5 }),
+      }),
+    ).toMatchObject({ ok: true })
+    expect(await priorityOf(seoul.id)).toBe(5)
+    expect(
+      await createDeliveryZoneAction(input({ code: 'X', regionCodes: ['26'], priority: 0 })),
+    ).toMatchObject({
+      ok: false,
+      error: { code: 'VALIDATION' },
+    })
+
+    // 수정 화면(서울 권역)에서 볼 다른 권역: 자기 것은 빼고, 사용 중지 권역도 뺀다
+    const others = await getOtherZoneRegions(
+      { kind: 'ALL', operatorId: TEST_OPERATOR_ID },
+      BigInt(seoul.id),
+    )
+    expect(others.map((o) => [o.regionCode, o.zoneName, o.priority]).sort()).toEqual([
+      ['11680', '서울남부', 30],
+      ['41', '서울남부', 30],
+    ])
+    await setDeliveryZonesActiveAction({ ids: [gangnam.id], isActive: false })
+    expect(
+      await getOtherZoneRegions({ kind: 'ALL', operatorId: TEST_OPERATOR_ID }, BigInt(seoul.id)),
+    ).toEqual([])
   })
 })
 

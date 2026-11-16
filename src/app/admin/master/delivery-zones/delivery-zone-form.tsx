@@ -11,6 +11,7 @@ import {
   type MasterFormSection,
   type MasterFormHeader,
 } from '@/components/master-form'
+import { NumberInput } from '@/components/inputs'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import {
@@ -26,12 +27,14 @@ import {
   deliveryZoneSchema,
   type DeliveryZoneInput,
 } from '@/lib/delivery-zones/delivery-zone-schema'
+import { DEFAULT_ZONE_PRIORITY, describeOverlaps } from '@/lib/delivery-zones/routing'
+import { cn } from '@/lib/utils'
 import {
   createDeliveryZoneAction,
   setDeliveryZonesActiveAction,
   updateDeliveryZoneAction,
 } from './actions'
-import type { DeliveryZoneForEdit, TakenRegions } from './queries'
+import type { DeliveryZoneForEdit, TakenRegions, ZoneRegionInfo } from './queries'
 import { RegionPicker } from './region-picker'
 
 type CenterOption = { id: string; code: string; name: string }
@@ -46,6 +49,8 @@ type DeliveryZoneFormProps = {
   initialCenterId?: string
   // 센터별로 다른 권역이 이미 담당하는 지역
   taken: TakenRegions
+  // 모든 센터 권역의 담당 지역 (다른 센터와 겹침 안내, 0072)
+  others: ZoneRegionInfo[]
   readOnly: boolean
   // 사용 중지/다시 사용 가능 여부
   canToggleActive?: boolean
@@ -61,6 +66,7 @@ export function DeliveryZoneForm({
   centers = [],
   initialCenterId,
   taken,
+  others,
   readOnly,
   canToggleActive = false,
 }: DeliveryZoneFormProps) {
@@ -73,6 +79,7 @@ export function DeliveryZoneForm({
         code: '',
         name: '',
         description: '',
+        priority: DEFAULT_ZONE_PRIORITY,
         regionCodes: [],
       } satisfies DeliveryZoneInput),
     version: zone?.rowVersion,
@@ -97,6 +104,13 @@ export function DeliveryZoneForm({
   })
   const { value, set, errors } = form
   const disabled = readOnly || form.pending
+  // 다른 센터 권역과 겹치는 곳마다 어느 쪽이 우선인지 (고르는 대로 바로 계산, 저장은 막지 않는다)
+  const overlaps = value.centerId
+    ? describeOverlaps(
+        { regionCodes: value.regionCodes, priority: value.priority ?? DEFAULT_ZONE_PRIORITY },
+        others.filter((o) => o.centerId !== value.centerId),
+      )
+    : []
 
   const sections: MasterFormSection[] = [
     {
@@ -171,6 +185,23 @@ export function DeliveryZoneForm({
               readOnly
             />
           </Field>
+          <Field
+            label="우선순위"
+            span={4}
+            error={errors.priority}
+            htmlFor="zone-priority"
+            hint="다른 센터 권역과 같은 지역으로 겹칠 때 작은 번호가 먼저 (1~999)"
+          >
+            <NumberInput
+              id="zone-priority"
+              value={value.priority ?? DEFAULT_ZONE_PRIORITY}
+              onChange={(n) => set({ priority: n ?? DEFAULT_ZONE_PRIORITY })}
+              min={1}
+              max={999}
+              disabled={disabled}
+              aria-invalid={Boolean(errors.priority)}
+            />
+          </Field>
           <Field label="설명" span={12} error={errors.description} htmlFor="zone-description">
             <Textarea
               id="zone-description"
@@ -207,6 +238,44 @@ export function DeliveryZoneForm({
             <p role="alert" className="mt-2 text-xs text-destructive">
               {errors.regionCodes}
             </p>
+          )}
+          {/* 다른 센터와 겹침 안내 (0072): 출고 때 배송 센터를 자동으로 고르는 규칙 */}
+          {overlaps.length > 0 && (
+            <div className="mt-4 space-y-2 rounded-md border p-3 text-sm">
+              <p className="font-medium">
+                다른 센터와 겹치는 지역 {overlaps.length}곳
+                <span className="ml-2 font-normal text-muted-foreground">
+                  거래처에 배송 센터가 없으면 더 구체적인 지역 → 우선순위 번호 순서로 배송 센터를
+                  고릅니다
+                </span>
+              </p>
+              <ul className="space-y-1">
+                {overlaps.map((o) => (
+                  <li
+                    key={`${o.region}-${o.other.centerName}-${o.other.zoneName}`}
+                    className="flex gap-2"
+                  >
+                    <span
+                      className={cn(
+                        'shrink-0 font-medium',
+                        o.winner === 'THIS' && 'text-primary',
+                        o.winner === 'TIE' && 'text-destructive',
+                      )}
+                    >
+                      {o.label}
+                    </span>
+                    <span
+                      className={cn(
+                        'text-muted-foreground',
+                        o.winner === 'TIE' && 'text-destructive',
+                      )}
+                    >
+                      {o.message}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            </div>
           )}
         </>
       ),

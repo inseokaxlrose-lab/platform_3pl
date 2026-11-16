@@ -4,7 +4,7 @@ import { AccessDenied } from '@/components/permission'
 import { getCurrentScope, hasPermission } from '@/lib/session'
 import { getCenterOptions } from '../../warehouses/queries'
 import { DeliveryZoneForm } from '../delivery-zone-form'
-import { getTakenRegions } from '../queries'
+import { getOtherZoneRegions, getTakenRegions } from '../queries'
 
 export const metadata: Metadata = { title: '배송권역 등록' }
 
@@ -14,9 +14,10 @@ export default async function NewDeliveryZonePage({
 }: PageProps<'/admin/master/delivery-zones/new'>) {
   if (!(await hasPermission('master.delivery-zones.create'))) return <AccessDenied />
   const scope = await getCurrentScope()
-  const [centers, taken, { centerId }] = await Promise.all([
+  const [centers, taken, others, { centerId }] = await Promise.all([
     getCenterOptions(scope),
     getTakenRegions(scope),
+    getOtherZoneRegions(scope),
     searchParams,
   ])
   const initialCenterId =
@@ -32,6 +33,7 @@ export default async function NewDeliveryZonePage({
       centers={centers}
       initialCenterId={initialCenterId ?? (centers.length === 1 ? centers[0].id : undefined)}
       taken={taken}
+      others={others}
       readOnly={false}
     />
   )
