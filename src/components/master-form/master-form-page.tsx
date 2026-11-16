@@ -47,8 +47,8 @@ type MasterFormPageProps = {
 }
 
 const sectionDomId = (id: string) => `section-${id}`
-// 고정 헤더 아래로 맞추는 위치: 상단 바(3.5rem) + 페이지 헤더 높이 + 여유 1rem
-const BELOW_HEADER = 'calc(3.5rem + var(--page-header-h, 0px) + 1rem)'
+// 고정 헤더 아래로 맞추는 위치: 상단 바(3.5rem) + 메뉴 탭(2.5rem, 0069) + 페이지 헤더 높이 + 여유 1rem
+const BELOW_HEADER = 'calc(6rem + var(--page-header-h, 0px) + 1rem)'
 
 // 기준정보 입력 화면 틀 (docs/ui-guidelines.md "입력 화면", "페이지 틀")
 // - AppPage(form): 헤더는 화면 전체 폭·고정, 왼쪽 목차 + 본문(최대 폭, 왼쪽 정렬)
