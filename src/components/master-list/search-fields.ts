@@ -34,6 +34,8 @@ export type SearchFieldDef = {
   // 이 조건들이 바뀌면 이 조건 값을 비운다 (예: 창고는 센터에, 구역은 창고에 딸림)
   dependsOn?: readonly string[]
   codeGroup?: string
+  // 'segment'에서 값이 비었을 때(첫 버튼)의 이름 (기본 '전체'). 예: 보기 기준의 기본 보기 '위치별'
+  allLabel?: string
   // 'yn'의 예/아니오 이름 (기본: 예 / 아니오)
   ynLabels?: [string, string]
   render?: (props: {

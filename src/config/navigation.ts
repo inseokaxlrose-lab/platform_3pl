@@ -182,7 +182,7 @@ const adminNavigation: NavArea = {
           title: '재고 조회',
           href: '/admin/stock',
           icon: BoxesIcon,
-          ready: false,
+          ready: true,
           permission: 'stock.inventory.read',
         },
         {
