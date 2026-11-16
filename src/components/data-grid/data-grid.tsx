@@ -356,7 +356,8 @@ export function DataGrid<TData extends RowData>({
       'z-10',
       header
         ? 'bg-muted'
-        : 'bg-card group-hover/row:bg-muted group-data-[state=selected]/row:bg-muted group-data-[active]/row:bg-accent',
+        : // 줄(TableRow)과 같은 transition-colors — 없으면 고정 칸만 먼저 색이 바뀐다
+          'bg-card transition-colors group-hover/row:bg-muted group-data-[state=selected]/row:bg-muted group-data-[active]/row:bg-accent',
       columnId === lastStickyId && 'border-r',
     )
 
