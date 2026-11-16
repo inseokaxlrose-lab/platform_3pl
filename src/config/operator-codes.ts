@@ -6,7 +6,7 @@
 // 값 → 화면 이름
 type Labels<T extends string> = Readonly<Record<T, string>>
 
-function codeSet<const T extends string>(labels: Labels<T>) {
+export function codeSet<const T extends string>(labels: Labels<T>) {
   const values = Object.keys(labels) as T[]
   return {
     values,

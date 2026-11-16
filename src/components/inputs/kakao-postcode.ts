@@ -14,6 +14,9 @@ export type KakaoPostcodeResult = {
   autoJibunAddress?: string
   // 법정동코드 10자리 (예: 4113510900)
   bcode?: string
+  // 시·도 / 시·군·구 (예: '경기', '성남시 분당구')
+  sido?: string
+  sigungu?: string
   userSelectedType: 'R' | 'J'
   buildingName: string
   apartment: 'Y' | 'N'
@@ -70,5 +73,7 @@ export function toAddress(data: KakaoPostcodeResult) {
     jibunAddress: data.jibunAddress || data.autoJibunAddress || '',
     // 법정동코드 (따로 저장하는 화면만 쓴다, 예: 거래처 region_cd — 배송권역과 맞춰 본다)
     regionCode: data.bcode ?? '',
+    // 지역명 '시·도 시·군·구' (따로 저장하는 화면만, 예: 센터 region_nm — 목록 표시·검색)
+    regionName: [data.sido, data.sigungu].filter(Boolean).join(' '),
   }
 }

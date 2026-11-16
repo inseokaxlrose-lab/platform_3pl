@@ -7,6 +7,7 @@ import { assertRowVersion, withVersionGuard } from '@/lib/row-version'
 import { prisma } from '@/lib/prisma'
 import type { WarehouseUpdateData } from './warehouse-schema'
 import { toStatus } from '@/lib/status'
+import { isStagingWarehouse } from '@/lib/warehouses/warehouse-labels'
 
 // 창고 저장 (docs/decisions/0027). 권한·데이터 범위 검사는 서버 액션에서 한다
 // 입고대기 창고 보호: 새로 만들 수 없고(센터 등록 때 자동으로만), 코드를 바꾸거나 사용 중지할 수 없다
@@ -66,9 +67,9 @@ export async function updateWarehouse(id: bigint, rowVersion: number, data: Ware
   const current = found!
 
   let code = data.code || current.systemCode
-  if (current.type === 'INBOUND_STAGING') {
+  if (isStagingWarehouse(current.type)) {
     if (data.code && data.code !== current.code) {
-      throw new ActionError('VALIDATION', '입고대기 창고의 코드는 바꿀 수 없습니다.')
+      throw new ActionError('VALIDATION', '대기 창고(입고·출고·반품)의 코드는 바꿀 수 없습니다.')
     }
     code = current.code
   }
@@ -90,12 +91,12 @@ export async function updateWarehouse(id: bigint, rowVersion: number, data: Ware
   })
 }
 
-// 사용 중지 / 다시 사용: 입고대기 창고는 늘 사용 중이어야 한다 (입고 확정이 들어갈 곳)
+// 사용 중지 / 다시 사용: 대기 창고는 늘 사용 중이어야 한다 (입고 확정·출고·반품이 들어갈 곳)
 export async function setWarehouseActive(id: bigint, isActive: boolean) {
   const current = await prisma.warehouse.findUnique({ where: { id }, select: { type: true } })
   if (!current) throw new ActionError('NOT_FOUND', '창고를 찾을 수 없습니다.')
-  if (current.type === 'INBOUND_STAGING' && !isActive) {
-    throw new ActionError('CONFLICT', '입고대기 창고는 사용 중지할 수 없습니다.')
+  if (isStagingWarehouse(current.type) && !isActive) {
+    throw new ActionError('CONFLICT', '대기 창고(입고·출고·반품)는 사용 중지할 수 없습니다.')
   }
   await prisma.warehouse.update({ where: { id }, data: { status: toStatus(isActive) } })
   return { id, isActive }

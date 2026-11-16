@@ -27,6 +27,7 @@ import {
   STORAGE_CONDITION_LABELS,
   STORAGE_CONDITIONS,
   WAREHOUSE_TYPE_LABELS,
+  isStagingWarehouse,
 } from '@/lib/warehouses/warehouse-labels'
 import { createWarehouseSchema, type WarehouseCreateInput } from '@/lib/warehouses/warehouse-schema'
 import { createWarehouseAction, setWarehouseActiveAction, updateWarehouseAction } from './actions'
@@ -50,12 +51,12 @@ type StorageCondition = WarehouseCreateInput['storageCondition']
 
 // 창고 등록·수정 (docs/decisions/0027, 입력 화면 틀 0031)
 // 등록하면 수정 화면으로, 수정은 그 자리에서 저장. 상태·로케이션은 따로 처리하는 섹션
-// 입고대기 창고: 코드가 잠기고 사용 중지 버튼이 없다
+// 대기 창고(입고·출고·반품): 코드가 잠기고 사용 중지 버튼이 없다
 export function WarehouseForm(props: WarehouseFormProps) {
   const router = useRouter()
   const { can } = usePermission()
   const editing = props.mode === 'edit' ? props.warehouse : null
-  const isStaging = editing?.type === 'INBOUND_STAGING'
+  const isStaging = editing ? isStagingWarehouse(editing.type) : false
   const readOnly = props.mode === 'edit' && props.readOnly
 
   const form = useMasterForm({
@@ -156,7 +157,7 @@ export function WarehouseForm(props: WarehouseFormProps) {
               id="warehouse-code"
               value={value.code}
               onChange={(e) => set({ code: e.target.value })}
-              // 입고대기 창고의 코드는 고정
+              // 대기 창고의 코드는 고정
               disabled={disabled || isStaging}
               placeholder="비우면 시스템 코드 사용"
               aria-invalid={Boolean(errors.code)}
@@ -185,7 +186,7 @@ export function WarehouseForm(props: WarehouseFormProps) {
             hint={
               isStaging
                 ? '센터마다 1개, 자동으로 만들어진 창고입니다.'
-                : '입고대기 창고는 센터 등록 때 자동으로만 만들어집니다.'
+                : '대기 창고(입고·출고·반품)는 센터 등록 때 자동으로만 만들어집니다.'
             }
           >
             <Input
@@ -242,7 +243,7 @@ export function WarehouseForm(props: WarehouseFormProps) {
             )}
             {isStaging ? (
               <p className="text-xs text-muted-foreground">
-                입고대기 창고는 사용 중지할 수 없습니다.
+                대기 창고(입고·출고·반품)는 사용 중지할 수 없습니다.
               </p>
             ) : (
               !readOnly && (
@@ -287,7 +288,7 @@ export function WarehouseForm(props: WarehouseFormProps) {
         title: `로케이션 (${editing.locationCount})`,
         standalone: true,
         description: isStaging
-          ? '입고대기 창고는 기본 로케이션 하나만 씁니다.'
+          ? '대기 창고는 기본 로케이션 하나만 씁니다.'
           : '로케이션 추가·일괄 생성은 로케이션 메뉴에서 합니다.',
         action: (
           <div className="flex gap-2">

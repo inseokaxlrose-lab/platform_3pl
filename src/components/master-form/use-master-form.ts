@@ -18,8 +18,13 @@ type UseMasterFormOptions<TSchema extends z.ZodType, TResult> = {
   version?: number | null
   // 서버 액션 호출 (서버도 같은 규칙으로 다시 검사)
   save: (value: z.input<TSchema>, version: number | null) => Promise<ActionResult<TResult>>
-  // 저장 성공 후 화면에 다시 채울 값 (예: 저장된 모양으로 정리). 없으면 입력값 그대로
-  afterSave?: (saved: z.output<TSchema>) => z.input<TSchema>
+  // 저장 성공 후 화면에 다시 채울 값 (예: 저장된 모양으로 정리, 새 줄에 서버가 준 키 넣기). 없으면 입력값 그대로
+  // saved = 검사를 통과한 값, result = 서버 액션 결과, value = 저장한 입력값
+  afterSave?: (
+    saved: z.output<TSchema>,
+    result: TResult,
+    value: z.input<TSchema>,
+  ) => z.input<TSchema>
   // 저장 성공 후 할 일 (예: 등록 화면 → 만든 항목의 수정 화면으로 이동). 서버 액션의 결과를 받는다
   onSuccess?: (result: TResult) => void
 }
@@ -100,7 +105,7 @@ export function useMasterForm<TSchema extends z.ZodType, TResult = unknown>({
         // 저장으로 올라간 버전을 들고 있어야 다음 저장이 충돌로 막히지 않는다
         const savedVersion = (result.data as { rowVersion?: unknown } | null)?.rowVersion
         if (typeof savedVersion === 'number') setVersion(savedVersion)
-        const next = afterSave ? afterSave(parsed.data) : value
+        const next = afterSave ? afterSave(parsed.data, result.data, value) : value
         setValue(next)
         setBaseline(next)
         setMessage({ ok: true, text: '저장했습니다.' })

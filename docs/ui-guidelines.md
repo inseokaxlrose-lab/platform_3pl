@@ -125,10 +125,40 @@ return (
 | 날짜 | `DateInput` | 3~4 | `'YYYY-MM-DD'` |
 | 기간 | `DateRangeInput` | 6~8 | `{ from, to }` |
 | 예/아니오 | `YnToggle` | 2~3 | boolean |
+| 시각 | `TimeInput` | 2~3 | `'HH:MM'` (24시간, 숫자만 치면 콜론 자동) |
+| 요일 | `WeekdaySelect` | 6 | 월~일 `'Y'`/`'N'` 7글자 (`[평일]`·`[매일]`) |
+| 로케이션 고르기 | `LocationSelect options` | 4 | 로케이션 키 (선택지는 서버가 범위를 좁혀 넘김) |
+| 상속 칸 (위 단계 값 따름) | `InheritableField` + 입력 부품 | 입력 부품과 같게 | 비우면 위 단계 값 — 아래 "상속 칸" |
 | 1:N 목록 | `EditableSubTable` | 섹션 전체 | 행 배열 |
 
 - 번호는 **DB에 숫자만** 저장하고, 마스크 부품이 하이픈을 붙여 보여준다 (0029). 화면에서 `formatPhone` 등으로 미리 바꿔 넣지 않는다.
 - 공통코드 목록은 `AppShell`이 나눠 준다. 그룹만 넘기면 된다 (0030).
+
+### 상속 칸 (`InheritableField`, 0073)
+
+운영사 → 센터 → 화주사처럼 **위 단계 값을 기본으로 따르고, 필요할 때만 이 단계에서 정하는** 설정(출고 마감·타임존·할당 규칙·로트 관리 등).
+
+```tsx
+<Field label="출고 마감" span={3} error={errors.shipCutoffTime} htmlFor={id('shipCutoffTime')}>
+  <InheritableField
+    id={id('shipCutoffTime')}
+    parentLabel="운영사"
+    parentValue={operator.shipCutoffTime} // 화면에 보일 위 단계 값 ('' = 정하지 않음)
+    inherited={value.shipCutoffTime === ''} // 비어 있으면 위 단계 값을 따르는 중
+    onInheritedChange={(inherited) =>
+      set({ shipCutoffTime: inherited ? '' : operator.shipCutoffTime || '17:00' })
+    }
+    disabled={disabled}
+  >
+    <TimeInput value={value.shipCutoffTime} onChange={(t) => set({ shipCutoffTime: t })} />
+  </InheritableField>
+</Field>
+```
+
+- **"운영사 값 사용" 체크 = 저장 값 비움(NULL)**. 체크하면 입력 부품 대신 "운영사 값: 17:00"을 보여 준다.
+- 체크를 풀면 위 단계 값으로 시작해서 고친다 (빈 칸에서 시작하지 않는다).
+- 위 단계 값은 화면을 그리는 서버 쪽(조회 함수)이 함께 넘긴다. 화면이 따로 불러오지 않는다.
+- 업무 코드는 칸을 직접 읽지 말고 `getEffectiveSetting(key, { centerId, shipperId? })`로 실제 값을 얻는다.
 
 ## 3. EditableSubTable (1:N 인라인 표)
 

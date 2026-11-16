@@ -17,7 +17,10 @@ export async function createTestCenter(
       systemCode: await nextSystemCode('CENTER'),
       code,
       name: data.name ?? `${code} 센터`,
-      status: toStatus(data.isActive ?? true),
+      // 센터 상태 4단계 (0073): 사용 = 운영중, 사용 중지 = 일시중지(사유 필수)
+      ...((data.isActive ?? true)
+        ? { status: 'ACTIVE' }
+        : { status: 'SUSPENDED', statusReason: '테스트' }),
     },
   })
 }

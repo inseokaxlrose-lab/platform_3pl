@@ -28,6 +28,8 @@ import { getUserForEdit } from '@/app/admin/system/users/queries'
 import { runInContext } from '@/lib/actor'
 import { loadCodeOptions } from '@/lib/common-code/common-codes'
 import { prisma } from '@/lib/prisma'
+import { withoutCode } from '@/lib/centers/center-schema'
+import { centerTestInput } from '@/test/center-input'
 import type { DataScope } from '@/lib/scope/data-scope'
 import { getCurrentPermissions, getCurrentScope, getCurrentUser } from '@/lib/session'
 import { createTestCenter, createTestUser, versionOf } from '@/test/factories'
@@ -154,15 +156,7 @@ describe('다른 운영사의 것은 고치거나 지울 수 없다 ("찾을 수
     const result = await updateCenterAction({
       id: String(b.center.id),
       rowVersion: await versionOf('center', b.center.id),
-      code: 'HACK',
-      name: '바꿈',
-      phone: '',
-      fax: '',
-      managerName: '',
-      managerPhone: '',
-      zipCode: '',
-      address: '',
-      addressDetail: '',
+      ...withoutCode(centerTestInput({ name: '바꿈' })),
     })
     expect(result).toMatchObject({ ok: false, error: { code: 'NOT_FOUND' } })
     expect(await prisma.center.findUniqueOrThrow({ where: { id: b.center.id } })).toMatchObject({

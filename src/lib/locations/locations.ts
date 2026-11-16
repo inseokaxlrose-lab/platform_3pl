@@ -7,20 +7,21 @@ import { assertRowVersion, withVersionGuard } from '@/lib/row-version'
 import { prisma } from '@/lib/prisma'
 import { expandLocationRange, type GeneratedLocation, type LocationRange } from './location-range'
 import { DELETED_ONLY, isActiveStatus, NOT_DELETED, toStatus } from '@/lib/status'
+import { isStagingWarehouse } from '@/lib/warehouses/warehouse-labels'
 
 // 로케이션 저장 (docs/decisions/0028). 권한·데이터 범위 검사는 서버 액션에서 한다
 // - 코드는 등록 후 바꿀 수 없다 (재고·적치 기록이 이 주소를 가리킨다)
-// - 입고대기 창고에는 추가할 수 없고(기본 로케이션 DEFAULT 하나만), DEFAULT는 사용 중지·삭제할 수 없다
+// - 대기 창고(입고·출고·반품)에는 추가할 수 없고(기본 로케이션 DEFAULT 하나만), DEFAULT는 사용 중지·삭제할 수 없다
 // - 삭제는 한 번도 쓰이지 않은 로케이션만
 
 export type TargetWarehouse = { id: bigint; centerId: bigint; type: string; status: string }
 
 // 로케이션을 추가할 수 있는 창고인지
 function assertCanAddTo(warehouse: TargetWarehouse) {
-  if (warehouse.type === 'INBOUND_STAGING') {
+  if (isStagingWarehouse(warehouse.type)) {
     throw new ActionError(
       'CONFLICT',
-      '입고대기 창고에는 로케이션을 추가할 수 없습니다. (기본 로케이션 하나만 씁니다)',
+      '대기 창고(입고·출고·반품)에는 로케이션을 추가할 수 없습니다. (기본 로케이션 하나만 씁니다)',
     )
   }
   if (!isActiveStatus(warehouse.status)) {
@@ -121,14 +122,14 @@ export async function bulkCreateLocations(warehouse: TargetWarehouse, range: Loc
   return { created: count, skipped: plan.total - count }
 }
 
-// 입고대기 창고의 기본 로케이션인지 (보호 대상)
+// 대기 창고의 기본 로케이션인지 (보호 대상)
 type LocationWithWarehouse = { code: string; warehouse: { type: string } }
 const isProtected = (l: LocationWithWarehouse) =>
-  l.warehouse.type === 'INBOUND_STAGING' && l.code === DEFAULT_LOCATION_CODE
+  isStagingWarehouse(l.warehouse.type) && l.code === DEFAULT_LOCATION_CODE
 
 function assertNoneProtected(locations: LocationWithWarehouse[], what: string) {
   if (locations.some(isProtected)) {
-    throw new ActionError('CONFLICT', `입고대기 창고의 기본 로케이션은 ${what}할 수 없습니다.`)
+    throw new ActionError('CONFLICT', `대기 창고의 기본 로케이션(DEFAULT)은 ${what}할 수 없습니다.`)
   }
 }
 

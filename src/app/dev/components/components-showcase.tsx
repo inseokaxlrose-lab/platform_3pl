@@ -16,6 +16,10 @@ import {
   SearchSelect,
   PhoneInput,
   YnToggle,
+  InheritableField,
+  LocationSelect,
+  TimeInput,
+  WeekdaySelect,
 } from '@/components/inputs'
 import {
   EditableSubTable,
@@ -85,6 +89,10 @@ function InputSamples() {
   const [date, setDate] = useState('')
   const [range, setRange] = useState({ from: '', to: '' })
   const [yn, setYn] = useState(true)
+  const [time, setTime] = useState('09:00')
+  const [days, setDays] = useState('YYYYYNN')
+  const [cutoff, setCutoff] = useState('')
+  const [location, setLocation] = useState('')
 
   return (
     <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
@@ -153,6 +161,46 @@ function InputSamples() {
       </Sample>
       <Sample title="DateRangeInput" note="span 6~8 · 종료일은 시작일 이후만" value={range}>
         <DateRangeInput value={range} onChange={setRange} />
+      </Sample>
+      <Sample
+        title="TimeInput"
+        note="span 2~3 · 24시간 'HH:MM', 숫자만 치면 콜론 자동"
+        value={time}
+      >
+        <TimeInput value={time} onChange={setTime} />
+      </Sample>
+      <Sample title="WeekdaySelect" note="span 6 · 월~일 Y/N 7글자, [평일]·[매일]" value={days}>
+        <WeekdaySelect value={days} onChange={setDays} />
+      </Sample>
+      <Sample
+        title="InheritableField"
+        note="상속 칸 (0073) · 비우면 위 단계 값, 체크를 풀면 직접 입력"
+        value={cutoff}
+      >
+        <InheritableField
+          id="sample-cutoff"
+          parentLabel="운영사"
+          parentValue="17:00"
+          inherited={cutoff === ''}
+          onInheritedChange={(inherited) => setCutoff(inherited ? '' : '17:00')}
+        >
+          <TimeInput value={cutoff} onChange={setCutoff} />
+        </InheritableField>
+      </Sample>
+      <Sample
+        title="LocationSelect"
+        note="span 4 · 서버가 범위를 좁힌 선택지를 검색"
+        value={location}
+      >
+        <LocationSelect
+          value={location}
+          onChange={setLocation}
+          options={[
+            { value: '1', label: 'DEFAULT', description: '입고대기 · 입고대기 창고' },
+            { value: '2', label: 'A-01-01', description: '일반 · 상온 1창고', keywords: 'A01' },
+            { value: '3', label: 'A-01-02', description: '일반 · 상온 1창고', keywords: 'A01' },
+          ]}
+        />
       </Sample>
       <Sample title="YnToggle" note="span 2~3 · 값은 boolean" value={yn}>
         <YnToggle value={yn} onChange={setYn} />

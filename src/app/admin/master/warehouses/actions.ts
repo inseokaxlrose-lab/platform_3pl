@@ -5,14 +5,19 @@ import { ActionError } from '@/lib/actions/action-error'
 import { createAction } from '@/lib/actions/create-action'
 import { listQuerySchema, toPrismaQuery } from '@/lib/grid/grid-query'
 import { codesFilter, dateRangeFilter, idFilter, statusWhere } from '@/lib/grid/list-filters'
-import { STORAGE_CONDITIONS, WAREHOUSE_TYPE_LABELS } from '@/lib/warehouses/warehouse-labels'
+import {
+  STORAGE_CONDITIONS,
+  WAREHOUSE_TYPE_LABELS,
+  isStagingWarehouse,
+} from '@/lib/warehouses/warehouse-labels'
 import { prisma } from '@/lib/prisma'
 import { assertInScope, scopeFilter } from '@/lib/scope/data-scope'
 import { createWarehouseSchema, updateWarehouseSchema } from '@/lib/warehouses/warehouse-schema'
 import { createWarehouse, setWarehouseActive, updateWarehouse } from '@/lib/warehouses/warehouses'
 import { rowVersionField } from '@/lib/row-version'
 import { idSchema } from '@/lib/id'
-import { NOT_DELETED, isActiveStatus, toStatus, withIsActive } from '@/lib/status'
+import { NOT_DELETED, toStatus, withIsActive } from '@/lib/status'
+import { isCenterSetupStatus } from '@/lib/centers/center-status'
 
 // 창고 관리 서버 액션 (docs/decisions/0027)
 // 데이터 범위: 센터 직원은 소속 센터의 창고만 보고 다룬다 (창고 추가도 자기 센터 안에서만)
@@ -114,8 +119,8 @@ export const createWarehouseAction = createAction({
     })
     assertInScope(scope, center, { center: 'id' })
     if (!center) throw new ActionError('NOT_FOUND', '센터를 찾을 수 없습니다.')
-    if (!isActiveStatus(center.status)) {
-      throw new ActionError('CONFLICT', '사용 중지된 센터에는 창고를 추가할 수 없습니다.')
+    if (!isCenterSetupStatus(center.status)) {
+      throw new ActionError('CONFLICT', '일시중지·폐쇄된 센터에는 창고를 추가할 수 없습니다.')
     }
     return createWarehouse(centerId, data)
   },
@@ -154,11 +159,11 @@ export const setWarehousesActiveAction = createAction({
     if (found.length !== ids.length) {
       throw new ActionError('NOT_FOUND', '찾을 수 없는 창고가 섞여 있습니다.')
     }
-    const staging = found.filter((w) => w.type === 'INBOUND_STAGING')
+    const staging = found.filter((w) => isStagingWarehouse(w.type))
     if (!input.isActive && staging.length > 0) {
       throw new ActionError(
         'CONFLICT',
-        `입고대기 창고는 사용 중지할 수 없습니다: ${staging.map((w) => w.code).join(', ')}`,
+        `대기 창고(입고·출고·반품)는 사용 중지할 수 없습니다: ${staging.map((w) => w.code).join(', ')}`,
       )
     }
     const { count } = await prisma.warehouse.updateMany({

@@ -7,9 +7,10 @@ import { deleteExternalCodes } from '@/lib/master-code/external-codes'
 import { nextSystemCode } from '@/lib/master-code/system-code'
 import { assertRowVersion, withVersionGuard } from '@/lib/row-version'
 import { prisma, type Db } from '@/lib/prisma'
-import { DELETED_ONLY, NOT_DELETED, isActiveStatus } from '@/lib/status'
+import { DELETED_ONLY, NOT_DELETED } from '@/lib/status'
 import type { DeliveryZoneData } from './delivery-zone-schema'
 import { regionLabel, regionsOverlap } from './regions'
+import { isCenterSetupStatus } from '@/lib/centers/center-status'
 
 // 배송권역 저장 (docs/decisions/0033). 권한·데이터 범위 검사는 서버 액션에서 한다
 
@@ -75,8 +76,8 @@ export async function createDeliveryZone(data: DeliveryZoneData) {
       select: { status: true },
     })
     if (!center) throw new ActionError('NOT_FOUND', '센터를 찾을 수 없습니다.')
-    if (!isActiveStatus(center.status)) {
-      throw new ActionError('CONFLICT', '사용 중지된 센터에는 배송권역을 추가할 수 없습니다.')
+    if (!isCenterSetupStatus(center.status)) {
+      throw new ActionError('CONFLICT', '일시중지·폐쇄된 센터에는 배송권역을 추가할 수 없습니다.')
     }
     const systemCode = await nextSystemCode('DELIVERY_ZONE', tx)
     const code = data.code || systemCode

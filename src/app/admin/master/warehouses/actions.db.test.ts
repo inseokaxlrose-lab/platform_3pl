@@ -100,15 +100,18 @@ describe('창고 등록', () => {
     })
   })
 
-  it('시스템 코드 모양은 쓸 수 없고, 사용 중지된 센터에는 추가할 수 없다', async () => {
+  it('시스템 코드 모양은 쓸 수 없고, 일시중지·폐쇄된 센터에는 추가할 수 없다', async () => {
     expect(await createWarehouseAction(input({ code: 'WH000999' }))).toMatchObject({
       ok: false,
       error: { code: 'VALIDATION' },
     })
-    await prisma.center.update({ where: { id: gmhId }, data: { status: 'INACTIVE' } })
+    await prisma.center.update({
+      where: { id: gmhId },
+      data: { status: 'SUSPENDED', statusReason: '점검' },
+    })
     expect(await createWarehouseAction(input({ centerId: String(gmhId) }))).toMatchObject({
       ok: false,
-      error: { code: 'CONFLICT', message: expect.stringContaining('사용 중지된 센터') },
+      error: { code: 'CONFLICT', message: expect.stringContaining('일시중지·폐쇄된 센터') },
     })
   })
 })
@@ -162,13 +165,13 @@ describe('창고 수정 · 입고대기 보호', () => {
       }),
     ).toMatchObject({
       ok: false,
-      error: { code: 'VALIDATION', message: expect.stringContaining('입고대기') },
+      error: { code: 'VALIDATION', message: expect.stringContaining('대기 창고') },
     })
     expect(
       await setWarehouseActiveAction({ id: String(staging.id), isActive: false }),
     ).toMatchObject({
       ok: false,
-      error: { code: 'CONFLICT', message: '입고대기 창고는 사용 중지할 수 없습니다.' },
+      error: { code: 'CONFLICT', message: '대기 창고(입고·출고·반품)는 사용 중지할 수 없습니다.' },
     })
   })
 
@@ -190,7 +193,12 @@ describe('목록 · 데이터 범위 · 권한', () => {
       ...createDataGridState(),
       filters: { center: String(icnId) },
     })
-    expect(icnOnly.ok && icnOnly.data.rows.map((r) => r.code)).toEqual(['A01', 'INBOUND'])
+    expect(icnOnly.ok && icnOnly.data.rows.map((r) => r.code)).toEqual([
+      'A01',
+      'INBOUND',
+      'OUTBOUND',
+      'RETURN',
+    ])
 
     const searched = await listWarehousesAction(createDataGridState({ search: '김해 1' }))
     expect(searched.ok && searched.data.rows).toEqual([
@@ -203,7 +211,10 @@ describe('목록 · 데이터 범위 · 권한', () => {
     signIn({ kind: 'CENTERS', operatorId: TEST_OPERATOR_ID, centerIds: [icnId] })
 
     const result = await listWarehousesAction(createDataGridState())
-    expect(result.ok && result.data.rows.map((r) => r.center)).toEqual(['ICN 센터 (ICN)'])
+    // ICN의 대기 창고 3개만
+    expect(result.ok && result.data.rows.map((r) => r.center)).toEqual(
+      Array(3).fill('ICN 센터 (ICN)'),
+    )
     // 다른 센터를 골라도 범위 밖은 나오지 않는다
     const other = await listWarehousesAction({
       ...createDataGridState(),
@@ -248,7 +259,13 @@ describe('목록 검색 조건 · 일괄 처리 · 엑셀', () => {
     await create({ code: 'A01', storageCondition: 'FROZEN' })
     expect(await codes({ center: String(icnId), type: 'INBOUND_STAGING' })).toEqual(['INBOUND'])
     expect(await codes({ center: String(icnId), storage: 'FROZEN' })).toEqual(['A01'])
-    expect(await codes({ center: String(icnId), type: 'HOT' })).toEqual(['A01', 'INBOUND'])
+    expect(await codes({ center: String(icnId), type: 'RETURN_STAGING' })).toEqual(['RETURN'])
+    expect(await codes({ center: String(icnId), type: 'HOT' })).toEqual([
+      'A01',
+      'INBOUND',
+      'OUTBOUND',
+      'RETURN',
+    ])
     expect(await codes({ center: String(icnId), status: 'INACTIVE' })).toEqual([])
   })
 

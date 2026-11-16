@@ -57,7 +57,7 @@ const COLUMNS: DataGridColumn<Row>[] = [
       <span className="font-medium">
         {row.code}
         {row.protected && (
-          <span className="ml-1.5 text-xs text-muted-foreground">입고대기 기본</span>
+          <span className="ml-1.5 text-xs text-muted-foreground">대기 창고 기본</span>
         )}
       </span>
     ),
