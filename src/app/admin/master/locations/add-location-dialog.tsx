@@ -2,7 +2,7 @@
 
 import { PlusIcon } from 'lucide-react'
 import { useState, useTransition } from 'react'
-import { Field } from '@/components/master-form'
+import { Field, FormGrid } from '@/components/master-form'
 import { Button } from '@/components/ui/button'
 import {
   Dialog,
@@ -13,6 +13,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
+import { Textarea } from '@/components/ui/textarea'
 import {
   Select,
   SelectContent,
@@ -37,12 +38,16 @@ export function AddLocationDialog({
   const [open, setOpen] = useState(false)
   const [warehouseId, setWarehouseId] = useState('')
   const [code, setCode] = useState('')
+  const [name, setName] = useState('')
+  const [remark, setRemark] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [pending, startTransition] = useTransition()
 
   function openDialog() {
     setWarehouseId(addable.some((w) => w.id === initialWarehouseId) ? initialWarehouseId! : '')
     setCode('')
+    setName('')
+    setRemark('')
     setError(null)
     setOpen(true)
   }
@@ -50,7 +55,7 @@ export function AddLocationDialog({
   function submit(event: React.FormEvent) {
     event.preventDefault()
     startTransition(async () => {
-      const result = await createLocationAction({ warehouseId, code })
+      const result = await createLocationAction({ warehouseId, code, name, remark })
       if (!result.ok) {
         setError(Object.values(result.error.fieldErrors ?? {})[0]?.[0] ?? result.error.message)
         return
@@ -74,29 +79,57 @@ export function AddLocationDialog({
                 코드는 등록 후 바꿀 수 없습니다. 여러 칸은 [일괄 생성]을 쓰세요.
               </DialogDescription>
             </DialogHeader>
-            <Field span={12} label="창고" required htmlFor="add-location-warehouse">
-              <Select value={warehouseId} onValueChange={setWarehouseId} disabled={pending}>
-                <SelectTrigger id="add-location-warehouse" className="w-full">
-                  <SelectValue placeholder="창고 선택" />
-                </SelectTrigger>
-                <SelectContent>
-                  {addable.map((w) => (
-                    <SelectItem key={w.id} value={w.id}>
-                      {w.centerLabel} · {w.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </Field>
-            <Field span={12} label="로케이션 코드" required htmlFor="add-location-code">
-              <Input
-                id="add-location-code"
-                value={code}
-                onChange={(e) => setCode(e.target.value)}
-                placeholder="예: A-01-01"
-                disabled={pending}
-              />
-            </Field>
+            <FormGrid>
+              <Field span={12} label="창고" required htmlFor="add-location-warehouse">
+                <Select value={warehouseId} onValueChange={setWarehouseId} disabled={pending}>
+                  <SelectTrigger id="add-location-warehouse" className="w-full">
+                    <SelectValue placeholder="창고 선택" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {addable.map((w) => (
+                      <SelectItem key={w.id} value={w.id}>
+                        {w.centerLabel} · {w.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </Field>
+              <Field span={12} label="로케이션 코드" required htmlFor="add-location-code">
+                <Input
+                  id="add-location-code"
+                  value={code}
+                  onChange={(e) => setCode(e.target.value)}
+                  placeholder="예: A-01-01"
+                  disabled={pending}
+                />
+              </Field>
+              {/* 명칭·비고 (0071): 명칭은 한글 가능, 비우면 코드와 같게 */}
+              <Field
+                span={12}
+                label="명칭"
+                htmlFor="add-location-name"
+                hint="비우면 코드와 같게 저장합니다"
+              >
+                <Input
+                  id="add-location-name"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  placeholder="예: 1번 도크, 냉동실 입구"
+                  maxLength={100}
+                  disabled={pending}
+                />
+              </Field>
+              <Field span={12} label="비고" htmlFor="add-location-remark">
+                <Textarea
+                  id="add-location-remark"
+                  value={remark}
+                  onChange={(e) => setRemark(e.target.value)}
+                  rows={2}
+                  maxLength={1000}
+                  disabled={pending}
+                />
+              </Field>
+            </FormGrid>
             {error && (
               <p role="alert" className="text-sm text-destructive">
                 {error}
