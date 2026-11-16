@@ -196,7 +196,7 @@ const adminNavigation: NavArea = {
           title: '재고 이력',
           href: '/admin/stock/history',
           icon: HistoryIcon,
-          ready: false,
+          ready: true,
           permission: 'stock.history.read',
         },
       ],
