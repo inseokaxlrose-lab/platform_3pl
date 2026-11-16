@@ -211,31 +211,92 @@ model UserPermissionOverride {
 // 센터: 운영사의 물류센터 (docs/decisions/0026)
 // 코드 3층 (0025): systemCode(자동·불변) / code(사용자 코드, 같은 운영사 안에서 중복 금지) / 외부 코드(ExternalCode)
 model Center {
-  id            BigInt   @id @default(autoincrement()) @map("center_id")
+  id                   BigInt    @id @default(autoincrement()) @map("center_id")
   // 운영사 (멀티테넌트: 같은 운영사 사람만 보고 고친다, docs/decisions/0039)
-  operatorId    BigInt   @map("operator_id")
-  operator      Operator @relation(fields: [operatorId], references: [id], onDelete: Restrict)
-  // 시스템 코드: CT000001 (라벨·문서·이력에 쓰는 불변 코드)
-  systemCode    String   @unique @map("sys_cd")
-  // 사용자 코드: 화면 검색·표시용 (바꿀 수 있음)
-  code          String   @map("center_cd")
-  name          String   @map("center_nm")
-  // 전화번호는 하이픈 없이 숫자만 (0029)
-  phone         String?  @map("tel_no")
-  fax           String?  @map("fax_no")
-  managerName   String?  @map("manager_nm")
-  managerPhone  String?  @map("manager_tel_no")
-  zipCode       String?  @map("zip_cd")
-  address       String?  @map("addr1")
-  addressDetail String?  @map("addr2")
-  // false면 데이터 범위에서 빠진다 (소속 직원도 이 센터 데이터를 볼 수 없음)
-  status        String   @default("ACTIVE") @map("status_cd") @db.VarChar(10)
-  createdAt     DateTime @default(now()) @map("created_at")
-  updatedAt     DateTime @updatedAt @map("updated_at")
+  operatorId           BigInt    @map("operator_id")
+  operator             Operator  @relation(fields: [operatorId], references: [id], onDelete: Restrict)
+  // 시스템 코드: CT000001 (내부용 불변 코드)
+  systemCode           String    @unique @map("sys_cd")
+  // ① 기본 정보 (docs/decisions/0073, docs/specs/center.md)
+  // 센터코드: 영문 대문자·숫자 1~20자, 필수, 등록 후 바꿀 수 없음 (라벨·문서에 찍힌다)
+  code                 String    @map("center_cd") @db.VarChar(20)
+  name                 String    @map("center_nm") @db.VarChar(100)
+  nameEn               String?   @map("center_nm_en") @db.VarChar(100)
+  shortName            String?   @map("center_short_nm") @db.VarChar(30)
+  // 센터 유형 (상수 CENTER_TYPE): OWN 자가 / LEASE 임차 / PARTNER 협력·위탁 / VIRTUAL 가상
+  type                 String    @default("LEASE") @map("center_type_cd") @db.VarChar(20)
+  // 운영 상태 (상수 CENTER_STATUS): PREPARING 준비중 / ACTIVE 운영중 / SUSPENDED 일시중지 / CLOSED 폐쇄
+  // 폐쇄만 데이터 범위에서 빠지고, 새 업무(입고·재고 등) 고르기는 운영중만
+  status               String    @default("PREPARING") @map("status_cd") @db.VarChar(20)
+  statusReason         String?   @map("status_reason") @db.VarChar(200)
+  openedOn             DateTime? @map("open_dt") @db.Date
+  closedOn             DateTime? @map("close_dt") @db.Date
+  // 운영사와 다를 때만 (NULL = 운영사 값), 숫자만
+  businessNumber       String?   @map("biz_reg_no") @db.Char(10)
+  subBizNo             String?   @map("sub_biz_no") @db.Char(4)
+  sortOrder            Int       @default(0) @map("sort_seq")
+  remark               String?   @db.VarChar(1000)
+  extAttr              Json?     @map("ext_attr")
+  // ② 위치·연락처 (전화번호는 하이픈 없이 숫자만, 0029)
+  countryCode          String    @default("KR") @map("country_cd") @db.Char(2)
+  zipCode              String?   @map("zip_cd") @db.VarChar(10)
+  address              String?   @map("addr1") @db.VarChar(200)
+  addressDetail        String?   @map("addr2") @db.VarChar(200)
+  addressJibun         String?   @map("addr_jibun") @db.VarChar(200)
+  regionName           String?   @map("region_nm") @db.VarChar(50)
+  latitude             Decimal?  @db.Decimal(10, 7)
+  longitude            Decimal?  @db.Decimal(10, 7)
+  phone                String?   @map("tel_no") @db.VarChar(15)
+  fax                  String?   @map("fax_no") @db.VarChar(15)
+  email                String?   @db.VarChar(100)
+  directions           String?   @db.VarChar(1000)
+  // 예전 센터장 칸 (사용자 결정으로 유지, 담당자 표와 별개)
+  managerName          String?   @map("manager_nm")
+  managerPhone         String?   @map("manager_tel_no")
+  // ③ 시설 정보 (1차: 연면적·보관면적·도크 / 2차: 나머지)
+  floorAreaM2          Decimal?  @map("floor_area_m2") @db.Decimal(12, 2)
+  storageAreaM2        Decimal?  @map("storage_area_m2") @db.Decimal(12, 2)
+  dockCount            Int?      @map("dock_cnt")
+  landAreaM2           Decimal?  @map("land_area_m2") @db.Decimal(12, 2)
+  floorCount           Int?      @map("floor_cnt")
+  ceilingHeightM       Decimal?  @map("ceiling_height_m") @db.Decimal(5, 2)
+  palletCapacity       Int?      @map("pallet_capa_cnt")
+  // ④ 시설 자격 (1차: 보세 여부 / 2차: 나머지 — 보세 칸은 나중에 tb_center_bonded로 옮길 수 있다)
+  bondedYn             String    @default("N") @map("bonded_yn") @db.Char(1)
+  warehouseRegNo       String?   @map("warehouse_reg_no") @db.VarChar(30)
+  glnCode              String?   @map("gln_cd") @db.VarChar(13)
+  bondedType           String?   @map("bonded_type_cd") @db.VarChar(20)
+  bondedLicenseNo      String?   @map("bonded_license_no") @db.VarChar(30)
+  bondedAreaCode       String?   @map("bonded_area_cd") @db.VarChar(20)
+  customsOfficeCode    String?   @map("customs_office_cd") @db.VarChar(10)
+  hazmatYn             String    @default("N") @map("hazmat_yn") @db.Char(1)
+  foodStorageYn        String    @default("N") @map("food_storage_yn") @db.Char(1)
+  pharmaYn             String    @default("N") @map("pharma_yn") @db.Char(1)
+  // ⑤ 운영 설정 — 상속 칸(출고 마감·타임존·할당 규칙·로트·유통기한·시리얼)은 NULL = 운영사 값
+  workStartTime        DateTime? @map("work_start_time") @db.Time(0)
+  workEndTime          DateTime? @map("work_end_time") @db.Time(0)
+  // 월~일 Y/N 7글자
+  workDays             String    @default("YYYYYNN") @map("work_days") @db.Char(7)
+  inboundCutoffTime    DateTime? @map("inbound_cutoff_time") @db.Time(0)
+  shipCutoffTime       DateTime? @map("ship_cutoff_time") @db.Time(0)
+  // 기본 로케이션 3개: 센터 생성·보정 때 입고대기·출고대기·반품대기 창고의 DEFAULT를 연결 (ensureCenterDefaults)
+  defaultInboundLocId  BigInt?   @map("default_inbound_loc_id")
+  defaultOutboundLocId BigInt?   @map("default_outbound_loc_id")
+  defaultReturnLocId   BigInt?   @map("default_return_loc_id")
+  defaultInboundLoc    Location? @relation("CenterDefaultInbound", fields: [defaultInboundLocId], references: [id], onDelete: Restrict)
+  defaultOutboundLoc   Location? @relation("CenterDefaultOutbound", fields: [defaultOutboundLocId], references: [id], onDelete: Restrict)
+  defaultReturnLoc     Location? @relation("CenterDefaultReturn", fields: [defaultReturnLocId], references: [id], onDelete: Restrict)
+  timezone             String?   @db.VarChar(50)
+  allocRule            String?   @map("alloc_rule_cd") @db.VarChar(10)
+  useLot               String?   @map("lot_mgmt_yn") @db.Char(1)
+  useExpiry            String?   @map("expiry_mgmt_yn") @db.Char(1)
+  useSerial            String?   @map("serial_mgmt_yn") @db.Char(1)
+  createdAt            DateTime  @default(now()) @map("created_at")
+  updatedAt            DateTime  @updatedAt @map("updated_at")
   // 등록·수정한 사람 아이디(username, 자동: 현재 작업자 / 시드 seed / 기존 데이터 system), 동시 수정 막기용 버전 (docs/db-conventions.md 공통 칸)
-  createdBy     String   @default("system") @map("created_by") @db.VarChar(50)
-  updatedBy     String   @default("system") @map("updated_by") @db.VarChar(50)
-  rowVersion    Int      @default(1) @map("row_version")
+  createdBy            String    @default("system") @map("created_by") @db.VarChar(50)
+  updatedBy            String    @default("system") @map("updated_by") @db.VarChar(50)
+  rowVersion           Int       @default(1) @map("row_version")
 
   users             UserCenter[]
   warehouses        Warehouse[]
@@ -245,6 +306,8 @@ model Center {
   asns              Asn[]
   // 이 센터를 배송 센터로 지정한 거래처 (0072)
   deliveryCustomers Customer[]
+  contacts          CenterContact[]
+  tempZones         CenterTempZone[]
 
   // 논리 삭제: 'Y'면 지운 것 (목록·조회에서 빠지고 되살릴 수 있다, 0038)
   delYn String @default("N") @map("del_yn") @db.Char(1)
@@ -252,6 +315,52 @@ model Center {
   // 코드는 삭제 안 된 것끼리만 겹치면 안 된다 (지운 것은 다시 쓸 수 있다, 0038)
   @@unique([operatorId, code], where: raw("del_yn = 'N'"), map: "tb_center_operator_id_center_cd_key")
   @@map("tb_center")
+}
+
+// 센터 담당자 (0073): 운영사 담당자와 같은 모양, 최대 10명, 대표 1명 (센터 저장 때 함께 저장)
+model CenterContact {
+  id           BigInt   @id @default(autoincrement()) @map("contact_id")
+  centerId     BigInt   @map("center_id")
+  sortOrder    Int      @map("sort_seq")
+  // 담당 업무: 운영사 공통코드 CENTER_CONTACT_ROLE의 코드 (예: MANAGER)
+  duty         String   @map("role_cd") @db.VarChar(20)
+  name         String   @map("contact_nm") @db.VarChar(50)
+  phone        String?  @map("tel_no") @db.VarChar(15)
+  email        String?  @db.VarChar(100)
+  isPrimary    String   @default("N") @map("primary_yn") @db.Char(1)
+  // [2차] 부서·직책·알림 수신
+  deptName     String?  @map("dept_nm") @db.VarChar(50)
+  positionName String?  @map("position_nm") @db.VarChar(50)
+  notifyYn     String   @default("Y") @map("notify_yn") @db.Char(1)
+  // 감사 칸: 저장 함수가 채운다 (버전은 센터에서 검사)
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @default(now()) @map("updated_at")
+  createdBy    String   @default("system") @map("created_by") @db.VarChar(50)
+  updatedBy    String   @default("system") @map("updated_by") @db.VarChar(50)
+  center       Center   @relation(fields: [centerId], references: [id], onDelete: Cascade)
+
+  @@index([centerId, sortOrder])
+  // 센터당 대표 1명
+  @@unique([centerId], where: raw("primary_yn = 'Y'"), map: "tb_center_contact_primary_key")
+  @@map("tb_center_contact")
+}
+
+// 센터 취급 온도대 (0073): 운영사 TEMP_ZONE 상수 재사용
+model CenterTempZone {
+  centerId   BigInt   @map("center_id")
+  tempZoneCd String   @map("temp_zone_cd") @db.VarChar(20)
+  // [2차] 면적·관리 온도
+  areaM2     Decimal? @map("area_m2") @db.Decimal(12, 2)
+  minTemp    Decimal? @map("min_temp") @db.Decimal(5, 1)
+  maxTemp    Decimal? @map("max_temp") @db.Decimal(5, 1)
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @default(now()) @map("updated_at")
+  createdBy  String   @default("system") @map("created_by") @db.VarChar(50)
+  updatedBy  String   @default("system") @map("updated_by") @db.VarChar(50)
+  center     Center   @relation(fields: [centerId], references: [id], onDelete: Cascade)
+
+  @@id([centerId, tempZoneCd])
+  @@map("tb_center_temp_zone")
 }
 
 // 창고 보관 조건 (docs/decisions/0027): 냉장 물건을 상온 창고에 적치하는 실수를 나중에 경고하는 데 쓴다
@@ -269,6 +378,10 @@ enum WarehouseType {
   GENERAL
   // 입고대기 창고: 입고 확정 후 적치 전까지 재고가 머무는 곳 (센터마다 1개, 센터 등록 시 자동 생성)
   INBOUND_STAGING
+  // 출고대기 창고: 피킹·검수 후 출고 전까지 (센터마다 1개, 0073)
+  OUTBOUND_STAGING
+  // 반품대기 창고: 반품 입고 후 판정 전까지 (센터마다 1개, 0073)
+  RETURN_STAGING
 }
 
 // 창고: 센터 안의 보관 구역 (관리 화면은 "센터별 창고 관리" 작업에서)
@@ -301,8 +414,8 @@ model Warehouse {
   delYn String @default("N") @map("del_yn") @db.Char(1)
 
   @@unique([centerId, code], where: raw("del_yn = 'N'"), map: "tb_warehouse_center_id_warehouse_cd_key")
-  // 센터마다 입고대기 창고 1개 (부분 고유 인덱스)
-  @@unique([centerId], where: raw("warehouse_type_cd = 'INBOUND_STAGING'::\"WarehouseType\""), map: "tb_warehouse_one_inbound_per_center")
+  // 센터마다 대기 창고(입고·출고·반품)는 유형별로 1개 (부분 고유 인덱스, 0073)
+  @@unique([centerId, type], where: raw("warehouse_type_cd <> 'GENERAL'::\"WarehouseType\""), map: "tb_warehouse_one_staging_per_center")
   @@index([centerId])
   @@index([operatorId])
   @@map("tb_warehouse")
@@ -311,29 +424,33 @@ model Warehouse {
 // 로케이션: 창고 안의 보관 위치. 코드 자체가 위치라 시스템 코드는 없다 (0025)
 // 코드는 등록 후 바꿀 수 없다 (재고·적치 기록이 이 주소를 가리킨다, 0028)
 model Location {
-  id          BigInt    @id @default(autoincrement()) @map("location_id")
+  id                BigInt    @id @default(autoincrement()) @map("location_id")
   // 운영사 (멀티테넌트: 같은 운영사 사람만 보고 고친다, docs/decisions/0039)
-  operatorId  BigInt    @map("operator_id")
-  operator    Operator  @relation(fields: [operatorId], references: [id], onDelete: Restrict)
-  warehouseId BigInt    @map("warehouse_id")
+  operatorId        BigInt    @map("operator_id")
+  operator          Operator  @relation(fields: [operatorId], references: [id], onDelete: Restrict)
+  warehouseId       BigInt    @map("warehouse_id")
   // 같은 창고 안에서 중복 금지 (예: A-01-01, DEFAULT)
-  code        String    @map("location_cd")
+  code              String    @map("location_cd")
   // 로케이션 명칭 (한글 가능, 0071): 비우면 코드와 같게 — 일괄 생성·기존 줄도 코드와 같다
-  name        String    @map("location_nm") @db.VarChar(100)
-  remark      String?   @db.VarChar(1000)
+  name              String    @map("location_nm") @db.VarChar(100)
+  remark            String?   @db.VarChar(1000)
   // 일괄 생성으로 만들면 함께 저장: 구역(A) / 열(01) / 단(02) — 구역별 거르기·정렬용 (docs/decisions/0028)
-  zone        String?   @map("zone_cd")
-  aisle       String?   @map("aisle_cd")
-  level       String?   @map("level_cd")
-  status      String    @default("ACTIVE") @map("status_cd") @db.VarChar(10)
-  createdAt   DateTime  @default(now()) @map("created_at")
-  updatedAt   DateTime  @updatedAt @map("updated_at")
+  zone              String?   @map("zone_cd")
+  aisle             String?   @map("aisle_cd")
+  level             String?   @map("level_cd")
+  status            String    @default("ACTIVE") @map("status_cd") @db.VarChar(10)
+  createdAt         DateTime  @default(now()) @map("created_at")
+  updatedAt         DateTime  @updatedAt @map("updated_at")
   // 등록·수정한 사람 아이디(username, 자동: 현재 작업자 / 시드 seed / 기존 데이터 system), 동시 수정 막기용 버전 (docs/db-conventions.md 공통 칸)
-  createdBy   String    @default("system") @map("created_by") @db.VarChar(50)
-  updatedBy   String    @default("system") @map("updated_by") @db.VarChar(50)
-  rowVersion  Int       @default(1) @map("row_version")
-  warehouse   Warehouse @relation(fields: [warehouseId], references: [id], onDelete: Restrict)
-  stocks      Stock[]
+  createdBy         String    @default("system") @map("created_by") @db.VarChar(50)
+  updatedBy         String    @default("system") @map("updated_by") @db.VarChar(50)
+  rowVersion        Int       @default(1) @map("row_version")
+  warehouse         Warehouse @relation(fields: [warehouseId], references: [id], onDelete: Restrict)
+  stocks            Stock[]
+  // 센터 기본 로케이션으로 연결된 곳 (0073)
+  defaultInboundOf  Center[]  @relation("CenterDefaultInbound")
+  defaultOutboundOf Center[]  @relation("CenterDefaultOutbound")
+  defaultReturnOf   Center[]  @relation("CenterDefaultReturn")
 
   // 코드는 삭제 안 된 것끼리만 겹치면 안 된다 (지운 코드는 다시 쓸 수 있다, 0038)
   // 논리 삭제: 'Y'면 지운 것 (목록·조회에서 빠지고 되살릴 수 있다, 0038)

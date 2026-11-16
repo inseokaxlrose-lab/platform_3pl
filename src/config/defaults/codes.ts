@@ -26,6 +26,21 @@ export const DEFAULT_CODE_GROUPS: readonly DefaultCodeGroup[] = [
     ],
   },
   {
+    code: 'CENTER_CONTACT_ROLE',
+    name: '센터 담당 업무',
+    description: '센터 담당자의 주요 업무',
+    items: [
+      { code: 'MANAGER', name: '센터장' },
+      { code: 'INBOUND', name: '입고' },
+      { code: 'OUTBOUND', name: '출고' },
+      { code: 'INVENTORY', name: '재고' },
+      { code: 'RETURN', name: '반품' },
+      { code: 'SAFETY', name: '안전관리' },
+      { code: 'IT', name: 'IT' },
+      { code: 'ETC', name: '기타' },
+    ],
+  },
+  {
     code: 'SERVICE_TYPE',
     name: '제공 서비스',
     description: '운영사가 제공하는 물류 서비스',
