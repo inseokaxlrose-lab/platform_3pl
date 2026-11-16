@@ -110,7 +110,9 @@ function TabLink({
   return (
     <div
       className={cn(
-        'group flex h-8 max-w-52 shrink-0 items-center rounded-t-md border border-b-0 text-sm transition-colors',
+        // 고정 폭: 이름 길이와 상관없이 같은 크기 (메뉴 탭 176px, 닫기 없는 홈 탭 96px), 넘치면 … 처리
+        'group flex h-8 shrink-0 items-center rounded-t-md border border-b-0 text-sm transition-colors',
+        onClose ? 'w-44' : 'w-24',
         active
           ? 'border-border bg-card font-medium text-foreground'
           : 'border-transparent text-muted-foreground hover:bg-muted hover:text-foreground',
@@ -119,7 +121,7 @@ function TabLink({
       <Link
         href={href}
         aria-current={active ? 'page' : undefined}
-        className="flex min-w-0 items-center gap-1.5 py-1 pl-3 outline-none focus-visible:underline [&_svg]:size-3.5 [&_svg]:shrink-0"
+        className="flex min-w-0 flex-1 items-center gap-1.5 py-1 pl-3 outline-none focus-visible:underline [&_svg]:size-3.5 [&_svg]:shrink-0"
       >
         {icon}
         <span className="truncate">{label}</span>
