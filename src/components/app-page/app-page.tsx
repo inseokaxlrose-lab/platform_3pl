@@ -22,12 +22,12 @@ export function AppPage({ variant = 'full', aside, children, ...header }: AppPag
   const [stuck, setStuck] = useState(false)
   const [headerHeight, setHeaderHeight] = useState(0)
 
-  // 헤더가 상단 바(3.5rem) 아래에 붙었는지: 바로 위 표식이 화면 밖으로 나가면 붙은 것
+  // 헤더가 상단 바 + 메뉴 탭(6rem = 96px) 아래에 붙었는지: 바로 위 표식이 화면 밖으로 나가면 붙은 것
   useEffect(() => {
     const target = sentinel.current
     if (!target || typeof IntersectionObserver === 'undefined') return
     const observer = new IntersectionObserver(([entry]) => setStuck(!entry.isIntersecting), {
-      rootMargin: '-56px 0px 0px 0px',
+      rootMargin: '-96px 0px 0px 0px',
     })
     observer.observe(target)
     return () => observer.disconnect()
@@ -54,7 +54,7 @@ export function AppPage({ variant = 'full', aside, children, ...header }: AppPag
         ref={headerBox}
         data-stuck={stuck || undefined}
         className={cn(
-          'sticky top-14 z-20 -mx-page -mt-page bg-background px-page pt-page pb-4 transition-shadow',
+          'sticky top-24 z-20 -mx-page -mt-page bg-background px-page pt-page pb-4 transition-shadow',
           stuck && 'border-b shadow-sm',
         )}
       >
