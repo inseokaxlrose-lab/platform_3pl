@@ -3,6 +3,7 @@ import { cn } from '@/lib/utils'
 
 // 12칸 격자: 칸 너비는 Field의 span으로 정한다 (docs/ui-guidelines.md "필드별 기본 span")
 // 좁은 화면(md 미만)에서는 모든 칸이 한 줄 전체
+// 줄 간격(gap-y-3)은 원래보다 좁다: Field마다 아래에 안내 한 줄 자리가 늘 있어서 그 자리도 간격 역할을 한다
 export function FormGrid({
   children,
   className,
@@ -11,7 +12,7 @@ export function FormGrid({
   className?: string
 }) {
   return (
-    <div className={cn('grid grid-cols-1 items-start gap-x-4 gap-y-5 md:grid-cols-12', className)}>
+    <div className={cn('grid grid-cols-1 items-start gap-x-4 gap-y-3 md:grid-cols-12', className)}>
       {children}
     </div>
   )
@@ -77,12 +78,13 @@ export function Field({
         {required && <span className="text-destructive"> *</span>}
       </Label>
       {children}
+      {/* 안내·오류 자리: 없어도 한 줄을 늘 잡아 둔다 → 안내가 있는 칸과 없는 칸의 줄 간격이 같다 */}
       {error ? (
-        <p role="alert" className="text-xs text-destructive">
+        <p role="alert" className="-mt-1 min-h-4 text-xs leading-4 text-destructive">
           {error}
         </p>
       ) : (
-        hint && <p className="text-xs text-muted-foreground">{hint}</p>
+        <p className="-mt-1 min-h-4 text-xs leading-4 text-muted-foreground">{hint}</p>
       )}
     </div>
   )
