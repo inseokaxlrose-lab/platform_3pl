@@ -66,6 +66,7 @@ export const TENANT_MODELS: ReadonlySet<string> = new Set([
   'InboundReceiptLine',
   'InboundInspection',
   'InboundLabel',
+  'Putaway',
 ])
 
 type Data = Record<string, unknown>
