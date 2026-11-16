@@ -224,7 +224,7 @@ export function MasterFormPage({
   )
 }
 
-// 섹션 하나: 카드 대신 위쪽 구분선 (첫 섹션은 선 없음), 간격은 section 토큰
+// 섹션 하나: 카드 대신 위쪽 구분선(진하게, 첫 섹션은 선 없음) + 제목 앞 색 막대, 간격은 section 토큰
 function renderSection(section: MasterFormSection, index: number) {
   return (
     <section
@@ -233,11 +233,12 @@ function renderSection(section: MasterFormSection, index: number) {
       data-section-id={section.id}
       aria-labelledby={`${sectionDomId(section.id)}-title`}
       style={{ scrollMarginTop: BELOW_HEADER }}
-      className={cn('pb-section', index > 0 && 'border-t pt-section')}
+      className={cn('pb-section', index > 0 && 'border-t border-foreground/15 pt-section')}
     >
       <div className="mb-4 flex items-start justify-between gap-3">
         <div className="space-y-1">
-          <h2 className="flex items-center gap-2 text-base font-semibold">
+          <h2 className="flex items-center gap-2 text-lg font-semibold">
+            <span aria-hidden className="h-5 w-1 shrink-0 rounded-full bg-primary" />
             {/* 섹션 이름은 제목 글자만 ("바로 적용" 표시는 빼고) */}
             <span id={`${sectionDomId(section.id)}-title`}>{section.title}</span>
             {section.standalone && (

@@ -167,7 +167,7 @@ export function OperatorForm({
               </Field>
               {text('name', '회사명', 8, { required: true })}
               {text('nameEn', '영문명', 6)}
-              {text('shortName', '약칭', 4)}
+              {text('shortName', '약칭', 2)}
               {select('type', '운영사 유형', OPERATOR_TYPE.options, !canEditType)}
               <Field
                 label="사업자등록번호"
