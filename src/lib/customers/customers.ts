@@ -4,7 +4,7 @@ import { ActionError } from '@/lib/actions/action-error'
 import { requireOperatorId } from '@/lib/actor'
 import { assertCodeValues } from '@/lib/common-code/common-codes'
 import { CONTACT_ROLE_GROUP } from '@/lib/contacts/contact-schema'
-import { deleteExternalCodes, saveExternalCodes } from '@/lib/master-code/external-codes'
+import { deleteExternalCodes } from '@/lib/master-code/external-codes'
 import { nextSystemCode } from '@/lib/master-code/system-code'
 import { prisma, type Db } from '@/lib/prisma'
 import { assertRowVersion, withVersionGuard } from '@/lib/row-version'
@@ -37,11 +37,10 @@ async function assertCustomerCode(
   }
 }
 
-// DB 칸으로 옮길 값 (담당자·외부 코드·코드 제외)
+// DB 칸으로 옮길 값 (담당자·코드 제외)
 function fieldsOf(data: CustomerData) {
-  const { contacts, externalCodes, code, ...fields } = data
+  const { contacts, code, ...fields } = data
   void contacts
-  void externalCodes
   void code
   return fields
 }
@@ -86,7 +85,6 @@ export async function createCustomer(data: CustomerCreateData) {
       select: { id: true, systemCode: true, code: true, rowVersion: true },
     })
     await tx.customerContact.createMany({ data: contactRows(customer.id, data.contacts) })
-    await saveExternalCodes(tx, 'CUSTOMER', customer.id, data.externalCodes)
     return customer
   })
 }
@@ -123,7 +121,6 @@ export async function updateCustomer(id: bigint, rowVersion: number, data: Custo
     )
     await tx.customerContact.deleteMany({ where: { customerId: id } })
     await tx.customerContact.createMany({ data: contactRows(id, data.contacts) })
-    await saveExternalCodes(tx, 'CUSTOMER', id, data.externalCodes)
     return saved
   })
 }

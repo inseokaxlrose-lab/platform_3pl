@@ -1,6 +1,5 @@
 import { z } from 'zod'
 import { contactsSchema } from '@/lib/contacts/contact-schema'
-import { externalCodesSchema } from '@/lib/master-code/external-codes-schema'
 import {
   addressShape,
   optionalBusinessNumber,
@@ -40,7 +39,6 @@ export const shipperSchema = z.object({
   useExpiry: z.boolean(),
   labelUnit: z.enum(LABEL_UNITS, '라벨 단위를 골라 주세요.'),
   contacts: contactsSchema,
-  externalCodes: externalCodesSchema,
 })
 
 export type ShipperInput = z.input<typeof shipperSchema>

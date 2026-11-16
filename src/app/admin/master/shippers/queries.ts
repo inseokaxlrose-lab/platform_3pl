@@ -1,6 +1,5 @@
 import 'server-only'
 import { toContactInput } from '@/lib/contacts/contact-schema'
-import { getExternalCodes } from '@/lib/master-code/external-codes'
 import { textIds } from '@/lib/id'
 import { prisma } from '@/lib/prisma'
 import { isActiveStatus, withIsActive } from '@/lib/status'
@@ -44,7 +43,6 @@ export async function getShipperForEdit(id: bigint, scope: DataScope) {
     useExpiry: isYes(shipper.useExpiry),
     labelUnit: shipper.labelUnit,
     contacts: shipper.contacts.map(toContactInput),
-    externalCodes: await getExternalCodes('SHIPPER', id),
   }
   // 화면으로 보낼 값이라 키는 글자로
   return textIds({

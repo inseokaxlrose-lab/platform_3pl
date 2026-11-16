@@ -1,7 +1,6 @@
 import 'server-only'
 import { toContactInput } from '@/lib/contacts/contact-schema'
 import { textIds } from '@/lib/id'
-import { getExternalCodes } from '@/lib/master-code/external-codes'
 import { prisma } from '@/lib/prisma'
 import { isInScope, scopeFilter, type DataScope } from '@/lib/scope/data-scope'
 import { ACTIVE_ONLY, isActiveStatus } from '@/lib/status'
@@ -49,7 +48,6 @@ export async function getCustomerForEdit(id: bigint, scope: DataScope) {
     deliveryMemo: text(customer.deliveryMemo),
     remark: text(customer.remark),
     contacts: customer.contacts.map(toContactInput),
-    externalCodes: await getExternalCodes('CUSTOMER', id),
   }
   return textIds({
     id: customer.id,
