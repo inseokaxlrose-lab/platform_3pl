@@ -10,6 +10,7 @@ import { ACTIVE_ONLY, DELETED_ONLY, isActiveStatus } from '@/lib/status'
 import { checkQtyDecimals, parseQty, qtyText, toBaseQty } from '@/lib/units/convert'
 import { isYes } from '@/lib/yn'
 import type { AsnCreateData, AsnData } from './asn-schema'
+import { refreshPutawayStatus } from './putaways'
 
 // ASN 등록·수정·삭제 (docs/decisions/0047·0048) — 운영사 화면(대리 등록)·화주 포털·엑셀 업로드 공용
 // 수량은 입력 단위 그대로 받아 기본단위로 바꿔 저장한다 (예정 수량 = 입력 수량 × 입수량, convert.ts)
@@ -298,6 +299,8 @@ export async function closeAsn(id: bigint, rowVersion: number, reason: string) {
     for (const r of remains) {
       await tx.asnLine.update({ where: { id: r.id }, data: { closedQty: r.closedQty } })
     }
-    return saved
+    // 확정분을 이미 모두 적치했으면 마감과 함께 적치완료
+    await refreshPutawayStatus(tx, id)
+    return { ...saved, rowVersion: saved.rowVersion + 1 }
   })
 }
