@@ -96,3 +96,44 @@ export function exactlyOne<T extends Record<string, unknown>>(
     }
   }
 }
+
+// 날짜 (선택): 'YYYY-MM-DD', 비우면 null
+export const optionalDateText = z
+  .string()
+  .trim()
+  .refine(
+    (value) => value === '' || (/^\d{4}-\d{2}-\d{2}$/.test(value) && !isNaN(Date.parse(value))),
+    '날짜를 확인해 주세요.',
+  )
+  .transform((value) => value || null)
+
+// 시각 (선택): 'HH:MM' 24시간, 비우면 null (DB는 TIME — src/lib/format/time.ts로 바꾼다)
+export const optionalTime = z
+  .string()
+  .trim()
+  .refine(
+    (value) => value === '' || /^([01]\d|2[0-3]):[0-5]\d$/.test(value),
+    '시각은 00:00~23:59입니다.',
+  )
+  .transform((value) => value || null)
+
+// 소수 (선택, 0 이상): 글자로 받아 글자로 넘긴다 (DB Decimal, Number로 계산하지 않는다)
+export const optionalDecimal = (digits: number, scale: number) =>
+  z
+    .string()
+    .trim()
+    .refine(
+      (value) =>
+        value === '' ||
+        new RegExp(`^\\d{1,${digits - scale}}(\\.\\d{1,${scale}})?$`).test(value.replace(/,/g, '')),
+      `0 이상, 소수 ${scale}자리까지의 숫자입니다.`,
+    )
+    .transform((value) => value.replace(/,/g, '') || null)
+
+// 정수 (선택, 0 이상)
+export const optionalCount = z
+  .number()
+  .int('정수로 입력해 주세요.')
+  .min(0, '0 이상입니다.')
+  .max(999_999, '너무 큽니다.')
+  .nullable()
