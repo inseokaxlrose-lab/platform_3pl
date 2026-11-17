@@ -1,8 +1,9 @@
 import 'server-only'
 import { prisma } from '@/lib/prisma'
-import { isActiveStatus, withIsActive } from '@/lib/status'
+import { isActiveStatus } from '@/lib/status'
 import { computeScope, type DataScope } from './data-scope'
 import { isCenterInScopeStatus } from '@/lib/centers/center-status'
+import { isShipperInScopeStatus } from '@/lib/shippers/shipper-codes'
 
 // 사용자의 데이터 범위를 DB에서 읽어 계산한다 (사용자가 없으면 NONE)
 export async function loadDataScope(userId: bigint): Promise<DataScope> {
@@ -28,6 +29,10 @@ export async function loadDataScope(userId: bigint): Promise<DataScope> {
       id: center.id,
       isActive: isCenterInScopeStatus(center.status),
     })),
-    shipper: user.shipper && withIsActive(user.shipper),
+    // 소속 화주사: 해지만 범위에서 뺀다 (일시정지는 조회만 — 새 업무는 상태 검사로 막힌다, 0080)
+    shipper: user.shipper && {
+      id: user.shipper.id,
+      isActive: isShipperInScopeStatus(user.shipper.status),
+    },
   })
 }

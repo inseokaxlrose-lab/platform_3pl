@@ -6,13 +6,15 @@ import { isInScope, scopeFilter, type DataScope } from '@/lib/scope/data-scope'
 import { ACTIVE_ONLY, NOT_DELETED, isActiveStatus } from '@/lib/status'
 import { CUSTOMER_SCOPE, SHIPPER_SCOPE } from './customer-list'
 import type { CustomerInput } from './customer-schema'
+import { SHIPPER_SETUP_ONLY } from '@/lib/shippers/shipper-codes'
 
 // 거래처 화면 조회 함수 (docs/decisions/0043) — 서버 액션 밖이라 데이터 범위를 직접 건다
 
 // 등록 화면의 화주사 선택지: 범위 안의 사용 중인 화주사
 export async function getCustomerShipperOptions(scope: DataScope) {
   const shippers = await prisma.shipper.findMany({
-    where: { AND: [scopeFilter(scope, SHIPPER_SCOPE), ACTIVE_ONLY] },
+    // 거래처를 등록할 수 있는 화주사: 준비중·운영중 (0080)
+    where: { AND: [scopeFilter(scope, SHIPPER_SCOPE), SHIPPER_SETUP_ONLY] },
     select: {
       id: true,
       code: true,

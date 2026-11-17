@@ -5,6 +5,7 @@ import { prisma } from '@/lib/prisma'
 import { operatorFilter, type DataScope } from '@/lib/scope/data-scope'
 import { isActiveStatus } from '@/lib/status'
 import { CENTER_SETUP_ONLY } from '@/lib/centers/center-status'
+import { SHIPPER_SETUP_ONLY } from '@/lib/shippers/shipper-codes'
 
 // 등록·수정 화면의 선택지: 내 운영사의 사용 중인 센터·화주사, 권한그룹(영역 포함)
 export async function getUserFormOptions(scope: DataScope) {
@@ -17,7 +18,8 @@ export async function getUserFormOptions(scope: DataScope) {
       orderBy: { code: 'asc' },
     }),
     prisma.shipper.findMany({
-      where: { ...operator, status: 'ACTIVE' },
+      // 포털 사용자를 연결할 수 있는 화주사: 준비중·운영중 (0080)
+      where: { ...operator, ...SHIPPER_SETUP_ONLY },
       select: { id: true, code: true, name: true },
       orderBy: { code: 'asc' },
     }),

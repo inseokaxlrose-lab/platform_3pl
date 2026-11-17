@@ -210,11 +210,14 @@ describe('품목 등록', () => {
     ).toBe(14)
   })
 
-  it('사용 중지된 화주사에는 등록할 수 없다', async () => {
-    await prisma.shipper.update({ where: { id: dara }, data: { status: 'INACTIVE' } })
+  it('일시정지·해지 화주사에는 등록할 수 없다 (준비중·운영중만, 0080)', async () => {
+    await prisma.shipper.update({
+      where: { id: dara },
+      data: { status: 'SUSPENDED', statusReason: '점검' },
+    })
     expect(await createItemAction(input({ shipperId: String(dara) }))).toMatchObject({
       ok: false,
-      error: { code: 'CONFLICT', message: expect.stringContaining('사용 중지된 화주사') },
+      error: { code: 'CONFLICT', message: expect.stringContaining('준비중·운영중') },
     })
   })
 })

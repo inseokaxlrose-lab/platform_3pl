@@ -1,3 +1,4 @@
+import { shipperDefaultsSelect, shipperItemDefaults } from '@/lib/shippers/shipper-defaults'
 import { ActionError } from '@/lib/actions/action-error'
 import { resolveUnitDecimals, unitDecimalsSelect } from '@/lib/units/unit-status'
 import { currentActor, requireOperatorId } from '@/lib/actor'
@@ -102,9 +103,7 @@ async function resolveAddress(
       baseUnit: { select: { code: true, ...unitDecimalsSelect(requireOperatorId()) } },
       shipper: {
         select: {
-          useLot: true,
-          useExpiry: true,
-          labelUnit: true,
+          ...shipperDefaultsSelect,
           // 이 로케이션의 센터를 화주사가 이용하는지
           centers: { where: { centerId: location.warehouse.centerId }, select: { centerId: true } },
         },
@@ -144,11 +143,7 @@ async function resolveAddress(
         useExpiry: item.useExpiry as 'Y' | 'N' | null,
         labelUnit: item.labelUnit,
       },
-      {
-        useLot: isYes(item.shipper.useLot),
-        useExpiry: isYes(item.shipper.useExpiry),
-        labelUnit: item.shipper.labelUnit,
-      },
+      shipperItemDefaults(item.shipper),
     )
     if (options.useLot && !lotNo) {
       throw new ActionError('VALIDATION', `로트번호를 넣어 주세요 (로트 관리 품목): ${item.code}`)

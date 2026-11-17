@@ -12,6 +12,7 @@ import { assertAllFound, assertNoCodeConflict } from '@/lib/soft-delete'
 import { DELETED_ONLY, NOT_DELETED, isActiveStatus, toStatus } from '@/lib/status'
 import { toYn } from '@/lib/yn'
 import type { CustomerCreateData, CustomerData } from './customer-schema'
+import { isShipperSetupStatus } from '@/lib/shippers/shipper-codes'
 
 // 거래처 저장 (docs/decisions/0043). 권한·데이터 범위 검사는 서버 액션에서 한다
 // - 화주사는 등록 후 바꿀 수 없다 (출고 기록이 화주사에 묶인다)
@@ -73,8 +74,8 @@ export async function createCustomer(data: CustomerCreateData) {
       select: { status: true },
     })
     if (!shipper) throw new ActionError('NOT_FOUND', '화주사를 찾을 수 없습니다.')
-    if (!isActiveStatus(shipper.status)) {
-      throw new ActionError('CONFLICT', '사용 중지된 화주사에는 거래처를 등록할 수 없습니다.')
+    if (!isShipperSetupStatus(shipper.status)) {
+      throw new ActionError('CONFLICT', '준비중·운영중인 화주사에만 거래처를 등록할 수 있습니다.')
     }
     const systemCode = await nextSystemCode('CUSTOMER', tx)
     const code = data.code || systemCode

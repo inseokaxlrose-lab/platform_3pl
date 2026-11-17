@@ -1,4 +1,5 @@
 import 'server-only'
+import { shipperDefaultsSelect, shipperItemDefaults } from '@/lib/shippers/shipper-defaults'
 import { ActionError } from '@/lib/actions/action-error'
 import { toPrismaQuery, type ListQuery } from '@/lib/grid/grid-query'
 import {
@@ -87,7 +88,7 @@ export async function listItems(input: ListQuery, scope: DataScope) {
         createdAt: true,
         updatedAt: true,
         shipper: {
-          select: { code: true, name: true, useLot: true, useExpiry: true, labelUnit: true },
+          select: { code: true, name: true, ...shipperDefaultsSelect },
         },
         baseUnit: { select: { code: true } },
         units: {
@@ -106,11 +107,7 @@ export async function listItems(input: ListQuery, scope: DataScope) {
           useExpiry: row.useExpiry as 'Y' | 'N' | null,
           labelUnit: row.labelUnit,
         },
-        {
-          useLot: isYes(shipper.useLot),
-          useExpiry: isYes(shipper.useExpiry),
-          labelUnit: shipper.labelUnit,
-        },
+        shipperItemDefaults(shipper),
       )
       return {
         id: row.id,

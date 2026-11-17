@@ -1,4 +1,5 @@
 import 'server-only'
+import { shipperDefaultsSelect, shipperItemDefaults } from '@/lib/shippers/shipper-defaults'
 import { resolveUnitDecimals, unitDecimalsSelect } from '@/lib/units/unit-status'
 import { textIds } from '@/lib/id'
 import { effectiveItemOptions } from '@/lib/items/item-schema'
@@ -52,7 +53,7 @@ export async function getAsnItemOptions(
 ): Promise<AsnItemOption[]> {
   const shipper = await prisma.shipper.findFirst({
     where: { AND: [{ id: shipperId }, scopeFilter(scope, SHIPPER_SCOPE)] },
-    select: { useLot: true, useExpiry: true, labelUnit: true },
+    select: shipperDefaultsSelect,
   })
   if (!shipper) return []
   const items = await prisma.item.findMany({
@@ -79,11 +80,7 @@ export async function getAsnItemOptions(
   })
   // 단위 소수 자리수: 시스템 단위는 이 운영사의 값 (0079)
   resolveUnitDecimals(items)
-  const defaults = {
-    useLot: isYes(shipper.useLot),
-    useExpiry: isYes(shipper.useExpiry),
-    labelUnit: shipper.labelUnit,
-  }
+  const defaults = shipperItemDefaults(shipper)
   return textIds(
     items.map(({ units, useLot, useExpiry, labelUnit, ...item }) => {
       const options = effectiveItemOptions(
