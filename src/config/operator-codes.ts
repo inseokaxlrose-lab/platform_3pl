@@ -43,8 +43,7 @@ export const PLAN = codeSet({
 })
 export const BILLING_BASIS = codeSet({ FIXED: '정액', USAGE: '건당', MIXED: '혼합' })
 export const ALLOC_RULE = codeSet({ FIFO: 'FIFO', FEFO: 'FEFO', LIFO: 'LIFO' })
-export const WEIGHT_UNIT = codeSet({ KG: 'KG', LB: 'LB' })
-export const LENGTH_UNIT = codeSet({ CM: 'CM', INCH: 'INCH' })
+// 중량·길이 표시 단위는 단위 기준정보(tb_unit의 WEIGHT·LENGTH 단위)를 참조한다 (0078)
 export const TEMP_ZONE = codeSet({
   AMBIENT: '상온',
   CHILLED: '냉장',

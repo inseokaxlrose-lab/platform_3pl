@@ -787,8 +787,9 @@ model Operator {
   currency       String    @default("KRW") @map("currency_cd") @db.Char(3)
   timezone       String    @default("Asia/Seoul") @db.VarChar(50)
   lang           String    @default("ko-KR") @map("lang_cd") @db.VarChar(5)
-  weightUnit     String    @default("KG") @map("weight_unit_cd") @db.VarChar(5)
-  lengthUnit     String    @default("CM") @map("length_unit_cd") @db.VarChar(5)
+  // 표시 단위: 단위 기준정보의 중량·길이 단위 코드 (시스템 또는 이 운영사의 단위 — DB 트리거로 검사, 0078)
+  weightUnit     String    @default("KG") @map("weight_unit_cd") @db.VarChar(10)
+  lengthUnit     String    @default("CM") @map("length_unit_cd") @db.VarChar(10)
   // 재고할당 규칙 ALLOC_RULE
   allocRule      String    @default("FIFO") @map("alloc_rule_cd") @db.VarChar(10)
   useLot         String    @default("N") @map("lot_mgmt_yn") @db.Char(1)

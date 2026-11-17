@@ -2,7 +2,7 @@
 
 import { LayersIcon, PlayIcon, PlusIcon, PowerIcon, Trash2Icon } from 'lucide-react'
 import Link from 'next/link'
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { ACTIVE_STATUS, ConfirmDialog, StatusBadge } from '@/components/common'
 import type { DataGridColumn } from '@/components/data-grid'
 import { ExcelUploadDialog } from '@/components/excel-upload'
@@ -28,6 +28,7 @@ import {
 } from './actions'
 import { LocationDialog, type EditingLocation } from './location-dialog'
 import type { LocationOptions } from './queries'
+import { kgToWeight, type DisplayUnits } from '@/lib/units/dimension'
 
 type Row = EditingLocation & {
   description: string | null
@@ -48,7 +49,8 @@ type Row = EditingLocation & {
   updatedAt: Date
 }
 
-const COLUMNS: DataGridColumn<Row>[] = [
+// 최대 중량은 저장(kg) 값을 운영사 표시 단위로 바꿔 보여 준다 (0078)
+const columnsFor = (units: DisplayUnits): DataGridColumn<Row>[] => [
   {
     id: 'code',
     header: '로케이션 코드',
@@ -94,8 +96,8 @@ const COLUMNS: DataGridColumn<Row>[] = [
   { id: 'mixClient', header: '다화주 혼적', accessor: 'mixClient', sortable: true, format: 'yn' },
   {
     id: 'maxWeightKg',
-    header: '최대 중량(kg)',
-    accessor: 'maxWeightKg',
+    header: `최대 중량(${units.weight.label})`,
+    accessor: (row) => kgToWeight(row.maxWeightKg, units.weight),
     sortable: true,
     format: { number: { decimals: 2 } },
     defaultHidden: true,
@@ -138,6 +140,7 @@ export function LocationsList({
   can: { create: boolean; update: boolean; delete: boolean; export: boolean }
 }) {
   const { warehouses, zones } = options
+  const columns = useMemo(() => columnsFor(options.units), [options.units])
   // 센터 선택지: 창고 목록에서 센터만 추린다 (순서는 서버가 정한 센터 정렬순서 그대로)
   const centers = [
     ...new Map(
@@ -331,7 +334,7 @@ export function LocationsList({
         gridId="master-locations"
         searchFields={fields}
         list={list}
-        columns={COLUMNS}
+        columns={columns}
         getRowId={(row) => row.id}
         // 줄을 누르면 수정 팝업 ("삭제됨" 보기에서는 열지 않는다)
         onRowClick={deletedView ? undefined : (row) => setDialog({ editing: row })}
