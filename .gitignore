@@ -47,3 +47,6 @@ next-env.d.ts
 
 # prisma generate로 만들어지는 코드
 /src/generated/
+
+# 지역 마스터 원본 파일 (주소DB·법정동코드, npm run region:load가 읽는다 — 크고 공공 원본이라 저장소에 두지 않는다)
+/data/region/

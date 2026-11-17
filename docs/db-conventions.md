@@ -309,6 +309,23 @@
 
 인덱스: 고유 `(warehouse_id, location_cd) WHERE del_yn='N'`, `(center_id, location_cd)`, `(warehouse_id, zone_id, status_cd)`, `(center_id, status_cd, del_yn)`, `(zone_id)`.
 
+### tb_region_* ← 권역설정 · 지역 마스터 (0076)
+
+지역 마스터(운영사 공통, `operator_id` 없음, `npm run region:load`로만 갱신)와 운영사별 권역 배정.
+
+| 표 (코드 모델) | 키 | 핵심 칸 |
+| --- | --- | --- |
+| `tb_region_bjd` (`RegionBjd`) | `bjd_cd` CHAR(10) | 시도·시군구 코드/이름, `emd_nm`·`ri_nm`, `bjd_level` 1~4, `abolished_yn`·`abolished_dt`, `load_ver` |
+| `tb_region_zip` (`RegionZip`) | `zip_cd` CHAR(5) | `sido_cd`·`sigungu_cd`, `rep_addr`(대표 주소), `addr_cnt`, `abolished_yn`, `first_load_ver`·`last_load_ver` |
+| `tb_region_zip_bjd` (`RegionZipBjd`) | (`zip_cd`, `bjd_cd`) | `addr_cnt` — 2개 이상 법정동 = 경계 우편번호 |
+| `tb_region_load_hist` (`RegionLoadHist`) | `load_id` | `load_ver`, `load_type_cd` FULL·DELTA, `status_cd` RUNNING·DONE·FAILED, 건수, `error_msg` |
+| `tb_region_center_map` (`RegionCenterMap`) | `map_id`, **고유 (`operator_id`, `zip_cd`, `temp_zone_cd`)** | `temp_zone_cd` ALL·온도대, `center_id`, `assign_type_cd` MANUAL·SUGGESTED·UPLOAD, `confirm_yn`, `last_batch_id`, 공통 칸(삭제 없음) |
+| `tb_region_change_batch` (`RegionChangeBatch`) | `batch_id` | `change_type_cd`(7가지), `scope_desc`, `temp_zone_cd`, `target_center_id`, `changed_cnt`, `reason`, `created_at/by` |
+| `tb_region_center_map_hist` (`RegionCenterMapHist`) | `hist_id` | `batch_id`, 우편번호·온도대, `before_center_id`·`after_center_id`(NULL = 미배정), `changed_at` |
+| `tb_address_norm_cache` (`AddressNormCache`, 공통) | `addr_hash` CHAR(64) | `raw_addr`, `grade` A~D·F, `method_cd`, 정제 결과(우편번호·법정동·도로명·지번·건물관리번호), `addr_load_ver`, `hit_cnt` |
+
+운영사 칸 추가: `tb_operator.region_auto_grade` CHAR(1) 기본 'D' — 자동 지정을 허용하는 주소 정제 등급.
+
 ### tb_shipper ← `shipper` (코드 모델 `Shipper`)
 
 | 코드(그대로) | 지금 DB | 새 DB | 비고 |
