@@ -47,7 +47,7 @@ const SHOTS: Shot[] = [
     ],
   },
   {
-    src: '/help/admin/inbound/asn/new.png',
+    src: '/help/admin/inbound/asn/new/form.png',
     url: '/admin/inbound/asn/new',
     markers: [
       { label: '1', target: (page) => page.locator('#section-basic') },
