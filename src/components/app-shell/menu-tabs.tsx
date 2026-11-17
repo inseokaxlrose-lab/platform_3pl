@@ -1,6 +1,6 @@
 'use client'
 
-import { ExternalLinkIcon, HouseIcon, XIcon } from 'lucide-react'
+import { ExternalLinkIcon, HouseIcon, ListXIcon, XIcon } from 'lucide-react'
 import Link from 'next/link'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import { useEffect, useRef } from 'react'
@@ -11,7 +11,7 @@ import { cn } from '@/lib/utils'
 import { filterNavigation } from './filter-navigation'
 import { findActiveHref } from './find-active-href'
 import { closeMenuTab } from './menu-tabs-state'
-import { closeTab, openTab, useMenuTabs } from './menu-tabs-store'
+import { closeAllTabs, closeTab, openTab, useMenuTabs } from './menu-tabs-store'
 
 // 상단 메뉴 탭 (docs/decisions/0069): 연 메뉴를 책갈피처럼 모아 두고 눌러서 오간다
 // - 탭을 누르면 그 메뉴에서 마지막으로 보던 주소로 (검색 조건·하위 화면 그대로)
@@ -55,6 +55,15 @@ export function MenuTabs({ area }: { area: NavAreaKey }) {
     if (!askBeforeLeave(next)) router.push(next)
   }
 
+  // 전체 닫기: 보던 탭이 아닌 것은 바로 닫고, 보던 탭은 홈으로 옮긴 뒤 닫는다 (한 탭 [×]와 같은 방식)
+  function closeAll() {
+    const keep = tabs.some((tab) => tab.href === activeHref) ? activeHref : null
+    closeAllTabs(area, keep)
+    if (!keep) return
+    closing.current = keep
+    if (!askBeforeLeave(homeHref)) router.push(homeHref)
+  }
+
   const shown = tabs.flatMap((tab) => {
     const item = items.find((i) => i.href === tab.href)
     // 권한이 바뀌어 볼 수 없게 된 메뉴는 그리지 않는다
@@ -89,6 +98,18 @@ export function MenuTabs({ area }: { area: NavAreaKey }) {
           />
         )
       })}
+      {shown.length > 0 && (
+        // 오른쪽 끝에 고정: 탭이 많아 줄이 옆으로 밀려도 늘 보인다 (바탕을 탭 줄과 같게 해 탭을 덮음)
+        <button
+          type="button"
+          onClick={closeAll}
+          title="열린 메뉴 탭을 모두 닫고 홈으로"
+          className="sticky right-0 ml-auto flex h-8 shrink-0 items-center gap-1 self-center bg-muted pr-1 pl-2 text-xs text-muted-foreground hover:text-foreground [&_svg]:size-3.5"
+        >
+          <ListXIcon />
+          전체 닫기
+        </button>
+      )}
     </nav>
   )
 }

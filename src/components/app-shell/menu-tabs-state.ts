@@ -46,6 +46,12 @@ export function closeMenuTab(
   return { tabs: rest, next: rest[index] ?? rest[index - 1] ?? null }
 }
 
+// 전체 닫기: keep으로 준 탭(보던 탭)만 남긴다. keep이 없으면 모두 닫는다
+// 보던 탭은 홈으로 옮겨 간 뒤에 닫는다 (변경 중 확인 창에서 [계속 작성]이면 남는다)
+export function closeAllMenuTabs(tabs: readonly MenuTab[], keep: string | null): MenuTab[] {
+  return tabs.filter((tab) => tab.href === keep)
+}
+
 // 저장해 둔 글자를 탭 목록으로 (모양이 틀리면 빈 목록)
 export function parseMenuTabs(raw: string | null): MenuTab[] {
   if (!raw) return []

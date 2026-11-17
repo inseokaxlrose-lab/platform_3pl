@@ -2,7 +2,13 @@
 
 import { useSyncExternalStore } from 'react'
 import type { NavAreaKey } from '@/config/navigation'
-import { closeMenuTab, openMenuTab, parseMenuTabs, type MenuTab } from './menu-tabs-state'
+import {
+  closeAllMenuTabs,
+  closeMenuTab,
+  openMenuTab,
+  parseMenuTabs,
+  type MenuTab,
+} from './menu-tabs-state'
 
 // 메뉴 탭 목록 보관 (docs/decisions/0069)
 // - 브라우저 창(탭)마다 따로: sessionStorage → 새 창은 자기 탭 줄을 따로 갖고, 새로고침해도 남는다
@@ -68,4 +74,9 @@ export function closeTab(area: NavAreaKey, href: string): MenuTab | null {
   const { tabs, next } = closeMenuTab(read(area), href)
   write(area, tabs)
   return next
+}
+
+// 전체 닫기: keep(보던 탭)만 남기고 모두 닫는다
+export function closeAllTabs(area: NavAreaKey, keep: string | null) {
+  write(area, closeAllMenuTabs(read(area), keep))
 }

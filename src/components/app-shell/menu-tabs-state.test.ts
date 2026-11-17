@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest'
-import { closeMenuTab, openMenuTab, parseMenuTabs, type MenuTab } from './menu-tabs-state'
+import {
+  closeAllMenuTabs,
+  closeMenuTab,
+  openMenuTab,
+  parseMenuTabs,
+  type MenuTab,
+} from './menu-tabs-state'
 
 // 메뉴 탭 계산 (0069)
 
@@ -30,6 +36,12 @@ describe('메뉴 탭 닫기', () => {
 
   it('없는 탭을 닫으면 그대로', () => {
     expect(closeMenuTab(tabs, '/x')).toEqual({ tabs, next: null })
+  })
+
+  it('전체 닫기: 보던 탭만 남기거나(홈으로 옮긴 뒤 닫음), 보던 탭이 없으면 모두 닫는다', () => {
+    expect(closeAllMenuTabs(tabs, '/b')).toEqual([tabs[1]])
+    expect(closeAllMenuTabs(tabs, null)).toEqual([])
+    expect(closeAllMenuTabs(tabs, '/x')).toEqual([])
   })
 })
 
