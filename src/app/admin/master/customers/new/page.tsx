@@ -15,7 +15,7 @@ export default async function NewCustomerPage() {
     <CustomerForm
       header={{
         title: '거래처 등록',
-        description: '거래처코드를 비우면 자동으로 부여되는 시스템 코드를 그대로 씁니다.',
+        description: '저장하면 거래처 주소로 기본 납품처가 만들어지고, 주소로 배송센터를 정합니다.',
         actions: <BackToListButton listPath="/admin/master/customers" />,
       }}
       shippers={shippers}
