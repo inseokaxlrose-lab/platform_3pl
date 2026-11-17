@@ -172,7 +172,12 @@ async function seedSampleOrganizations(operatorId: bigint) {
           useLot: toYn(shipper.useLot),
           useExpiry: toYn(shipper.useExpiry),
           systemCode: await nextSystemCode('SHIPPER'),
-          centers: { create: centers.map((c) => ({ centerId: c.id })) },
+          // 견본은 바로 입고를 받을 수 있게 운영중으로 (새로 등록하는 화주사는 준비중, 0080)
+          status: 'ACTIVE',
+          // 첫 센터가 기본 센터
+          centers: {
+            create: centers.map((c, i) => ({ centerId: c.id, isDefault: toYn(i === 0) })),
+          },
         },
       })
     } else if (found._count.centers === 0) {
@@ -182,7 +187,9 @@ async function seedSampleOrganizations(operatorId: bigint) {
         data: {
           useLot: toYn(shipper.useLot),
           useExpiry: toYn(shipper.useExpiry),
-          centers: { create: centers.map((c) => ({ centerId: c.id })) },
+          centers: {
+            create: centers.map((c, i) => ({ centerId: c.id, isDefault: toYn(i === 0) })),
+          },
         },
       })
     }

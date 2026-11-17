@@ -589,39 +589,92 @@ enum LabelUnit {
   BOX
 }
 
-// 화주사 (docs/decisions/0035)
+// 화주사 (docs/decisions/0035, 0080 — 정의서 docs/specs/shipper.md, 표 이름은 tb_shipper 유지)
 // 코드 3층 (0025): systemCode SH000001(자동·불변) / code(사용자 코드, 같은 운영사 안에서 중복 금지) / 외부 코드(ExternalCode)
 model Shipper {
-  id             BigInt    @id @default(autoincrement()) @map("shipper_id")
+  id                   BigInt    @id @default(autoincrement()) @map("shipper_id")
   // 운영사 (멀티테넌트: 같은 운영사 사람만 보고 고친다, docs/decisions/0039)
-  operatorId     BigInt    @map("operator_id")
-  operator       Operator  @relation(fields: [operatorId], references: [id], onDelete: Restrict)
-  systemCode     String    @unique @map("sys_cd")
-  code           String    @map("shipper_cd")
-  name           String    @map("shipper_nm")
-  // 사업자등록번호·전화번호는 하이픈 없이 숫자만 (0029)
-  businessNumber String?   @map("biz_reg_no")
-  ceoName        String?   @map("ceo_nm")
-  businessType   String?   @map("biz_condition")
-  businessItem   String?   @map("biz_item")
-  phone          String?   @map("tel_no")
-  fax            String?   @map("fax_no")
-  email          String?
-  zipCode        String?   @map("zip_cd")
-  address        String?   @map("addr1")
-  addressDetail  String?   @map("addr2")
-  // 품목 기본값: 품목에서 그대로 쓰거나 개별 지정한다 (0003 결정 2)
-  useLot         String    @default("N") @map("lot_mgmt_yn") @db.Char(1)
-  useExpiry      String    @default("N") @map("expiry_mgmt_yn") @db.Char(1)
-  labelUnit      LabelUnit @default(PLT) @map("label_unit_cd")
-  // false면 데이터 범위에서 빠진다 (소속 사용자도 데이터를 볼 수 없음)
-  status         String    @default("ACTIVE") @map("status_cd") @db.VarChar(10)
-  createdAt      DateTime  @default(now()) @map("created_at")
-  updatedAt      DateTime  @updatedAt @map("updated_at")
+  operatorId           BigInt    @map("operator_id")
+  operator             Operator  @relation(fields: [operatorId], references: [id], onDelete: Restrict)
+  systemCode           String    @unique @map("sys_cd")
+  code                 String    @map("shipper_cd")
+  name                 String    @map("shipper_nm")
+  // ── ① 기본 정보
+  nameEn               String?   @map("shipper_nm_en") @db.VarChar(100)
+  shortName            String?   @map("shipper_short_nm") @db.VarChar(30)
+  // 화주 유형·업종: 공통코드 SHIPPER_TYPE·SHIPPER_INDUSTRY (표시·분류용)
+  shipperType          String?   @map("shipper_type_cd") @db.VarChar(20)
+  industry             String?   @map("industry_cd") @db.VarChar(20)
+  // 사업자등록번호·전화번호는 하이픈 없이 숫자만 (0029). 화면에서는 필수, 기존 화주는 비어 있을 수 있다 (0080)
+  businessNumber       String?   @map("biz_reg_no")
+  // 사업자 구분·과세유형: 상수 BIZ_ENTITY·TAX_TYPE (운영사와 같은 값)
+  bizEntity            String    @default("CORP") @map("biz_entity_cd") @db.VarChar(10)
+  corpRegNo            String?   @map("corp_reg_no") @db.Char(13)
+  subBizNo             String?   @map("sub_biz_no") @db.Char(4)
+  taxType              String    @default("GENERAL") @map("tax_type_cd") @db.VarChar(10)
+  ceoName              String?   @map("ceo_nm")
+  businessType         String?   @map("biz_condition")
+  businessItem         String?   @map("biz_item")
+  sortOrder            Int       @default(0) @map("sort_seq")
+  remark               String?   @db.VarChar(1000)
+  extAttr              Json?     @map("ext_attr")
+  // ── ② 연락처·주소
+  phone                String?   @map("tel_no")
+  fax                  String?   @map("fax_no")
+  email                String?
+  homepageUrl          String?   @map("homepage_url") @db.VarChar(200)
+  countryCode          String    @default("KR") @map("country_cd") @db.Char(2)
+  zipCode              String?   @map("zip_cd")
+  address              String?   @map("addr1")
+  addressDetail        String?   @map("addr2")
+  addressJibun         String?   @map("addr_jibun") @db.VarChar(200)
+  // ── ③ 계약·정산
+  contractStartOn      DateTime  @default(dbgenerated("CURRENT_DATE")) @map("contract_start_dt") @db.Date
+  // 비어 있으면 자동연장(기한 없음)
+  contractEndOn        DateTime? @map("contract_end_dt") @db.Date
+  autoRenewYn          String    @default("Y") @map("auto_renew_yn") @db.Char(1)
+  // 정산 주기: 공통코드 SETTLE_CYCLE
+  settleCycle          String    @default("MONTHLY") @map("settle_cycle_cd") @db.VarChar(10)
+  // 정산 마감일 1~31, 99 = 말일. 비어 있으면 운영사 값
+  closingDay           Int?      @map("closing_day") @db.SmallInt
+  // 결제 조건: 마감 후 n일
+  paymentTermsDays     Int?      @map("payment_terms_days")
+  taxInvoiceEmail      String?   @map("tax_invoice_email") @db.VarChar(100)
+  // ── ④ 운영 설정 (상속: 비어 있으면 위 단계 값 — 0073·0080, getEffectiveSetting)
+  // 로트·유통기한은 품목 기본값으로도 쓴다 (품목에서 그대로 쓰거나 개별 지정, 0003 결정 2)
+  useLot               String?   @map("lot_mgmt_yn") @db.Char(1)
+  useExpiry            String?   @map("expiry_mgmt_yn") @db.Char(1)
+  useSerial            String?   @map("serial_mgmt_yn") @db.Char(1)
+  allocRule            String?   @map("alloc_rule_cd") @db.VarChar(10)
+  shipCutoffTime       DateTime? @map("ship_cutoff_time") @db.Time(0)
+  // 유통기한 잔여일 기준 (비어 있으면 검사 안 함, 상속 아님)
+  minInboundShelfDays  Int?      @map("min_inbound_shelf_days")
+  minOutboundShelfDays Int?      @map("min_outbound_shelf_days")
+  partialShipYn        String    @default("Y") @map("partial_ship_yn") @db.Char(1)
+  // 재고 부족 시 처리: 상수 SHORTAGE_POLICY (HOLD·PARTIAL·CANCEL_SHORT)
+  shortagePolicy       String    @default("HOLD") @map("shortage_policy_cd") @db.VarChar(20)
+  labelUnit            LabelUnit @default(PLT) @map("label_unit_cd")
+  // ── ⑤ 거래처·주문 정책 (포털·API 공통, 상수)
+  // 납품처 배송센터 미지정: AUTO_HOLD·AUTO_REJECT·REQUIRED
+  shipToCenterPolicy   String    @default("AUTO_HOLD") @map("ship_to_center_policy_cd") @db.VarChar(20)
+  autoCreateShipToYn   String    @default("Y") @map("auto_create_ship_to_yn") @db.Char(1)
+  autoCreateItemYn     String    @default("N") @map("auto_create_item_yn") @db.Char(1)
+  // 주문번호 중복 기준: CLIENT(화주 전체 기간)·CLIENT_DAY(일자별)
+  orderNoScope         String    @default("CLIENT") @map("order_no_unique_scope_cd") @db.VarChar(20)
+  // ── ⑥ 연동 (API 키 관리는 다음 작업 — 정의서 PART 2)
+  // 연동 방식: PORTAL·API·FILE·EDI
+  ifMethod             String    @default("PORTAL") @map("if_method_cd") @db.VarChar(20)
+  apiEnabledYn         String    @default("N") @map("api_enabled_yn") @db.Char(1)
+  // 상태 (상수 SHIPPER_STATUS, 0080): 준비중 → 운영중 → 일시정지 → 해지. 일시정지·해지는 사유 필수
+  // 해지만 데이터 범위에서 빠진다 (소속 사용자 로그인 불가)
+  status               String    @default("PREPARING") @map("status_cd") @db.VarChar(20)
+  statusReason         String?   @map("status_reason") @db.VarChar(200)
+  createdAt            DateTime  @default(now()) @map("created_at")
+  updatedAt            DateTime  @updatedAt @map("updated_at")
   // 등록·수정한 사람 아이디(username, 자동: 현재 작업자 / 시드 seed / 기존 데이터 system), 동시 수정 막기용 버전 (docs/db-conventions.md 공통 칸)
-  createdBy      String    @default("system") @map("created_by") @db.VarChar(50)
-  updatedBy      String    @default("system") @map("updated_by") @db.VarChar(50)
-  rowVersion     Int       @default(1) @map("row_version")
+  createdBy            String    @default("system") @map("created_by") @db.VarChar(50)
+  updatedBy            String    @default("system") @map("updated_by") @db.VarChar(50)
+  rowVersion           Int       @default(1) @map("row_version")
 
   users     User[]
   centers   ShipperCenter[]
@@ -644,29 +697,48 @@ model Shipper {
 }
 
 // 화주사의 이용 센터 (화주사 ↔ 센터, 1개 이상) — 센터 직원은 자기 센터를 이용하는 화주사만 본다
+// 기본 센터는 화주당 1개 (부분 고유), 센터별 운영 설정 재정의는 비어 있으면 화주 값 (0080, 화면은 2차)
 model ShipperCenter {
-  shipperId BigInt  @map("shipper_id")
-  centerId  BigInt  @map("center_id")
-  shipper   Shipper @relation(fields: [shipperId], references: [id], onDelete: Cascade)
-  center    Center  @relation(fields: [centerId], references: [id], onDelete: Restrict)
+  shipperId      BigInt    @map("shipper_id")
+  centerId       BigInt    @map("center_id")
+  isDefault      String    @default("N") @map("default_yn") @db.Char(1)
+  startOn        DateTime  @default(dbgenerated("CURRENT_DATE")) @map("start_dt") @db.Date
+  endOn          DateTime? @map("end_dt") @db.Date
+  status         String    @default("ACTIVE") @map("status_cd") @db.VarChar(20)
+  // 센터별 재정의 (2차 화면)
+  allocRule      String?   @map("alloc_rule_cd") @db.VarChar(10)
+  useLot         String?   @map("lot_mgmt_yn") @db.Char(1)
+  useExpiry      String?   @map("expiry_mgmt_yn") @db.Char(1)
+  useSerial      String?   @map("serial_mgmt_yn") @db.Char(1)
+  shipCutoffTime DateTime? @map("ship_cutoff_time") @db.Time(0)
+  createdAt      DateTime  @default(now()) @map("created_at")
+  updatedAt      DateTime  @default(now()) @updatedAt @map("updated_at")
+  createdBy      String    @default("system") @map("created_by") @db.VarChar(50)
+  updatedBy      String    @default("system") @map("updated_by") @db.VarChar(50)
+  shipper        Shipper   @relation(fields: [shipperId], references: [id], onDelete: Cascade)
+  center         Center    @relation(fields: [centerId], references: [id], onDelete: Restrict)
 
   @@id([shipperId, centerId])
+  @@unique([shipperId], where: raw("default_yn = 'Y'"), map: "tb_shipper_center_default_key")
   @@index([centerId])
   @@map("tb_shipper_center")
 }
 
-// 화주사 담당자 (운영사 담당자와 같은 모양: 최대 5명, 대표 1명, 담당 업무는 공통코드 CONTACT_DUTY)
+// 화주사 담당자 (운영사 담당자와 같은 모양, 화주사만 최대 10명 — 0080), 대표 1명, 담당 업무는 공통코드 CONTACT_ROLE
+// 연동 담당(if_contact_yn): 화주당 최대 1명, 이메일 필수 (API 키 발급·만료 알림 받는 사람)
 model ShipperContact {
-  id        BigInt  @id @default(autoincrement()) @map("contact_id")
-  shipperId BigInt  @map("shipper_id")
-  sortOrder Int     @map("sort_seq")
-  duty      String  @map("role_cd")
-  name      String  @map("contact_nm")
-  phone     String? @map("tel_no")
-  email     String?
-  isPrimary String  @default("N") @map("primary_yn") @db.Char(1)
-  shipper   Shipper @relation(fields: [shipperId], references: [id], onDelete: Cascade)
+  id          BigInt  @id @default(autoincrement()) @map("contact_id")
+  shipperId   BigInt  @map("shipper_id")
+  sortOrder   Int     @map("sort_seq")
+  duty        String  @map("role_cd")
+  name        String  @map("contact_nm")
+  phone       String? @map("tel_no")
+  email       String?
+  isPrimary   String  @default("N") @map("primary_yn") @db.Char(1)
+  isIfContact String  @default("N") @map("if_contact_yn") @db.Char(1)
+  shipper     Shipper @relation(fields: [shipperId], references: [id], onDelete: Cascade)
 
+  @@unique([shipperId], where: raw("if_contact_yn = 'Y'"), map: "tb_shipper_contact_if_contact_key")
   @@index([shipperId, sortOrder])
   @@map("tb_shipper_contact")
 }

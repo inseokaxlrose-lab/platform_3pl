@@ -37,7 +37,10 @@ export function createTestShipper(
       code,
       systemCode: `SH-T${operatorId}-${code}`,
       name: data.name ?? `${code} 화주`,
-      status: toStatus(data.isActive ?? true),
+      // 화주사 상태 4단계 (0080): 사용 = 운영중, 사용 중지 = 일시정지(사유 필수)
+      ...((data.isActive ?? true)
+        ? { status: 'ACTIVE' }
+        : { status: 'SUSPENDED', statusReason: '테스트' }),
     },
   })
 }
