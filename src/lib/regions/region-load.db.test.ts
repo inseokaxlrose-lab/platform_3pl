@@ -66,6 +66,40 @@ describe('지역 마스터 적재', () => {
     expect((await prisma.regionZip.findUnique({ where: { code: '30145' } }))?.abolishedYn).toBe('Y')
   })
 
+  it('법정동 파일에 없는 법정동(면 → 읍 승격으로 새 코드)은 주소DB 이름으로 덧붙이고 우편번호를 빠뜨리지 않는다', async () => {
+    const { mkdtempSync, writeFileSync, readFileSync } = await import('node:fs')
+    const { tmpdir } = await import('node:os')
+    const dir = mkdtempSync(`${tmpdir()}/region-`)
+    // 법정동 파일에는 '마장면 이치리'(4150025021)만 있고, 주소DB는 승격 뒤 새 코드 '마장읍 이치리'(4150026021)를 쓴다
+    const promoted = [1, 2].map(
+      (n) =>
+        `N415002602100${n}|4150026021|경기도|이천시|마장읍|이치리|0|1|0|R9|이치로|0|${n * 10}|0|4150026000|마장읍|17390||20260101|0||||`,
+    )
+    writeFileSync(
+      `${dir}/address.txt`,
+      [readFileSync(`${FIXTURE}/address-sample.txt`, 'utf-8').trimEnd(), ...promoted].join('\n'),
+    )
+
+    const result = await loadRegionMaster(prisma, input('202611', [`${dir}/address.txt`]))
+    expect(result.addedBjds).toEqual([
+      { code: '4150026021', name: '경기도 이천시 마장읍 이치리', addressCount: 2 },
+    ])
+    expect(result).toMatchObject({ bjdCount: 16, zipCount: 7 })
+    expect(await prisma.regionBjd.findUnique({ where: { code: '4150026021' } })).toMatchObject({
+      sigunguCode: '41500',
+      sigunguName: '이천시',
+      emdName: '마장읍',
+      riName: '이치리',
+      level: 4,
+      abolishedYn: 'N',
+    })
+    expect(await prisma.regionZip.findUnique({ where: { code: '17390' } })).toMatchObject({
+      addressCount: 2,
+      repAddress: '이치로 10~20',
+    })
+    expect(await prisma.regionZipBjd.count({ where: { zipCode: '17390' } })).toBe(1)
+  })
+
   it('파일 모양이 틀리면 적재 이력에 실패를 남긴다', async () => {
     const { mkdtempSync, writeFileSync } = await import('node:fs')
     const { tmpdir } = await import('node:os')

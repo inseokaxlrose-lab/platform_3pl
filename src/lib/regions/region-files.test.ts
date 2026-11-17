@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest'
 import {
   bjdLevel,
   decodeKorean,
+  mainSigunguCode,
   parseAddressLine,
   parseBjdFile,
   representativeAddress,
@@ -62,6 +63,19 @@ describe('주소DB 파일', () => {
       ['4111313600', 1],
     ])
     expect(agg.crossSigungu.size).toBe(0)
+  })
+
+  it('시군구를 넘는 우편번호는 주소가 가장 많은 시군구로 정한다 (처음 읽은 줄이 아니라)', () => {
+    const agg = new ZipAggregator()
+    const line = (bjd: string, n: number) =>
+      `M${n}|${bjd}|경기도|고양시|동||0|1|0|R|길|0|${n}|0|${bjd}|동|10457||20200101|0||||`
+    // 일산동구(41285) 1곳이 먼저, 덕양구(41281) 3곳이 뒤에
+    ;[line('4128510100', 1), line('4128110100', 2), line('4128110100', 3), line('4128110200', 4)]
+      .map((l, i) => parseAddressLine(l, i + 1)!)
+      .forEach((row) => agg.add(row))
+    const zip = agg.zips.get('10457')!
+    expect(agg.crossSigungu.has('10457')).toBe(true)
+    expect(mainSigunguCode(zip)).toBe('41281')
   })
 
   it('열 모양이 다르면 줄 번호와 함께 알려 준다', () => {

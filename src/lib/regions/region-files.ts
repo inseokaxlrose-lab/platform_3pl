@@ -3,7 +3,7 @@
 // 1) 법정동코드 파일: 공공데이터포털 '국토교통부_법정동코드' CSV 또는 code.go.kr '법정동코드 전체자료' txt
 //    머리줄에 법정동코드·법정동명·폐지여부 열이 있다 (쉼표 또는 탭 구분, CP949 또는 UTF-8)
 // 2) 주소DB 파일: juso.go.kr 주소DB(도로명주소 한글) 전체분, 시도별 txt, '|' 구분, 한 줄 = 주소(건물) 하나
-//    쓰는 열(0부터): 1 법정동코드, 10 도로명, 12 건물본번, 13 건물부번, 16 기초구역번호(우편번호)
+//    쓰는 열(0부터): 1 법정동코드, 2~5 시도·시군구·읍면동·리 이름, 10 도로명, 12 건물본번, 16 기초구역번호(우편번호)
 //    파일 모양이 다르면 첫 줄부터 검사해 어느 줄·열이 맞지 않는지 알려 준다
 
 export type BjdRow = {
@@ -92,12 +92,25 @@ export function parseBjdFile(text: string): BjdRow[] {
 // 주소DB 한 줄에서 쓰는 칸
 export type AddressRow = {
   bjdCode: string
+  sidoName: string
+  sigunguName: string
+  emdName: string
+  riName: string
   roadName: string
   buildingMain: number
   zipCode: string
 }
 
-export const ADDRESS_COLUMNS = { bjdCode: 1, roadName: 10, buildingMain: 12, zipCode: 16 } as const
+export const ADDRESS_COLUMNS = {
+  bjdCode: 1,
+  sidoName: 2,
+  sigunguName: 3,
+  emdName: 4,
+  riName: 5,
+  roadName: 10,
+  buildingMain: 12,
+  zipCode: 16,
+} as const
 
 // 주소DB 한 줄 해석 (빈 줄은 null). 모양이 다르면 줄 번호와 함께 오류
 export function parseAddressLine(line: string, lineNo: number): AddressRow | null {
@@ -110,13 +123,39 @@ export function parseAddressLine(line: string, lineNo: number): AddressRow | nul
       `주소DB ${lineNo}번째 줄: 열 모양이 예상과 다릅니다 (법정동코드 [${ADDRESS_COLUMNS.bjdCode}]번째 칸 '${bjdCode}', 기초구역번호 [${ADDRESS_COLUMNS.zipCode}]번째 칸 '${zipCode}'). 주소DB(도로명주소 한글) 전체분 파일인지 확인해 주세요.`,
     )
   }
+  const cell = (index: number) => cells[index]?.trim() ?? ''
   return {
     bjdCode,
-    roadName: cells[ADDRESS_COLUMNS.roadName]?.trim() ?? '',
+    sidoName: cell(ADDRESS_COLUMNS.sidoName),
+    sigunguName: cell(ADDRESS_COLUMNS.sigunguName),
+    emdName: cell(ADDRESS_COLUMNS.emdName),
+    riName: cell(ADDRESS_COLUMNS.riName),
+    roadName: cell(ADDRESS_COLUMNS.roadName),
     buildingMain: Number(cells[ADDRESS_COLUMNS.buildingMain] ?? 0) || 0,
     zipCode,
   }
 }
+
+// 법정동코드 파일에 없는 법정동을 주소DB 줄의 이름으로 만든다
+// (두 파일의 기준일이 달라 새 코드가 아직 법정동 파일에 없을 때 — 예: 면 → 읍 승격으로 코드가 바뀜)
+export function bjdFromAddress(row: AddressRow): BjdRow {
+  const level = bjdLevel(row.bjdCode)
+  return {
+    code: row.bjdCode,
+    sidoCode: row.bjdCode.slice(0, 2),
+    sidoName: row.sidoName,
+    sigunguCode: row.bjdCode.slice(0, 5),
+    sigunguName: level >= 2 ? row.sigunguName : '',
+    emdName: level >= 3 ? row.emdName || null : null,
+    riName: level === 4 ? row.riName || null : null,
+    level,
+    abolished: false,
+  }
+}
+
+// 법정동 표시 이름 (예: '대구광역시 달성군 구지읍 창리')
+export const bjdFullName = (bjd: BjdRow) =>
+  [bjd.sidoName, bjd.sigunguName, bjd.emdName, bjd.riName].filter(Boolean).join(' ')
 
 // 주소 줄을 우편번호별로 모으기: 시군구, 주소 수, 법정동별 주소 수, 도로별 건물번호 범위
 export type ZipSummary = {
@@ -161,6 +200,17 @@ export class ZipAggregator {
       }
     }
   }
+}
+
+// 우편번호의 시군구 = 주소가 가장 많은 시군구 (경계에 몇 집만 걸친 우편번호가 처음 읽은 줄로 정해지지 않게)
+// 조사(2026-09 주소DB): 시군구를 넘는 우편번호 117건 중 115건은 같은 시의 다른 구, 나머지도 대부분 1~2곳만 넘는다
+export function mainSigunguCode(zip: ZipSummary) {
+  const bySigungu = new Map<string, number>()
+  for (const [bjdCode, count] of zip.bjdCounts) {
+    const sigungu = bjdCode.slice(0, 5)
+    bySigungu.set(sigungu, (bySigungu.get(sigungu) ?? 0) + count)
+  }
+  return [...bySigungu.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))[0][0]
 }
 
 // 대표 주소: 주소가 많은 도로 2곳 '권선로 300~420, 세권로 1~88' (200자 이내)
