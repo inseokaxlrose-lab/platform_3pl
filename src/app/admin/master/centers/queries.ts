@@ -7,20 +7,7 @@ import { NOT_DELETED, withIsActive } from '@/lib/status'
 import { isInScope, type DataScope } from '@/lib/scope/data-scope'
 import { toContactInput } from '@/lib/contacts/contact-schema'
 import { isYes } from '@/lib/yn'
-import {
-  STAGING_WAREHOUSE_TYPES,
-  WAREHOUSE_TYPE_LABELS,
-  type WarehouseTypeKey,
-} from '@/lib/warehouses/warehouse-labels'
-
-// 대기 창고(입고 → 출고 → 반품) 먼저, 그다음 일반 창고 (같은 유형 안에서는 받은 순서 그대로)
-function byWarehouseType<T>(rows: T[], typeOf: (row: T) => string) {
-  const rank = (type: string) => {
-    const index = (STAGING_WAREHOUSE_TYPES as readonly string[]).indexOf(type)
-    return index === -1 ? STAGING_WAREHOUSE_TYPES.length : index
-  }
-  return [...rows].sort((a, b) => rank(typeOf(a)) - rank(typeOf(b)))
-}
+import { WAREHOUSE_TYPE } from '@/lib/warehouses/warehouse-codes'
 
 // 등록 화면에 보여 줄 운영사 값 (상속 칸의 "운영사 값" 안내, 0073)
 export async function getOperatorDefaults(operatorId: bigint) {
@@ -47,11 +34,13 @@ export async function getCenterForEdit(id: bigint, scope: DataScope) {
           code: true,
           name: true,
           type: true,
-          storageCondition: true,
+          tempZone: true,
+          systemYn: true,
           status: true,
           _count: { select: { locations: { where: NOT_DELETED } } },
         },
-        orderBy: { code: 'asc' },
+        // 창고 정렬순서(기본 창고 입고 → 출고 → 반품이 앞) → 코드
+        orderBy: [{ sortOrder: 'asc' }, { code: 'asc' }],
       },
       deliveryZones: {
         where: NOT_DELETED,
@@ -71,7 +60,7 @@ export async function getCenterForEdit(id: bigint, scope: DataScope) {
 
   const [operator, locations] = await Promise.all([
     getOperatorDefaults(center.operatorId),
-    // 기본 로케이션 고르기: 이 센터의 사용 중인 로케이션 (대기 창고 먼저)
+    // 기본 로케이션 고르기: 이 센터의 사용 중인 로케이션 (창고 정렬순서 → 기본 창고가 앞)
     prisma.location.findMany({
       where: { status: 'ACTIVE', warehouse: { centerId: id, delYn: 'N' } },
       select: {
@@ -80,7 +69,11 @@ export async function getCenterForEdit(id: bigint, scope: DataScope) {
         name: true,
         warehouse: { select: { code: true, name: true, type: true } },
       },
-      orderBy: [{ warehouse: { code: 'asc' } }, { code: 'asc' }],
+      orderBy: [
+        { warehouse: { sortOrder: 'asc' } },
+        { warehouse: { code: 'asc' } },
+        { code: 'asc' },
+      ],
       take: 3000,
     }),
   ])
@@ -135,18 +128,16 @@ export async function getCenterForEdit(id: bigint, scope: DataScope) {
     input,
     // 상속 칸의 운영사 값
     operator,
-    locationOptions: byWarehouseType(locations, (l) => l.warehouse.type).map((l) => ({
+    locationOptions: locations.map((l) => ({
       value: l.id.toString(),
       label: l.code,
-      description: `${WAREHOUSE_TYPE_LABELS[l.warehouse.type as WarehouseTypeKey]} · ${l.warehouse.name}${l.name && l.name !== l.code ? ` · ${l.name}` : ''}`,
+      description: `${WAREHOUSE_TYPE.labels[l.warehouse.type as keyof typeof WAREHOUSE_TYPE.labels] ?? l.warehouse.type} · ${l.warehouse.name}${l.name && l.name !== l.code ? ` · ${l.name}` : ''}`,
       keywords: `${l.warehouse.code} ${l.name ?? ''}`,
     })),
-    warehouses: byWarehouseType(center.warehouses, (w) => w.type)
-      .map(withIsActive)
-      .map(({ _count, ...w }) => ({
-        ...w,
-        locationCount: _count.locations,
-      })),
+    warehouses: center.warehouses.map(withIsActive).map(({ _count, ...w }) => ({
+      ...w,
+      locationCount: _count.locations,
+    })),
     deliveryZones: center.deliveryZones.map(withIsActive).map(({ regions, ...z }) => ({
       ...z,
       regionCodes: regions.map((r) => r.regionCode),

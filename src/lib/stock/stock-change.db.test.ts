@@ -36,6 +36,7 @@ beforeEach(async () => {
       systemCode: 'WH-T-GEN',
       code: 'GEN',
       name: '일반창고',
+      tempZone: 'AMBIENT',
     },
   })
   const location = (warehouseId: bigint, code: string) =>

@@ -51,6 +51,7 @@ async function main() {
           systemCode: 'WH-E2E-1',
           code: E2E_LOCATION.warehouse,
           name: 'E2E 보관창고',
+          tempZone: 'AMBIENT',
         },
       }))
     await prisma.location.upsert({

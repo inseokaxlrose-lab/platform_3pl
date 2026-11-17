@@ -71,6 +71,7 @@ async function generalWarehouse(centerId: bigint, code: string) {
       systemCode: await nextSystemCode('WAREHOUSE'),
       code,
       name: code,
+      tempZone: 'AMBIENT',
     },
   })
   return w.id

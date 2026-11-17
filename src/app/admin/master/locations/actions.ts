@@ -28,7 +28,7 @@ import { DELETED_ONLY, withIsActive } from '@/lib/status'
 import { assertInScope, scopeFilter, type DataScope } from '@/lib/scope/data-scope'
 import { idField, idSchema } from '@/lib/id'
 import { deletedWhere, idFilter, statusWhere } from '@/lib/grid/list-filters'
-import { isStagingWarehouse } from '@/lib/warehouses/warehouse-labels'
+import { isSystemWarehouse } from '@/lib/warehouses/warehouse-codes'
 
 // 로케이션 관리 서버 액션 (docs/decisions/0028)
 // 데이터 범위: 센터 직원은 소속 센터 창고의 로케이션만
@@ -39,7 +39,7 @@ const LOCATION_SCOPE = { center: 'warehouse.centerId' }
 async function findWarehouseInScope(warehouseId: bigint, scope: DataScope) {
   const warehouse = await prisma.warehouse.findUnique({
     where: { id: warehouseId },
-    select: { id: true, operatorId: true, centerId: true, type: true, status: true },
+    select: { id: true, operatorId: true, centerId: true, systemYn: true, status: true },
   })
   assertInScope(scope, warehouse, { center: 'centerId' })
   return warehouse!
@@ -50,7 +50,7 @@ async function findLocationsInScope(ids: bigint[], scope: DataScope) {
   const unique = [...new Set(ids)]
   const locations = await prisma.location.findMany({
     where: { AND: [{ id: { in: unique } }, scopeFilter(scope, LOCATION_SCOPE)] },
-    select: { id: true, code: true, warehouse: { select: { type: true } } },
+    select: { id: true, code: true, warehouse: { select: { systemYn: true } } },
   })
   if (locations.length !== unique.length) {
     throw new ActionError('NOT_FOUND', '찾을 수 없는 로케이션이 섞여 있습니다.')
@@ -125,7 +125,7 @@ export const listLocationsAction = createAction({
             select: {
               code: true,
               name: true,
-              type: true,
+              systemYn: true,
               center: { select: { code: true, name: true } },
             },
           },
@@ -138,8 +138,8 @@ export const listLocationsAction = createAction({
         ...row,
         center: `${warehouse.center.name} (${warehouse.center.code})`,
         warehouse: `${warehouse.name} (${warehouse.code})`,
-        // 대기 창고(입고·출고·반품)의 기본 로케이션: 사용 중지·삭제 불가
-        protected: isStagingWarehouse(warehouse.type),
+        // 시스템 기본 창고(입고·출고·반품 대기)의 기본 로케이션: 사용 중지·삭제 불가
+        protected: isSystemWarehouse(warehouse),
       })),
       rowCount,
     }

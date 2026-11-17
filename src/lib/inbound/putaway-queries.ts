@@ -44,14 +44,20 @@ export async function getPutawayWork(asnId: bigint, scope: DataScope) {
   })
   if (!asn || !isInScope(scope, asn, ASN_SCOPE)) return null
 
-  // 보관 로케이션 (같은 센터의 일반 창고, 사용 중)
+  // 보관 로케이션 (같은 센터의 입고 가능 창고, 시스템 기본 창고 제외, 사용 중, 0074)
   const locations = await prisma.location.findMany({
     where: {
       ...ACTIVE_ONLY,
-      warehouse: { centerId: asn.centerId, type: 'GENERAL', delYn: 'N', ...ACTIVE_ONLY },
+      warehouse: {
+        centerId: asn.centerId,
+        systemYn: 'N',
+        inboundYn: 'Y',
+        delYn: 'N',
+        ...ACTIVE_ONLY,
+      },
     },
     select: { id: true, code: true, zone: true, warehouse: { select: { code: true, name: true } } },
-    orderBy: [{ warehouse: { code: 'asc' } }, { code: 'asc' }],
+    orderBy: [{ warehouse: { sortOrder: 'asc' } }, { warehouse: { code: 'asc' } }, { code: 'asc' }],
   })
   const locationLabel = new Map(locations.map((l) => [l.id, `${l.warehouse.code} / ${l.code}`]))
   const otherIds = asn.receipts

@@ -24,7 +24,7 @@ export const centerTestInput = (overrides: Partial<CenterCreateInput> = {}): Cen
   floorAreaM2: '',
   storageAreaM2: '',
   dockCount: null,
-  tempZones: [],
+  tempZones: ['AMBIENT'],
   bondedYn: false,
   workStartTime: '',
   workEndTime: '',
