@@ -20,7 +20,8 @@ async function main() {
     throw new Error('기준 데이터 연월을 --ver 202611 처럼 넣어 주세요.')
   }
   const files = readdirSync(dir).filter((f) => /\.(txt|csv)$/i.test(f))
-  const bjdFile = files.find((f) => f.includes('법정동'))
+  // macOS는 파일 이름 한글을 자모로 풀어(NFD) 저장하므로 완성형(NFC)으로 맞춰 비교한다
+  const bjdFile = files.find((f) => f.normalize('NFC').includes('법정동'))
   const addressFiles = files.filter((f) => f !== bjdFile && /\.txt$/i.test(f))
   if (!bjdFile) throw new Error(`${dir}에 법정동코드 파일(이름에 '법정동')이 없습니다.`)
   if (addressFiles.length === 0) throw new Error(`${dir}에 주소DB 파일(.txt)이 없습니다.`)
@@ -38,6 +39,14 @@ async function main() {
       `적재 완료 (${Math.round((Date.now() - started) / 1000)}초)`,
       `법정동 ${result.bjdCount.toLocaleString()}건, 우편번호 ${result.zipCount.toLocaleString()}건`,
       `신규 우편번호 ${result.newZips.length}건, 폐지 ${result.abolishedZips.length}건`,
+      `법정동 파일에 없어 주소DB 이름으로 덧붙인 법정동 ${result.addedBjds.length}건${
+        result.addedBjds.length
+          ? ` (법정동 파일이 주소DB보다 오래됨): ${result.addedBjds
+              .slice(0, 5)
+              .map((b) => `${b.name}(${b.code})`)
+              .join(', ')}`
+          : ''
+      }`,
       `시군구를 넘는 우편번호 ${result.crossSigunguZips.length}건${result.crossSigunguZips.length ? `: ${result.crossSigunguZips.slice(0, 10).join(', ')}` : ''}`,
     ].join('\n'),
   )
