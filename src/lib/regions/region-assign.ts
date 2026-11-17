@@ -1,6 +1,7 @@
 import 'server-only'
 import { TEMP_ZONE, type TempZoneKey } from '@/config/operator-codes'
 import { ActionError } from '@/lib/actions/action-error'
+import { currentActor } from '@/lib/actor'
 import type { Db } from '@/lib/prisma'
 import { REGION_CHANGE_TYPE, TEMP_ZONE_ALL } from './region-codes'
 
@@ -160,6 +161,8 @@ export async function applyRegionChange(
   const batch = await tx.regionChangeBatch.create({
     data: {
       operatorId,
+      // 작업 단위는 감사 칸 자동 채움 대상이 아니라(작성자만 있음) 지금 작업자를 직접 넣는다
+      createdBy: currentActor(),
       changeType: input.changeType,
       scopeDesc: input.scopeDesc.slice(0, 500),
       tempZone: input.tempZone,
@@ -228,6 +231,8 @@ export async function confirmSuggested(
   const batch = await tx.regionChangeBatch.create({
     data: {
       operatorId,
+      // 작업 단위는 감사 칸 자동 채움 대상이 아니라(작성자만 있음) 지금 작업자를 직접 넣는다
+      createdBy: currentActor(),
       changeType: 'CONFIRM',
       scopeDesc: `추천 배정 확인 ${maps.length}건`,
       tempZone: input.tempZone,
