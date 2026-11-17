@@ -5,7 +5,12 @@
 const PERSONAL_KEY = /(name|nm|tel|phone|mobile|hp|addr|address|email|receiver|recipient|zip|memo)/i
 const SECRET_KEY = /(api.?key|secret|password|token)/i
 // 업무 정보 칸은 가리지 않는다 (품목명·센터명·화주명·거래처명·단위명 — 개인정보가 아님)
-const BUSINESS_KEY = /^(item|product|sku|center|shipper|client|partner|customer|unit|warehouse)/i
+// customer는 개인 구매자일 수 있어 넣지 않는다 (덜 가리는 것보다 더 가리는 쪽이 안전)
+const BUSINESS_LEAF = /^(item|product|sku|center|shipper|client|partner|unit|warehouse)/i
+// 부모가 업무 객체이면 그 안의 일반 칸(name 등)은 그대로: { client: { name } }·{ key: { name } }·{ centers: [{ name }] }
+// 목록 껍데기(items·lines 등)는 업무 객체가 아니다 → 그 안의 receiverName은 가린다
+const BUSINESS_PARENT = /^(client|key|centers?|shipper|warehouse|units?|item|product|partner)$/i
+const GENERIC_LEAF = /^(name|nm|email|tel|phone|address|addr)$/i
 
 // 글자 가운데 가리기: '홍길동' → '홍*동', '01012345678' → '010****5678', 주소는 앞 2마디만
 export function maskText(key: string, value: string): string {
@@ -24,16 +29,23 @@ export function maskText(key: string, value: string): string {
 }
 
 // JSON 값 전체를 따라가며 가린다 (원본은 그대로 두고 새 값을 돌려준다)
-export function maskPersonal(value: unknown, key = ''): unknown {
-  if (Array.isArray(value)) return value.map((item) => maskPersonal(item, key))
+// 칸 이름과 그 칸을 담은 부모 이름을 함께 본다: { client: { name } }·{ key: { name } }의 name은 업무 정보라 그대로,
+// { receiver: { name } }·{ receiverName }은 가린다
+export function maskPersonal(value: unknown, key = '', parent = ''): unknown {
+  if (Array.isArray(value)) return value.map((item) => maskPersonal(item, key, parent))
   if (value !== null && typeof value === 'object') {
     return Object.fromEntries(
-      Object.entries(value as Record<string, unknown>).map(([k, v]) => [k, maskPersonal(v, k)]),
+      Object.entries(value as Record<string, unknown>).map(([k, v]) => [
+        k,
+        maskPersonal(v, k, key),
+      ]),
     )
   }
   if (typeof value === 'string') {
     if (SECRET_KEY.test(key)) return '***'
-    if (PERSONAL_KEY.test(key) && !BUSINESS_KEY.test(key)) return maskText(key, value)
+    const business =
+      BUSINESS_LEAF.test(key) || (GENERIC_LEAF.test(key) && BUSINESS_PARENT.test(parent))
+    if (PERSONAL_KEY.test(key) && !business) return maskText(key, value)
   }
   return value
 }

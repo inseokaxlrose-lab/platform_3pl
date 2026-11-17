@@ -75,6 +75,23 @@ describe('로그 개인정보 가리기', () => {
       lines: [{ itemCd: 'A1', itemName: '생수 2L', qty: 3 }],
       apiKey: '***',
     })
+    // 부모가 업무 정보면 name은 그대로 (GET /me 응답), 수령인 객체 안의 name은 가린다
+    expect(
+      maskPersonal({
+        client: { code: 'GANA', name: '가나식품' },
+        key: { name: 'ERP 연동용', prefix: 'ab12cd34' },
+        centers: [{ code: 'ICN', name: '이천센터' }],
+        receiver: { name: '김영희', tel: '0212345678' },
+        // 목록 껍데기 안의 수령인 이름은 가린다
+        items: [{ orderNo: 'O1', receiverName: '박철수', customerName: '이민수' }],
+      }),
+    ).toEqual({
+      client: { code: 'GANA', name: '가나식품' },
+      key: { name: 'ERP 연동용', prefix: 'ab12cd34' },
+      centers: [{ code: 'ICN', name: '이천센터' }],
+      receiver: { name: '김*희', tel: '021***5678' },
+      items: [{ orderNo: 'O1', receiverName: '박*수', customerName: '이*수' }],
+    })
     expect(maskBody('not json')).toBe('(JSON 아님) not json')
     expect(maskBody(null)).toBeNull()
   })
