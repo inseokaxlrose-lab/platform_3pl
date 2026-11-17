@@ -4,7 +4,6 @@
 export const EXTERNAL_TARGETS = [
   'CENTER',
   'WAREHOUSE',
-  'DELIVERY_ZONE',
   'SHIPPER',
   'ITEM',
   'CUSTOMER',
@@ -16,7 +15,6 @@ export type ExternalTarget = (typeof EXTERNAL_TARGETS)[number]
 export const EXTERNAL_TARGET_LABELS: Record<ExternalTarget, string> = {
   CENTER: '센터',
   WAREHOUSE: '창고',
-  DELIVERY_ZONE: '배송권역',
   SHIPPER: '화주사',
   ITEM: '품목',
   CUSTOMER: '거래처',
@@ -26,7 +24,6 @@ export const EXTERNAL_TARGET_LABELS: Record<ExternalTarget, string> = {
 // 대상마다 "소속" 칸에 보여 줄 것 (없으면 칸을 숨긴다)
 export const EXTERNAL_TARGET_OWNER: Partial<Record<ExternalTarget, string>> = {
   WAREHOUSE: '센터',
-  DELIVERY_ZONE: '센터',
   ITEM: '화주사',
   CUSTOMER: '화주사',
 }

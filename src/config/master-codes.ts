@@ -7,12 +7,6 @@ export const SYSTEM_CODE_TYPES = {
   SHIPPER: { prefix: 'SH', digits: 6, sequence: 'system_code_shipper_seq', label: '화주사' },
   ITEM: { prefix: 'IT', digits: 8, sequence: 'system_code_item_seq', label: '품목' },
   CUSTOMER: { prefix: 'CU', digits: 8, sequence: 'system_code_customer_seq', label: '거래처' },
-  DELIVERY_ZONE: {
-    prefix: 'DZ',
-    digits: 6,
-    sequence: 'system_code_delivery_zone_seq',
-    label: '배송권역',
-  },
 } as const
 
 export type SystemCodeType = keyof typeof SYSTEM_CODE_TYPES

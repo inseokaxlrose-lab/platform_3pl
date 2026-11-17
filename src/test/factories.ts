@@ -103,7 +103,6 @@ type VersionedModel =
   | 'center'
   | 'warehouse'
   | 'shipper'
-  | 'deliveryZone'
   | 'unit'
   | 'codeGroup'
   | 'codeItem'
