@@ -141,3 +141,11 @@ export function assertInScope(scope: DataScope, record: unknown, fields: ScopeFi
 export function operatorFilter(scope: DataScope): { operatorId: bigint | { in: bigint[] } } {
   return scope.kind === 'NONE' ? { operatorId: { in: [] } } : { operatorId: scope.operatorId }
 }
+
+// 시스템 공유 줄이 있는 표(단위, 0078)의 화면 조회: 시스템 줄(operator_id 없음) + 지금 운영사의 줄
+// (서버 액션 안은 prisma.ts가 같은 조건을 자동으로 붙인다)
+export function sharedOperatorFilter(scope: DataScope) {
+  return scope.kind === 'NONE'
+    ? { operatorId: { in: [] as bigint[] } }
+    : { OR: [{ operatorId: null }, { operatorId: scope.operatorId }] }
+}

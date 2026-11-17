@@ -16,7 +16,7 @@ const unit = (code: string) => ({
   operatorId: TEST_OPERATOR_ID,
   code,
   name: code,
-  kind: 'BASE' as const,
+  type: 'QTY' as const,
 })
 const unitC = { operatorId_code: { operatorId: TEST_OPERATOR_ID, code: 'C' } }
 
@@ -37,8 +37,13 @@ describe('공통 칸 자동 채우기', () => {
 
   it('여러 줄 등록·수정·upsert도 같은 규칙', async () => {
     await runAsActor('kim', () => prisma.unit.createMany({ data: [unit('A'), unit('B')] }))
-    await runAsActor('lee', () => prisma.unit.updateMany({ data: { sortOrder: 5 } }))
-    const rows = await prisma.unit.findMany({ orderBy: { code: 'asc' } })
+    await runAsActor('lee', () =>
+      prisma.unit.updateMany({ where: { operatorId: TEST_OPERATOR_ID }, data: { sortOrder: 5 } }),
+    )
+    const rows = await prisma.unit.findMany({
+      where: { operatorId: TEST_OPERATOR_ID },
+      orderBy: { code: 'asc' },
+    })
     expect(rows.map((r) => [r.code, r.createdBy, r.updatedBy, r.rowVersion])).toEqual([
       ['A', 'kim', 'lee', 2],
       ['B', 'kim', 'lee', 2],

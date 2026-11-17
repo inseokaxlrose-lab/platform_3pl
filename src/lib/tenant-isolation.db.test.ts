@@ -68,12 +68,19 @@ function dataOf<T>(result: { ok: true; data: T } | { ok: false; error: { message
   return result.data
 }
 
+// 운영사 추가 단위 (시스템 기본 단위에 없는 코드, 0078)
 const unitInput = (code: string) => ({
   code,
   name: code,
-  kind: 'BASE' as const,
+  nameEn: '',
+  printName: '',
+  type: 'QTY' as const,
   decimals: 0,
   sortOrder: 0,
+  baseFactor: '',
+  stdCode: '',
+  description: '',
+  remark: '',
   isActive: true,
 })
 const groupInput = (code: string) => ({
@@ -89,7 +96,7 @@ const roleInput = (name: string) => ({ name, area: 'ADMIN' as const, permissionC
 async function seedOperator(operatorId: bigint) {
   signInAs(operatorId)
   const center = await createTestCenter('ICN', { operatorId })
-  const unit = dataOf(await createUnitAction(unitInput('KG')))
+  const unit = dataOf(await createUnitAction(unitInput('GN')))
   const group = dataOf(await createCodeGroupAction(groupInput('DUTY')))
   const role = dataOf(await createPermissionGroupAction(roleInput('관리자')))
   const user = await createTestUser(`kim${operatorId}`, { userType: 'OPERATOR', operatorId })
@@ -114,7 +121,7 @@ afterAll(async () => {
 describe('같은 코드를 운영사마다 쓸 수 있다', () => {
   it('센터·단위·공통코드 그룹·권한그룹 이름이 두 운영사에 각각 있다', async () => {
     expect(await prisma.center.count({ where: { code: 'ICN' } })).toBe(2)
-    expect(await prisma.unit.count({ where: { code: 'KG' } })).toBe(2)
+    expect(await prisma.unit.count({ where: { code: 'GN' } })).toBe(2)
     expect(await prisma.codeGroup.count({ where: { code: 'DUTY' } })).toBe(2)
     expect(await prisma.permissionGroup.count({ where: { name: '관리자' } })).toBe(2)
     // 운영사가 자동으로 채워졌다
@@ -124,7 +131,7 @@ describe('같은 코드를 운영사마다 쓸 수 있다', () => {
   })
 
   it('같은 운영사 안에서는 여전히 겹칠 수 없다', async () => {
-    expect(await createUnitAction(unitInput('KG'))).toMatchObject({
+    expect(await createUnitAction(unitInput('GN'))).toMatchObject({
       ok: false,
       error: { code: 'CONFLICT' },
     })
@@ -138,7 +145,11 @@ describe('목록: 내 운영사 것만 보인다', () => {
       (result.ok ? result.data!.rows : []).map((row) => row.id)
 
     expect(ids(await listCentersAction(state))).toEqual([String(a.center.id)])
-    expect(ids(await listUnitsAction(state))).toEqual([a.unit.id])
+    // 단위는 시스템 기본 단위(공유) + 내 운영사 단위 — 다른 운영사의 단위는 없다 (0078)
+    const units = ids(await listUnitsAction(createDataGridState({ pageSize: 100 })))
+    expect(units).toContain(a.unit.id)
+    expect(units).not.toContain(b.unit.id)
+    expect(units.length).toBe((await prisma.unit.count({ where: { operatorId: null } })) + 1)
     expect(ids(await listCodeGroupsAction(state))).toEqual([a.group.id])
     expect(ids(await listPermissionGroupsAction(state))).toEqual([a.role.id])
     expect(ids(await listUsersAction(state))).toEqual([String(a.user.id)])
@@ -231,7 +242,7 @@ describe('플랫폼 관리자가 운영사로 전환해 작업 (3b)', () => {
       userType: 'PLATFORM',
     })
     vi.mocked(getCurrentScope).mockResolvedValue(scopeOf(B))
-    const unit = dataOf(await createUnitAction(unitInput('BOX')))
+    const unit = dataOf(await createUnitAction(unitInput('CS')))
     expect(await prisma.unit.findUniqueOrThrow({ where: { id: BigInt(unit.id) } })).toMatchObject({
       operatorId: B,
       createdBy: 'platform',
@@ -254,11 +265,28 @@ describe('Prisma 안전망 (운영사 출입증)', () => {
     expect(count).toBe(0)
   })
 
+  it('시스템 공유 줄(단위)은 출입증 안에서 읽을 수 있지만 고칠 수 없다 (0078)', async () => {
+    const ea = await prisma.unit.findFirstOrThrow({ where: { code: 'EA', operatorId: null } })
+    expect(await inA(() => prisma.unit.findUnique({ where: { id: ea.id } }))).toMatchObject({
+      code: 'EA',
+    })
+    // 다른 운영사의 단위는 키로 찾아도 없다
+    expect(await inA(() => prisma.unit.findUnique({ where: { id: BigInt(b.unit.id) } }))).toBeNull()
+    const { count } = await inA(() =>
+      prisma.unit.updateMany({ where: { id: ea.id }, data: { name: '바꿈' } }),
+    )
+    expect(count).toBe(0)
+    await expect(
+      inA(() => prisma.unit.update({ where: { id: ea.id }, data: { name: '바꿈' } })),
+    ).rejects.toThrow()
+    expect((await prisma.unit.findUniqueOrThrow({ where: { id: ea.id } })).name).toBe('개')
+  })
+
   it('출입증 안에서 다른 운영사의 데이터를 만들려고 하면 오류 (개발 실수)', async () => {
     await expect(
       inA(() =>
         prisma.unit.create({
-          data: { operatorId: B, code: 'X', name: 'X', kind: 'BASE' },
+          data: { operatorId: B, code: 'X', name: 'X', type: 'QTY' },
         }),
       ),
     ).rejects.toThrow('지금 운영사')
