@@ -1,5 +1,6 @@
 import { act, fireEvent, render, screen } from '@testing-library/react'
 import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
+import { DEFAULT_DISPLAY_UNITS } from '@/lib/units/dimension'
 import { bulkCreateLocationsAction, previewBulkLocationsAction } from '../actions'
 import type { LocationOptions } from '../queries'
 import { BulkLocationForm } from './bulk-form'
@@ -32,7 +33,7 @@ const OPTIONS: LocationOptions = {
     { ...warehouse, id: '12', code: 'INBOUND', name: '입고대기', addable: false },
   ],
   zones: [{ id: '21', warehouseId: '11', code: 'B', name: 'B구역' }],
-  units: { length: 'CM', weight: 'KG' },
+  units: DEFAULT_DISPLAY_UNITS,
 }
 
 const createButton = () => screen.getByRole('button', { name: '생성' })

@@ -4,7 +4,7 @@ import { ensureCenterDefaults } from '@/lib/centers/center-defaults'
 import { findUsedItemIds } from '@/lib/items/items'
 import { findUsedLocationIds } from '@/lib/locations/locations'
 import { prisma, type Tx } from '@/lib/prisma'
-import { createTestCenter, createTestShipper } from '@/test/factories'
+import { createTestCenter, createTestShipper, systemUnit } from '@/test/factories'
 import { createTestOperator, resetDatabase, TEST_OPERATOR_ID } from '@/test/reset-database'
 import { adjustStock, moveStock, receiveStock } from './stock-change'
 import { withStockWrite } from './stock-write-guard'
@@ -57,12 +57,9 @@ beforeEach(async () => {
     where: { id: shipper.id },
     data: { centers: { create: [{ centerId: icn.id }] } },
   })
-  const unit = (code: string, decimals: number) =>
-    prisma.unit.create({
-      data: { operatorId: TEST_OPERATOR_ID, code, name: code, kind: 'BASE', decimals },
-    })
-  const ea = await unit('EA', 0)
-  const kg = await unit('KG', 3)
+  // 시스템 기본 단위 (EA 0자리·KG 3자리, 0078)
+  const ea = await systemUnit('EA')
+  const kg = await systemUnit('KG')
   const item = (code: string, baseUnitId: bigint, data: Record<string, unknown> = {}) =>
     prisma.item.create({
       data: {

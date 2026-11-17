@@ -2,7 +2,8 @@ import 'server-only'
 import { textIds } from '@/lib/id'
 import { prisma } from '@/lib/prisma'
 import { ACTIVE_ONLY, NOT_DELETED } from '@/lib/status'
-import type { LengthUnit, WeightUnit } from '@/lib/units/dimension'
+import { DEFAULT_DISPLAY_UNITS } from '@/lib/units/dimension'
+import { getOperatorDisplayUnits } from '@/lib/units/display-units'
 import { isSystemWarehouse } from '@/lib/warehouses/warehouse-codes'
 import { isYes } from '@/lib/yn'
 import { scopeFilter, type DataScope } from '@/lib/scope/data-scope'
@@ -13,7 +14,7 @@ import { scopeFilter, type DataScope } from '@/lib/scope/data-scope'
 // - 구역: 그 창고들의 사용 중인 구역 (정렬순서 → 코드)
 // - 단위: 운영사의 길이·무게 단위 (용량 칸 라벨·변환)
 export async function getLocationOptions(scope: DataScope) {
-  const [warehouses, zones, operator] = await Promise.all([
+  const [warehouses, zones, units] = await Promise.all([
     prisma.warehouse.findMany({
       where: {
         AND: [scopeFilter(scope, { center: 'centerId' }), { center: ACTIVE_ONLY }, ACTIVE_ONLY],
@@ -44,10 +45,10 @@ export async function getLocationOptions(scope: DataScope) {
       select: { id: true, warehouseId: true, code: true, name: true },
       orderBy: [{ sortOrder: 'asc' }, { code: 'asc' }],
     }),
-    prisma.operator.findUnique({
-      where: { id: scope.operatorId },
-      select: { lengthUnit: true, weightUnit: true },
-    }),
+    // 운영사 표시 단위 (단위 기준정보의 중량·길이 단위, 0078)
+    scope.operatorId === undefined
+      ? DEFAULT_DISPLAY_UNITS
+      : getOperatorDisplayUnits(prisma, scope.operatorId),
   ])
   // 화면으로 보낼 값이라 키는 글자로
   return textIds({
@@ -73,10 +74,7 @@ export async function getLocationOptions(scope: DataScope) {
       separator: w.locCodeSeparator ?? '-',
     })),
     zones,
-    units: {
-      length: (operator?.lengthUnit ?? 'CM') as LengthUnit,
-      weight: (operator?.weightUnit ?? 'KG') as WeightUnit,
-    },
+    units,
   })
 }
 

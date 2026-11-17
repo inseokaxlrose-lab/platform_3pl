@@ -1,12 +1,10 @@
 import 'server-only'
 import { DEFAULT_CODE_GROUPS } from '@/config/defaults/codes'
 import { DEFAULT_GROUPS } from '@/config/defaults/roles'
-import { DEFAULT_UNITS } from '@/config/defaults/units'
 import type { Db } from '@/lib/prisma'
-import { toYn } from '@/lib/yn'
 
 // 운영사 기본값 넣기 (docs/decisions/0039 3c)
-// 새 운영사에 기본 공통코드·단위·권한그룹을 복사한다. 플랫폼의 운영사 등록과 개발 시드가 같이 쓴다
+// 새 운영사에 기본 공통코드·권한그룹을 복사한다. 단위는 복사하지 않는다 (시스템 기본 단위는 모든 운영사가 함께 보는 한 벌, 0078). 플랫폼의 운영사 등록과 개발 시드가 같이 쓴다
 // - "없으면 만들기": 여러 번 불러도 안전하고, 운영사가 화면에서 고친 이름·순서·사용 여부를 되돌리지 않는다
 // - 운영사 키는 직접 받는다 (플랫폼·시드는 운영사 출입증 밖에서 부른다)
 // - 같은 트랜잭션(db)에서 부르면 운영사 등록과 함께 만들어지거나 함께 취소된다
@@ -35,20 +33,6 @@ async function provisionCodes(db: Db, operatorId: bigint) {
   }
 }
 
-// 단위: 기본 단위 (이미 있으면 시스템 표시만 맞춘다)
-async function provisionUnits(db: Db, operatorId: bigint) {
-  for (const [index, unit] of DEFAULT_UNITS.entries()) {
-    // 예/아니오 칸은 DB에 'Y'/'N'으로
-    const isSystem = toYn(unit.isSystem ?? false)
-    await db.unit.upsert({
-      where: { operatorId_code: { operatorId, code: unit.code } },
-      create: { ...unit, operatorId, isSystem, sortOrder: (index + 1) * 10 },
-      update: { isSystem },
-    })
-  }
-}
-
-// 권한그룹: 기본 4개. 돌려주는 값: 그룹 이름 → 키 (관리자 계정에 슈퍼 관리자 그룹을 붙일 때)
 async function provisionGroups(db: Db, operatorId: bigint, sync: boolean) {
   const ids = new Map<string, bigint>()
   for (const definition of DEFAULT_GROUPS) {
@@ -88,6 +72,5 @@ export async function provisionOperator(
   { syncGroupPermissions = false }: ProvisionOptions = {},
 ) {
   await provisionCodes(db, operatorId)
-  await provisionUnits(db, operatorId)
   return provisionGroups(db, operatorId, syncGroupPermissions)
 }

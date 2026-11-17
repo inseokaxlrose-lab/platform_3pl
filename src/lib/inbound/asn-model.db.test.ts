@@ -2,7 +2,7 @@ import { afterAll, beforeEach, describe, expect, it } from 'vitest'
 import { runInContext } from '@/lib/actor'
 import { nextDocumentNumber } from '@/lib/documents/doc-no'
 import { prisma } from '@/lib/prisma'
-import { createTestCenter, createTestShipper } from '@/test/factories'
+import { createTestCenter, createTestShipper, systemUnit } from '@/test/factories'
 import { resetDatabase, TEST_OPERATOR_ID } from '@/test/reset-database'
 
 // ASN · 입고확정 DB 규칙 (docs/decisions/0047) — 업무 함수가 실수해도 DB가 마지막에 막는다
@@ -13,9 +13,7 @@ beforeEach(async () => {
   await resetDatabase()
   const center = await createTestCenter('ICN')
   const shipper = await createTestShipper('GANA')
-  const unit = await prisma.unit.create({
-    data: { operatorId: TEST_OPERATOR_ID, code: 'EA', name: '개', kind: 'BASE' },
-  })
+  const unit = await systemUnit('EA')
   const item = await prisma.item.create({
     data: {
       operatorId: TEST_OPERATOR_ID,

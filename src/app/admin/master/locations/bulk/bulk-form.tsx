@@ -32,7 +32,7 @@ import {
   locationBulkSchema,
   type LocationBulkInput,
 } from '@/lib/locations/location-schema'
-import { LENGTH_LABEL, WEIGHT_LABEL, lengthToCm, weightToKg } from '@/lib/units/dimension'
+import { lengthToCm, weightToKg } from '@/lib/units/dimension'
 import { bulkCreateLocationsAction, previewBulkLocationsAction } from '../actions'
 import type { LocationOptions } from '../queries'
 
@@ -418,10 +418,10 @@ export function BulkLocationForm({
           </Field>
         </FormGrid>
         <FormGrid>
-          {decimal('widthCm', '가로', LENGTH_LABEL[units.length])}
-          {decimal('depthCm', '세로', LENGTH_LABEL[units.length])}
-          {decimal('heightCm', '높이', LENGTH_LABEL[units.length])}
-          {decimal('maxWeightKg', '최대 중량', WEIGHT_LABEL[units.weight])}
+          {decimal('widthCm', '가로', units.length.label)}
+          {decimal('depthCm', '세로', units.length.label)}
+          {decimal('heightCm', '높이', units.length.label)}
+          {decimal('maxWeightKg', '최대 중량', units.weight.label)}
         </FormGrid>
         <FormGrid>
           {inherit('inbound', '적치 가능')}

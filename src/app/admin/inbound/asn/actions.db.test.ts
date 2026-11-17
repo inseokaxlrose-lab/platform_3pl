@@ -5,7 +5,7 @@ import type { AsnCreateInput } from '@/lib/inbound/asn-schema'
 import { prisma } from '@/lib/prisma'
 import type { DataScope } from '@/lib/scope/data-scope'
 import { getCurrentPermissions, getCurrentScope, getCurrentUser } from '@/lib/session'
-import { createTestCenter, createTestShipper, versionOf } from '@/test/factories'
+import { createTestCenter, createTestShipper, versionOf, systemUnit } from '@/test/factories'
 import { resetDatabase, TEST_OPERATOR_ID } from '@/test/reset-database'
 import {
   createPortalAsnAction,
@@ -65,11 +65,11 @@ beforeEach(async () => {
     where: { id: dara.id },
     data: { centers: { create: [{ centerId: gmh.id }] } },
   })
-  const unit = (code: string, kind: 'BASE' | 'PACK', decimals = 0) =>
-    prisma.unit.create({ data: { operatorId: TEST_OPERATOR_ID, code, name: code, kind, decimals } })
-  const ea = await unit('EA', 'BASE')
-  const kg = await unit('KG', 'BASE', 3)
-  const box = await unit('BOX', 'PACK')
+  // 시스템 기본 단위 (EA 0자리·KG 3자리·BOX·PLT, 0078)
+  const unit = (code: string) => systemUnit(code)
+  const ea = await unit('EA')
+  const kg = await unit('KG')
+  const box = await unit('BOX')
   const item = (shipperId: bigint, code: string, baseUnitId: bigint, data = {}) =>
     prisma.item.create({
       data: {

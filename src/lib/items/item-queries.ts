@@ -3,7 +3,12 @@ import { textIds } from '@/lib/id'
 import type { ItemFormOptions } from '@/lib/items/item-form-options'
 import type { ItemInput } from '@/lib/items/item-schema'
 import { prisma } from '@/lib/prisma'
-import { isInScope, operatorFilter, scopeFilter, type DataScope } from '@/lib/scope/data-scope'
+import {
+  isInScope,
+  scopeFilter,
+  sharedOperatorFilter,
+  type DataScope,
+} from '@/lib/scope/data-scope'
 import { ACTIVE_ONLY, isActiveStatus } from '@/lib/status'
 import { parseQty, qtyText } from '@/lib/units/convert'
 import { isYes } from '@/lib/yn'
@@ -29,9 +34,10 @@ export async function getItemFormOptions(scope: DataScope): Promise<ItemFormOpti
       },
       orderBy: { code: 'asc' },
     }),
+    // 단위: 시스템 기본 단위 + 이 운영사의 추가 단위 (0078)
     prisma.unit.findMany({
-      where: operatorFilter(scope),
-      select: { id: true, code: true, name: true, kind: true, decimals: true, status: true },
+      where: sharedOperatorFilter(scope),
+      select: { id: true, code: true, name: true, type: true, decimals: true, status: true },
       orderBy: [{ sortOrder: 'asc' }, { code: 'asc' }],
     }),
   ])

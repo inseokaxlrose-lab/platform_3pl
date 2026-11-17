@@ -96,17 +96,37 @@ function notDeleted<T extends { where?: unknown }>(model: string, args: T): T {
   return { ...args, where: { ...(args.where as Data | undefined), delYn: 'N' } }
 }
 
+// 시스템 줄(operator_id 비어 있음)을 모든 운영사가 함께 보는 표 (단위의 시스템 기본 단위, 0078)
+// 읽을 때는 "시스템 + 지금 운영사", 고치거나 지울 때는 지금 운영사의 줄만 → 시스템 줄은 운영사가 고칠 수 없다
+export const SHARED_SYSTEM_MODELS: ReadonlySet<string> = new Set(['Unit'])
+
 // 운영사 거르기: 서버 액션 안이면 지금 운영사의 줄만 (조건에 다른 운영사를 적어도 지금 운영사로 덮어쓴다 → 새지 않는 쪽으로)
 // 서버 액션 밖(화면 조회 함수)은 데이터 범위 scopeFilter·isInScope가 운영사를 거른다
-function inTenant<T extends { where?: unknown }>(model: string, args: T): T {
+function inTenant<T extends { where?: unknown }>(
+  model: string,
+  args: T,
+  mode: 'read' | 'write' = 'write',
+): T {
   const operatorId = currentOperatorId()
   if (operatorId === undefined || !TENANT_MODELS.has(model)) return args
-  return { ...args, where: { ...(args.where as Data | undefined), operatorId } }
+  const where = (args.where as Data | undefined) ?? {}
+  if (mode === 'read' && SHARED_SYSTEM_MODELS.has(model)) {
+    // 고유 조건(id 등)은 맨 바깥에 그대로 두고 AND로 더한다 (findUnique가 쓸 수 있게)
+    const and = where.AND === undefined ? [] : Array.isArray(where.AND) ? where.AND : [where.AND]
+    return {
+      ...args,
+      where: { ...where, AND: [...and, { OR: [{ operatorId: null }, { operatorId }] }] },
+    }
+  }
+  return { ...args, where: { ...where, operatorId } }
 }
 
-// 읽기·수정·삭제 조건: 지운 줄 빼기 + 운영사 거르기
+// 읽기 조건: 지운 줄 빼기 + 운영사 거르기 (시스템 공유 줄 포함)
 const scoped = <T extends { where?: unknown }>(model: string, args: T): T =>
-  inTenant(model, notDeleted(model, args))
+  inTenant(model, notDeleted(model, args), 'read')
+// 수정 조건: 지운 줄 빼기 + 지금 운영사의 줄만
+const scopedWrite = <T extends { where?: unknown }>(model: string, args: T): T =>
+  inTenant(model, notDeleted(model, args), 'write')
 
 // 등록: 운영사를 지금 운영사로 채운다 (다른 운영사를 적었으면 개발 실수 → 오류)
 function withOperator(model: string, data: Data): Data {
@@ -195,12 +215,12 @@ function createPrismaClient() {
         update({ model, args, query }) {
           assertStockWrite(model, 'update')
           if (AUDITED_MODELS.has(model)) args.data = forUpdate(args.data as Data) as never
-          return query(scoped(model, args))
+          return query(scopedWrite(model, args))
         },
         updateMany({ model, args, query }) {
           assertStockWrite(model, 'updateMany')
           if (AUDITED_MODELS.has(model)) args.data = forUpdate(args.data as Data) as never
-          return query(scoped(model, args))
+          return query(scopedWrite(model, args))
         },
         // 아래 둘은 공통 칸·운영사 자동 채우기를 하지 않는다 (지금 쓰는 곳 없음). 재고 표만 막는다
         createManyAndReturn({ model, args, query }) {
@@ -216,7 +236,7 @@ function createPrismaClient() {
           args.create = forCreate(model, args.create as Data) as never
           if (AUDITED_MODELS.has(model)) args.update = forUpdate(args.update as Data) as never
           // 지운 줄은 찾지 않는다 → 없으면 새로 만든다 (부분 고유 조건과도 맞다)
-          return query(scoped(model, args))
+          return query(scopedWrite(model, args))
         },
       },
     },

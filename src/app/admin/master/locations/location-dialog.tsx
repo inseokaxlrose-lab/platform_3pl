@@ -26,15 +26,7 @@ import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { suggestLocationCode } from '@/lib/locations/location-pattern'
 import { locationCreateSchema, type LocationFormValue } from '@/lib/locations/location-schema'
-import {
-  cbmOf,
-  cmToLength,
-  kgToWeight,
-  LENGTH_LABEL,
-  lengthToCm,
-  WEIGHT_LABEL,
-  weightToKg,
-} from '@/lib/units/dimension'
+import { cbmOf, cmToLength, kgToWeight, lengthToCm, weightToKg } from '@/lib/units/dimension'
 import { createLocationAction, updateLocationAction } from './actions'
 import type { LocationOptions } from './queries'
 
@@ -301,8 +293,8 @@ export function LocationDialog({
     <h3 className="col-span-12 border-l-2 border-primary pl-2 text-sm font-semibold">{title}</h3>
   )
 
-  const lengthUnit = LENGTH_LABEL[units.length]
-  const weightUnit = WEIGHT_LABEL[units.weight]
+  const lengthUnit = units.length.label
+  const weightUnit = units.weight.label
   const tempZone = warehouse ? TEMP_ZONE.labels[warehouse.tempZone as TempZoneKey] : null
 
   return (

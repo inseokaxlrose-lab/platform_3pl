@@ -3,12 +3,12 @@
 import { z } from 'zod'
 import { createAction } from '@/lib/actions/create-action'
 import { listQuerySchema, toPrismaQuery } from '@/lib/grid/grid-query'
-import { deletedWhere, statusWhere } from '@/lib/grid/list-filters'
+import { codesFilter, deletedWhere, statusWhere, ynFilter } from '@/lib/grid/list-filters'
+import { idSchema } from '@/lib/id'
 import { prisma } from '@/lib/prisma'
-import { operatorFilter } from '@/lib/scope/data-scope'
+import { sharedOperatorFilter } from '@/lib/scope/data-scope'
 import { withIsActive } from '@/lib/status'
-import { isYes } from '@/lib/yn'
-import { UNIT_KINDS } from '@/lib/units/unit-labels'
+import { UNIT_TYPES, type UnitTypeValue } from '@/lib/units/unit-labels'
 import { unitCreateSchema, unitUpdateSchema } from '@/lib/units/unit-schema'
 import {
   createUnit,
@@ -17,39 +17,42 @@ import {
   setUnitsActive,
   updateUnit,
 } from '@/lib/units/units'
-import { idSchema } from '@/lib/id'
+import { isYes } from '@/lib/yn'
 
-// 단위 관리 서버 액션 (docs/decisions/0034)
-// 단위는 전체 공통 기준정보라 데이터 범위(센터·화주사)를 적용하지 않는다
+// 단위 관리 서버 액션 (docs/decisions/0034·0078)
+// 목록은 시스템 기본 단위 + 이 운영사의 추가 단위. 데이터 범위(센터·화주사)는 없다
 
 const idsSchema = z.array(idSchema).min(1).max(200)
 
-// 목록 (검색 조건: 단위 목록 화면의 searchFields와 같은 키 — kind·status)
+// 목록 (검색 조건: 단위 목록 화면의 searchFields와 같은 키 — type·status·system)
 export const listUnitsAction = createAction({
   permission: 'master.units.read',
   input: listQuerySchema,
   handler: async ({ input, scope }) => {
     const { filters } = input
     const query = toPrismaQuery(input, {
-      searchFields: ['code', 'name'],
+      searchFields: ['code', 'name', 'nameEn'],
       sortable: {
         code: 'code',
         name: 'name',
-        kind: 'kind',
+        type: 'type',
         sortOrder: 'sortOrder',
         isActive: 'status',
+        updatedAt: 'updatedAt',
       },
       defaultOrderBy: { sortOrder: 'asc' },
     })
-    const kind = (UNIT_KINDS as readonly string[]).includes(filters.kind ?? '')
-      ? (filters.kind as (typeof UNIT_KINDS)[number])
-      : undefined
+    const types = (codesFilter(filters, 'type')?.in ?? []).filter((t): t is UnitTypeValue =>
+      (UNIT_TYPES as readonly string[]).includes(t),
+    )
+    const system = ynFilter(filters, 'system')
     const where = {
       // '삭제됨'을 고르면 지운 것만 (아니면 prisma.ts가 지운 것을 뺀다)
       AND: [
-        operatorFilter(scope),
+        sharedOperatorFilter(scope),
         query.where,
-        kind ? { kind } : {},
+        types.length > 0 ? { type: { in: types } } : {},
+        system ? { isSystem: system } : {},
         statusWhere(filters),
         deletedWhere(filters),
       ],
@@ -57,29 +60,39 @@ export const listUnitsAction = createAction({
     const [rows, rowCount] = await prisma.$transaction([
       prisma.unit.findMany({
         ...query,
-        // 정렬을 고르지 않으면 종류(기본 → 환산) → 정렬 순서
+        // 정렬을 고르지 않으면 단위 유형 → 정렬 순서 → 코드
         orderBy:
           input.sorting.length > 0
             ? query.orderBy
-            : [{ kind: 'asc' }, { sortOrder: 'asc' }, { code: 'asc' }],
+            : [{ type: 'asc' }, { sortOrder: 'asc' }, { code: 'asc' }],
         where,
         select: {
           id: true,
           code: true,
           name: true,
-          kind: true,
+          nameEn: true,
+          type: true,
           decimals: true,
           sortOrder: true,
           status: true,
           isSystem: true,
-          rowVersion: true,
+          isBase: true,
+          baseFactor: true,
+          stdCode: true,
+          baseUnit: { select: { code: true } },
           updatedAt: true,
         },
       }),
       prisma.unit.count({ where }),
     ])
-    // 예/아니오 칸은 화면에서 true/false로
-    const shaped = rows.map((row) => ({ ...row, isSystem: isYes(row.isSystem) }))
+    const shaped = rows.map(({ baseUnit, baseFactor, isSystem, isBase, ...row }) => ({
+      ...row,
+      // 예/아니오 칸은 화면에서 true/false로, 소수는 글자로 (끝의 0 정리는 화면 표시에서)
+      isSystem: isYes(isSystem),
+      isBase: isYes(isBase),
+      baseCode: baseUnit?.code ?? null,
+      baseFactor: baseFactor?.toString() ?? null,
+    }))
     return { rows: shaped.map(withIsActive), rowCount }
   },
 })

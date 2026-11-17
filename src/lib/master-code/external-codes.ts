@@ -53,7 +53,9 @@ export async function saveExternalCodes(
       )
     }
     await db.externalCode.upsert({
-      where: { system_entityType_entityId: { system, entityType, entityId } },
+      where: {
+        operatorId_system_entityType_entityId: { operatorId, system, entityType, entityId },
+      },
       create: { operatorId, system, entityType, entityId, code },
       update: { code },
     })

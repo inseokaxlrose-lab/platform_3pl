@@ -156,7 +156,7 @@ describe('운영사 등록 (3c)', () => {
       status: 'ACTIVE',
       createdBy: 'platform',
     })
-    expect(await prisma.unit.count({ where: { operatorId: id } })).toBeGreaterThan(0)
+    expect(await prisma.codeGroup.count({ where: { operatorId: id } })).toBeGreaterThan(0)
     const admin = await prisma.user.findUniqueOrThrow({
       where: { username: 'admin.nara' },
       include: { permissionGroups: { include: { group: true } } },
@@ -176,8 +176,8 @@ describe('운영사 등록 (3c)', () => {
     const result = await register()
     expect(result.ok).toBe(true)
     const id = BigInt(result.ok ? result.data.id : 0)
-    expect(await prisma.unit.count({ where: { operatorId: TEST_OPERATOR_ID } })).toBe(0)
-    expect(await prisma.unit.count({ where: { operatorId: id } })).toBeGreaterThan(0)
+    expect(await prisma.codeGroup.count({ where: { operatorId: TEST_OPERATOR_ID } })).toBe(0)
+    expect(await prisma.codeGroup.count({ where: { operatorId: id } })).toBeGreaterThan(0)
   })
 
   it('운영사코드·관리자 아이디가 이미 있으면 거부하고 아무것도 만들지 않는다', async () => {
