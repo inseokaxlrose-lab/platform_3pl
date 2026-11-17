@@ -54,7 +54,7 @@ type RoleFormProps = {
 const LIST_HREF = '/admin/system/roles'
 
 // 권한그룹 등록·수정 (docs/decisions/0017, 입력 화면 틀 0031)
-// 권한 체크 표는 넓은 섹션 하나, 삭제는 따로 처리하는 섹션. 등록하면 수정 화면으로 이동
+// 권한 체크 표는 넓은 섹션 하나, 삭제는 따로 처리하는 섹션. 등록하면 [계속 등록]·[등록한 항목 보기]
 export function RoleForm({ group, header }: RoleFormProps) {
   const router = useRouter()
   const { can } = usePermission()
@@ -81,9 +81,7 @@ export function RoleForm({ group, header }: RoleFormProps) {
             permissionCodes: value.permissionCodes,
           })
         : createPermissionGroupAction(value),
-    onSuccess: group
-      ? undefined
-      : (created) => router.push(`${LIST_HREF}/${(created as { id: string }).id}`),
+    createdHref: group ? undefined : (created) => `${LIST_HREF}/${(created as { id: string }).id}`,
   })
   const { value, set, errors } = form
   const disabled = readOnly || form.pending

@@ -118,9 +118,9 @@ export function CustomerForm({
           })
         : createCustomerAction(value),
     afterSave: toFormValues,
-    onSuccess: customer
+    createdHref: customer
       ? undefined
-      : (created) => router.push(`/admin/master/customers/${(created as { id: string }).id}`),
+      : (created) => `/admin/master/customers/${(created as { id: string }).id}`,
   })
   const { value, set, errors } = form
   const disabled = readOnly || form.pending

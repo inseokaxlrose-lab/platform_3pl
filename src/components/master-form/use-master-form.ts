@@ -25,8 +25,11 @@ type UseMasterFormOptions<TSchema extends z.ZodType, TResult> = {
     result: TResult,
     value: z.input<TSchema>,
   ) => z.input<TSchema>
-  // 저장 성공 후 할 일 (예: 등록 화면 → 만든 항목의 수정 화면으로 이동). 서버 액션의 결과를 받는다
+  // 저장 성공 후 할 일. 서버 액션의 결과를 받는다
   onSuccess?: (result: TResult) => void
+  // 등록 화면: 만든 항목의 주소. 주면 저장 후 등록 화면에 머물며 입력 칸을 잠그고
+  // [계속 등록](빈 양식으로)·[등록한 항목 보기](이 주소)를 보여 준다 (onSuccess·화면 새로 읽기는 하지 않는다)
+  createdHref?: (result: TResult) => string
 }
 
 // 기준정보 입력 화면의 공통 동작: 값·오류·변경 감지·취소·저장 (MasterFormPage와 함께 쓴다)
@@ -37,10 +40,17 @@ export function useMasterForm<TSchema extends z.ZodType, TResult = unknown>({
   save,
   afterSave,
   onSuccess,
+  createdHref,
 }: UseMasterFormOptions<TSchema, TResult>) {
   type Input = z.input<TSchema>
   const router = useRouter()
+  // [계속 등록]으로 되돌아갈 빈 양식 (처음 받은 값)
+  const [blank] = useState<Input>(initial)
   const [value, setValue] = useState<Input>(initial)
+  // 등록을 마친 상태: 만든 항목의 주소 (null = 입력 중)
+  const [created, setCreated] = useState<{ href: string } | null>(null)
+  // [계속 등록]을 누른 횟수: 바뀔 때마다 MasterFormPage가 입력 칸을 새로 그리고 첫 칸에 초점
+  const [resetCount, setResetCount] = useState(0)
   // 변경 감지 기준: 저장에 성공하면 새 값이 기준이 된다
   const [baseline, setBaseline] = useState<Input>(initial)
   const [version, setVersion] = useState<number | null>(initialVersion)
@@ -70,6 +80,18 @@ export function useMasterForm<TSchema extends z.ZodType, TResult = unknown>({
     pending,
     dirty,
     submitCount,
+    created,
+    resetCount,
+    // [계속 등록]: 빈 양식으로 되돌려 다음 항목을 입력한다
+    startNext() {
+      setValue(blank)
+      setBaseline(blank)
+      setVersion(null)
+      setErrors({})
+      setMessage(null)
+      setCreated(null)
+      setResetCount((n) => n + 1)
+    },
     // [취소]: 처음 값(마지막 저장 값)으로 되돌린다
     cancel() {
       setValue(baseline)
@@ -110,10 +132,15 @@ export function useMasterForm<TSchema extends z.ZodType, TResult = unknown>({
         setBaseline(next)
         // 저장은 됐지만 알려 줄 것이 있으면 결과의 notice를 덧붙인다 (예: 할당 가능 창고 없음 경고)
         const notice = (result.data as { notice?: unknown } | null)?.notice
+        const done = createdHref ? '등록했습니다.' : '저장했습니다.'
         setMessage({
           ok: true,
-          text: typeof notice === 'string' && notice ? `저장했습니다. ${notice}` : '저장했습니다.',
+          text: typeof notice === 'string' && notice ? `${done} ${notice}` : done,
         })
+        if (createdHref) {
+          setCreated({ href: createdHref(result.data) })
+          return
+        }
         if (onSuccess) onSuccess(result.data)
         else router.refresh()
       })
@@ -124,5 +151,14 @@ export function useMasterForm<TSchema extends z.ZodType, TResult = unknown>({
 // MasterFormPage가 쓰는 부분만 (값의 모양과 상관없이)
 export type MasterFormState = Pick<
   ReturnType<typeof useMasterForm>,
-  'errors' | 'message' | 'pending' | 'dirty' | 'submitCount' | 'cancel' | 'submit'
+  | 'errors'
+  | 'message'
+  | 'pending'
+  | 'dirty'
+  | 'submitCount'
+  | 'cancel'
+  | 'submit'
+  | 'created'
+  | 'resetCount'
+  | 'startNext'
 >
