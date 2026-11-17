@@ -74,7 +74,7 @@ export function ShipToSection({
     <div className="space-y-3">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <p className="text-xs text-muted-foreground">
-          {rows.length} 곳 · 기본 납품처 1곳과 사용 중 1곳 이상이 필요합니다. 주문에 납품처가 없으면
+          {rows.length}곳 · 기본 납품처 1곳과 사용 중 1곳 이상이 필요합니다. 주문에 납품처가 없으면
           기본 납품처로 갑니다.
         </p>
         <Button

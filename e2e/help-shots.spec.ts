@@ -29,6 +29,8 @@ type Shot = {
   account: Account
   // 화면을 원하는 모습으로 만드는 동작 (펼치기·고르기 등)
   prepare?: (page: Page) => Promise<void>
+  // 첫 화면 대신 이 요소를 맨 위로 올려 찍는다 (긴 입력 화면의 아래쪽 섹션)
+  scrollTo?: (page: Page) => Locator
   markers: Marker[]
 }
 
@@ -113,6 +115,24 @@ const SHOTS: Shot[] = [
   },
   list('/admin/master/items'),
   list('/admin/master/customers'),
+  {
+    // 거래처 등록: 화주사를 고르면 [납품처 추가]가 열린다 — ① 주소 ② 납품처 ③ 저장 (0082)
+    src: '/help/admin/master/customers/new.png',
+    url: '/admin/master/customers/new',
+    account: 'admin',
+    prepare: async (page) => {
+      await page.locator('#customer-shipperId').click()
+      await page.getByRole('option', { name: /GANA/ }).click()
+      await expect(page.getByRole('button', { name: '납품처 추가' })).toBeEnabled()
+    },
+    // 주소·납품처 섹션이 한 화면에 들어오게
+    scrollTo: (page) => page.locator('#section-address'),
+    markers: [
+      { label: '1', target: (page) => page.locator('#section-address') },
+      { label: '2', target: (page) => page.locator('#section-ship-to') },
+      { label: '3', target: (page) => page.getByRole('button', { name: '저장' }) },
+    ],
+  },
   list('/admin/master/units'),
   {
     // 운영사 추가 단위 '근' (중량): 환산 섹션과 "1 근 = 0.6 KG" 미리보기가 보이게
@@ -231,7 +251,12 @@ async function addMarkers(page: Page, markers: Marker[]) {
 }
 
 // 지금 화면을 라이트·다크 두 장으로 (새로 불러오지 않고 테마만 바꾼다 → 입력·미리보기 상태가 그대로)
-async function shoot(page: Page, src: string, markers: Marker[]) {
+async function shoot(
+  page: Page,
+  src: string,
+  markers: Marker[],
+  scrollTo?: (page: Page) => Locator,
+) {
   // 목록·버튼을 다 불러온 뒤에 (불러오는 중의 회색 상자를 찍지 않게)
   await page.waitForLoadState('networkidle')
   await expect(page.locator('[data-slot="skeleton"]')).toHaveCount(0)
@@ -243,6 +268,7 @@ async function shoot(page: Page, src: string, markers: Marker[]) {
   // 개발 모드 표시(Next 'N' 버튼)는 사진에서 뺀다
   await page.addStyleTag({ content: 'nextjs-portal { display: none !important; }' })
   await page.evaluate(() => window.scrollTo(0, 0))
+  if (scrollTo) await scrollTo(page).evaluate((el) => el.scrollIntoView({ block: 'start' }))
   for (const scheme of ['light', 'dark'] as const) {
     await page.emulateMedia({ colorScheme: scheme })
     const html = expect(page.locator('html'))
@@ -330,7 +356,7 @@ for (const shot of SHOTS) {
     await page.goto(shot.url)
     await expect(page.getByRole('heading', { level: 1 })).toBeVisible()
     await shot.prepare?.(page)
-    await shoot(page, shot.src, shot.markers)
+    await shoot(page, shot.src, shot.markers, shot.scrollTo)
     await page.context().close()
   })
 }
