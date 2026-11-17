@@ -1,4 +1,5 @@
 import 'server-only'
+import { resolveUnitDecimals, unitDecimalsSelect } from '@/lib/units/unit-status'
 import { toPrismaQuery, type ListQuery } from '@/lib/grid/grid-query'
 import { codesFilter, dateRangeFilter, idFilter } from '@/lib/grid/list-filters'
 import { textIds } from '@/lib/id'
@@ -163,11 +164,13 @@ export async function getAdjustStockOptions(centerId: bigint, scope: DataScope) 
           code: true,
           name: true,
           barcode: true,
-          baseUnit: { select: { code: true, decimals: true } },
+          baseUnit: { select: { code: true, ...unitDecimalsSelect(scope.operatorId ?? 0n) } },
         },
       },
     },
   })
+  // 단위 소수 자리수: 시스템 단위는 이 운영사의 값 (0079)
+  resolveUnitDecimals(stocks)
   return textIds(
     stocks.map((s) => ({
       id: s.id,

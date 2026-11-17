@@ -16,6 +16,7 @@ import { Button } from '@/components/ui/button'
 import { unwrap } from '@/lib/actions'
 import { UNIT_TYPE_LABELS, UNIT_TYPE_STATUS, UNIT_TYPES } from '@/lib/units/unit-labels'
 import { decimalText } from '@/lib/units/unit-format'
+import { bulkAvailability } from './unit-bulk'
 import {
   deleteUnitsAction,
   listUnitsAction,
@@ -133,7 +134,13 @@ const COLUMNS: DataGridColumn<UnitRow>[] = [
 ]
 
 // 단위 목록 (docs/decisions/0034·0078): 시스템 기본 단위 + 운영사 추가 단위. 코드를 누르면 편집 화면
-export function UnitsList({ can }: { can: { create: boolean; update: boolean; delete: boolean } }) {
+export function UnitsList({
+  can,
+  lockedCodes,
+}: {
+  can: { create: boolean; update: boolean; delete: boolean }
+  lockedCodes: readonly string[]
+}) {
   const list = useListQuery<UnitRow>({
     gridId: 'master-units',
     fields: SEARCH_FIELDS,
@@ -143,6 +150,10 @@ export function UnitsList({ can }: { can: { create: boolean; update: boolean; de
   })
 
   const bulk = (ids: string[], done: () => void, kind: 'deactivate' | 'activate' | 'delete') => {
+    const blocked = bulkAvailability(
+      list.rows.filter((r) => ids.includes(r.id)),
+      lockedCodes,
+    )[kind]
     const label = { deactivate: '사용 중지', activate: '다시 사용', delete: '삭제' }[kind]
     return (
       <ConfirmDialog
@@ -151,7 +162,8 @@ export function UnitsList({ can }: { can: { create: boolean; update: boolean; de
           <Button
             type="button"
             variant={kind === 'activate' ? 'outline' : 'destructive'}
-            disabled={ids.length === 0}
+            disabled={blocked !== null}
+            title={blocked ?? undefined}
           >
             {kind === 'delete' ? (
               <Trash2Icon />

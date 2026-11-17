@@ -1088,9 +1088,9 @@ model Unit {
   @@map("tb_unit")
 }
 
-// ── 운영사별 단위 설정 (docs/decisions/0079): 시스템 기본 단위를 운영사마다 사용 / 사용 중지
-// 사용 중지한 단위만 줄이 생긴다 (줄이 없으면 시스템 단위의 상태 = 사용). 운영사 추가 단위는 자기 status_cd를 쓴다
-// 실제 상태 = 이 줄의 상태 ?? 단위의 상태 (src/lib/units/unit-status.ts)
+// ── 운영사별 단위 설정 (docs/decisions/0079): 시스템 기본 단위를 운영사마다 사용 여부·소수 자리수
+// 바꾼 단위만 줄이 생긴다 (줄이 없으면 시스템 단위의 값). 운영사 추가 단위는 자기 칸을 쓴다
+// 실제 값 = 이 줄의 값 ?? 단위의 값 (src/lib/units/unit-status.ts)
 model OperatorUnit {
   id         BigInt   @id @default(autoincrement()) @map("operator_unit_id")
   operatorId BigInt   @map("operator_id")
@@ -1098,6 +1098,8 @@ model OperatorUnit {
   unitId     BigInt   @map("unit_id")
   unit       Unit     @relation(fields: [unitId], references: [id], onDelete: Restrict)
   status     String   @default("ACTIVE") @map("status_cd") @db.VarChar(10)
+  // 이 운영사의 소수 자리수 (비우면 시스템 단위 값, 0~6)
+  decimals   Int?     @map("decimal_cnt")
   createdAt  DateTime @default(now()) @map("created_at")
   updatedAt  DateTime @updatedAt @map("updated_at")
   createdBy  String   @default("system") @map("created_by") @db.VarChar(50)

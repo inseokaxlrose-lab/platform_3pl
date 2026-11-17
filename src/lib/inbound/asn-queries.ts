@@ -1,4 +1,5 @@
 import 'server-only'
+import { resolveUnitDecimals, unitDecimalsSelect } from '@/lib/units/unit-status'
 import { textIds } from '@/lib/id'
 import { effectiveItemOptions } from '@/lib/items/item-schema'
 import { prisma } from '@/lib/prisma'
@@ -65,14 +66,19 @@ export async function getAsnItemOptions(
       useLot: true,
       useExpiry: true,
       labelUnit: true,
-      baseUnit: { select: { code: true, decimals: true } },
+      baseUnit: { select: { code: true, ...unitDecimalsSelect(scope.operatorId ?? 0n) } },
       units: {
-        select: { convQty: true, unit: { select: { code: true, decimals: true } } },
+        select: {
+          convQty: true,
+          unit: { select: { code: true, ...unitDecimalsSelect(scope.operatorId ?? 0n) } },
+        },
         orderBy: { sortOrder: 'asc' },
       },
     },
     orderBy: { code: 'asc' },
   })
+  // 단위 소수 자리수: 시스템 단위는 이 운영사의 값 (0079)
+  resolveUnitDecimals(items)
   const defaults = {
     useLot: isYes(shipper.useLot),
     useExpiry: isYes(shipper.useExpiry),

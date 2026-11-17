@@ -1,4 +1,5 @@
 import 'server-only'
+import { resolveUnitDecimals, unitDecimalsSelect } from '@/lib/units/unit-status'
 import { ActionError } from '@/lib/actions/action-error'
 import { currentActor, requireOperatorId } from '@/lib/actor'
 import { nextDocumentNumber } from '@/lib/documents/doc-no'
@@ -48,17 +49,24 @@ async function assertCenter(db: Db, shipperId: bigint, centerId: bigint, scope: 
 }
 
 // ASN 라인에 쓸 품목 정보 (단위·환산·관리 옵션)
-export const ASN_ITEM_SELECT = {
-  id: true,
-  code: true,
-  status: true,
-  useLot: true,
-  useExpiry: true,
-  labelUnit: true,
-  baseUnit: { select: { code: true, decimals: true } },
-  units: { select: { convQty: true, unit: { select: { code: true, decimals: true } } } },
-  shipper: { select: { useLot: true, useExpiry: true, labelUnit: true } },
-} as const
+// operatorId: 단위 소수 자리수를 이 운영사의 값으로 읽기 위해 (0079) — 조회 뒤 resolveUnitDecimals
+export const asnItemSelect = (operatorId: bigint) =>
+  ({
+    id: true,
+    code: true,
+    status: true,
+    useLot: true,
+    useExpiry: true,
+    labelUnit: true,
+    baseUnit: { select: { code: true, ...unitDecimalsSelect(operatorId) } },
+    units: {
+      select: {
+        convQty: true,
+        unit: { select: { code: true, ...unitDecimalsSelect(operatorId) } },
+      },
+    },
+    shipper: { select: { useLot: true, useExpiry: true, labelUnit: true } },
+  }) as const
 
 export type AsnLineItem = {
   id: bigint
@@ -149,8 +157,10 @@ export function resolveAsnLine(item: AsnLineItem | undefined, line: AsnLineValue
 async function lineRows(db: Db, shipperId: bigint, lines: AsnData['lines']) {
   const items = await db.item.findMany({
     where: { id: { in: [...new Set(lines.map((l) => l.itemId))] }, shipperId },
-    select: ASN_ITEM_SELECT,
+    select: asnItemSelect(requireOperatorId()),
   })
+  // 단위 소수 자리수: 시스템 단위는 이 운영사의 값 (0079)
+  resolveUnitDecimals(items)
   const byId = new Map(items.map((item) => [item.id, item]))
   return lines.map((line, index) => {
     try {

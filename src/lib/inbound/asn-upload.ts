@@ -1,4 +1,6 @@
 import 'server-only'
+import { requireOperatorId } from '@/lib/actor'
+import { resolveUnitDecimals } from '@/lib/units/unit-status'
 import { ActionError } from '@/lib/actions/action-error'
 import {
   buildPreview,
@@ -12,7 +14,7 @@ import { scopeFilter, type DataScope } from '@/lib/scope/data-scope'
 import { ACTIVE_ONLY } from '@/lib/status'
 import { asnUploadTemplate } from './asn-upload-template'
 import { asnLineSchema, type AsnCreateData } from './asn-schema'
-import { ASN_ITEM_SELECT, createAsnInTx, resolveAsnLine } from './asns'
+import { asnItemSelect, createAsnInTx, resolveAsnLine } from './asns'
 
 // ASN 엑셀 업로드 검증·등록 (docs/decisions/0050)
 // 검증: 행마다 문제를 모은다 (저장 안 함). 등록: 다시 검증하고, 문제가 없을 때만 모든 ASN을 한 트랜잭션으로 만든다
@@ -74,8 +76,10 @@ export async function checkAsnUpload(
   }
   const items = await prisma.item.findMany({
     where: { shipperId: { in: [...shipperIds] } },
-    select: { ...ASN_ITEM_SELECT, shipperId: true },
+    select: { ...asnItemSelect(requireOperatorId()), shipperId: true },
   })
+  // 단위 소수 자리수: 시스템 단위는 이 운영사의 값 (0079)
+  resolveUnitDecimals(items)
   const itemByKey = new Map(items.map((item) => [`${item.shipperId}:${item.code}`, item]))
 
   const result: Group[] = []

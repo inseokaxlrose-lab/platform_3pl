@@ -1,4 +1,5 @@
 import 'server-only'
+import { resolveUnitDecimals, unitDecimalsSelect } from '@/lib/units/unit-status'
 import { textIds } from '@/lib/id'
 import { prisma } from '@/lib/prisma'
 import { isInScope, type DataScope } from '@/lib/scope/data-scope'
@@ -30,7 +31,9 @@ export async function getPutawayWork(asnId: bigint, scope: DataScope) {
                     select: {
                       code: true,
                       name: true,
-                      baseUnit: { select: { code: true, decimals: true } },
+                      baseUnit: {
+                        select: { code: true, ...unitDecimalsSelect(scope.operatorId ?? 0n) },
+                      },
                     },
                   },
                 },
@@ -42,6 +45,8 @@ export async function getPutawayWork(asnId: bigint, scope: DataScope) {
       },
     },
   })
+  // 단위 소수 자리수: 시스템 단위는 이 운영사의 값 (0079)
+  resolveUnitDecimals(asn)
   if (!asn || !isInScope(scope, asn, ASN_SCOPE)) return null
 
   // 보관 로케이션: 같은 센터의 사용 중인 창고(시스템 기본 창고 제외)·구역·로케이션, 잠기지 않음,

@@ -29,7 +29,7 @@ import {
   type UnitTypeValue,
 } from '@/lib/units/unit-labels'
 import { MAX_UNIT_DECIMALS, unitCreateSchema, type UnitCreateInput } from '@/lib/units/unit-schema'
-import { createUnitAction, updateUnitAction } from './actions'
+import { createUnitAction, setUnitDecimalsAction, updateUnitAction } from './actions'
 import type { BaseUnits, UnitForEdit } from './queries'
 
 const LIST_HREF = '/admin/master/units'
@@ -75,14 +75,18 @@ export function UnitForm({
     schema: unitCreateSchema,
     save: (value: UnitCreateInput, version) => {
       if (!unit) return createUnitAction(value)
+      // 시스템 기본 단위: 소수 자리수만, 이 운영사에서만 (0079)
+      if (unit.isSystem) return setUnitDecimalsAction({ id: unit.id, decimals: value.decimals })
       // 코드는 바꿀 수 없다 (수정 입력 규칙에 코드 칸이 없어 서버가 버린다)
       return updateUnitAction({ id: unit.id, rowVersion: version ?? unit.rowVersion, ...value })
     },
     createdHref: unit ? undefined : (created) => `${LIST_HREF}/${created.id}`,
   })
   const { value, set, errors } = form
+  // 시스템 기본 단위는 소수 자리수만 고칠 수 있다 (이 운영사에서만, 0079) — 나머지 칸은 잠금
   const locked = readOnly || Boolean(unit?.isSystem)
   const disabled = locked || form.pending
+  const decimalsDisabled = readOnly || form.pending
   const id = (key: string) => `unit-${key}`
   const props = (key: string) => ({ id: id(key), disabled, 'aria-invalid': Boolean(errors[key]) })
   const type = value.type as UnitTypeValue
@@ -179,10 +183,15 @@ export function UnitForm({
             required
             error={errors.decimals}
             htmlFor={id('decimals')}
-            hint={`0~${MAX_UNIT_DECIMALS}`}
+            hint={
+              unit?.isSystem
+                ? `시스템 값 ${unit.systemDecimals}${value.decimals !== unit.systemDecimals ? ' · 이 운영사만 바꿈' : ''}`
+                : `0~${MAX_UNIT_DECIMALS}`
+            }
           >
             <NumberInput
               {...props('decimals')}
+              disabled={decimalsDisabled}
               value={value.decimals}
               min={0}
               max={MAX_UNIT_DECIMALS}
@@ -314,7 +323,7 @@ export function UnitForm({
   return (
     <MasterFormPage
       form={form}
-      readOnly={locked}
+      readOnly={readOnly}
       header={{
         ...header,
         meta: unit && (
@@ -325,8 +334,8 @@ export function UnitForm({
             </StatusBadge>
             {unit.isSystem && (
               <span>
-                시스템 기본 단위는 모든 운영사가 함께 쓰며 고칠 수 없습니다. 사용 여부는 목록에서
-                운영사별로 바꿉니다.
+                시스템 기본 단위는 모든 운영사가 함께 씁니다. 소수 자리수와 사용 여부(목록)만 이
+                운영사에서 따로 바꿀 수 있습니다.
               </span>
             )}
           </>

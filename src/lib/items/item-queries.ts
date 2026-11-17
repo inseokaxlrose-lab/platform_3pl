@@ -10,7 +10,7 @@ import {
   type DataScope,
 } from '@/lib/scope/data-scope'
 import { ACTIVE_ONLY, isActiveStatus } from '@/lib/status'
-import { isUnitActive, unitStatusSelect } from '@/lib/units/unit-status'
+import { isUnitActive, resolveUnitDecimals, unitStatusSelect } from '@/lib/units/unit-status'
 import { parseQty, qtyText } from '@/lib/units/convert'
 import { isYes } from '@/lib/yn'
 import { ITEM_SCOPE, SHIPPER_SCOPE } from './item-list'
@@ -50,6 +50,8 @@ export async function getItemFormOptions(scope: DataScope): Promise<ItemFormOpti
       orderBy: [{ sortOrder: 'asc' }, { code: 'asc' }],
     }),
   ])
+  // 소수 자리수: 시스템 단위는 이 운영사의 값 (0079)
+  resolveUnitDecimals(units)
   return textIds({
     shippers: shippers.map((s) => ({
       ...s,
