@@ -2,6 +2,7 @@
 
 import { PlayIcon, PowerIcon, Trash2Icon } from 'lucide-react'
 import { ConfirmDialog } from '@/components/common'
+import { ExcelUploadDialog } from '@/components/excel-upload'
 import type { DataGridColumn } from '@/components/data-grid'
 import {
   DELETED_STATUS_OPTION,
@@ -20,11 +21,14 @@ import {
   ORDER_ADDR_MODE,
   PARTNER_TYPE_GROUP,
 } from '@/lib/customers/customer-codes'
+import { customerUploadTemplate } from '@/lib/customers/customer-upload-template'
 import {
   deleteCustomersAction,
   listCustomersAction,
+  commitCustomerUploadAction,
   restoreCustomersAction,
   setCustomersStatusAction,
+  validateCustomerUploadAction,
 } from './actions'
 
 type Row = {
@@ -145,7 +149,7 @@ export function CustomersList({
   actions,
 }: {
   shippers: { id: string; code: string; name: string }[]
-  can: { update: boolean; delete: boolean; export: boolean }
+  can: { update: boolean; delete: boolean; export: boolean; upload: boolean }
   actions?: React.ReactNode
 }) {
   const searchFields: SearchFieldDef[] = [
@@ -259,7 +263,21 @@ export function CustomersList({
     <MasterListPage
       title="거래처"
       description="화주사의 고객사입니다. 거래처마다 물건을 받는 납품처를 두고, 납품처 주소로 권역설정의 배송센터를 정합니다."
-      actions={actions}
+      actions={
+        <>
+          {can.upload && (
+            <ExcelUploadDialog
+              template={customerUploadTemplate}
+              title="거래처 엑셀 업로드"
+              description="한 줄이 납품처 하나입니다. 이미 있는 거래처는 넣은 칸만 고칩니다. 오류가 하나라도 있으면 파일 전체가 등록되지 않습니다."
+              validate={validateCustomerUploadAction}
+              commit={commitCustomerUploadAction}
+              onDone={list.refresh}
+            />
+          )}
+          {actions}
+        </>
+      }
       gridId="master-customers"
       searchFields={searchFields}
       list={list}
