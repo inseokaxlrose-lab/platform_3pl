@@ -6,7 +6,7 @@ import { runInContext } from '@/lib/actor'
 import { prisma } from '@/lib/prisma'
 import type { DataScope } from '@/lib/scope/data-scope'
 import { getCurrentPermissions, getCurrentScope, getCurrentUser } from '@/lib/session'
-import { createTestShipper, versionOf } from '@/test/factories'
+import { createTestShipper, versionOf, systemUnit } from '@/test/factories'
 import { resetDatabase, TEST_OPERATOR_ID } from '@/test/reset-database'
 import {
   createPortalItemAction,
@@ -67,11 +67,7 @@ const input = (overrides: Record<string, unknown> = {}) => ({
 
 beforeEach(async () => {
   await resetDatabase()
-  ea = (
-    await prisma.unit.create({
-      data: { operatorId: TEST_OPERATOR_ID, code: 'EA', name: '개', kind: 'BASE' },
-    })
-  ).id
+  ea = (await systemUnit('EA')).id
   gana = (await createTestShipper('GANA')).id
   dara = (await createTestShipper('DARA')).id
   signIn(shipperScope(gana))

@@ -124,3 +124,8 @@ export async function versionOf(model: VersionedModel, id: bigint | string): Pro
   })
   return row.rowVersion
 }
+
+// 시스템 기본 단위 (마이그레이션이 넣은 EA·KG·BOX·PLT 등, 0078) — 테스트 DB를 비워도 resetDatabase가 되살린다
+export function systemUnit(code: string) {
+  return prisma.unit.findFirstOrThrow({ where: { code, operatorId: null } })
+}

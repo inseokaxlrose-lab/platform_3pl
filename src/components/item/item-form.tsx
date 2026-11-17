@@ -141,8 +141,13 @@ export function ItemForm({
 
   const unitById = new Map(options.units.map((u) => [u.id, u]))
   // 고를 수 있는 단위: 사용 중인 것 + 지금 저장된 값 (사용 중지돼도 그대로 둘 수 있다)
-  const choosable = (kind: ItemUnitOption['kind'], current: string) =>
-    options.units.filter((u) => u.kind === kind && (u.isActive || u.id === current))
+  // role BASE: 기본단위(포장 아닌 단위) / PACK: 환산단위(포장 단위) — 0078
+  const choosable = (role: 'BASE' | 'PACK', current: string) =>
+    options.units.filter(
+      (u) =>
+        (role === 'PACK' ? u.type === 'PACK' : u.type !== 'PACK') &&
+        (u.isActive || u.id === current),
+    )
   const baseUnit = unitById.get(value.baseUnitId)
   const shipper = options.shippers.find((s) => s.id === value.shipperId)
   // 지금 실제로 적용되는 관리 옵션 (화주사를 고르기 전에는 모른다)

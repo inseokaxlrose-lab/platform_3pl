@@ -6,7 +6,7 @@ import type { ItemCreateInput } from '@/lib/items/item-schema'
 import { prisma } from '@/lib/prisma'
 import type { DataScope } from '@/lib/scope/data-scope'
 import { getCurrentPermissions, getCurrentScope, getCurrentUser } from '@/lib/session'
-import { createTestCenter, createTestShipper, versionOf } from '@/test/factories'
+import { createTestCenter, createTestShipper, versionOf, systemUnit } from '@/test/factories'
 import { resetDatabase, TEST_OPERATOR_ID } from '@/test/reset-database'
 import {
   createItemAction,
@@ -41,18 +41,22 @@ function signIn(scope: DataScope = ALL, codes: PermissionCode[] = [...ALL_PERMIS
 
 // 테스트 준비: 단위·센터·화주사
 const unitIds: Record<string, bigint> = {}
-async function createUnit(code: string, kind: 'BASE' | 'PACK', decimals = 0, isActive = true) {
+// 운영사 추가 단위 (시스템 기본 단위에 없는 코드, 0078)
+async function createUnit(code: string, type: 'QTY' | 'PACK', isActive = true) {
   const unit = await prisma.unit.create({
     data: {
       operatorId: TEST_OPERATOR_ID,
       code,
       name: code,
-      kind,
-      decimals,
+      type,
       status: isActive ? 'ACTIVE' : 'INACTIVE',
     },
   })
   unitIds[code] = unit.id
+}
+// 시스템 기본 단위 (EA 0자리·KG 3자리·BOX·PLT)
+async function useSystemUnit(code: string) {
+  unitIds[code] = (await systemUnit(code)).id
 }
 
 let gana = 0n // 식품 화주사: 로트·유통기한 사용, 라벨 BOX — 이천센터 이용
@@ -89,11 +93,13 @@ const update = async (id: string, overrides: Partial<ItemCreateInput> = {}) => {
 
 beforeEach(async () => {
   await resetDatabase()
-  await createUnit('EA', 'BASE')
-  await createUnit('KG', 'BASE', 3)
-  await createUnit('OLD', 'BASE', 0, false)
-  await createUnit('BOX', 'PACK')
-  await createUnit('PLT', 'PACK')
+  await useSystemUnit('EA')
+  await useSystemUnit('KG')
+  await createUnit('OLD', 'QTY', false)
+  await useSystemUnit('BOX')
+  await useSystemUnit('PLT')
+  await createUnit('PCS', 'QTY')
+  await createUnit('CS', 'PACK')
   icn = (await createTestCenter('ICN')).id
   const gmh = (await createTestCenter('GMH')).id
   gana = (await createTestShipper('GANA')).id
@@ -321,15 +327,23 @@ describe('사용 중지 · 삭제 · 되살리기 · 단위 사용 검사', () =
     expect(await restoreItemsAction({ ids: [a.id] })).toEqual({ ok: true, data: { count: 1 } })
   })
 
-  it('품목에서 쓰는 단위(기본단위·환산단위)는 지울 수 없고, 품목을 지우면 지울 수 있다', async () => {
-    const item = await create({ code: 'A1' })
-    for (const code of ['EA', 'BOX']) {
+  it('품목에서 쓰는 운영사 단위(기본단위·환산단위)는 지울 수 없고, 품목을 지우면 지울 수 있다. 시스템 단위는 늘 거부', async () => {
+    const item = await create({
+      code: 'A1',
+      baseUnitId: String(unitIds.PCS),
+      units: [{ unitId: String(unitIds.CS), convQty: '12' }],
+    })
+    for (const code of ['PCS', 'CS']) {
       expect(await deleteUnitsAction({ ids: [String(unitIds[code])] })).toMatchObject({
         ok: false,
-        error: { code: 'CONFLICT', message: expect.stringContaining('품목에서 쓰는 단위') },
+        error: { code: 'CONFLICT', message: expect.stringContaining('쓰는 곳이 있어') },
       })
     }
     await deleteItemsAction({ ids: [item.id] })
-    expect(await deleteUnitsAction({ ids: [String(unitIds.BOX)] })).toMatchObject({ ok: true })
+    expect(await deleteUnitsAction({ ids: [String(unitIds.CS)] })).toMatchObject({ ok: true })
+    expect(await deleteUnitsAction({ ids: [String(unitIds.BOX)] })).toMatchObject({
+      ok: false,
+      error: { code: 'FORBIDDEN' },
+    })
   })
 })

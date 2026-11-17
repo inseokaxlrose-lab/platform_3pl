@@ -2,7 +2,7 @@ import { afterAll, beforeEach, describe, expect, it } from 'vitest'
 import { runInContext } from '@/lib/actor'
 import { ensureCenterDefaults } from '@/lib/centers/center-defaults'
 import { prisma, type Tx } from '@/lib/prisma'
-import { createTestCenter, createTestShipper } from '@/test/factories'
+import { createTestCenter, createTestShipper, systemUnit } from '@/test/factories'
 import { resetDatabase, TEST_OPERATOR_ID } from '@/test/reset-database'
 import { adjustStock, moveStock, receiveStock } from './stock-change'
 import { isRetryableTxError, stockTransaction } from './stock-transaction'
@@ -28,9 +28,7 @@ beforeEach(async () => {
     where: { id: shipper.id },
     data: { centers: { create: [{ centerId: center.id }] } },
   })
-  const unit = await prisma.unit.create({
-    data: { operatorId: TEST_OPERATOR_ID, code: 'EA', name: '개', kind: 'BASE' },
-  })
+  const unit = await systemUnit('EA')
   itemId = (
     await prisma.item.create({
       data: {

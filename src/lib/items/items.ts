@@ -9,6 +9,7 @@ import { prisma, type Db } from '@/lib/prisma'
 import { assertRowVersion, withVersionGuard } from '@/lib/row-version'
 import { assertAllFound, assertNoCodeConflict } from '@/lib/soft-delete'
 import { DELETED_ONLY, NOT_DELETED, isActiveStatus, toStatus } from '@/lib/status'
+import { isItemBaseType } from '@/lib/units/unit-labels'
 import { checkQtyDecimals } from '@/lib/units/convert'
 import { isYes } from '@/lib/yn'
 import { effectiveItemOptions, type ItemCreateData, type ItemData } from './item-schema'
@@ -50,14 +51,14 @@ async function assertBarcode(db: Db, shipperId: bigint, barcode: string | null, 
   }
 }
 
-// 단위 검사: 기본단위는 기본단위(BASE), 환산단위는 환산단위(PACK)만, 새로 고르는 단위는 사용 중이어야 한다
+// 단위 검사: 기본단위는 포장이 아닌 단위(수량·중량·부피·길이·면적), 환산단위는 포장 단위(PACK)만, 새로 고르는 단위는 사용 중이어야 한다 (0078)
 // keep: 이미 저장돼 있던 단위 (그 사이 사용 중지됐어도 그대로 둘 수 있다)
 // 입수량 소수 자리는 기본단위의 소수 자리수까지 (EA면 정수만)
 async function assertUnits(db: Db, data: SaveItemData, keep: bigint[] = []) {
   const ids = [data.baseUnitId, ...data.units.map((u) => u.unitId)]
   const units = await db.unit.findMany({
     where: { id: { in: ids } },
-    select: { id: true, code: true, kind: true, decimals: true, status: true },
+    select: { id: true, code: true, type: true, decimals: true, status: true },
   })
   const byId = new Map(units.map((u) => [u.id, u]))
   const usable = (id: bigint) => {
@@ -65,13 +66,16 @@ async function assertUnits(db: Db, data: SaveItemData, keep: bigint[] = []) {
     return unit && (isActiveStatus(unit.status) || keep.includes(id)) ? unit : null
   }
   const base = usable(data.baseUnitId)
-  if (!base || base.kind !== 'BASE') {
-    throw new ActionError('VALIDATION', '기본단위는 사용 중인 기본단위 중에서 골라 주세요.')
+  if (!base || !isItemBaseType(base.type)) {
+    throw new ActionError(
+      'VALIDATION',
+      '기본단위는 사용 중인 수량·중량·부피·길이·면적 단위 중에서 골라 주세요.',
+    )
   }
   for (const row of data.units) {
     const pack = usable(row.unitId)
-    if (!pack || pack.kind !== 'PACK') {
-      throw new ActionError('VALIDATION', '환산단위는 사용 중인 환산단위 중에서 골라 주세요.')
+    if (!pack || pack.type !== 'PACK') {
+      throw new ActionError('VALIDATION', '환산단위는 사용 중인 포장 단위 중에서 골라 주세요.')
     }
     if (!checkQtyDecimals(row.convQty, base.decimals)) {
       throw new ActionError(

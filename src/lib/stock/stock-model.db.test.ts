@@ -2,7 +2,7 @@ import { afterAll, beforeEach, describe, expect, it } from 'vitest'
 import { ensureCenterDefaults } from '@/lib/centers/center-defaults'
 import { prisma } from '@/lib/prisma'
 import { withStockWrite } from '@/lib/stock/stock-write-guard'
-import { createTestCenter, createTestShipper } from '@/test/factories'
+import { createTestCenter, createTestShipper, systemUnit } from '@/test/factories'
 import { resetDatabase, TEST_OPERATOR_ID } from '@/test/reset-database'
 
 // 재고·재고 이력 DB 규칙 (docs/decisions/0044) — 재고 변경 함수가 실수해도 DB가 마지막에 막는다
@@ -23,9 +23,7 @@ beforeEach(async () => {
   const warehouse = await ensureCenterDefaults(prisma, center.id)
   const location = await prisma.location.findFirstOrThrow({ where: { warehouseId: warehouse.id } })
   const shipper = await createTestShipper('GANA')
-  const unit = await prisma.unit.create({
-    data: { operatorId: TEST_OPERATOR_ID, code: 'EA', name: '개', kind: 'BASE' },
-  })
+  const unit = await systemUnit('EA')
   const item = await prisma.item.create({
     data: {
       operatorId: TEST_OPERATOR_ID,
