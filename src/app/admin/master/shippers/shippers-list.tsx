@@ -1,29 +1,42 @@
 'use client'
 
-import { PlayIcon, PowerIcon } from 'lucide-react'
-import { ACTIVE_STATUS, ConfirmDialog } from '@/components/common'
-import type { DataGridColumn } from '@/components/data-grid'
+import { PauseIcon, PlayIcon } from 'lucide-react'
+import { ConfirmDialog } from '@/components/common'
+import type { DataGridColumn, StatusFormat } from '@/components/data-grid'
 import { MasterListPage, useListQuery, type SearchFieldDef } from '@/components/master-list'
 import { Button } from '@/components/ui/button'
 import { unwrap } from '@/lib/actions'
-import { listShippersAction, setShippersActiveAction } from './actions'
+import { IF_METHOD, SHIPPER_STATUS, SHIPPER_STATUS_BADGE } from '@/lib/shippers/shipper-codes'
+import { SHIPPER_INDUSTRY_GROUP, SHIPPER_TYPE_GROUP } from '@/lib/shippers/shipper-schema'
+import { changeShippersStatusAction, listShippersAction } from './actions'
 
 type Row = {
   id: string
   systemCode: string
   code: string
   name: string
-  businessNumber: string | null
+  shipperType: string | null
+  ceoName: string | null
   phone: string | null
   centers: string | null
-  useLot: boolean
-  useExpiry: boolean
-  labelUnit: string
-  isActive: boolean
+  ifMethod: string
+  apiEnabled: boolean
+  contractStartOn: string | null
+  contractEndOn: string | null
+  status: string
+  sortOrder: number
   createdAt: Date
   updatedAt: Date
   userCount: number
 }
+
+// 연동 방식 배지 (포털은 기본이라 회색)
+const IF_METHOD_FORMAT: StatusFormat = Object.fromEntries(
+  IF_METHOD.options.map((o) => [
+    o.value,
+    { label: o.label, tone: o.value === 'PORTAL' ? 'neutral' : 'info' },
+  ]),
+)
 
 const COLUMNS: DataGridColumn<Row>[] = [
   {
@@ -50,19 +63,61 @@ const COLUMNS: DataGridColumn<Row>[] = [
     align: 'center',
     defaultHidden: true,
   },
-  { id: 'businessNumber', header: '사업자등록번호', accessor: 'businessNumber', format: 'bizNo' },
-  { id: 'phone', header: '대표 전화', accessor: 'phone', format: 'phone', defaultHidden: true },
-  { id: 'centers', header: '이용 센터', accessor: 'centers' },
-  { id: 'useLot', header: '로트', accessor: 'useLot', format: 'yn' },
-  { id: 'useExpiry', header: '유통기한', accessor: 'useExpiry', format: 'yn' },
-  { id: 'labelUnit', header: '라벨 단위', accessor: 'labelUnit', align: 'center' },
-  { id: 'userCount', header: '포털 사용자', accessor: 'userCount', format: 'number' },
   {
-    id: 'isActive',
-    header: '상태',
-    accessor: (row) => String(row.isActive),
+    id: 'shipperType',
+    header: '화주 유형',
+    accessor: 'shipperType',
     sortable: true,
-    format: { status: ACTIVE_STATUS },
+    format: { code: SHIPPER_TYPE_GROUP },
+  },
+  { id: 'ceoName', header: '대표자', accessor: 'ceoName' },
+  { id: 'phone', header: '대표 전화', accessor: 'phone', format: 'phone' },
+  // ★ = 기본 센터
+  { id: 'centers', header: '이용 센터', accessor: 'centers' },
+  {
+    id: 'ifMethod',
+    header: '연동 방식',
+    accessor: 'ifMethod',
+    sortable: true,
+    format: { status: IF_METHOD_FORMAT },
+  },
+  { id: 'apiEnabled', header: 'API 사용', accessor: 'apiEnabled', format: 'yn' },
+  {
+    id: 'contractStartOn',
+    header: '계약시작일',
+    accessor: 'contractStartOn',
+    align: 'center',
+    sortable: true,
+  },
+  {
+    id: 'contractEndOn',
+    header: '계약종료일',
+    // 비어 있으면 자동연장
+    accessor: (row) => row.contractEndOn ?? '자동연장',
+    align: 'center',
+    sortable: true,
+  },
+  {
+    id: 'status',
+    header: '상태',
+    accessor: 'status',
+    sortable: true,
+    format: { status: SHIPPER_STATUS_BADGE },
+  },
+  {
+    id: 'userCount',
+    header: '포털 사용자',
+    accessor: 'userCount',
+    format: 'number',
+    defaultHidden: true,
+  },
+  {
+    id: 'sortOrder',
+    header: '정렬순서',
+    accessor: 'sortOrder',
+    format: 'number',
+    sortable: true,
+    defaultHidden: true,
   },
   { id: 'createdAt', header: '등록일', accessor: 'createdAt', format: 'date', sortable: true },
   {
@@ -75,7 +130,7 @@ const COLUMNS: DataGridColumn<Row>[] = [
   },
 ]
 
-// 화주사 목록 (docs/decisions/0035): 센터 직원은 자기 센터를 이용하는 화주사만 (서버에서 거른다)
+// 화주사 목록 (docs/decisions/0035, 0080): 센터 직원은 자기 센터를 이용하는 화주사만 (서버에서 거른다)
 export function ShippersList({
   centers,
   actions,
@@ -94,8 +149,9 @@ export function ShippersList({
       label: '검색어',
       type: 'keyword',
       span: 4,
-      placeholder: '화주사 코드·시스템 코드·화주사명·사업자번호(숫자)',
+      placeholder: '화주사 코드·시스템 코드·화주사명·약칭',
     },
+    { key: 'status', label: '상태', type: 'multi', options: SHIPPER_STATUS.options },
     {
       key: 'center',
       label: '이용 센터',
@@ -103,62 +159,81 @@ export function ShippersList({
       options: centers.map((c) => ({ value: c.id, label: `${c.name} (${c.code})` })),
     },
     {
-      key: 'status',
-      label: '상태',
-      type: 'segment',
-      options: [
-        { value: 'ACTIVE', label: '사용' },
-        { value: 'INACTIVE', label: '사용 중지' },
-      ],
-    },
-    { key: 'lot', label: '로트 사용', type: 'yn', detail: true },
-    { key: 'expiry', label: '유통기한 사용', type: 'yn', detail: true },
-    {
-      key: 'labelUnit',
-      label: '라벨 단위',
-      type: 'segment',
+      key: 'shipperType',
+      label: '화주 유형',
+      type: 'codeMulti',
+      codeGroup: SHIPPER_TYPE_GROUP,
       detail: true,
-      options: [
-        { value: 'PLT', label: 'PLT' },
-        { value: 'BOX', label: 'BOX' },
-      ],
+    },
+    {
+      key: 'industry',
+      label: '업종',
+      type: 'codeMulti',
+      codeGroup: SHIPPER_INDUSTRY_GROUP,
+      detail: true,
+    },
+    {
+      key: 'ifMethod',
+      label: '연동 방식',
+      type: 'multi',
+      options: IF_METHOD.options,
+      detail: true,
+    },
+    { key: 'api', label: 'API 사용', type: 'yn', detail: true },
+    { key: 'contractEnd', label: '계약종료일', type: 'dateRange', span: 6, detail: true },
+    {
+      key: 'businessNumber',
+      label: '사업자등록번호',
+      type: 'text',
+      placeholder: '숫자 일부',
+      detail: true,
     },
     { key: 'createdAt', label: '등록일', type: 'dateRange', span: 6, detail: true },
   ]
-  const list = useListQuery<Row>({ gridId: 'master-shippers', fields, fetch: listShippersAction })
+  const list = useListQuery<Row>({
+    gridId: 'master-shippers',
+    fields,
+    fetch: listShippersAction,
+    defaultSort: [],
+  })
 
-  const bulkButton = (ids: string[], done: () => void, isActive: boolean) => (
-    <ConfirmDialog
-      trigger={
-        <Button
-          type="button"
-          variant={isActive ? 'outline' : 'destructive'}
-          disabled={ids.length === 0}
-        >
-          {isActive ? <PlayIcon /> : <PowerIcon />}
-          {isActive ? '다시 사용' : '사용 중지'}
-          {ids.length > 0 && ` (${ids.length})`}
-        </Button>
-      }
-      title={`화주사 ${ids.length}곳을 ${isActive ? '다시 사용' : '사용 중지'}할까요?`}
-      description={
-        isActive
-          ? '소속 사용자가 다시 데이터를 볼 수 있게 됩니다.'
-          : '소속 사용자는 데이터를 볼 수 없게 됩니다. 기록은 남습니다.'
-      }
-      confirmLabel={isActive ? '다시 사용' : '사용 중지'}
-      destructive={!isActive}
-      onConfirm={async () => {
-        unwrap(await setShippersActiveAction({ ids, isActive }))
-        done()
-      }}
-    />
-  )
+  // 일괄 운영중 / 일시정지: 실행 전에 대상 건수 확인 (일시정지는 사유 필수, 해지된 화주사는 건너뜀)
+  const bulkButton = (ids: string[], done: () => void, status: 'ACTIVE' | 'SUSPENDED') => {
+    const suspend = status === 'SUSPENDED'
+    return (
+      <ConfirmDialog
+        trigger={
+          <Button
+            type="button"
+            variant={suspend ? 'destructive' : 'outline'}
+            disabled={ids.length === 0}
+          >
+            {suspend ? <PauseIcon /> : <PlayIcon />}
+            {suspend ? '일시정지' : '운영중으로'}
+            {ids.length > 0 && ` (${ids.length})`}
+          </Button>
+        }
+        title={`화주사 ${ids.length}곳을 ${suspend ? '일시정지' : '운영중으로'} 바꿀까요?`}
+        description={
+          suspend
+            ? '새 입고·품목 등록을 막습니다. 포털 사용자는 조회만 할 수 있습니다. 해지된 화주사는 바꾸지 않습니다.'
+            : '입고 등 모든 업무를 할 수 있게 됩니다. 해지된 화주사는 바꾸지 않습니다.'
+        }
+        confirmLabel={suspend ? '일시정지' : '운영중으로'}
+        destructive={suspend}
+        reason={suspend ? { label: '일시정지 사유' } : undefined}
+        onConfirm={async (reason) => {
+          unwrap(await changeShippersStatusAction({ ids, status, reason: reason ?? '' }))
+          done()
+        }}
+      />
+    )
+  }
 
   return (
     <MasterListPage
       title="화주사"
-      description="물건 보관·배송을 맡기는 회사를 관리합니다. 이용 센터와 품목 기본값(로트·유통기한·라벨 단위)을 정합니다."
+      description="물건 보관·배송을 맡기는 회사를 관리합니다. 계약·운영 설정·이용 센터·연동 방식을 정합니다."
       actions={actions}
       gridId="master-shippers"
       searchFields={fields}
@@ -170,8 +245,8 @@ export function ShippersList({
         canBulkUpdate
           ? ({ ids, done }) => (
               <>
-                {bulkButton(ids, done, false)}
-                {bulkButton(ids, done, true)}
+                {bulkButton(ids, done, 'SUSPENDED')}
+                {bulkButton(ids, done, 'ACTIVE')}
               </>
             )
           : undefined

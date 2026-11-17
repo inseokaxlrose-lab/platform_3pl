@@ -98,6 +98,17 @@ const SHOTS: Shot[] = [
   list('/admin/master/warehouses'),
   list('/admin/master/locations'),
   list('/admin/master/shippers'),
+  {
+    // 화주사 등록: ① 섹션 목차 ② 기본 정보 ③ [저장] (0080)
+    src: '/help/admin/master/shippers/new.png',
+    url: '/admin/master/shippers/new',
+    account: 'admin',
+    markers: [
+      { label: '1', target: sectionToc },
+      { label: '2', target: (page) => page.locator('#section-basic') },
+      { label: '3', target: (page) => page.getByRole('button', { name: '저장' }) },
+    ],
+  },
   list('/admin/master/items'),
   list('/admin/master/customers'),
   list('/admin/master/units'),
