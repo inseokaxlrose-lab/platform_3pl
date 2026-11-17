@@ -3,7 +3,7 @@ import { textIds } from '@/lib/id'
 import { prisma } from '@/lib/prisma'
 import { sharedOperatorFilter, type DataScope } from '@/lib/scope/data-scope'
 import { decimalText } from '@/lib/units/unit-format'
-import { isUnitActive, unitStatusSelect } from '@/lib/units/unit-status'
+import { isUnitActive, resolveUnitDecimals, unitStatusSelect } from '@/lib/units/unit-status'
 import type { UnitTypeValue } from '@/lib/units/unit-labels'
 import { isYes } from '@/lib/yn'
 
@@ -31,11 +31,11 @@ export async function getUnitForEdit(id: bigint, scope: DataScope) {
       name: true,
       nameEn: true,
       type: true,
-      decimals: true,
       printName: true,
       sortOrder: true,
-      // 실제 사용 여부: 시스템 단위는 이 운영사의 설정 (0079)
+      // 실제 사용 여부·소수 자리수: 시스템 단위는 이 운영사의 설정 (0079)
       ...unitStatusSelect(scope.operatorId ?? 0n),
+      decimals: true,
       isSystem: true,
       isBase: true,
       baseFactor: true,
@@ -47,6 +47,8 @@ export async function getUnitForEdit(id: bigint, scope: DataScope) {
     },
   })
   if (!unit) return null
+  const systemDecimals = unit.decimals
+  resolveUnitDecimals(unit)
   const history = (unit.extAttr as { baseFactorHistory?: unknown } | null)?.baseFactorHistory
   return textIds({
     id: unit.id,
@@ -54,6 +56,8 @@ export async function getUnitForEdit(id: bigint, scope: DataScope) {
     rowVersion: unit.rowVersion,
     isSystem: isYes(unit.isSystem),
     isBase: isYes(unit.isBase),
+    // 시스템 단위의 원래 소수 자리수 (운영사가 바꿨으면 화면에 함께 보여 줌)
+    systemDecimals,
     // 환산계수 변경 기록 (최근 것부터)
     factorHistory: (Array.isArray(history) ? history : []).slice().reverse() as {
       at: string

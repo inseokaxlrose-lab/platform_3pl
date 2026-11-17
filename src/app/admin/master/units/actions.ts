@@ -9,12 +9,18 @@ import { prisma } from '@/lib/prisma'
 import { sharedOperatorFilter } from '@/lib/scope/data-scope'
 import { requireOperatorId } from '@/lib/actor'
 import { UNIT_TYPES, type UnitTypeValue } from '@/lib/units/unit-labels'
-import { isUnitActive, unitStatusFilter, unitStatusSelect } from '@/lib/units/unit-status'
+import {
+  isUnitActive,
+  resolveUnitDecimals,
+  unitStatusFilter,
+  unitStatusSelect,
+} from '@/lib/units/unit-status'
 import { unitCreateSchema, unitUpdateSchema } from '@/lib/units/unit-schema'
 import {
   createUnit,
   deleteUnits,
   restoreUnits,
+  setOperatorUnitDecimals,
   setUnitsActive,
   updateUnit,
 } from '@/lib/units/units'
@@ -88,6 +94,8 @@ export const listUnitsAction = createAction({
       }),
       prisma.unit.count({ where }),
     ])
+    // 소수 자리수: 시스템 단위는 이 운영사의 값 (0079)
+    resolveUnitDecimals(rows)
     const shaped = rows.map(
       ({
         baseUnit,
@@ -122,6 +130,13 @@ export const updateUnitAction = createAction({
   permission: 'master.units.update',
   input: unitUpdateSchema,
   handler: ({ input }) => updateUnit(input),
+})
+
+// 시스템 기본 단위의 소수 자리수: 이 운영사에서만 (0079)
+export const setUnitDecimalsAction = createAction({
+  permission: 'master.units.update',
+  input: z.object({ id: idSchema, decimals: z.number().int().min(0).max(6) }),
+  handler: ({ input }) => setOperatorUnitDecimals(input.id, input.decimals),
 })
 
 export const setUnitsActiveAction = createAction({

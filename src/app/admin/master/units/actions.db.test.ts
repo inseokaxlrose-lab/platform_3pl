@@ -17,6 +17,7 @@ import {
   deleteUnitsAction,
   listUnitsAction,
   restoreUnitsAction,
+  setUnitDecimalsAction,
   setUnitsActiveAction,
   updateUnitAction,
 } from './actions'
@@ -374,5 +375,68 @@ describe('운영사별 시스템 단위 사용 여부 (0079)', () => {
         data: { operatorId: TEST_OPERATOR_ID, unitId: BigInt(gn.id), status: 'INACTIVE' },
       }),
     ).rejects.toThrow(/시스템 기본 단위만/)
+  })
+})
+
+describe('운영사별 시스템 단위 소수 자리수 (0079)', () => {
+  const ALL = (operatorId: bigint) => ({ kind: 'ALL' as const, operatorId })
+  const kgDecimals = async (operatorId: bigint) =>
+    (await getUnitOptions(ALL(operatorId))).find((u) => u.code === 'KG')?.decimals
+
+  it('이 운영사에서만 바꾸고, 시스템 값과 같게 하면 설정을 비운다', async () => {
+    const kg = await systemUnit('KG')
+    const other = await createTestOperator('B물류')
+    expect(await setUnitDecimalsAction({ id: String(kg.id), decimals: 1 })).toMatchObject({
+      ok: true,
+      data: { notice: expect.stringContaining('시스템 값 3') },
+    })
+    expect(await kgDecimals(TEST_OPERATOR_ID)).toBe(1)
+    expect(await kgDecimals(other.id)).toBe(3)
+    expect((await systemUnit('KG')).decimals).toBe(3)
+    // 목록·품목 화면 선택지도 실제 값
+    const listed = await listUnitsAction({
+      ...createDataGridState({ pageSize: 100 }),
+      filters: { keyword: 'KG' },
+    })
+    expect(listed.ok && listed.data.rows.find((r) => r.code === 'KG')?.decimals).toBe(1)
+    const itemOptions = await getItemFormOptions(ALL(TEST_OPERATOR_ID))
+    expect(itemOptions.units.find((u) => u.code === 'KG')?.decimals).toBe(1)
+
+    expect(await setUnitDecimalsAction({ id: String(kg.id), decimals: 3 })).toMatchObject({
+      ok: true,
+    })
+    expect(await prisma.operatorUnit.findFirst({ select: { decimals: true } })).toEqual({
+      decimals: null,
+    })
+    expect(await kgDecimals(TEST_OPERATOR_ID)).toBe(3)
+  })
+
+  it('재고 수량 검사에 이 운영사의 자리수를 쓰고, 더 많은 자리의 재고가 있으면 줄일 수 없다', async () => {
+    const kg = await systemUnit('KG')
+    const ids = await createInboundFixture()
+    const receive = (qty: string) =>
+      runInContext({ actor: 'test', operatorId: TEST_OPERATOR_ID }, () =>
+        stockTransaction((tx) =>
+          receiveStock(tx, { address: { locationId: ids.icnStaging, itemId: ids.rice }, qty }),
+        ),
+      )
+    await receive('1.25')
+    expect(await setUnitDecimalsAction({ id: String(kg.id), decimals: 1 })).toMatchObject({
+      ok: false,
+      error: { code: 'CONFLICT', message: expect.stringContaining('재고') },
+    })
+    expect(await setUnitDecimalsAction({ id: String(kg.id), decimals: 2 })).toMatchObject({
+      ok: true,
+    })
+    await expect(receive('1.255')).rejects.toMatchObject({ code: 'VALIDATION' })
+    await receive('1.5')
+  })
+
+  it('운영사 추가 단위는 이 기능이 아니라 단위 수정으로', async () => {
+    const gn = await create()
+    expect(await setUnitDecimalsAction({ id: gn.id, decimals: 1 })).toMatchObject({
+      ok: false,
+      error: { code: 'VALIDATION' },
+    })
   })
 })
