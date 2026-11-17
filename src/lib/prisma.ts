@@ -23,6 +23,8 @@ export const AUDITED_MODELS: ReadonlySet<string> = new Set([
   'OperatorUnit',
   'Item',
   'Customer',
+  // 납품처 (0082)
+  'ShipTo',
   'Asn',
   'RegionCenterMap',
   // 화주 연동 API 키 (0081)
@@ -43,6 +45,7 @@ export const SOFT_DELETE_MODELS: ReadonlySet<string> = new Set([
   'Unit',
   'Item',
   'Customer',
+  'ShipTo',
   'Asn',
 ])
 
@@ -67,6 +70,7 @@ export const TENANT_MODELS: ReadonlySet<string> = new Set([
   'OperatorUnit',
   'Item',
   'Customer',
+  'ShipTo',
   'Stock',
   'StockTxn',
   'Asn',

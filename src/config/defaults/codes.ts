@@ -156,4 +156,20 @@ export const DEFAULT_CODE_GROUPS: readonly DefaultCodeGroup[] = [
       { code: 'WEEKLY', name: '주' },
     ],
   },
+  // 거래처 (0082)
+  {
+    code: 'PARTNER_TYPE',
+    name: '거래처 유형',
+    description: '거래처(화주가 물건을 파는 상대)의 형태',
+    items: [
+      { code: 'STORE', name: '매장' },
+      { code: 'AGENCY', name: '대리점' },
+      { code: 'WHOLESALE', name: '도매' },
+      { code: 'RETAIL_CHAIN', name: '유통사·체인 본사' },
+      { code: 'ONLINE_MALL', name: '온라인몰' },
+      { code: 'CORPORATE', name: '기업·기관' },
+      { code: 'INTERNAL', name: '자사·계열사' },
+      { code: 'ETC', name: '기타' },
+    ],
+  },
 ]
