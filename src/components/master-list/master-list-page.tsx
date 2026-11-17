@@ -32,6 +32,8 @@ type MasterListPageProps<TRow extends RowData> = {
   // 일괄 처리 버튼: 주면 행 체크박스가 생긴다. 선택이 없으면 버튼을 끄고,
   // 처리 뒤 done()을 부르면 선택을 비우고 목록을 다시 읽는다
   bulkActions?: (selection: { ids: string[]; done: () => void }) => React.ReactNode
+  // 일괄 처리에서 고를 수 없는 행 (예: 시스템 기본 창고)
+  canSelectRow?: (row: TRow) => boolean
   // 엑셀 파일 이름 앞부분 (예: '센터' → 센터_20261115_1405.xlsx). 없으면 엑셀 버튼 없음 (권한 없을 때 등)
   excelName?: string
   // 조건 없이 비었을 때 문구 (예: '등록된 센터가 없습니다')
@@ -53,6 +55,7 @@ export function MasterListPage<TRow extends RowData>({
   rowHref,
   onRowClick,
   bulkActions,
+  canSelectRow,
   excelName,
   emptyTitle = '조회된 데이터가 없습니다',
 }: MasterListPageProps<TRow>) {
@@ -105,6 +108,7 @@ export function MasterListPage<TRow extends RowData>({
         getRowId={getRowId}
         searchable={false}
         enableRowSelection={Boolean(bulkActions)}
+        canSelectRow={canSelectRow}
         onSelectionChange={setSelectedIds}
         toolbarActions={bulkActions?.({ ids: selectedIds, done })}
         onRowClick={onRowClick ?? (rowHref ? (row) => router.push(rowHref(row)) : undefined)}

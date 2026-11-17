@@ -108,7 +108,12 @@ export function useMasterForm<TSchema extends z.ZodType, TResult = unknown>({
         const next = afterSave ? afterSave(parsed.data, result.data, value) : value
         setValue(next)
         setBaseline(next)
-        setMessage({ ok: true, text: '저장했습니다.' })
+        // 저장은 됐지만 알려 줄 것이 있으면 결과의 notice를 덧붙인다 (예: 할당 가능 창고 없음 경고)
+        const notice = (result.data as { notice?: unknown } | null)?.notice
+        setMessage({
+          ok: true,
+          text: typeof notice === 'string' && notice ? `저장했습니다. ${notice}` : '저장했습니다.',
+        })
         if (onSuccess) onSuccess(result.data)
         else router.refresh()
       })

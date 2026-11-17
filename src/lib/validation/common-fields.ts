@@ -4,6 +4,10 @@ import { digitsOnly, isValidBusinessNumber, isValidPhone } from '@/lib/format'
 // 입력 칸 공통 규칙 — 화면·서버 공용 (운영사·센터·화주사·거래처 등 기준정보 입력에서 재사용)
 
 // 선택 입력 글자: 앞뒤 공백 제거, 비어 있으면 null
+// 정해진 값 목록 중 하나 (상수 codeSet의 values)
+export const oneOf = <T extends string>(values: readonly T[], message: string) =>
+  z.string().refine((value): value is T => (values as readonly string[]).includes(value), message)
+
 export const optionalText = (max: number) =>
   z
     .string()

@@ -88,6 +88,8 @@ export function GridShowcase() {
         loading={loading}
         getRowId={(row) => row.id}
         enableRowSelection
+        // 고를 수 없는 행 예시: 보류 재고는 체크박스가 꺼진다 ("모두 선택"에서도 빠짐)
+        canSelectRow={(row) => row.status !== 'HOLD'}
         onSelectionChange={setSelectedIds}
         onRowClick={setActiveRow}
         activeRowId={activeRow?.id}

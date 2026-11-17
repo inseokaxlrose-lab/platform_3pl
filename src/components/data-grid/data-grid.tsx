@@ -71,6 +71,8 @@ export type DataGridProps<TData extends RowData> = {
   getRowId: (row: TData) => string
   loading?: boolean
   enableRowSelection?: boolean
+  // 고를 수 없는 행 (예: 시스템 기본 창고) → 체크박스가 꺼지고 "모두 선택"에서도 빠진다
+  canSelectRow?: (row: TData) => boolean
   // 선택한 행의 id 목록 (다른 페이지에서 선택한 행 포함)
   onSelectionChange?: (ids: string[]) => void
   // 검색칸 표시 (기본 표시)
@@ -117,6 +119,7 @@ export function DataGrid<TData extends RowData>({
   getRowId,
   loading = false,
   enableRowSelection = false,
+  canSelectRow,
   onSelectionChange,
   searchable = true,
   searchPlaceholder,
@@ -284,7 +287,8 @@ export function DataGrid<TData extends RowData>({
     manualSorting: true,
     manualPagination: true,
     rowCount,
-    enableRowSelection,
+    enableRowSelection:
+      enableRowSelection && canSelectRow ? (row) => canSelectRow(row.original) : enableRowSelection,
     state: { sorting, pagination, rowSelection, columnVisibility, columnOrder: tableColumnOrder },
     onSortingChange: (updater) => onStateChange(changeSorting(state, resolve(updater, sorting))),
     onPaginationChange: (updater) => {
@@ -591,6 +595,7 @@ export function DataGrid<TData extends RowData>({
                         >
                           <Checkbox
                             aria-label="행 선택"
+                            disabled={!row.getCanSelect()}
                             checked={row.getIsSelected()}
                             onCheckedChange={(checked) => row.toggleSelected(checked === true)}
                           />
