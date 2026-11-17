@@ -2,26 +2,62 @@ import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { createDataGridState } from '@/components/data-grid/state'
 import { ALL_PERMISSION_CODES, type PermissionCode } from '@/config/permissions'
 import { getCustomerForEdit } from '@/lib/customers/customer-queries'
-import type { CustomerCreateInput } from '@/lib/customers/customer-schema'
+import {
+  EMPTY_SHIP_TO,
+  type CustomerCreateInput,
+  type ShipToInput,
+} from '@/lib/customers/customer-schema'
 import { prisma } from '@/lib/prisma'
 import type { DataScope } from '@/lib/scope/data-scope'
 import { getCurrentPermissions, getCurrentScope, getCurrentUser } from '@/lib/session'
-import {
-  createTestCenter,
-  createTestCodeGroup,
-  createTestShipper,
-  versionOf,
-} from '@/test/factories'
+import { createTestCenter, createTestCodeGroup, createTestShipper } from '@/test/factories'
 import { resetDatabase, TEST_OPERATOR_ID } from '@/test/reset-database'
 import {
   createCustomerAction,
   deleteCustomersAction,
   listCustomersAction,
   restoreCustomersAction,
+  setCustomersStatusAction,
   updateCustomerAction,
 } from './actions'
 
-// 거래처 (docs/decisions/0043)
+// 거래처·납품처 (docs/decisions/0043, 0082)
+
+// 주소 검색 API 대신 가짜 검색기: 아는 주소 두 곳만 1건으로 찾고, 나머지는 0건
+vi.mock('@/lib/regions/juso-client', () => {
+  const KNOWN = [
+    {
+      key: '판교역로 166',
+      hit: {
+        roadAddress: '경기도 성남시 분당구 판교역로 166',
+        jibunAddress: '경기도 성남시 분당구 백현동 532',
+        zipCode: '13529',
+        bjdCode: '4113510900',
+        bdMgtSn: '4113510900105320000000001',
+        buildingName: '',
+      },
+    },
+    {
+      key: '테헤란로 152',
+      hit: {
+        roadAddress: '서울특별시 강남구 테헤란로 152',
+        jibunAddress: '서울특별시 강남구 역삼동 737',
+        zipCode: '06236',
+        bjdCode: '1168010100',
+        bdMgtSn: '1168010100107370000000001',
+        buildingName: '',
+      },
+    },
+  ]
+  return {
+    jusoSearcher: () => async (keyword: string) => {
+      const found = KNOWN.find((k) => keyword.includes(k.key))
+      return found
+        ? { status: 'OK', total: 1, hits: [found.hit] }
+        : { status: 'OK', total: 0, hits: [] }
+    },
+  }
+})
 
 vi.mock('@/lib/session', () => ({
   getCurrentUser: vi.fn(),
@@ -52,21 +88,38 @@ const BUNDANG = '4113510900'
 
 const input = (overrides: Partial<CustomerCreateInput> = {}): CustomerCreateInput => ({
   shipperId: String(gana),
-  code: '',
+  code: 'C1',
   name: '한빛마트 분당점',
+  shortName: '',
+  customerType: '',
+  customerGroup: '',
   businessNumber: '',
   ceoName: '',
+  orderAddrMode: 'SHIP_TO',
   phone: '031-123-4567',
+  fax: '',
   email: '',
   zipCode: '13529',
   address: '경기 성남시 분당구 판교역로 166',
   addressDetail: '1층',
+  addressJibun: '',
   regionCode: BUNDANG,
-  receiverName: '김수령',
-  receiverPhone: '010-1111-2222',
-  deliveryMemo: '',
+  minShelfDays: null,
+  minShelfRatio: '',
   remark: '',
   contacts: [],
+  shipTos: [],
+  ...overrides,
+})
+
+// 납품처 한 곳 (기본값: 강남 주소, 권역 자동)
+const shipTo = (overrides: Partial<ShipToInput> = {}): ShipToInput => ({
+  ...EMPTY_SHIP_TO,
+  code: 'S1',
+  name: '강남 매장',
+  isDefault: true,
+  zipCode: '06236',
+  address: '서울 강남구 테헤란로 152',
   ...overrides,
 })
 
@@ -144,30 +197,56 @@ afterAll(async () => {
 })
 
 describe('거래처 등록 · 수정', () => {
-  it('시스템 코드 자동, 번호는 숫자만, 법정동코드·담당자·외부 코드 함께, 운영사 자동', async () => {
+  it('시스템 코드 자동, 번호는 숫자만, 담당자 함께, 납품처가 없으면 거래처 주소로 기본 납품처', async () => {
+    await assignZip('13529', icn)
     const created = await create({
+      code: 'hanbit-1',
       contacts: [{ duty: 'OUTBOUND', name: '박담당', phone: '', email: 'a@b.co', isPrimary: true }],
     })
     const saved = await prisma.customer.findUniqueOrThrow({
       where: { id: BigInt(created.id) },
-      include: { contacts: true },
+      include: { contacts: true, shipTos: true },
     })
     expect(saved.systemCode).toMatch(/^CU\d{8}$/)
     expect(saved).toMatchObject({
-      code: saved.systemCode,
+      code: 'HANBIT-1',
       operatorId: TEST_OPERATOR_ID,
       shipperId: gana,
       phone: '0311234567',
-      receiverPhone: '01011112222',
-      regionCode: BUNDANG,
+      status: 'ACTIVE',
+      source: 'SCREEN',
+      rawAddress: '경기 성남시 분당구 판교역로 166',
+      addressGrade: 'A',
       createdBy: 'boss',
     })
     expect(saved.contacts.map((c) => [c.duty, c.name, c.isPrimary])).toEqual([
       ['OUTBOUND', '박담당', 'Y'],
     ])
+    // 기본 납품처: 거래처코드·이름 그대로, 주소 동기화, 권역 자동으로 이천센터
+    expect(saved.shipTos).toHaveLength(1)
+    expect(saved.shipTos[0]).toMatchObject({
+      code: 'HANBIT-1',
+      name: '한빛마트 분당점',
+      isDefault: 'Y',
+      systemCreatedYn: 'Y',
+      addrSyncYn: 'Y',
+      zipCode: '13529',
+      regionCode: BUNDANG,
+      addressGrade: 'A',
+      deliveryCenterId: icn,
+      regionCenterId: icn,
+      centerAssignType: 'AUTO',
+      centerAssignStatus: 'ASSIGNED',
+      regionMismatchYn: 'N',
+      resolveLevel: 'ZIP',
+    })
   })
 
-  it('거래처코드는 같은 화주사 안에서만 겹칠 수 없다, 없는 담당 업무 코드는 거부', async () => {
+  it('거래처코드는 필수 · 화주사 안에서 겹칠 수 없다, 납품처도 주소도 없으면 거부', async () => {
+    expect(await createCustomerAction(input({ code: '' }))).toMatchObject({
+      ok: false,
+      error: { code: 'VALIDATION' },
+    })
     await create({ code: 'hanbit' })
     expect(await createCustomerAction(input({ code: 'HANBIT' }))).toMatchObject({
       ok: false,
@@ -177,8 +256,15 @@ describe('거래처 등록 · 수정', () => {
       (await createCustomerAction(input({ shipperId: String(dara), code: 'HANBIT' }))).ok,
     ).toBe(true)
     expect(
+      await createCustomerAction(input({ code: 'NOADDR', zipCode: '', address: '' })),
+    ).toMatchObject({
+      ok: false,
+      error: { code: 'VALIDATION', fieldErrors: { address: [expect.stringContaining('납품처')] } },
+    })
+    expect(
       await createCustomerAction(
         input({
+          code: 'C9',
           contacts: [{ duty: 'NOPE', name: '김', phone: '', email: 'a@b.co', isPrimary: true }],
         }),
       ),
@@ -188,24 +274,191 @@ describe('거래처 등록 · 수정', () => {
     })
   })
 
-  it('수정: 화주사는 그대로, 버전이 다르면 충돌, 법정동코드를 비우면 null', async () => {
+  it('수정: 화주사·거래처코드는 그대로, 버전이 다르면 충돌', async () => {
     const created = await create({ code: 'C1' })
-    const { shipperId, ...rest } = input({ code: 'C1', name: '한빛마트 본점', regionCode: '' })
-    void shipperId
+    const edit = await getCustomerForEdit(BigInt(created.id), ALL)
     expect(
       await updateCustomerAction({
-        ...rest,
+        ...edit!.input,
+        name: '한빛마트 본점',
         id: created.id,
-        rowVersion: await versionOf('customer', created.id),
+        rowVersion: edit!.rowVersion,
       }),
     ).toMatchObject({ ok: true })
     expect(await getCustomerForEdit(BigInt(created.id), ALL)).toMatchObject({
       shipperId: String(gana),
-      input: { name: '한빛마트 본점', regionCode: '' },
+      code: 'C1',
+      input: { name: '한빛마트 본점' },
     })
-    expect(await updateCustomerAction({ ...rest, id: created.id, rowVersion: 1 })).toMatchObject({
+    expect(
+      await updateCustomerAction({ ...edit!.input, id: created.id, rowVersion: 1 }),
+    ).toMatchObject({ ok: false, error: { code: 'CONFLICT' } })
+  })
+
+  it('거래중지 · 거래재개', async () => {
+    const created = await create()
+    expect(
+      await setCustomersStatusAction({ ids: [created.id], status: 'SUSPENDED' }),
+    ).toMatchObject({ ok: true })
+    const statusOf = async () =>
+      (await prisma.customer.findUniqueOrThrow({ where: { id: BigInt(created.id) } })).status
+    expect(await statusOf()).toBe('SUSPENDED')
+    await setCustomersStatusAction({ ids: [created.id], status: 'ACTIVE' })
+    expect(await statusOf()).toBe('ACTIVE')
+  })
+})
+
+describe('납품처 · 배송센터 (0082)', () => {
+  const shipTosOf = (customerId: string) =>
+    prisma.shipTo.findMany({
+      where: { customerId: BigInt(customerId), delYn: 'N' },
+      orderBy: { sortOrder: 'asc' },
+    })
+
+  it('기본 납품처는 정확히 1곳, 코드는 겹칠 수 없다', async () => {
+    expect(
+      await createCustomerAction(input({ shipTos: [shipTo({ isDefault: false })] })),
+    ).toMatchObject({ ok: false, error: { code: 'VALIDATION' } })
+    expect(
+      await createCustomerAction(input({ shipTos: [shipTo(), shipTo({ isDefault: false })] })),
+    ).toMatchObject({ ok: false, error: { code: 'VALIDATION' } })
+  })
+
+  it('권역 자동: 배정된 지역이면 지정 완료, 배정 안 된 지역이면 확인 필요로 저장하고 알려 준다', async () => {
+    await assignZip('06236', icn)
+    const ok = await create({ code: 'A1', shipTos: [shipTo()] })
+    expect((await shipTosOf(ok.id))[0]).toMatchObject({
+      deliveryCenterId: icn,
+      centerAssignType: 'AUTO',
+      centerAssignStatus: 'ASSIGNED',
+    })
+    // 13529는 권역 배정이 없다
+    const hold = await createCustomerAction(
+      input({
+        code: 'A2',
+        shipTos: [
+          shipTo({ code: 'BD', zipCode: '13529', address: '경기 성남시 분당구 판교역로 166' }),
+        ],
+      }),
+    )
+    expect(hold).toMatchObject({ ok: true, data: { notice: expect.stringContaining('BD') } })
+    expect((await shipTosOf(hold.ok ? hold.data.id : ''))[0]).toMatchObject({
+      deliveryCenterId: null,
+      centerAssignStatus: 'NEED_CONFIRM',
+      centerConfirmReason: 'REGION_UNASSIGNED',
+    })
+    // 목록: 확인 필요 거르기 · 건수
+    const result = await listCustomersAction({
+      ...createDataGridState(),
+      filters: { needConfirm: 'Y' },
+    })
+    expect(result.ok && result.data.rows.map((r) => [r.code, r.needConfirmCount])).toEqual([
+      ['A2', 1],
+    ])
+  })
+
+  it('직접 지정: 이용 센터만, 권역과 다르면 불일치 표시', async () => {
+    await assignZip('06236', icn)
+    // 가나식품은 이천센터만 이용 → 화면 저장은 반려하지 않고 "확인 필요"로 둔다 (API 정책은 ③에서)
+    const held = await create({
+      shipTos: [shipTo({ centerMode: 'MANUAL', deliveryCenterId: String(gmh) })],
+    })
+    expect((await shipTosOf(held.id))[0]).toMatchObject({
+      centerAssignStatus: 'NEED_CONFIRM',
+      centerConfirmReason: 'NOT_CLIENT_CENTER',
+    })
+    // 다라상사는 이천·김해 이용 → 김해로 직접 지정 (권역은 이천)
+    const created = await create({
+      code: 'C2',
+      shipperId: String(dara),
+      shipTos: [shipTo({ centerMode: 'MANUAL', deliveryCenterId: String(gmh) })],
+    })
+    expect((await shipTosOf(created.id))[0]).toMatchObject({
+      deliveryCenterId: gmh,
+      regionCenterId: icn,
+      centerAssignType: 'MANUAL',
+      centerAssignStatus: 'ASSIGNED',
+      regionMismatchYn: 'Y',
+    })
+  })
+
+  it('수정: 납품처 추가·빼기·기본 바꾸기, 코드는 바꿀 수 없다, 주소를 안 바꾸면 지정 그대로', async () => {
+    await assignZip('06236', icn)
+    await assignZip('13529', gmh)
+    const created = await create({ shipperId: String(dara), shipTos: [shipTo()] })
+    const load = async () => (await getCustomerForEdit(BigInt(created.id), ALL))!
+    let edit = await load()
+    const [first] = edit.input.shipTos
+    // 권역 배정을 바꿔도 주소를 안 바꾼 납품처는 다시 계산하지 않는다
+    await assignZip('06236', gmh)
+    const second = shipTo({
+      code: 'S2',
+      isDefault: true,
+      zipCode: '13529',
+      address: '경기 성남시 분당구 판교역로 166',
+    })
+    expect(
+      await updateCustomerAction({
+        ...edit.input,
+        shipTos: [{ ...first, isDefault: false }, second],
+        id: created.id,
+        rowVersion: edit.rowVersion,
+      }),
+    ).toMatchObject({ ok: true })
+    let rows = await shipTosOf(created.id)
+    expect(rows.map((r) => [r.code, r.isDefault, r.deliveryCenterId])).toEqual([
+      ['S1', 'N', icn],
+      ['S2', 'Y', gmh],
+    ])
+    // 코드 바꾸기 → 거부
+    edit = await load()
+    expect(
+      await updateCustomerAction({
+        ...edit.input,
+        shipTos: edit.input.shipTos.map((s) => (s.code === 'S1' ? { ...s, code: 'S9' } : s)),
+        id: created.id,
+        rowVersion: edit.rowVersion,
+      }),
+    ).toMatchObject({
       ok: false,
-      error: { code: 'CONFLICT' },
+      error: { code: 'VALIDATION', message: expect.stringContaining('바꿀 수 없') },
+    })
+    // S1 빼기 → 논리 삭제
+    expect(
+      await updateCustomerAction({
+        ...edit.input,
+        shipTos: edit.input.shipTos.filter((s) => s.code !== 'S1'),
+        id: created.id,
+        rowVersion: edit.rowVersion,
+      }),
+    ).toMatchObject({ ok: true })
+    rows = await shipTosOf(created.id)
+    expect(rows.map((r) => r.code)).toEqual(['S2'])
+    expect(
+      await prisma.shipTo.count({ where: { customerId: BigInt(created.id), delYn: 'Y' } }),
+    ).toBe(1)
+  })
+
+  it('기본 납품처 동기화: 거래처 주소를 바꾸면 납품처 주소·배송센터도 다시 정한다', async () => {
+    await assignZip('13529', icn)
+    await assignZip('06236', gmh)
+    const created = await create({ shipperId: String(dara) })
+    expect((await shipTosOf(created.id))[0].deliveryCenterId).toBe(icn)
+    const edit = (await getCustomerForEdit(BigInt(created.id), ALL))!
+    expect(
+      await updateCustomerAction({
+        ...edit.input,
+        zipCode: '06236',
+        address: '서울 강남구 테헤란로 152',
+        regionCode: '',
+        id: created.id,
+        rowVersion: edit.rowVersion,
+      }),
+    ).toMatchObject({ ok: true })
+    expect((await shipTosOf(created.id))[0]).toMatchObject({
+      zipCode: '06236',
+      deliveryCenterId: gmh,
+      addrSyncYn: 'Y',
     })
   })
 })
@@ -219,16 +472,17 @@ describe('데이터 범위 · 삭제', () => {
     signIn(gmhScope)
     const result = await listCustomersAction(createDataGridState())
     expect(result.ok && result.data.rows.map((r) => r.code)).toEqual(['DARA-C'])
-    expect(await createCustomerAction(input())).toMatchObject({
+    expect(await createCustomerAction(input({ code: 'X1' }))).toMatchObject({
       ok: false,
       error: { code: 'NOT_FOUND' },
     })
     expect(await getCustomerForEdit(BigInt(dara1.id), gmhScope)).not.toBeNull()
   })
 
-  it('지우면 목록에서 빠지고 "삭제됨"에서 되살린다 (같은 코드가 다시 생겼으면 거부)', async () => {
+  it('지우면 납품처도 함께 지우고, "삭제됨"에서 되살린다 (같은 코드가 다시 생겼으면 거부)', async () => {
     const a = await create({ code: 'C1' })
     expect(await deleteCustomersAction({ ids: [a.id] })).toEqual({ ok: true, data: { count: 1 } })
+    expect(await prisma.shipTo.count({ where: { customerId: BigInt(a.id), delYn: 'N' } })).toBe(0)
     const b = await create({ code: 'C1' })
     expect(await restoreCustomersAction({ ids: [a.id] })).toMatchObject({
       ok: false,
@@ -236,6 +490,7 @@ describe('데이터 범위 · 삭제', () => {
     })
     await deleteCustomersAction({ ids: [b.id] })
     expect(await restoreCustomersAction({ ids: [a.id] })).toEqual({ ok: true, data: { count: 1 } })
+    expect(await prisma.shipTo.count({ where: { customerId: BigInt(a.id), delYn: 'N' } })).toBe(1)
   })
 
   it('엑셀 전체 읽기는 엑셀 권한이 필요하다', async () => {
@@ -244,57 +499,5 @@ describe('데이터 범위 · 삭제', () => {
       ok: false,
       error: { code: 'FORBIDDEN' },
     })
-  })
-})
-
-describe('배송 센터 (0072)', () => {
-  const GANGNAM = '1168010100' // 서울 강남구
-
-  it('배송 센터는 그 화주사의 이용 센터만 저장되고, 비우면 null', async () => {
-    // 가나식품은 이천센터만 이용
-    expect(await createCustomerAction(input({ deliveryCenterId: String(gmh) }))).toMatchObject({
-      ok: false,
-      error: { code: 'VALIDATION', message: expect.stringContaining('이용하는 센터') },
-    })
-    const fixed = await create({ code: 'C1', deliveryCenterId: String(icn) })
-    const free = await create({ code: 'C2', deliveryCenterId: '' })
-    const centerOf = async (id: string) =>
-      (await prisma.customer.findUniqueOrThrow({ where: { id: BigInt(id) } })).deliveryCenterId
-    expect(await centerOf(fixed.id)).toBe(icn)
-    expect(await centerOf(free.id)).toBeNull()
-  })
-
-  it('목록의 배송 센터: 지정 → 권역설정(배송지 우편번호, 없으면 법정동) → 미배정', async () => {
-    // 다라상사는 이천·김해 이용
-    await assignZip('13529', icn)
-    await assignZip('06236', null, GANGNAM)
-    await create({ code: 'ZIP', shipperId: String(dara) }) // 13529
-    await create({ code: 'NOMAP', shipperId: String(dara), zipCode: '06236', regionCode: GANGNAM })
-    await create({
-      code: 'FIX',
-      shipperId: String(dara),
-      zipCode: '06236',
-      regionCode: GANGNAM,
-      deliveryCenterId: String(gmh),
-    })
-    await create({ code: 'BJD', shipperId: String(dara), zipCode: '', regionCode: GANGNAM })
-    await create({ code: 'NONE', shipperId: String(dara), zipCode: '', regionCode: '' })
-
-    const centers = async () => {
-      const result = await listCustomersAction(createDataGridState())
-      return Object.fromEntries(
-        (result.ok ? result.data.rows : []).map((r) => [r.code, r.deliveryCenter]),
-      )
-    }
-    expect(await centers()).toEqual({
-      ZIP: '이천센터 (권역)',
-      NOMAP: '미배정',
-      FIX: '김해센터 (지정)',
-      BJD: '미배정',
-      NONE: null,
-    })
-    // 06236을 김해로 배정하면 우편번호·법정동 모두 김해
-    await assignZip('06236', gmh)
-    expect(await centers()).toMatchObject({ NOMAP: '김해센터 (권역)', BJD: '김해센터 (권역)' })
   })
 })
