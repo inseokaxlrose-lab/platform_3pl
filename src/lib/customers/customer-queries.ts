@@ -1,4 +1,5 @@
 import 'server-only'
+import type { Prisma } from '@/generated/prisma/client'
 import { toContactInput } from '@/lib/contacts/contact-schema'
 import { textIds } from '@/lib/id'
 import { prisma } from '@/lib/prisma'
@@ -57,24 +58,8 @@ export async function getCustomerShipperOptions(scope: DataScope) {
 
 export type CustomerShipperOption = Awaited<ReturnType<typeof getCustomerShipperOptions>>[number]
 
-// 수정 화면용 거래처 한 건 + 납품처 (범위 밖이면 null → "찾을 수 없음")
-export async function getCustomerForEdit(id: bigint, scope: DataScope) {
-  const customer = await prisma.customer.findUnique({
-    where: { id },
-    include: {
-      shipper: { select: { code: true, name: true, centers: SHIPPER_CENTERS } },
-      contacts: { orderBy: { sortOrder: 'asc' } },
-      shipTos: {
-        where: NOT_DELETED,
-        orderBy: [{ sortOrder: 'asc' }, { id: 'asc' }],
-        include: {
-          deliveryCenter: { select: { code: true, name: true } },
-          regionCenter: { select: { code: true, name: true } },
-        },
-      },
-    },
-  })
-  if (!customer || !isInScope(scope, customer, CUSTOMER_SCOPE)) return null
+// DB 행(담당자·지우지 않은 납품처 포함) → 입력값 모양. 수정 화면과 연동 upsert(보낸 칸만 덮어쓰기)가 같이 쓴다
+export function customerInputOf(customer: CustomerInputSource): CustomerInput {
   const text = (value: string | null) => value ?? ''
   const shipTos: ShipToInput[] = customer.shipTos.map((s) => {
     const manual = s.centerAssignType === 'MANUAL' || s.centerAssignType === 'IF'
@@ -99,7 +84,7 @@ export async function getCustomerForEdit(id: bigint, scope: DataScope) {
       remark: text(s.remark),
     }
   })
-  const input: CustomerInput = {
+  return {
     name: customer.name,
     shortName: text(customer.shortName),
     customerType: text(customer.customerType),
@@ -120,7 +105,33 @@ export async function getCustomerForEdit(id: bigint, scope: DataScope) {
     remark: text(customer.remark),
     contacts: customer.contacts.map(toContactInput),
     shipTos,
-  }
+  } satisfies CustomerInput
+}
+
+// customerInputOf에 필요한 칸
+export type CustomerInputSource = Prisma.CustomerGetPayload<{
+  include: { contacts: true; shipTos: true }
+}>
+
+// 수정 화면용 거래처 한 건 + 납품처 (범위 밖이면 null → "찾을 수 없음")
+export async function getCustomerForEdit(id: bigint, scope: DataScope) {
+  const customer = await prisma.customer.findUnique({
+    where: { id },
+    include: {
+      shipper: { select: { code: true, name: true, centers: SHIPPER_CENTERS } },
+      contacts: { orderBy: { sortOrder: 'asc' } },
+      shipTos: {
+        where: NOT_DELETED,
+        orderBy: [{ sortOrder: 'asc' }, { id: 'asc' }],
+        include: {
+          deliveryCenter: { select: { code: true, name: true } },
+          regionCenter: { select: { code: true, name: true } },
+        },
+      },
+    },
+  })
+  if (!customer || !isInScope(scope, customer, CUSTOMER_SCOPE)) return null
+  const input = customerInputOf(customer)
   return textIds({
     id: customer.id,
     code: customer.code,

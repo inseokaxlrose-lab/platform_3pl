@@ -64,13 +64,18 @@ export const shipToSchema = z
     receiverPhone: optionalPhone,
     receiverPhone2: optionalPhone,
     deliveryMemo: optionalText(200),
-    centerMode: z.enum(['AUTO', 'MANUAL']),
+    // IF = 연동(API·엑셀)이 보낸 센터코드 (centerCode). 화면은 AUTO·MANUAL만 쓴다
+    centerMode: z.enum(['AUTO', 'MANUAL', 'IF']),
     deliveryCenterId: optionalIdSchema.default(null),
+    centerCode: z.string().trim().max(20).optional(),
     remark: optionalText(1000),
   })
   .superRefine((row, ctx) => {
     if (!row.addrSync && !row.address) {
       ctx.addIssue({ code: 'custom', path: ['address'], message: '납품처 주소를 입력해 주세요.' })
+    }
+    if (row.centerMode === 'IF' && !row.centerCode) {
+      ctx.addIssue({ code: 'custom', path: ['centerCode'], message: '센터코드를 넣어 주세요.' })
     }
     if (row.centerMode === 'MANUAL' && !row.deliveryCenterId) {
       ctx.addIssue({
@@ -92,13 +97,26 @@ const shipTosSchema = z
       ctx.addIssue({ code: 'custom', message: '같은 납품처코드가 두 번 있습니다.' })
     }
     const defaults = rows.filter((r) => r.isDefault)
+    // params.apiCode: 연동 API의 건별 오류코드 (0082 ③)
     if (defaults.length !== 1) {
-      ctx.addIssue({ code: 'custom', message: '기본 납품처를 1곳 정해 주세요.' })
+      ctx.addIssue({
+        code: 'custom',
+        message: '기본 납품처를 1곳 정해 주세요.',
+        params: { apiCode: 'DEFAULT_SHIP_TO_REQUIRED' },
+      })
     } else if (defaults[0].status !== 'ACTIVE') {
-      ctx.addIssue({ code: 'custom', message: '기본 납품처는 사용 중이어야 합니다.' })
+      ctx.addIssue({
+        code: 'custom',
+        message: '기본 납품처는 사용 중이어야 합니다.',
+        params: { apiCode: 'LAST_SHIP_TO_INACTIVE' },
+      })
     }
     if (!rows.some((r) => r.status === 'ACTIVE')) {
-      ctx.addIssue({ code: 'custom', message: '사용 중인 납품처가 1곳 이상 있어야 합니다.' })
+      ctx.addIssue({
+        code: 'custom',
+        message: '사용 중인 납품처가 1곳 이상 있어야 합니다.',
+        params: { apiCode: 'LAST_SHIP_TO_INACTIVE' },
+      })
     }
   })
 
@@ -138,6 +156,7 @@ const requireAddressWithoutShipTo = (
       code: 'custom',
       path: ['address'],
       message: '납품처가 없으면 거래처 주소가 필요합니다. (이 주소로 기본 납품처를 만듭니다)',
+      params: { apiCode: 'PARTNER_ADDRESS_REQUIRED' },
     })
   }
 }
