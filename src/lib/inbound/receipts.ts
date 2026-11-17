@@ -1,4 +1,5 @@
 import 'server-only'
+import { resolveUnitDecimals, unitDecimalsSelect } from '@/lib/units/unit-status'
 import { ActionError } from '@/lib/actions/action-error'
 import { currentActor, requireOperatorId } from '@/lib/actor'
 import { DEFAULT_LOCATION_CODE } from '@/lib/centers/center-defaults'
@@ -64,9 +65,16 @@ export async function confirmReceipt(data: ReceiptData) {
         expiryOn: true,
         inspectedQty: true,
         confirmedQty: true,
-        item: { select: { code: true, baseUnit: { select: { code: true, decimals: true } } } },
+        item: {
+          select: {
+            code: true,
+            baseUnit: { select: { code: true, ...unitDecimalsSelect(requireOperatorId()) } },
+          },
+        },
       },
     })
+    // 단위 소수 자리수: 시스템 단위는 이 운영사의 값 (0079)
+    resolveUnitDecimals(inspections)
     if (inspections.length !== merged.size) {
       throw new ActionError('NOT_FOUND', '이 ASN의 검수 기록이 아닌 것이 섞여 있습니다.')
     }

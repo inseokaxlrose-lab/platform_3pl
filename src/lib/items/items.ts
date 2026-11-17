@@ -10,7 +10,7 @@ import { assertRowVersion, withVersionGuard } from '@/lib/row-version'
 import { assertAllFound, assertNoCodeConflict } from '@/lib/soft-delete'
 import { DELETED_ONLY, NOT_DELETED, isActiveStatus, toStatus } from '@/lib/status'
 import { isItemBaseType } from '@/lib/units/unit-labels'
-import { isUnitActive, unitStatusSelect } from '@/lib/units/unit-status'
+import { isUnitActive, resolveUnitDecimals, unitStatusSelect } from '@/lib/units/unit-status'
 import { checkQtyDecimals } from '@/lib/units/convert'
 import { isYes } from '@/lib/yn'
 import { effectiveItemOptions, type ItemCreateData, type ItemData } from './item-schema'
@@ -68,6 +68,8 @@ async function assertUnits(db: Db, data: SaveItemData, keep: bigint[] = []) {
       ...unitStatusSelect(requireOperatorId()),
     },
   })
+  // 소수 자리수: 시스템 단위는 이 운영사의 값 (0079)
+  resolveUnitDecimals(units)
   const byId = new Map(units.map((u) => [u.id, u]))
   const usable = (id: bigint) => {
     const unit = byId.get(id)

@@ -1,4 +1,5 @@
 import 'server-only'
+import { resolveUnitDecimals, unitDecimalsSelect } from '@/lib/units/unit-status'
 import { ActionError } from '@/lib/actions/action-error'
 import { currentActor, requireOperatorId } from '@/lib/actor'
 import { nextDocumentNumber } from '@/lib/documents/doc-no'
@@ -39,9 +40,16 @@ export async function createAdjust(data: AdjustData, scope: DataScope) {
       select: {
         id: true,
         qty: true,
-        item: { select: { code: true, baseUnit: { select: { code: true, decimals: true } } } },
+        item: {
+          select: {
+            code: true,
+            baseUnit: { select: { code: true, ...unitDecimalsSelect(requireOperatorId()) } },
+          },
+        },
       },
     })
+    // 단위 소수 자리수: 시스템 단위는 이 운영사의 값 (0079)
+    resolveUnitDecimals(stocks)
     const byId = new Map(stocks.map((s) => [s.id, s]))
     const lines = data.lines.map((line, index) => {
       const stock = byId.get(line.stockId)

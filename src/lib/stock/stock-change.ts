@@ -1,4 +1,5 @@
 import { ActionError } from '@/lib/actions/action-error'
+import { resolveUnitDecimals, unitDecimalsSelect } from '@/lib/units/unit-status'
 import { currentActor, requireOperatorId } from '@/lib/actor'
 import { effectiveItemOptions } from '@/lib/items/item-schema'
 import type { Tx } from '@/lib/prisma'
@@ -98,7 +99,7 @@ async function resolveAddress(
       useLot: true,
       useExpiry: true,
       labelUnit: true,
-      baseUnit: { select: { code: true, decimals: true } },
+      baseUnit: { select: { code: true, ...unitDecimalsSelect(requireOperatorId()) } },
       shipper: {
         select: {
           useLot: true,
@@ -110,6 +111,8 @@ async function resolveAddress(
       },
     },
   })
+  // 단위 소수 자리수: 시스템 단위는 이 운영사의 값 (0079)
+  resolveUnitDecimals(item)
   if (!item) throw new ActionError('NOT_FOUND', '품목을 찾을 수 없습니다.')
 
   const lotNo = address.lotNo?.trim() || null

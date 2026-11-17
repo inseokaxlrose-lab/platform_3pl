@@ -1,9 +1,10 @@
 import 'server-only'
+import { resolveUnitDecimals } from '@/lib/units/unit-status'
 import { ActionError } from '@/lib/actions/action-error'
 import { currentActor, requireOperatorId } from '@/lib/actor'
 import { prisma } from '@/lib/prisma'
 import { parseQty } from '@/lib/units/convert'
-import { ASN_ITEM_SELECT, entryToBase, itemLotOptions } from './asns'
+import { asnItemSelect, entryToBase, itemLotOptions } from './asns'
 import type { InspectionData } from './inspection-schema'
 
 // 입고 검수 (docs/decisions/0053) — 도착한 물건의 수량·불량·로트·유통기한을 적는다
@@ -21,9 +22,11 @@ export async function addInspection(data: InspectionData) {
         id: true,
         asnId: true,
         asn: { select: { status: true, delYn: true } },
-        item: { select: ASN_ITEM_SELECT },
+        item: { select: asnItemSelect(requireOperatorId()) },
       },
     })
+    // 단위 소수 자리수: 시스템 단위는 이 운영사의 값 (0079)
+    resolveUnitDecimals(line)
     if (!line || line.asn.delYn === 'Y')
       throw new ActionError('NOT_FOUND', 'ASN 줄을 찾을 수 없습니다.')
     if (line.asn.status === 'CLOSED') {

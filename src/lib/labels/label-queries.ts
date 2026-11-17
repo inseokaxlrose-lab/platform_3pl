@@ -1,6 +1,7 @@
 import 'server-only'
+import { resolveUnitDecimals } from '@/lib/units/unit-status'
 import { textIds } from '@/lib/id'
-import { ASN_SCOPE, itemLotOptions, ASN_ITEM_SELECT } from '@/lib/inbound/asns'
+import { ASN_SCOPE, itemLotOptions, asnItemSelect } from '@/lib/inbound/asns'
 import { prisma } from '@/lib/prisma'
 import { isInScope, type DataScope } from '@/lib/scope/data-scope'
 import { parseQty, qtyText } from '@/lib/units/convert'
@@ -21,12 +22,14 @@ export async function getLabelWork(asnId: bigint, scope: DataScope) {
         orderBy: { id: 'asc' },
         include: {
           asnLine: { select: { lineNo: true } },
-          item: { select: { ...ASN_ITEM_SELECT, name: true } },
+          item: { select: { ...asnItemSelect(scope.operatorId ?? 0n), name: true } },
           labels: { select: { printCount: true } },
         },
       },
     },
   })
+  // 단위 소수 자리수: 시스템 단위는 이 운영사의 값 (0079)
+  resolveUnitDecimals(asn)
   if (!asn || !isInScope(scope, asn, ASN_SCOPE)) return null
   return textIds({
     id: asn.id,

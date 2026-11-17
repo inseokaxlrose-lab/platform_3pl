@@ -288,3 +288,46 @@ export async function restoreUnits(ids: bigint[]) {
     return { count }
   })
 }
+
+// 시스템 기본 단위의 소수 자리수를 이 운영사에서만 바꾼다 (0079)
+// - 시스템 값과 같게 하면 운영사 설정을 비운다 (시스템 값을 따름)
+// - 줄일 때는 이 운영사의 수량 중 더 많은 소수 자리가 있으면 막는다
+export async function setOperatorUnitDecimals(unitId: bigint, decimals: number) {
+  const operatorId = requireOperatorId()
+  const unit = await prisma.unit.findUnique({
+    where: { id: unitId },
+    select: {
+      code: true,
+      isSystem: true,
+      decimals: true,
+      operatorSettings: { where: { operatorId }, select: { decimals: true } },
+    },
+  })
+  if (!unit) throw new ActionError('NOT_FOUND', '단위를 찾을 수 없습니다.')
+  if (!isYes(unit.isSystem)) {
+    throw new ActionError('VALIDATION', '운영사 추가 단위는 단위 수정에서 소수 자리수를 바꿉니다.')
+  }
+  const current = unit.operatorSettings[0]?.decimals ?? unit.decimals
+  if (decimals < current) {
+    const over = await findDecimalOverflow(prisma, operatorId, unitId, decimals)
+    if (over.length > 0) {
+      throw new ActionError(
+        'CONFLICT',
+        `소수 ${decimals}자리보다 많은 수량이 있어 줄일 수 없습니다: ${over.join(', ')}`,
+      )
+    }
+  }
+  const value = decimals === unit.decimals ? null : decimals
+  await prisma.operatorUnit.upsert({
+    where: { operatorId_unitId: { operatorId, unitId } },
+    create: { operatorId, unitId, decimals: value },
+    update: { decimals: value },
+  })
+  return {
+    id: unitId,
+    notice:
+      value === null
+        ? `${unit.code}는 시스템 값(소수 ${unit.decimals}자리)을 따릅니다.`
+        : `${unit.code}를 이 운영사에서 소수 ${decimals}자리로 씁니다 (시스템 값 ${unit.decimals}자리).`,
+  }
+}

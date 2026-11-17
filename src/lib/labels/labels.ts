@@ -1,8 +1,9 @@
 import 'server-only'
+import { resolveUnitDecimals } from '@/lib/units/unit-status'
 import { ActionError } from '@/lib/actions/action-error'
 import { currentActor, requireOperatorId } from '@/lib/actor'
 import { nextDocumentNumber } from '@/lib/documents/doc-no'
-import { ASN_ITEM_SELECT, itemLotOptions } from '@/lib/inbound/asns'
+import { asnItemSelect, itemLotOptions } from '@/lib/inbound/asns'
 import { prisma } from '@/lib/prisma'
 import { labelQuantities, parseQty, qtyText } from '@/lib/units/convert'
 import { buildLabelPayload, LABEL_FORMAT_VERSION } from './label-payload'
@@ -28,12 +29,14 @@ export async function ensureLabels(inspectionId: bigint) {
         lotNo: true,
         expiryOn: true,
         inspectedQty: true,
-        item: { select: ASN_ITEM_SELECT },
+        item: { select: asnItemSelect(requireOperatorId()) },
         asn: {
           select: { center: { select: { code: true } }, shipper: { select: { code: true } } },
         },
       },
     })
+    // 단위 소수 자리수: 시스템 단위는 이 운영사의 값 (0079)
+    resolveUnitDecimals(inspection)
     if (!inspection) throw new ActionError('NOT_FOUND', '검수 기록을 찾을 수 없습니다.')
     const item = inspection.item
     const total = parseQty(inspection.inspectedQty.toString())
