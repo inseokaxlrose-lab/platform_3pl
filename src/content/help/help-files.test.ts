@@ -59,8 +59,13 @@ describe('화면 도움말 파일', () => {
   )
 
   it.each(helpFiles.map((file) => [file.href, file] as const))(
-    '%s: 화면 사진은 자기 메뉴 폴더(public/help/…)에 라이트·다크 두 장이 있다 (0077)',
+    '%s: 화면 사진이 1장 이상, 자기 메뉴 폴더(public/help/…)에 라이트·다크 두 장 (0077)',
     (href, { raw }) => {
+      // 모든 도움말에 화면 사진이 1장 이상 (새 화면도 같은 모양으로 — e2e/help-shots.spec.ts에 추가)
+      expect(
+        helpImageSources(raw).length,
+        `화면 사진이 없습니다: e2e/help-shots.spec.ts SHOTS에 추가 → npm run help:shots → 문서에 ![설명](/help${href}/이름.png)`,
+      ).toBeGreaterThan(0)
       for (const src of helpImageSources(raw)) {
         expect(isHelpImage(src), `/help/ 아래 .png만 씁니다: ${src}`).toBe(true)
         expect(src.startsWith(`/help${href}/`), `다른 메뉴 폴더의 사진: ${src}`).toBe(true)

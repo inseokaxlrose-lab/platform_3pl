@@ -53,6 +53,8 @@ Next.js (App Router) · TypeScript · PostgreSQL · Prisma · Tailwind + shadcn/
 - **페이지 틀**: 목록·편집·기타 화면 모두 공통 `AppPage`(헤더 전체 폭·고정, 버튼 순서 보조 → 주 → [도움말](맨 오른쪽 끝))를 쓴다. 목록·편집은 `MasterListPage`·`MasterFormPage`가 감싸므로 화면에서 `mx-auto max-w-*`·자체 헤더를 쓰지 않는다. 간격은 토큰(`page`·`section`·`card`) (`docs/ui-guidelines.md` "페이지 틀", `docs/decisions/0036`)
 - **입력 화면 배치**: 등록·수정 화면은 `MasterFormPage`(제한 폭 + 섹션 목차 + 아래 저장 막대) + `useMasterForm`(값·검사·변경 감지·취소·저장) + `FormGrid`/`Field span`(12칸) + 입력 부품(`@/components/inputs`: 번호 마스크·주소·공통코드 등) + 1:N은 `EditableSubTable`로 만든다. 화면 파일에는 섹션·필드 정의와 그 화면 전용 로직만. 카드 중첩·화면 폭 전체 입력칸·화면별 자체 마스크/검사 금지 (`docs/ui-guidelines.md`, `docs/decisions/0031`)
 - **화면 도움말**: 화면을 완성하면(`ready: true`) `src/content/help/{메뉴 주소}.md` 도움말을 함께 쓴다. 버튼 설명 단락에는 `<!-- 권한: 메뉴.동작 -->`를 붙인다. 빠지면 `help-files.test.ts`가 실패한다 (`docs/decisions/0023`)
+  - **모든 도움말에 화면 사진 1장 이상**(권역설정 도움말 모양): `e2e/help-shots.spec.ts`의 `SHOTS`에 화면·번호 대상을 추가 → `npm run e2e:prepare` → `npm run help:shots` → 소개 글 아래에 `![설명](/help/{메뉴 주소}/이름.png)` + `① … · ② … · ③ …` 설명. 손으로 캡처하지 않는다. 화면 모습이 바뀌면 사진도 다시 찍어 같은 작업에서 커밋한다
+  - 글 표기: 버튼은 `[저장]`, 팁·참고·주의는 `> [!TIP]`·`> [!NOTE]`·`> [!WARNING]`, 순서는 `1. 2. 3.` (`docs/decisions/0077`)
 - **화면 권한**: 각 화면(page.tsx) 맨 위에서 `hasPermission('메뉴.read')`로 확인하고 없으면 `<AccessDenied />`. 버튼은 `<Can permission="…">`으로 감싼다. 권한 코드는 `src/config/permissions.ts`에만 정의한다 (`docs/decisions/0011`, `0014`)
 
 ## 코드 스타일

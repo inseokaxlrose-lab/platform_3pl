@@ -27,7 +27,8 @@ export function PageHeader({ title, description, meta, actions, className }: Pag
           </div>
         )}
       </div>
-      <div className="flex flex-wrap items-center gap-2">
+      {/* data-slot: 도움말 사진 촬영(e2e/help-shots)이 '화면 버튼' 자리를 찾는 표시 */}
+      <div data-slot="page-actions" className="flex flex-wrap items-center gap-2">
         {actions}
         <HelpButton />
       </div>
