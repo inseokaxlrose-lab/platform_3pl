@@ -12,6 +12,7 @@ import {
   ListTreeIcon,
   MapIcon,
   MapPinIcon,
+  MapPinnedIcon,
   PackageCheckIcon,
   PackageIcon,
   PrinterIcon,
@@ -126,6 +127,14 @@ const adminNavigation: NavArea = {
           title: '거래처',
           href: '/admin/master/customers',
           icon: ContactIcon,
+          ready: true,
+          permission: 'master.customers.read',
+        },
+        {
+          // 납품처 (0082 ②): 배송센터 확인 필요·권역 불일치를 모아 처리 — 권한은 거래처와 같다
+          title: '납품처',
+          href: '/admin/master/ship-tos',
+          icon: MapPinnedIcon,
           ready: true,
           permission: 'master.customers.read',
         },

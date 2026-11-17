@@ -133,6 +133,15 @@ const SHOTS: Shot[] = [
       { label: '3', target: (page) => page.getByRole('button', { name: '저장' }) },
     ],
   },
+  {
+    // 납품처 (0082 ②): ③은 일괄 처리 버튼
+    ...list('/admin/master/ship-tos'),
+    markers: [
+      { label: '1', target: searchArea },
+      { label: '2', target: firstTable },
+      { label: '3', target: (page) => page.getByRole('button', { name: /배송센터 일괄 지정/ }) },
+    ],
+  },
   list('/admin/master/units'),
   {
     // 운영사 추가 단위 '근' (중량): 환산 섹션과 "1 근 = 0.6 KG" 미리보기가 보이게

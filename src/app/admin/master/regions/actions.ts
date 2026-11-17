@@ -12,6 +12,12 @@ import {
   type UploadIssue,
   type UploadRow,
 } from '@/lib/excel/upload'
+import {
+  reassignAfterRegionChange,
+  shipToRegionImpact,
+  type ReassignResult,
+  type ShipToRegionImpact,
+} from '@/lib/customers/ship-to-region'
 import { idSchema, optionalIdSchema } from '@/lib/id'
 import { prisma, type Db } from '@/lib/prisma'
 import { normalizeAddress } from '@/lib/regions/address-normalize'
@@ -114,6 +120,28 @@ const previewOf = (plan: RegionChangePlan) => ({
     confirmOnly: c.confirmOnly,
   })),
 })
+
+// 센터가 바뀐 우편번호 (추천 확인처럼 같은 센터면 납품처에 영향 없음)
+const movedZips = (plan: RegionChangePlan) =>
+  plan.changes.filter((c) => !c.confirmOnly).map((c) => c.zipCode)
+
+// 납품처 영향 글 (미리보기·업로드 검증 요약에 붙인다, 0082)
+function shipToImpactText(impact: ShipToRegionImpact) {
+  const parts = [
+    impact.autoChange > 0 && `자동 지정 납품처 ${impact.autoChange}곳 센터 변경`,
+    impact.manualMismatch > 0 &&
+      `수동·연동 지정 납품처 ${impact.manualMismatch}곳 권역 불일치 발생`,
+    impact.needConfirmRetry > 0 && `확인 필요 납품처 ${impact.needConfirmRetry}곳 다시 지정`,
+    impact.estimated > 0 && `법정동·시군구 추정 납품처 ${impact.estimated}곳 다시 계산`,
+  ].filter(Boolean)
+  return parts.length > 0 ? parts.join(' · ') : null
+}
+
+// 저장 결과 글: '납품처 n곳을 다시 정했습니다 (지정 a · 확인 필요 b)'
+const reassignText = (result: ReassignResult | null) =>
+  result && result.total > 0
+    ? ` 납품처 ${result.total}곳을 다시 정했습니다 (센터·상태 변경 ${result.changed} · 확인 필요 ${result.needConfirm}).`
+    : ''
 
 // ── 조회 ──
 
@@ -319,7 +347,18 @@ export const previewRegionAssignAction = createAction({
       tempZone: input.tempZone,
       centerId: input.centerId,
     })
-    return { ...previewOf(plan), boundary: target.boundary, scopeDesc: target.scopeDesc }
+    const impact = await shipToRegionImpact(
+      prisma,
+      requireOperatorId(),
+      input.tempZone,
+      plan.changes,
+    )
+    return {
+      ...previewOf(plan),
+      boundary: target.boundary,
+      scopeDesc: target.scopeDesc,
+      shipToImpact: shipToImpactText(impact),
+    }
   },
 })
 
@@ -338,7 +377,19 @@ export const applyRegionAssignAction = createAction({
           scopeDesc: target.scopeDesc,
           reason: input.reason,
         })
-        return { batchId, changeCount: plan.changes.length, invalidCount: plan.invalid.length }
+        // 바뀐 우편번호의 납품처 배송센터를 바로 다시 정한다 (같은 트랜잭션 — 0082 ②)
+        const reassigned = await reassignAfterRegionChange(
+          tx,
+          requireOperatorId(),
+          input.tempZone,
+          movedZips(plan),
+        )
+        return {
+          batchId,
+          changeCount: plan.changes.length,
+          invalidCount: plan.invalid.length,
+          shipToNotice: reassignText(reassigned),
+        }
       },
       { timeout: 60_000 },
     ),
@@ -440,7 +491,20 @@ async function checkUpload(db: Db, rows: UploadRow[]) {
       ),
     )
     .join(', ')
-  return { issues, plans, summary: summary || '바뀌는 배정이 없습니다.' }
+  const impact = await shipToRegionImpact(
+    db,
+    operatorId,
+    TEMP_ZONE_ALL,
+    plans
+      .filter(({ group }) => group.tempZone === TEMP_ZONE_ALL)
+      .flatMap(({ plan }) => plan.changes),
+  )
+  const impactText = shipToImpactText(impact)
+  return {
+    issues,
+    plans,
+    summary: `${summary || '바뀌는 배정이 없습니다.'}${impactText ? ` / ${impactText}` : ''}`,
+  }
 }
 
 export const validateRegionUploadAction = createAction({
@@ -466,6 +530,7 @@ export const commitRegionUploadAction = createAction({
           )
         }
         let changed = 0
+        const moved: string[] = []
         for (const { group, plan } of plans) {
           if (plan.changes.length === 0) continue
           const center = group.centerId
@@ -478,8 +543,15 @@ export const commitRegionUploadAction = createAction({
             scopeDesc: `엑셀 업로드 우편번호 ${group.zips.length}건 → ${center?.name ?? '배정 해제'}${tempLabel(group.tempZone)}`,
           })
           changed += result.plan.changes.length
+          if (group.tempZone === TEMP_ZONE_ALL) moved.push(...movedZips(result.plan))
         }
-        return { message: `배정 ${changed}건을 반영했습니다.` }
+        const reassigned = await reassignAfterRegionChange(
+          tx,
+          requireOperatorId(),
+          TEMP_ZONE_ALL,
+          moved,
+        )
+        return { message: `배정 ${changed}건을 반영했습니다.${reassignText(reassigned)}` }
       },
       { timeout: 60_000 },
     ),

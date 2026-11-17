@@ -34,6 +34,8 @@ export type AssignShipToInput = {
   policy?: ShipToCenterPolicy
   tempZone?: string
   searcher?: AddressSearcher
+  // false = 정제 캐시를 쓰지 않고 다시 정제 (납품처 목록 [재정제])
+  useCache?: boolean
   actor: string
 }
 
@@ -92,7 +94,7 @@ export async function assignShipToCenter(
   const norm = await normalizeAddress(
     db,
     { address: input.rawAddress, zipCode: input.rawZipCode, detail: input.addressDetail },
-    { searcher: input.searcher },
+    { searcher: input.searcher, useCache: input.useCache },
   )
   const sigungu = norm.sigunguCode
     ? await db.regionBjd.findFirst({
