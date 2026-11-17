@@ -3,14 +3,18 @@ import { contactsSchema } from '@/lib/contacts/contact-schema'
 import { idField, optionalIdSchema } from '@/lib/id'
 import {
   addressShape,
+  oneOf,
   optionalBusinessNumber,
+  optionalCount,
+  optionalDecimal,
   optionalEmail,
   optionalPhone,
   optionalText,
   requiredText,
 } from '@/lib/validation/common-fields'
+import { ORDER_ADDR_MODE, SHIP_TO_STATUS } from './customer-codes'
 
-// 거래처 입력 규칙 — 화면·서버 공용 (docs/decisions/0043)
+// 거래처·납품처 입력 규칙 — 화면·서버 공용 (docs/decisions/0043, 0082)
 
 // 담당자 규칙은 운영사·화주사와 같다
 export {
@@ -19,51 +23,160 @@ export {
   MAX_CONTACTS as MAX_CUSTOMER_CONTACTS,
 } from '@/lib/contacts/contact-schema'
 
-// 거래처코드: 영문·숫자·점·하이픈·밑줄 2~30자, 대문자로 저장. 비우면 시스템 코드 (0025)
-export const customerCodeField = z
-  .string()
-  .trim()
-  .toUpperCase()
-  .max(30, '30자 이하로 입력해 주세요.')
-  .refine(
-    (value) => value === '' || (value.length >= 2 && /^[A-Z0-9._-]+$/.test(value)),
-    '거래처코드는 영문·숫자·점·하이픈·밑줄 2~30자입니다.',
-  )
-
-const customerShape = {
-  code: customerCodeField,
-  name: requiredText('거래처명을 입력해 주세요.', 200),
-  businessNumber: optionalBusinessNumber,
-  ceoName: optionalText(50),
-  phone: optionalPhone,
-  email: optionalEmail,
-  // 배송지
-  ...addressShape,
-  // 법정동코드 10자리 (주소 검색 결과를 자동으로 채운다, 화면 미노출)
-  regionCode: z
+// 거래처코드·납품처코드: 화주 코드 그대로 — 영문·숫자·하이픈·밑줄 1~30자 (소문자는 대문자로), 필수, 등록 후 변경 불가
+const codeField = (label: string) =>
+  z
     .string()
     .trim()
-    .refine((value) => value === '' || /^\d{10}$/.test(value), '법정동코드는 숫자 10자리입니다.')
-    .transform((value) => value || null),
-  receiverName: optionalText(50),
-  receiverPhone: optionalPhone,
-  deliveryMemo: optionalText(200),
-  // 배송 센터 (0072·0076): 주소보다 먼저 따르는 지정. 화주사 이용 센터 중 하나, 비우면 권역설정(우편번호)으로
-  deliveryCenterId: optionalIdSchema.default(null),
+    .toUpperCase()
+    .min(1, `${label}를 입력해 주세요.`)
+    .max(30, '30자 이하로 입력해 주세요.')
+    .regex(/^[A-Z0-9_-]+$/, `${label}는 영문·숫자·하이픈·밑줄만 씁니다.`)
+
+export const customerCodeField = codeField('거래처코드')
+export const shipToCodeField = codeField('납품처코드')
+
+// 법정동코드 10자리 (주소 검색 결과를 자동으로 채운다, 화면 미노출)
+const regionCodeField = z
+  .string()
+  .trim()
+  .refine((value) => value === '' || /^\d{10}$/.test(value), '법정동코드는 숫자 10자리입니다.')
+  .transform((value) => value || null)
+
+// ── 납품처 한 곳
+// centerMode: AUTO = 권역 자동 (배송센터를 비우면 주소로 정한다) / MANUAL = 화면에서 고른 센터
+// 저장할 때 주소·센터를 바꾸지 않은 납품처는 기존 지정(연동 IF 포함)을 그대로 둔다
+export const shipToSchema = z
+  .object({
+    // 있으면 고치고, 없으면 새로
+    id: optionalIdSchema.default(null),
+    code: shipToCodeField,
+    name: requiredText('납품처명을 입력해 주세요.', 100),
+    isDefault: z.boolean(),
+    // 기본 납품처: 거래처 주소와 함께 바뀜 (켜져 있으면 주소 칸은 거래처 주소를 쓴다)
+    addrSync: z.boolean(),
+    status: oneOf(SHIP_TO_STATUS.values, '상태를 골라 주세요.'),
+    zipCode: z.string().trim().max(10),
+    address: z.string().trim().max(200),
+    addressDetail: optionalText(200),
+    regionCode: regionCodeField,
+    receiverName: optionalText(50),
+    receiverPhone: optionalPhone,
+    receiverPhone2: optionalPhone,
+    deliveryMemo: optionalText(200),
+    centerMode: z.enum(['AUTO', 'MANUAL']),
+    deliveryCenterId: optionalIdSchema.default(null),
+    remark: optionalText(1000),
+  })
+  .superRefine((row, ctx) => {
+    if (!row.addrSync && !row.address) {
+      ctx.addIssue({ code: 'custom', path: ['address'], message: '납품처 주소를 입력해 주세요.' })
+    }
+    if (row.centerMode === 'MANUAL' && !row.deliveryCenterId) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['deliveryCenterId'],
+        message: '배송센터를 고르거나 "권역 자동"으로 두세요.',
+      })
+    }
+  })
+
+// 기본 납품처 정확히 1곳(사용 중), 사용 중 1곳 이상, 코드 겹침 없음
+const shipTosSchema = z
+  .array(shipToSchema)
+  .max(200, '납품처는 한 번에 200곳까지입니다.')
+  .superRefine((rows, ctx) => {
+    if (rows.length === 0) return
+    const codes = rows.map((r) => r.code)
+    if (new Set(codes).size !== codes.length) {
+      ctx.addIssue({ code: 'custom', message: '같은 납품처코드가 두 번 있습니다.' })
+    }
+    const defaults = rows.filter((r) => r.isDefault)
+    if (defaults.length !== 1) {
+      ctx.addIssue({ code: 'custom', message: '기본 납품처를 1곳 정해 주세요.' })
+    } else if (defaults[0].status !== 'ACTIVE') {
+      ctx.addIssue({ code: 'custom', message: '기본 납품처는 사용 중이어야 합니다.' })
+    }
+    if (!rows.some((r) => r.status === 'ACTIVE')) {
+      ctx.addIssue({ code: 'custom', message: '사용 중인 납품처가 1곳 이상 있어야 합니다.' })
+    }
+  })
+
+const customerShape = {
+  name: requiredText('거래처명을 입력해 주세요.', 200),
+  shortName: optionalText(30),
+  customerType: optionalText(20),
+  customerGroup: optionalText(30),
+  businessNumber: optionalBusinessNumber,
+  ceoName: optionalText(50),
+  orderAddrMode: oneOf(ORDER_ADDR_MODE.values, '주문 주소 사용 방식을 골라 주세요.'),
+  phone: optionalPhone,
+  fax: optionalPhone,
+  email: optionalEmail,
+  // 주소 (납품처가 하나도 없으면 필수 — 기본 납품처를 이 주소로 만든다)
+  ...addressShape,
+  addressJibun: optionalText(200),
+  regionCode: regionCodeField,
+  // 출고 조건
+  minShelfDays: optionalCount.refine((v) => v === null || v <= 9999, '9999일 이하입니다.'),
+  minShelfRatio: optionalDecimal(5, 2).refine(
+    (v) => v === null || Number(v) <= 100,
+    '100% 이하입니다.',
+  ),
   remark: optionalText(1000),
   contacts: contactsSchema,
+  shipTos: shipTosSchema,
 }
 
-// 수정: 화주사는 바꿀 수 없다
-export const customerSchema = z.object(customerShape)
+// 납품처가 없으면 거래처 주소 필수 (PARTNER_ADDRESS_REQUIRED)
+const requireAddressWithoutShipTo = (
+  value: { shipTos: unknown[]; address: string | null; zipCode: string | null },
+  ctx: z.RefinementCtx,
+) => {
+  if (value.shipTos.length === 0 && !value.address) {
+    ctx.addIssue({
+      code: 'custom',
+      path: ['address'],
+      message: '납품처가 없으면 거래처 주소가 필요합니다. (이 주소로 기본 납품처를 만듭니다)',
+    })
+  }
+}
 
-// 등록: 화주사를 고른다
-export const customerCreateSchema = z.object({
-  shipperId: idField('화주사를 골라 주세요.'),
-  ...customerShape,
-})
+// 수정: 화주사·거래처코드는 바꿀 수 없다 (받지 않는다)
+export const customerSchema = z.object(customerShape).superRefine(requireAddressWithoutShipTo)
+
+// 등록: 화주사를 고르고 거래처코드를 넣는다
+export const customerCreateSchema = z
+  .object({
+    shipperId: idField('화주사를 골라 주세요.'),
+    code: customerCodeField,
+    ...customerShape,
+  })
+  .superRefine(requireAddressWithoutShipTo)
 
 export type CustomerInput = z.input<typeof customerSchema>
 export type CustomerData = z.output<typeof customerSchema>
 export type CustomerCreateInput = z.input<typeof customerCreateSchema>
 export type CustomerCreateData = z.output<typeof customerCreateSchema>
+export type ShipToInput = z.input<typeof shipToSchema>
+export type ShipToData = z.output<typeof shipToSchema>
+
+export const EMPTY_SHIP_TO: ShipToInput = {
+  id: '',
+  code: '',
+  name: '',
+  isDefault: false,
+  addrSync: false,
+  status: 'ACTIVE',
+  zipCode: '',
+  address: '',
+  addressDetail: '',
+  regionCode: '',
+  receiverName: '',
+  receiverPhone: '',
+  receiverPhone2: '',
+  deliveryMemo: '',
+  centerMode: 'AUTO',
+  deliveryCenterId: '',
+  remark: '',
+}

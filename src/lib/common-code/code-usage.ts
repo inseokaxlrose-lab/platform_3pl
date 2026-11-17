@@ -34,6 +34,9 @@ const CODE_USAGES: Record<string, CountUsage> = {
     db.shipper.count({ where: { operatorId, industry: code } }),
   SETTLE_CYCLE: async (db, operatorId, code) =>
     db.shipper.count({ where: { operatorId, settleCycle: code } }),
+  // 거래처 유형 (0082)
+  PARTNER_TYPE: async (db, operatorId, code) =>
+    db.customer.count({ where: { operatorId, customerType: code } }),
   // 제공 서비스: 운영사 (0040)
   SERVICE_TYPE: async (db, operatorId, code) =>
     db.operatorService.count({ where: { operatorId, serviceCd: code } }),

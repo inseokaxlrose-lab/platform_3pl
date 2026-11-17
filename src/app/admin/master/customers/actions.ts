@@ -9,9 +9,10 @@ import {
   createCustomer,
   deleteCustomers,
   restoreCustomers,
-  setCustomersActive,
+  setCustomersStatus,
   updateCustomer,
 } from '@/lib/customers/customers'
+import { getDefaultCenter } from '@/lib/regions/center-resolve'
 import { listQuerySchema } from '@/lib/grid/grid-query'
 import { idSchema } from '@/lib/id'
 import { prisma } from '@/lib/prisma'
@@ -52,18 +53,42 @@ export const createCustomerAction = createAction({
 // 수정 (rowVersion: 화면이 불러온 버전, 동시 수정 막기)
 export const updateCustomerAction = createAction({
   permission: 'master.customers.update',
-  input: customerSchema.extend({ id: idSchema, rowVersion: rowVersionField }),
+  input: customerSchema.and(z.object({ id: idSchema, rowVersion: rowVersionField })),
   handler: async ({ input: { id, rowVersion, ...data }, scope }) => {
     await assertCustomersInScope([id], scope)
     return updateCustomer(id, rowVersion, data)
   },
 })
 
-export const setCustomersActiveAction = createAction({
+// 거래중 / 거래중지 (여러 건)
+export const setCustomersStatusAction = createAction({
   permission: 'master.customers.update',
-  input: z.object({ ids: idsSchema, isActive: z.boolean() }),
+  input: z.object({ ids: idsSchema, status: z.enum(['ACTIVE', 'SUSPENDED']) }),
   handler: async ({ input, scope }) =>
-    setCustomersActive(await assertCustomersInScope(input.ids, scope), input.isActive),
+    setCustomersStatus(await assertCustomersInScope(input.ids, scope), input.status),
+})
+
+// 납품처 드로어: 고른 주소의 지역 기본 배송센터 (배송센터를 직접 고를 때 미리 고를 값·다르면 경고)
+export const previewShipToCenterAction = createAction({
+  permission: 'master.customers.read',
+  input: z.object({
+    shipperId: idSchema,
+    zipCode: z.string().trim().max(10),
+    regionCode: z.string().trim().max(10),
+  }),
+  handler: async ({ input, scope }) => {
+    const shipper = await prisma.shipper.findUnique({
+      where: { id: input.shipperId },
+      select: { id: true, operatorId: true, centers: { select: { centerId: true } } },
+    })
+    assertInScope(scope, shipper, SHIPPER_SCOPE)
+    const zip = input.zipCode.replace(/\D/g, '')
+    const center = await getDefaultCenter(prisma, shipper!.operatorId, {
+      zipCode: zip.length === 5 ? zip : undefined,
+      bjdCode: /^\d{10}$/.test(input.regionCode) ? input.regionCode : undefined,
+    })
+    return center ? { centerId: String(center.centerId), centerName: center.centerName } : null
+  },
 })
 
 export const deleteCustomersAction = createAction({

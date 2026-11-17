@@ -1,7 +1,7 @@
 'use client'
 
 import { PlayIcon, PowerIcon, Trash2Icon } from 'lucide-react'
-import { ACTIVE_STATUS, ConfirmDialog } from '@/components/common'
+import { ConfirmDialog } from '@/components/common'
 import type { DataGridColumn } from '@/components/data-grid'
 import {
   DELETED_STATUS_OPTION,
@@ -14,10 +14,17 @@ import {
 import { Button } from '@/components/ui/button'
 import { unwrap } from '@/lib/actions'
 import {
+  CUSTOMER_STATUS,
+  CUSTOMER_STATUS_BADGE,
+  DATA_SOURCE,
+  ORDER_ADDR_MODE,
+  PARTNER_TYPE_GROUP,
+} from '@/lib/customers/customer-codes'
+import {
   deleteCustomersAction,
   listCustomersAction,
   restoreCustomersAction,
-  setCustomersActiveAction,
+  setCustomersStatusAction,
 } from './actions'
 
 type Row = {
@@ -25,15 +32,18 @@ type Row = {
   systemCode: string
   code: string
   name: string
+  customerType: string | null
+  customerGroup: string | null
   businessNumber: string | null
   phone: string | null
-  zipCode: string | null
-  address: string | null
-  receiverName: string | null
-  receiverPhone: string | null
+  status: string
+  source: string
+  lastIfAt: Date | null
   shipper: string
+  defaultShipTo: string | null
   deliveryCenter: string | null
-  isActive: boolean
+  shipToCount: number
+  needConfirmCount: number
   createdAt: Date
   updatedAt: Date
 }
@@ -51,42 +61,72 @@ const COLUMNS: DataGridColumn<Row>[] = [
   { id: 'name', header: '거래처명', accessor: 'name', sortable: true, pinned: true },
   { id: 'shipper', header: '화주사', accessor: 'shipper', sortable: true },
   {
+    id: 'customerType',
+    header: '유형',
+    accessor: 'customerType',
+    format: { code: PARTNER_TYPE_GROUP },
+    sortable: true,
+  },
+  {
+    id: 'customerGroup',
+    header: '그룹',
+    accessor: 'customerGroup',
+    sortable: true,
+    defaultHidden: true,
+  },
+  {
     id: 'businessNumber',
     header: '사업자등록번호',
     accessor: 'businessNumber',
     format: 'bizNo',
     defaultHidden: true,
   },
-  { id: 'phone', header: '대표 전화', accessor: 'phone', format: 'phone' },
-  { id: 'address', header: '배송지', accessor: 'address' },
-  { id: 'receiverName', header: '받는 사람', accessor: 'receiverName' },
+  { id: 'phone', header: '대표 전화', accessor: 'phone', format: 'phone', defaultHidden: true },
+  // 기본 납품처의 시군구와 배송센터 (0082)
+  { id: 'defaultShipTo', header: '기본 납품처 지역', accessor: 'defaultShipTo' },
+  { id: 'deliveryCenter', header: '배송센터', accessor: 'deliveryCenter' },
   {
-    id: 'receiverPhone',
-    header: '받는 사람 연락처',
-    accessor: 'receiverPhone',
-    format: 'phone',
-    defaultHidden: true,
+    id: 'shipToCount',
+    header: '납품처 수',
+    accessor: 'shipToCount',
+    format: 'number',
   },
-  // 배송할 센터 (0076): 거래처 지정 → 권역설정(배송지 우편번호), 못 정하면 미배정
+  // 배송센터 확인이 필요한 납품처 수 (있으면 경고색)
   {
-    id: 'deliveryCenter',
-    header: '배송 센터',
-    accessor: 'deliveryCenter',
+    id: 'needConfirmCount',
+    header: '확인 필요',
+    accessor: 'needConfirmCount',
     cell: (row) =>
-      row.deliveryCenter === '미배정' ? (
-        <span className="font-medium text-destructive">{row.deliveryCenter}</span>
+      row.needConfirmCount > 0 ? (
+        <span className="font-medium text-warning">{row.needConfirmCount}</span>
       ) : (
-        (row.deliveryCenter ?? '-')
+        '-'
       ),
   },
-  { id: 'systemCode', header: '시스템 코드', accessor: 'systemCode', defaultHidden: true },
   {
-    id: 'isActive',
+    id: 'status',
     header: '상태',
-    accessor: (row) => String(row.isActive),
+    accessor: 'status',
     sortable: true,
-    format: { status: ACTIVE_STATUS },
+    format: { status: CUSTOMER_STATUS_BADGE },
   },
+  {
+    id: 'source',
+    header: '등록 경로',
+    accessor: (row) =>
+      DATA_SOURCE.labels[row.source as keyof typeof DATA_SOURCE.labels] ?? row.source,
+    sortable: true,
+    defaultHidden: true,
+  },
+  {
+    id: 'lastIfAt',
+    header: '마지막 연동',
+    accessor: 'lastIfAt',
+    format: 'datetime',
+    sortable: true,
+    defaultHidden: true,
+  },
+  { id: 'systemCode', header: '시스템 코드', accessor: 'systemCode', defaultHidden: true },
   { id: 'createdAt', header: '등록일', accessor: 'createdAt', format: 'date', sortable: true },
   {
     id: 'updatedAt',
@@ -114,7 +154,7 @@ export function CustomersList({
       label: '검색어',
       type: 'keyword',
       span: 4,
-      placeholder: '거래처코드·명·사업자번호·주소·받는 사람·화주사',
+      placeholder: '거래처코드·명·약칭·사업자번호·화주사',
     },
     {
       key: 'shipper',
@@ -127,11 +167,38 @@ export function CustomersList({
       label: '상태',
       type: 'segment',
       options: [
-        { value: 'ACTIVE', label: '사용' },
-        { value: 'INACTIVE', label: '사용 중지' },
+        ...CUSTOMER_STATUS.options,
         // 지운 거래처 보기 → [되살리기]
         DELETED_STATUS_OPTION,
       ],
+    },
+    {
+      key: 'needConfirm',
+      label: '배송센터 확인 필요',
+      type: 'yn',
+      ynLabels: ['있음', '없음'],
+    },
+    {
+      key: 'customerType',
+      label: '거래처 유형',
+      type: 'codeMulti',
+      codeGroup: PARTNER_TYPE_GROUP,
+      detail: true,
+    },
+    { key: 'customerGroup', label: '거래처 그룹', type: 'text', detail: true },
+    {
+      key: 'orderAddrMode',
+      label: '주문 주소 사용',
+      type: 'multi',
+      options: ORDER_ADDR_MODE.options,
+      detail: true,
+    },
+    {
+      key: 'source',
+      label: '등록 경로',
+      type: 'multi',
+      options: DATA_SOURCE.options,
+      detail: true,
     },
     { key: 'createdAt', label: '등록일', type: 'dateRange', span: 6, detail: true },
   ]
@@ -142,7 +209,7 @@ export function CustomersList({
   })
 
   const bulk = (ids: string[], done: () => void, kind: 'deactivate' | 'activate' | 'delete') => {
-    const label = { deactivate: '사용 중지', activate: '다시 사용', delete: '삭제' }[kind]
+    const label = { deactivate: '거래중지', activate: '거래재개', delete: '삭제' }[kind]
     return (
       <ConfirmDialog
         key={kind}
@@ -168,14 +235,20 @@ export function CustomersList({
           kind === 'delete'
             ? '출고 기록이 없는 거래처만 지워집니다. 상태 거르기의 "삭제됨"에서 되살릴 수 있습니다.'
             : kind === 'deactivate'
-              ? '새 출고에서 고를 수 없게 됩니다. 기록은 남습니다.'
+              ? '새 출고요청을 받지 않습니다. 진행 중인 주문은 그대로 처리합니다.'
               : undefined
         }
         confirmLabel={label}
         destructive={kind !== 'activate'}
         onConfirm={async () => {
           if (kind === 'delete') unwrap(await deleteCustomersAction({ ids }))
-          else unwrap(await setCustomersActiveAction({ ids, isActive: kind === 'activate' }))
+          else
+            unwrap(
+              await setCustomersStatusAction({
+                ids,
+                status: kind === 'activate' ? 'ACTIVE' : 'SUSPENDED',
+              }),
+            )
           done()
         }}
       />
@@ -185,7 +258,7 @@ export function CustomersList({
   return (
     <MasterListPage
       title="거래처"
-      description="화주사의 고객사입니다. 출고할 때 물건을 받는 곳이며, 배송지 우편번호로 권역설정의 배송센터를 찾습니다."
+      description="화주사의 고객사입니다. 거래처마다 물건을 받는 납품처를 두고, 납품처 주소로 권역설정의 배송센터를 정합니다."
       actions={actions}
       gridId="master-customers"
       searchFields={searchFields}

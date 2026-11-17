@@ -300,15 +300,17 @@ model Center {
   updatedBy            String    @default("system") @map("updated_by") @db.VarChar(50)
   rowVersion           Int       @default(1) @map("row_version")
 
-  users             UserCenter[]
-  warehouses        Warehouse[]
-  shippers          ShipperCenter[]
-  stocks            Stock[]
-  asns              Asn[]
+  users         UserCenter[]
+  warehouses    Warehouse[]
+  shippers      ShipperCenter[]
+  stocks        Stock[]
+  asns          Asn[]
   // 이 센터를 배송 센터로 지정한 거래처 (0072)
-  deliveryCustomers Customer[]
-  contacts          CenterContact[]
-  tempZones         CenterTempZone[]
+  // 납품처 배송센터·권역 기준 센터 (0082)
+  shipTos       ShipTo[]         @relation("ShipToDeliveryCenter")
+  regionShipTos ShipTo[]         @relation("ShipToRegionCenter")
+  contacts      CenterContact[]
+  tempZones     CenterTempZone[]
 
   // 논리 삭제: 'Y'면 지운 것 (목록·조회에서 빠지고 되살릴 수 있다, 0038)
   delYn         String              @default("N") @map("del_yn") @db.Char(1)
@@ -692,6 +694,7 @@ model Shipper {
   dedicatedLocations  Location[]
   // 연동 API 키 (0081)
   apiClients          ApiClient[]
+  shipTos             ShipTo[]
 
   // 코드는 삭제 안 된 것끼리만 겹치면 안 된다 (지운 것은 다시 쓸 수 있다, 0038)
   @@unique([operatorId, code], where: raw("del_yn = 'N'"), map: "tb_shipper_operator_id_shipper_cd_key")
@@ -941,6 +944,7 @@ model Operator {
   regionMaps      RegionCenterMap[]
   regionBatches   RegionChangeBatch[]
   apiClients      ApiClient[]
+  shipTos         ShipTo[]
 
   // 운영사코드는 삭제 안 된 것끼리만 겹치면 안 된다 (0038)
   @@unique([code], where: raw("del_yn = 'N'"), map: "tb_operator_operator_cd_key")
@@ -1267,31 +1271,51 @@ model Customer {
   operator       Operator @relation(fields: [operatorId], references: [id], onDelete: Restrict)
   shipperId      BigInt   @map("shipper_id")
   shipper        Shipper  @relation(fields: [shipperId], references: [id], onDelete: Restrict)
+  // 시스템 코드는 내부용. 거래처코드는 화주가 쓰는 코드 그대로 — 필수·등록 후 변경 불가 (0082, API 업무 키)
   systemCode     String   @unique @map("sys_cd")
   code           String   @map("customer_cd") @db.VarChar(30)
   name           String   @map("customer_nm") @db.VarChar(200)
+  shortName      String?  @map("customer_short_nm") @db.VarChar(30)
+  // 거래처 유형: 공통코드 PARTNER_TYPE (분류·표시), 거래처 그룹: 화주가 쓰는 그룹 (자유 입력)
+  customerType   String?  @map("customer_type_cd") @db.VarChar(20)
+  customerGroup  String?  @map("customer_group_cd") @db.VarChar(30)
   // 사업자등록번호·전화번호는 하이픈 없이 숫자만 (0029)
   businessNumber String?  @map("biz_reg_no") @db.Char(10)
   ceoName        String?  @map("ceo_nm") @db.VarChar(50)
+  // 주문 주소 사용 방식 (상수): SHIP_TO(납품처 지정) / ORDER_ADDR(주문의 수령인 주소 — 온라인몰·B2C)
+  orderAddrMode  String   @default("SHIP_TO") @map("order_addr_mode_cd") @db.VarChar(20)
   phone          String?  @map("tel_no") @db.VarChar(15)
+  fax            String?  @map("fax_no") @db.VarChar(15)
   email          String?  @db.VarChar(100)
 
-  // ── 배송지: 카카오 우편번호 서비스로 검색해 채우고, 상세주소만 직접 입력
-  zipCode          String? @map("zip_cd") @db.VarChar(10)
-  address          String? @map("addr1") @db.VarChar(200)
-  addressDetail    String? @map("addr2") @db.VarChar(200)
-  // 법정동코드 10자리 (주소 검색 결과를 자동 저장, 화면 미노출) — 배송권역(앞 2·5자리)과 맞춰 본다
-  regionCode       String? @map("region_cd") @db.Char(10)
-  receiverName     String? @map("receiver_nm") @db.VarChar(50)
-  receiverPhone    String? @map("receiver_tel_no") @db.VarChar(15)
-  // 배송 메모 (예: 정문 경비실에 맡겨 주세요)
-  deliveryMemo     String? @map("delivery_memo") @db.VarChar(200)
-  // 배송 센터 (0072): 배송권역이 겹칠 때 맨 먼저 따르는 지정. 화주사 이용 센터 중 하나, 비우면 권역 규칙으로
-  deliveryCenterId BigInt? @map("delivery_center_id")
-  deliveryCenter   Center? @relation(fields: [deliveryCenterId], references: [id], onDelete: Restrict)
+  // ── 주소: 원본(입력·연동 그대로)은 보존하고 정제 결과는 따로 (0082)
+  rawZipCode    String?   @map("raw_zip_cd") @db.VarChar(10)
+  rawAddress    String?   @map("raw_addr") @db.VarChar(500)
+  zipCode       String?   @map("zip_cd") @db.VarChar(10)
+  address       String?   @map("addr1") @db.VarChar(200)
+  addressDetail String?   @map("addr2") @db.VarChar(200)
+  addressJibun  String?   @map("addr_jibun") @db.VarChar(200)
+  // 법정동코드 10자리 (정제 결과)
+  regionCode    String?   @map("region_cd") @db.Char(10)
+  // 주소 정제 등급 A~F (0076 ADDR_GRADE)
+  addressGrade  String?   @map("addr_grade") @db.Char(1)
+  addressNormAt DateTime? @map("addr_norm_at")
+
+  // ── 출고 조건 (거래처가 요구, 화주 설정보다 우선 — 적용은 출고 할당 작업에서)
+  // 비어 있으면 화주 출고 최소 잔여일
+  minShelfDays  Int?     @map("min_shelf_days")
+  // 전체 유통기간 대비 잔여 비율 % (예: 66.67). 일수와 둘 다 있으면 더 엄격한 쪽
+  minShelfRatio Decimal? @map("min_shelf_ratio") @db.Decimal(5, 2)
+
+  // ── 연동 정보 (읽기 전용): 등록 경로 DATA_SOURCE, 최근 연동
+  source        String    @default("SCREEN") @map("source_cd") @db.VarChar(20)
+  lastIfAt      DateTime? @map("last_if_at")
+  lastRequestId String?   @map("last_request_id") @db.VarChar(40)
 
   remark     String?  @db.VarChar(1000)
-  status     String   @default("ACTIVE") @map("status_cd") @db.VarChar(10)
+  extAttr    Json?    @map("ext_attr")
+  // 상태 (상수 CUSTOMER_STATUS): ACTIVE 거래중 / SUSPENDED 거래중지 (신규 출고요청만 막는다)
+  status     String   @default("ACTIVE") @map("status_cd") @db.VarChar(20)
   createdAt  DateTime @default(now()) @map("created_at")
   updatedAt  DateTime @updatedAt @map("updated_at")
   // 등록·수정한 사람 아이디(username, 자동: 현재 작업자 / 시드 seed / 기존 데이터 system), 동시 수정 막기용 버전 (docs/db-conventions.md 공통 칸)
@@ -1300,19 +1324,104 @@ model Customer {
   rowVersion Int      @default(1) @map("row_version")
 
   contacts CustomerContact[]
+  shipTos  ShipTo[]
 
   // 논리 삭제: 'Y'면 지운 것 (목록·조회에서 빠지고 되살릴 수 있다, 0038)
   delYn String @default("N") @map("del_yn") @db.Char(1)
 
   // 거래처코드는 같은 화주사의 삭제 안 된 것끼리만 겹치면 안 된다 (0038)
   @@unique([shipperId, code], where: raw("del_yn = 'N'"), map: "tb_customer_shipper_id_customer_cd_key")
-  @@index([operatorId])
+  @@index([operatorId, shipperId, status])
+  @@index([shipperId, name])
+  @@index([businessNumber])
   @@index([regionCode])
-  @@index([deliveryCenterId])
   @@map("tb_customer")
 }
 
-// 거래처 담당자 (화주사·운영사 담당자와 같은 모양: 최대 5명, 대표 1명, 담당 업무는 공통코드 CONTACT_ROLE). 거래처의 이력으로 본다 (0038)
+// 납품처: 물건이 실제로 도착하는 곳 (0082). 거래처 하나에 여러 곳, 기본 납품처 정확히 1곳, 사용 중 1곳 이상
+// 납품처마다 배송센터가 정해진다 (assignShipToCenter: 연동 IF / 권역 자동 AUTO / 화면 수동 MANUAL)
+model ShipTo {
+  id              BigInt   @id @default(autoincrement()) @map("ship_to_id")
+  operatorId      BigInt   @map("operator_id")
+  operator        Operator @relation(fields: [operatorId], references: [id], onDelete: Restrict)
+  // 조회 성능용 (거래처의 화주사와 같다)
+  shipperId       BigInt   @map("shipper_id")
+  shipper         Shipper  @relation(fields: [shipperId], references: [id], onDelete: Restrict)
+  customerId      BigInt   @map("customer_id")
+  customer        Customer @relation(fields: [customerId], references: [id], onDelete: Restrict)
+  // 거래처 안에서 고유, 등록 후 변경 불가. 자동 생성 기본 납품처는 거래처코드와 같다
+  code            String   @map("ship_to_cd") @db.VarChar(30)
+  name            String   @map("ship_to_nm") @db.VarChar(100)
+  isDefault       String   @default("N") @map("default_yn") @db.Char(1)
+  // 거래처 주소로 자동 만든 납품처
+  systemCreatedYn String   @default("N") @map("system_created_yn") @db.Char(1)
+  // 기본 납품처에서만 의미: Y면 거래처 주소가 바뀔 때 함께 바뀐다 (직접 고치면 N)
+  addrSyncYn      String   @default("N") @map("addr_sync_yn") @db.Char(1)
+  status          String   @default("ACTIVE") @map("status_cd") @db.VarChar(20)
+  sortOrder       Int      @default(0) @map("sort_seq")
+
+  // ── 주소·수령 정보: 원본 보존 + 정제 결과 (정제 실패면 원본을 addr1에 두고 등급 F)
+  rawZipCode        String?   @map("raw_zip_cd") @db.VarChar(10)
+  rawAddress        String    @map("raw_addr") @db.VarChar(500)
+  zipCode           String?   @map("zip_cd") @db.VarChar(10)
+  address           String    @map("addr1") @db.VarChar(200)
+  addressDetail     String?   @map("addr2") @db.VarChar(200)
+  addressJibun      String?   @map("addr_jibun") @db.VarChar(200)
+  regionCode        String?   @map("bjd_cd") @db.Char(10)
+  sigunguName       String?   @map("sigungu_nm") @db.VarChar(50)
+  bdMgtSn           String?   @map("bd_mgt_sn") @db.VarChar(30)
+  latitude          Decimal?  @db.Decimal(10, 7)
+  longitude         Decimal?  @db.Decimal(10, 7)
+  addressGrade      String    @default("F") @map("addr_grade") @db.Char(1)
+  addressNormMethod String?   @map("addr_norm_method_cd") @db.VarChar(20)
+  addressNormAt     DateTime? @map("addr_norm_at")
+  receiverName      String?   @map("receiver_nm") @db.VarChar(50)
+  receiverPhone     String?   @map("receiver_tel_no") @db.VarChar(15)
+  receiverPhone2    String?   @map("receiver_tel_no2") @db.VarChar(15)
+  // 배송 메모 (기사 전달, 예: 정문 경비실)
+  deliveryMemo      String?   @map("delivery_memo") @db.VarChar(200)
+
+  // ── 배송센터 (상수 CENTER_ASSIGN_TYPE·STATUS·CONFIRM_REASON)
+  deliveryCenterId    BigInt?   @map("delivery_center_id")
+  deliveryCenter      Center?   @relation("ShipToDeliveryCenter", fields: [deliveryCenterId], references: [id], onDelete: Restrict)
+  centerAssignType    String?   @map("center_assign_type_cd") @db.VarChar(10)
+  // 센터가 없으면 반드시 NEED_CONFIRM (DB 검사)
+  centerAssignStatus  String    @default("NEED_CONFIRM") @map("center_assign_status_cd") @db.VarChar(20)
+  centerConfirmReason String?   @map("center_confirm_reason_cd") @db.VarChar(30)
+  // 권역설정 결과 (지정 센터와 비교용 — 권역 변경 때 갱신)
+  regionCenterId      BigInt?   @map("region_center_id")
+  regionCenter        Center?   @relation("ShipToRegionCenter", fields: [regionCenterId], references: [id], onDelete: Restrict)
+  regionMismatchYn    String    @default("N") @map("region_mismatch_yn") @db.Char(1)
+  // 결정 기준 ZIP / BJD / SIGUNGU (resolveCenterByAddress)
+  resolveLevel        String?   @map("resolve_level_cd") @db.VarChar(20)
+  centerAssignedAt    DateTime? @map("center_assigned_at")
+  centerAssignedBy    String?   @map("center_assigned_by") @db.VarChar(50)
+
+  // ── 연동 정보
+  source        String    @default("SCREEN") @map("source_cd") @db.VarChar(20)
+  lastIfAt      DateTime? @map("last_if_at")
+  lastRequestId String?   @map("last_request_id") @db.VarChar(40)
+
+  remark     String?  @db.VarChar(1000)
+  extAttr    Json?    @map("ext_attr")
+  delYn      String   @default("N") @map("del_yn") @db.Char(1)
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
+  createdBy  String   @default("system") @map("created_by") @db.VarChar(50)
+  updatedBy  String   @default("system") @map("updated_by") @db.VarChar(50)
+  rowVersion Int      @default(1) @map("row_version")
+
+  // 코드는 같은 거래처의 삭제 안 된 것끼리만 겹치면 안 된다
+  @@unique([customerId, code], where: raw("del_yn = 'N'"), map: "tb_ship_to_customer_id_ship_to_cd_key")
+  // 기본 납품처는 거래처당 하나 (삭제 안 된 것 중)
+  @@unique([customerId], where: raw("default_yn = 'Y' AND del_yn = 'N'"), map: "tb_ship_to_default_key")
+  @@index([shipperId, centerAssignStatus])
+  @@index([deliveryCenterId])
+  @@index([shipperId, zipCode])
+  @@index([operatorId, regionMismatchYn])
+  @@map("tb_ship_to")
+}
+
 model CustomerContact {
   id         BigInt   @id @default(autoincrement()) @map("contact_id")
   customerId BigInt   @map("customer_id")

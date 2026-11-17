@@ -23,9 +23,11 @@ export default async function CustomerPage({ params }: PageProps<'/admin/master/
   if (!customer) notFound()
 
   return (
+    // 저장하면 버전이 바뀌어 화면을 새로 그린다 (납품처 키·배송센터 지정 결과를 다시 채운다)
     <CustomerForm
+      key={customer.rowVersion}
       header={{
-        title: `${customer.input.name} (${customer.input.code})`,
+        title: `${customer.input.name} (${customer.code})`,
         description: customer.shipper,
         meta: `마지막 수정: ${await actorLabel(customer.updatedBy)} · ${formatDate(new Date(customer.updatedAt), true)}`,
         actions: <BackToListButton listPath="/admin/master/customers" />,
@@ -33,7 +35,7 @@ export default async function CustomerPage({ params }: PageProps<'/admin/master/
       shippers={[]}
       customer={customer}
       readOnly={!canUpdate}
-      canToggleActive={canUpdate}
+      canChangeStatus={canUpdate}
     />
   )
 }
