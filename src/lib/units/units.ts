@@ -10,6 +10,7 @@ import { isYes } from '@/lib/yn'
 import { decimalText } from './unit-format'
 import { isPhysicalType, UNIT_TYPE_LABELS, type UnitTypeValue } from './unit-labels'
 import type { UnitCreateData, UnitUpdateData } from './unit-schema'
+import { ALWAYS_ACTIVE_UNIT_CODES } from './unit-status'
 import { findDecimalOverflow, findUnitUsage, usageText } from './unit-usage'
 
 // 단위 저장 (docs/decisions/0034·0078). 권한 검사는 서버 액션에서 한다
@@ -172,21 +173,75 @@ async function findOwnUnits(ids: bigint[], what: string) {
   return units
 }
 
-// 일괄 사용 중지·다시 사용. 사용 중지는 쓰는 곳을 경고로 알린다
+// 일괄 사용 중지·다시 사용 (0079). 사용 중지는 쓰는 곳을 경고로 알린다
+// - 운영사 추가 단위: 그 단위의 상태를 바꾼다
+// - 시스템 기본 단위: 이 운영사의 설정만 바꾼다 (tb_operator_unit — 다른 운영사·시스템 단위 자체는 그대로)
+// - 사용 중지할 수 없는 단위: EA·BOX·PLT(프로그램이 직접 씀), 운영사의 중량·길이 표시 단위
 export async function setUnitsActive(ids: bigint[], isActive: boolean) {
   const operatorId = requireOperatorId()
-  const units = await findOwnUnits(ids, isActive ? '다시 사용' : '사용 중지')
-  const { count } = await prisma.unit.updateMany({
-    where: { id: { in: units.map((u) => u.id) } },
-    data: { status: toStatus(isActive) },
+  const unique = [...new Set(ids)]
+  const units = await prisma.unit.findMany({
+    where: { id: { in: unique } },
+    select: { id: true, code: true, isSystem: true },
   })
+  if (units.length !== unique.length) {
+    throw new ActionError('NOT_FOUND', '찾을 수 없는 단위가 섞여 있습니다.')
+  }
+  if (!isActive) await assertCanDeactivate(operatorId, units)
+
+  const status = toStatus(isActive)
+  const system = units.filter((u) => isYes(u.isSystem))
+  const own = units.filter((u) => !isYes(u.isSystem))
+  await prisma.$transaction(async (tx) => {
+    if (own.length > 0) {
+      await tx.unit.updateMany({ where: { id: { in: own.map((u) => u.id) } }, data: { status } })
+    }
+    for (const unit of system) {
+      await tx.operatorUnit.upsert({
+        where: { operatorId_unitId: { operatorId, unitId: unit.id } },
+        create: { operatorId, unitId: unit.id, status },
+        update: { status },
+      })
+    }
+  })
+
   const used = isActive
     ? []
     : (await findUnitUsage(prisma, operatorId, units)).filter((u) => u.uses.length)
   const notice = used.length
     ? `쓰는 곳이 있는 단위: ${used.map((u) => `${u.code}(${usageText(u.uses)})`).join(', ')} — 기존 데이터는 그대로 보이고 새로 고를 때만 빠집니다.`
     : undefined
-  return { count, notice }
+  return { count: units.length, notice }
+}
+
+async function assertCanDeactivate(
+  operatorId: bigint,
+  units: { code: string; isSystem: string }[],
+) {
+  const fixed = units
+    .filter(
+      (u) => isYes(u.isSystem) && (ALWAYS_ACTIVE_UNIT_CODES as readonly string[]).includes(u.code),
+    )
+    .map((u) => u.code)
+  if (fixed.length > 0) {
+    throw new ActionError(
+      'FORBIDDEN',
+      `${fixed.join('·')}는 프로그램이 직접 쓰는 단위(기본 수량·라벨 단위)라 사용 중지할 수 없습니다.`,
+    )
+  }
+  const operator = await prisma.operator.findUnique({
+    where: { id: operatorId },
+    select: { weightUnit: true, lengthUnit: true },
+  })
+  const display = units
+    .filter((u) => u.code === operator?.weightUnit || u.code === operator?.lengthUnit)
+    .map((u) => u.code)
+  if (display.length > 0) {
+    throw new ActionError(
+      'FORBIDDEN',
+      `운영사의 중량·길이 표시 단위(${display.join('·')})는 사용 중지할 수 없습니다.`,
+    )
+  }
 }
 
 export async function deleteUnits(ids: bigint[]) {

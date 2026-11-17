@@ -2,8 +2,8 @@ import 'server-only'
 import { textIds } from '@/lib/id'
 import { prisma } from '@/lib/prisma'
 import { sharedOperatorFilter, type DataScope } from '@/lib/scope/data-scope'
-import { isActiveStatus } from '@/lib/status'
 import { decimalText } from '@/lib/units/unit-format'
+import { isUnitActive, unitStatusSelect } from '@/lib/units/unit-status'
 import type { UnitTypeValue } from '@/lib/units/unit-labels'
 import { isYes } from '@/lib/yn'
 
@@ -34,7 +34,8 @@ export async function getUnitForEdit(id: bigint, scope: DataScope) {
       decimals: true,
       printName: true,
       sortOrder: true,
-      status: true,
+      // 실제 사용 여부: 시스템 단위는 이 운영사의 설정 (0079)
+      ...unitStatusSelect(scope.operatorId ?? 0n),
       isSystem: true,
       isBase: true,
       baseFactor: true,
@@ -72,7 +73,7 @@ export async function getUnitForEdit(id: bigint, scope: DataScope) {
       stdCode: unit.stdCode ?? '',
       description: unit.description ?? '',
       remark: unit.remark ?? '',
-      isActive: isActiveStatus(unit.status),
+      isActive: isUnitActive(unit),
     },
   })
 }

@@ -10,6 +10,7 @@ import {
   type DataScope,
 } from '@/lib/scope/data-scope'
 import { ACTIVE_ONLY, isActiveStatus } from '@/lib/status'
+import { isUnitActive, unitStatusSelect } from '@/lib/units/unit-status'
 import { parseQty, qtyText } from '@/lib/units/convert'
 import { isYes } from '@/lib/yn'
 import { ITEM_SCOPE, SHIPPER_SCOPE } from './item-list'
@@ -37,7 +38,15 @@ export async function getItemFormOptions(scope: DataScope): Promise<ItemFormOpti
     // 단위: 시스템 기본 단위 + 이 운영사의 추가 단위 (0078)
     prisma.unit.findMany({
       where: sharedOperatorFilter(scope),
-      select: { id: true, code: true, name: true, type: true, decimals: true, status: true },
+      select: {
+        id: true,
+        code: true,
+        name: true,
+        type: true,
+        decimals: true,
+        // 실제 사용 여부: 시스템 단위는 이 운영사의 설정 (0079)
+        ...unitStatusSelect(scope.operatorId ?? 0n),
+      },
       orderBy: [{ sortOrder: 'asc' }, { code: 'asc' }],
     }),
   ])
@@ -47,7 +56,10 @@ export async function getItemFormOptions(scope: DataScope): Promise<ItemFormOpti
       useLot: isYes(s.useLot),
       useExpiry: isYes(s.useExpiry),
     })),
-    units: units.map(({ status, ...u }) => ({ ...u, isActive: isActiveStatus(status) })),
+    units: units.map(({ status, operatorId, operatorSettings, ...u }) => ({
+      ...u,
+      isActive: isUnitActive({ status, operatorId, operatorSettings }),
+    })),
   })
 }
 

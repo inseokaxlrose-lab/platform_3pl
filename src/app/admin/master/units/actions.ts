@@ -3,12 +3,13 @@
 import { z } from 'zod'
 import { createAction } from '@/lib/actions/create-action'
 import { listQuerySchema, toPrismaQuery } from '@/lib/grid/grid-query'
-import { codesFilter, deletedWhere, statusWhere, ynFilter } from '@/lib/grid/list-filters'
+import { codesFilter, deletedWhere, ynFilter } from '@/lib/grid/list-filters'
 import { idSchema } from '@/lib/id'
 import { prisma } from '@/lib/prisma'
 import { sharedOperatorFilter } from '@/lib/scope/data-scope'
-import { withIsActive } from '@/lib/status'
+import { requireOperatorId } from '@/lib/actor'
 import { UNIT_TYPES, type UnitTypeValue } from '@/lib/units/unit-labels'
+import { isUnitActive, unitStatusFilter, unitStatusSelect } from '@/lib/units/unit-status'
 import { unitCreateSchema, unitUpdateSchema } from '@/lib/units/unit-schema'
 import {
   createUnit,
@@ -46,6 +47,7 @@ export const listUnitsAction = createAction({
       (UNIT_TYPES as readonly string[]).includes(t),
     )
     const system = ynFilter(filters, 'system')
+    const operatorId = requireOperatorId()
     const where = {
       // '삭제됨'을 고르면 지운 것만 (아니면 prisma.ts가 지운 것을 뺀다)
       AND: [
@@ -53,7 +55,8 @@ export const listUnitsAction = createAction({
         query.where,
         types.length > 0 ? { type: { in: types } } : {},
         system ? { isSystem: system } : {},
-        statusWhere(filters),
+        // 실제 상태: 시스템 단위는 이 운영사의 설정 (0079)
+        unitStatusFilter(operatorId, filters.status),
         deletedWhere(filters),
       ],
     }
@@ -74,7 +77,7 @@ export const listUnitsAction = createAction({
           type: true,
           decimals: true,
           sortOrder: true,
-          status: true,
+          ...unitStatusSelect(operatorId),
           isSystem: true,
           isBase: true,
           baseFactor: true,
@@ -85,15 +88,27 @@ export const listUnitsAction = createAction({
       }),
       prisma.unit.count({ where }),
     ])
-    const shaped = rows.map(({ baseUnit, baseFactor, isSystem, isBase, ...row }) => ({
-      ...row,
-      // 예/아니오 칸은 화면에서 true/false로, 소수는 글자로 (끝의 0 정리는 화면 표시에서)
-      isSystem: isYes(isSystem),
-      isBase: isYes(isBase),
-      baseCode: baseUnit?.code ?? null,
-      baseFactor: baseFactor?.toString() ?? null,
-    }))
-    return { rows: shaped.map(withIsActive), rowCount }
+    const shaped = rows.map(
+      ({
+        baseUnit,
+        baseFactor,
+        isSystem,
+        isBase,
+        status,
+        operatorId: owner,
+        operatorSettings,
+        ...row
+      }) => ({
+        ...row,
+        isActive: isUnitActive({ status, operatorId: owner, operatorSettings }),
+        // 예/아니오 칸은 화면에서 true/false로, 소수는 글자로 (끝의 0 정리는 화면 표시에서)
+        isSystem: isYes(isSystem),
+        isBase: isYes(isBase),
+        baseCode: baseUnit?.code ?? null,
+        baseFactor: baseFactor?.toString() ?? null,
+      }),
+    )
+    return { rows: shaped, rowCount }
   },
 })
 
