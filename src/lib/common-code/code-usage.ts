@@ -19,6 +19,14 @@ const CODE_USAGES: Record<string, CountUsage> = {
   // 보관 방식: 창고 (0074)
   STORAGE_METHOD: async (db, operatorId, code) =>
     db.warehouse.count({ where: { operatorId, storageMethod: code } }),
+  // 구역·로케이션 (0075)
+  ZONE_TYPE: async (db, operatorId, code) => db.zone.count({ where: { operatorId, type: code } }),
+  LOC_TYPE: async (db, operatorId, code) =>
+    db.location.count({ where: { operatorId, locType: code } }),
+  LOCK_REASON: async (db, operatorId, code) =>
+    db.location.count({ where: { operatorId, lockReason: code } }),
+  ABC_CLASS: async (db, operatorId, code) =>
+    db.location.count({ where: { operatorId, abcClass: code } }),
   // 제공 서비스: 운영사 (0040)
   SERVICE_TYPE: async (db, operatorId, code) =>
     db.operatorService.count({ where: { operatorId, serviceCd: code } }),

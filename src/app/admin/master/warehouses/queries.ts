@@ -49,9 +49,24 @@ export async function getWarehouseForEdit(id: bigint, scope: DataScope) {
       // 기본 로케이션 고르기: 이 창고의 사용 중인 로케이션
       locations: {
         where: { ...NOT_DELETED, status: 'ACTIVE' },
-        select: { id: true, code: true, name: true },
+        select: { id: true, code: true, description: true },
         orderBy: { code: 'asc' },
         take: 3000,
+      },
+      // 구역 표 (0075): 정렬순서 → 코드, 로케이션 수 함께
+      zones: {
+        where: NOT_DELETED,
+        select: {
+          id: true,
+          code: true,
+          name: true,
+          type: true,
+          pickSeq: true,
+          sortOrder: true,
+          status: true,
+          _count: { select: { locations: { where: NOT_DELETED } } },
+        },
+        orderBy: [{ sortOrder: 'asc' }, { code: 'asc' }],
       },
       // 관계 목록·개수는 지운 줄을 직접 뺀다 (NOT_DELETED)
       _count: { select: { locations: { where: NOT_DELETED } } },
@@ -77,6 +92,17 @@ export async function getWarehouseForEdit(id: bigint, scope: DataScope) {
     defaultStockStatus: warehouse.defaultStockStatus,
     allocPriority: warehouse.allocPriority,
     defaultLocId: warehouse.defaultLocId?.toString() ?? '',
+    // 구역 표 줄 (EditableSubTable은 글자 칸)
+    zones: warehouse.zones.map((z) => ({
+      id: z.id.toString(),
+      code: z.code,
+      name: z.name,
+      type: z.type,
+      pickSeq: z.pickSeq?.toString() ?? '',
+      sortOrder: String(z.sortOrder),
+      status: z.status as 'ACTIVE' | 'INACTIVE',
+      locationCount: z._count.locations,
+    })),
   }
   const { center } = warehouse
   // 화면으로 보낼 값이라 키는 글자로
@@ -100,7 +126,7 @@ export async function getWarehouseForEdit(id: bigint, scope: DataScope) {
     locationOptions: warehouse.locations.map((l) => ({
       value: l.id.toString(),
       label: l.code,
-      description: l.name && l.name !== l.code ? l.name : undefined,
+      description: l.description ?? undefined,
     })),
     locationCount: warehouse._count.locations,
   })

@@ -41,7 +41,13 @@ beforeEach(async () => {
   })
   const location = (warehouseId: bigint, code: string) =>
     prisma.location.create({
-      data: { operatorId: TEST_OPERATOR_ID, warehouseId, code, name: code },
+      // 로케이션의 센터 = 창고의 센터 (0075)
+      data: {
+        operatorId: TEST_OPERATOR_ID,
+        warehouseId,
+        code,
+        centerId: warehouseId === gmhInbound.id ? gmh.id : icn.id,
+      },
     })
   const firstLocation = (warehouseId: bigint) =>
     prisma.location.findFirstOrThrow({ where: { warehouseId } })

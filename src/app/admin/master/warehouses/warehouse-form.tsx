@@ -5,6 +5,7 @@ import { useState } from 'react'
 import { STOCK_STATUS, TEMP_ZONE, type TempZoneKey } from '@/config/operator-codes'
 import { CenterSelect, LocationSelect, NumberInput, YnToggle } from '@/components/inputs'
 import {
+  EditableSubTable,
   Field,
   FormGrid,
   MasterFormPage,
@@ -37,7 +38,8 @@ import {
   WAREHOUSE_TYPE_DEFAULTS,
   type WarehouseTypeKey,
 } from '@/lib/warehouses/warehouse-codes'
-import { warehouseCreateSchema, type WarehouseFormValue } from '@/lib/warehouses/warehouse-schema'
+import { warehouseFormSchema, type WarehouseFormValue } from '@/lib/warehouses/warehouse-schema'
+import { EMPTY_ZONE, ZONE_TYPE_GROUP, type ZoneRow } from '@/lib/zones/zone-schema'
 import { createWarehouseAction, updateWarehouseAction } from './actions'
 import type { CenterOption, WarehouseForEdit } from './queries'
 
@@ -69,8 +71,8 @@ const sameOps = (a: Ops, b: Ops) => OPS_KEYS.every((key) => a[key] === b[key])
 const defaultTempZone = (zones: readonly string[]) =>
   zones.length === 1 ? zones[0] : zones.includes('AMBIENT') ? 'AMBIENT' : ''
 
-// 창고 등록·수정 (docs/decisions/0027, 0074, 입력 화면 틀 0031)
-// 섹션: 기본 정보 / 위치·시설 / 운영 속성. 상태 변경·삭제는 헤더 버튼(warehouse-header-actions)
+// 창고 등록·수정 (docs/decisions/0027, 0074, 0075, 입력 화면 틀 0031)
+// 섹션: 기본 정보 / 위치·시설 / 운영 속성 / 구역(수정에서만). 상태 변경·삭제는 헤더 버튼(warehouse-header-actions)
 // - 유형을 고르면 운영 속성을 유형 기본값으로 채운다. 이미 고친 값이 있으면 바꿀지 묻는다
 // - 시스템 기본 창고: 설명·정렬순서·비고만 고칠 수 있다
 export function WarehouseForm(props: WarehouseFormProps) {
@@ -104,17 +106,24 @@ export function WarehouseForm(props: WarehouseFormProps) {
           defaultLocId: '',
         } satisfies WarehouseFormValue),
     version: editing?.rowVersion,
-    schema: warehouseCreateSchema,
-    save: ({ centerId, code, ...data }: WarehouseFormValue, version) =>
+    schema: warehouseFormSchema,
+    save: ({ centerId, code, zones, ...data }: WarehouseFormValue, version) =>
       editing
         ? updateWarehouseAction({
             id: editing.id,
             rowVersion: version ?? editing.rowVersion,
             ...data,
+            // 시스템 기본 창고는 구역을 쓰지 않는다
+            ...(!editing.isSystem && { zones }),
           })
         : createWarehouseAction({ centerId, code, ...data }),
-    // 검사를 거친 값은 글자·키 모양이 바뀌므로 화면 값은 입력한 그대로 둔다
-    afterSave: (_saved, _result, value) => value,
+    // 검사를 거친 값은 글자·키 모양이 바뀌므로 화면 값은 입력한 그대로 두고, 새 구역 줄에 키를 채운다
+    afterSave: (_saved, result, value) => {
+      const ids = result.zoneIds
+      return ids && value.zones
+        ? { ...value, zones: value.zones.map((z, i) => ({ ...z, id: ids[i] ?? z.id })) }
+        : value
+    },
     onSuccess: editing
       ? undefined
       : (created) => router.push(`/admin/master/warehouses/${(created as { id: string }).id}`),
@@ -431,6 +440,82 @@ export function WarehouseForm(props: WarehouseFormProps) {
       ),
     },
   ]
+
+  // 구역 (0075): 수정 화면에서만, 시스템 기본 창고는 구역을 쓰지 않는다
+  if (editing && !isSystem) {
+    sections.push({
+      id: 'zones',
+      title: '구역',
+      description:
+        '같은 방식으로 운영하는 로케이션 묶음입니다 (예: A구역 랙 보관, P구역 피킹). 구역코드는 로케이션 코드 앞자리라 저장 후 바꿀 수 없고, 로케이션이 있는 구역은 지울 수 없습니다.',
+      content: (
+        <EditableSubTable<ZoneRow>
+          name="zones"
+          rows={(value.zones ?? []) as ZoneRow[]}
+          onChange={(zones) => set({ zones })}
+          columns={[
+            {
+              key: 'code',
+              label: '구역코드',
+              required: true,
+              width: '7rem',
+              // 저장된 구역의 코드는 잠근다
+              render: (cell) => (
+                <Input
+                  id={cell.id}
+                  value={cell.value}
+                  onChange={(e) => cell.onChange(e.target.value.toUpperCase())}
+                  maxLength={10}
+                  disabled={cell.disabled || Boolean(cell.row.id)}
+                  aria-invalid={cell.invalid}
+                />
+              ),
+            },
+            { key: 'name', label: '구역명', required: true },
+            {
+              key: 'type',
+              label: '구역 유형',
+              required: true,
+              width: '8rem',
+              input: { codeGroup: ZONE_TYPE_GROUP },
+            },
+            { key: 'pickSeq', label: '피킹 순서', width: '6rem' },
+            { key: 'sortOrder', label: '정렬순서', required: true, width: '6rem' },
+            {
+              key: 'status',
+              label: '상태',
+              width: '7.5rem',
+              render: (cell) => (
+                <Select value={cell.value} onValueChange={cell.onChange} disabled={cell.disabled}>
+                  <SelectTrigger id={cell.id} className="w-full">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="ACTIVE">사용</SelectItem>
+                    <SelectItem value="INACTIVE">사용 중지</SelectItem>
+                  </SelectContent>
+                </Select>
+              ),
+            },
+            {
+              key: 'locationCount',
+              label: '로케이션 수',
+              width: '6rem',
+              render: (cell) => (
+                <span className="text-sm text-muted-foreground">{cell.row.locationCount}</span>
+              ),
+            },
+          ]}
+          createRow={() => ({ ...EMPTY_ZONE })}
+          errors={errors}
+          addLabel="구역 추가"
+          countUnit="개"
+          emptyText="등록된 구역이 없습니다. 로케이션 일괄 생성 전에 구역을 만드세요."
+          disabled={disabled}
+        />
+      ),
+    })
+  }
 
   return (
     <>

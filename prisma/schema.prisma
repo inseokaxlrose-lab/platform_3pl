@@ -312,7 +312,10 @@ model Center {
   tempZones         CenterTempZone[]
 
   // 논리 삭제: 'Y'면 지운 것 (목록·조회에서 빠지고 되살릴 수 있다, 0038)
-  delYn String @default("N") @map("del_yn") @db.Char(1)
+  delYn     String     @default("N") @map("del_yn") @db.Char(1)
+  // 구역·로케이션 (0075)
+  zones     Zone[]
+  locations Location[]
 
   // 코드는 삭제 안 된 것끼리만 겹치면 안 된다 (지운 것은 다시 쓸 수 있다, 0038)
   @@unique([operatorId, code], where: raw("del_yn = 'N'"), map: "tb_center_operator_id_center_cd_key")
@@ -436,6 +439,7 @@ model Warehouse {
   // 코드는 삭제 안 된 것끼리만 겹치면 안 된다 (지운 코드는 다시 쓸 수 있다, 0038)
   // 논리 삭제: 'Y'면 지운 것 (목록·조회에서 빠지고 되살릴 수 있다, 0038)
   delYn String @default("N") @map("del_yn") @db.Char(1)
+  zones Zone[]
 
   @@unique([centerId, code], where: raw("del_yn = 'N'"), map: "tb_warehouse_center_id_warehouse_cd_key")
   // 센터마다 시스템 기본 창고는 유형별 1개 (부분 고유 인덱스, 0074)
@@ -446,24 +450,107 @@ model Warehouse {
   @@map("tb_warehouse")
 }
 
-// 로케이션: 창고 안의 보관 위치. 코드 자체가 위치라 시스템 코드는 없다 (0025)
-// 코드는 등록 후 바꿀 수 없다 (재고·적치 기록이 이 주소를 가리킨다, 0028)
+// 구역: 창고 안에서 같은 방식으로 운영되는 로케이션 묶음 (docs/decisions/0075). 예: A구역(랙 보관), P구역(피킹)
+model Zone {
+  id          BigInt     @id @default(autoincrement()) @map("zone_id")
+  // 운영사 (멀티테넌트, 0039)
+  operatorId  BigInt     @map("operator_id")
+  operator    Operator   @relation(fields: [operatorId], references: [id], onDelete: Restrict)
+  // 창고의 센터 (조회·범위용, 저장 때 창고와 맞춰 본다)
+  centerId    BigInt     @map("center_id")
+  center      Center     @relation(fields: [centerId], references: [id], onDelete: Restrict)
+  // 등록 후 바꿀 수 없다
+  warehouseId BigInt     @map("warehouse_id")
+  warehouse   Warehouse  @relation(fields: [warehouseId], references: [id], onDelete: Restrict)
+  // 구역코드: 영문 대문자·숫자 1~10자, 창고 안에서 중복 금지. 로케이션 코드 앞자리로 쓴다
+  code        String     @map("zone_cd") @db.VarChar(10)
+  name        String     @map("zone_nm") @db.VarChar(100)
+  // 공통코드 ZONE_TYPE
+  type        String     @default("STORAGE") @map("zone_type_cd") @db.VarChar(20)
+  status      String     @default("ACTIVE") @map("status_cd") @db.VarChar(20)
+  // 구역 간 피킹 동선 순서
+  pickSeq     Int?       @map("pick_seq")
+  sortOrder   Int        @default(10) @map("sort_seq")
+  description String?    @db.VarChar(200)
+  remark      String?    @db.VarChar(1000)
+  extAttr     Json?      @map("ext_attr")
+  createdAt   DateTime   @default(now()) @map("created_at")
+  updatedAt   DateTime   @updatedAt @map("updated_at")
+  // 등록·수정한 사람 아이디, 동시 수정 막기용 버전 (docs/db-conventions.md 공통 칸)
+  createdBy   String     @default("system") @map("created_by") @db.VarChar(50)
+  updatedBy   String     @default("system") @map("updated_by") @db.VarChar(50)
+  rowVersion  Int        @default(1) @map("row_version")
+  locations   Location[]
+
+  // 논리 삭제 (0038)
+  delYn String @default("N") @map("del_yn") @db.Char(1)
+
+  @@unique([warehouseId, code], where: raw("del_yn = 'N'"), map: "tb_zone_warehouse_id_zone_cd_key")
+  @@index([centerId])
+  @@index([operatorId])
+  @@map("tb_zone")
+}
+
+// 로케이션: 재고가 실제로 놓이는 한 칸, 바코드로 스캔하는 최소 단위 (docs/decisions/0028, 0075)
 model Location {
   id                  BigInt      @id @default(autoincrement()) @map("location_id")
   // 운영사 (멀티테넌트: 같은 운영사 사람만 보고 고친다, docs/decisions/0039)
   operatorId          BigInt      @map("operator_id")
   operator            Operator    @relation(fields: [operatorId], references: [id], onDelete: Restrict)
+  // 센터·창고는 등록 후 불변 (센터는 창고의 센터, 조회·범위용)
+  centerId            BigInt      @map("center_id")
+  center              Center      @relation(fields: [centerId], references: [id], onDelete: Restrict)
   warehouseId         BigInt      @map("warehouse_id")
-  // 같은 창고 안에서 중복 금지 (예: A-01-01, DEFAULT)
-  code                String      @map("location_cd")
-  // 로케이션 명칭 (한글 가능, 0071): 비우면 코드와 같게 — 일괄 생성·기존 줄도 코드와 같다
-  name                String      @map("location_nm") @db.VarChar(100)
+  // 같은 창고의 구역만 (시스템 기본 로케이션 등은 비움)
+  zoneId              BigInt?     @map("zone_id")
+  zone                Zone?       @relation(fields: [zoneId], references: [id], onDelete: Restrict)
+  // ① 기본 정보 [1차]
+  // 같은 창고 안에서 중복 금지, 등록 후 수정 불가 (라벨이 붙어 있다). 영문 대문자·숫자·'-', 글자 그대로 비교(C 정렬)
+  code                String      @map("location_cd") @db.VarChar(30)
+  // 목록 코드 옆 보조 문구 (예전 명칭 칸, 0071)
+  description         String?     @db.VarChar(200)
+  // 공통코드 LOC_TYPE
+  locType             String      @default("RACK") @map("loc_type_cd") @db.VarChar(20)
+  status              String      @default("ACTIVE") @map("status_cd") @db.VarChar(20)
+  // 시스템 기본 로케이션 (시스템 기본 창고의 DEFAULT): 사용 중지·삭제 불가
+  systemYn            String      @default("N") @map("system_yn") @db.Char(1)
   remark              String?     @db.VarChar(1000)
-  // 일괄 생성으로 만들면 함께 저장: 구역(A) / 열(01) / 단(02) — 구역별 거르기·정렬용 (docs/decisions/0028)
-  zone                String?     @map("zone_cd")
-  aisle               String?     @map("aisle_cd")
-  level               String?     @map("level_cd")
-  status              String      @default("ACTIVE") @map("status_cd") @db.VarChar(10)
+  // ② 위치 구성 [1차: 열·단 / 2차: 연·칸·좌표] (정보용, 일괄 생성은 코드와 같은 값)
+  rowNo               String?     @map("row_no") @db.VarChar(10)
+  levelNo             String?     @map("level_no") @db.VarChar(10)
+  bayNo               String?     @map("bay_no") @db.VarChar(10)
+  cellNo              String?     @map("cell_no") @db.VarChar(10)
+  posX                Decimal?    @map("pos_x") @db.Decimal(10, 2)
+  posY                Decimal?    @map("pos_y") @db.Decimal(10, 2)
+  // ③ 용량 [1차: 입력만] — 저장은 cm·kg, 화면은 운영사 단위로 바꿔 보여 준다
+  widthCm             Decimal?    @map("width_cm") @db.Decimal(8, 2)
+  depthCm             Decimal?    @map("depth_cm") @db.Decimal(8, 2)
+  heightCm            Decimal?    @map("height_cm") @db.Decimal(8, 2)
+  maxCbm              Decimal?    @map("max_cbm") @db.Decimal(10, 4)
+  maxWeightKg         Decimal?    @map("max_weight_kg") @db.Decimal(10, 2)
+  maxPalletCnt        Int?        @map("max_pallet_cnt")
+  // ④ 운영 속성 [1차] — 적치·피킹·할당 가능은 NULL이면 창고 값 (getEffectiveLocationOps)
+  inboundYn           String?     @map("inbound_yn") @db.Char(1)
+  outboundYn          String?     @map("outbound_yn") @db.Char(1)
+  allocatableYn       String?     @map("allocatable_yn") @db.Char(1)
+  mixItemYn           String      @default("Y") @map("mix_item_yn") @db.Char(1)
+  mixLotYn            String      @default("Y") @map("mix_lot_yn") @db.Char(1)
+  // 3PL은 화주 간 재고 섞임 방지가 기본
+  mixClientYn         String      @default("N") @map("mix_client_yn") @db.Char(1)
+  putawaySeq          Int?        @map("putaway_seq")
+  pickSeq             Int?        @map("pick_seq")
+  // ⑤ 잠금·관리 [2차] — 잠금(일시적으로 작업 금지)은 사용 중지(장기간 안 씀)와 다르다
+  lockYn              String      @default("N") @map("lock_yn") @db.Char(1)
+  // 공통코드 LOCK_REASON, 잠그면 필수
+  lockReason          String?     @map("lock_reason_cd") @db.VarChar(20)
+  lockAt              DateTime?   @map("lock_at")
+  // 공통코드 ABC_CLASS
+  abcClass            String?     @map("abc_class_cd") @db.VarChar(5)
+  dedicatedShipperId  BigInt?     @map("dedicated_shipper_id")
+  dedicatedShipper    Shipper?    @relation(fields: [dedicatedShipperId], references: [id], onDelete: Restrict)
+  checkDigit          String?     @map("check_digit") @db.VarChar(4)
+  lastCountOn         DateTime?   @map("last_count_dt") @db.Date
+  extAttr             Json?       @map("ext_attr")
   createdAt           DateTime    @default(now()) @map("created_at")
   updatedAt           DateTime    @updatedAt @map("updated_at")
   // 등록·수정한 사람 아이디(username, 자동: 현재 작업자 / 시드 seed / 기존 데이터 system), 동시 수정 막기용 버전 (docs/db-conventions.md 공통 칸)
@@ -484,7 +571,11 @@ model Location {
   delYn String @default("N") @map("del_yn") @db.Char(1)
 
   @@unique([warehouseId, code], where: raw("del_yn = 'N'"), map: "tb_location_warehouse_id_location_cd_key")
-  @@index([warehouseId, zone])
+  // 센터 안 코드 앞부분·범위 검색
+  @@index([centerId, code])
+  @@index([warehouseId, zoneId, status])
+  @@index([centerId, status, delYn])
+  @@index([zoneId])
   @@index([operatorId])
   @@map("tb_location")
 }
@@ -542,6 +633,8 @@ model Shipper {
   delYn               String      @default("N") @map("del_yn") @db.Char(1)
   // 전용 창고 (0074)
   dedicatedWarehouses Warehouse[]
+  // 전용 로케이션 (0075)
+  dedicatedLocations  Location[]
 
   // 코드는 삭제 안 된 것끼리만 겹치면 안 된다 (지운 것은 다시 쓸 수 있다, 0038)
   @@unique([operatorId, code], where: raw("del_yn = 'N'"), map: "tb_shipper_operator_id_shipper_cd_key")
@@ -765,6 +858,7 @@ model Operator {
 
   // 논리 삭제: 'Y'면 지운 것 (목록·조회에서 빠지고 되살릴 수 있다, 0038)
   delYn String @default("N") @map("del_yn") @db.Char(1)
+  zones Zone[]
 
   // 운영사코드는 삭제 안 된 것끼리만 겹치면 안 된다 (0038)
   @@unique([code], where: raw("del_yn = 'N'"), map: "tb_operator_operator_cd_key")

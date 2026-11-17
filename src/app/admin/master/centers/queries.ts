@@ -66,7 +66,7 @@ export async function getCenterForEdit(id: bigint, scope: DataScope) {
       select: {
         id: true,
         code: true,
-        name: true,
+        description: true,
         warehouse: { select: { code: true, name: true, type: true } },
       },
       orderBy: [
@@ -131,8 +131,8 @@ export async function getCenterForEdit(id: bigint, scope: DataScope) {
     locationOptions: locations.map((l) => ({
       value: l.id.toString(),
       label: l.code,
-      description: `${WAREHOUSE_TYPE.labels[l.warehouse.type as keyof typeof WAREHOUSE_TYPE.labels] ?? l.warehouse.type} · ${l.warehouse.name}${l.name && l.name !== l.code ? ` · ${l.name}` : ''}`,
-      keywords: `${l.warehouse.code} ${l.name ?? ''}`,
+      description: `${WAREHOUSE_TYPE.labels[l.warehouse.type as keyof typeof WAREHOUSE_TYPE.labels] ?? l.warehouse.type} · ${l.warehouse.name}${l.description ? ` · ${l.description}` : ''}`,
+      keywords: `${l.warehouse.code} ${l.description ?? ''}`,
     })),
     warehouses: center.warehouses.map(withIsActive).map(({ _count, ...w }) => ({
       ...w,

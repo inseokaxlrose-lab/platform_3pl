@@ -130,6 +130,8 @@ return (
 | 로케이션 고르기 | `LocationSelect options` | 4 | 로케이션 키 (선택지는 서버가 범위를 좁혀 넘김) |
 | 센터 고르기 | `CenterSelect options` | 4 | 센터 키 (하나뿐이면 저절로 고름, 검색 조건은 `allowAll`) |
 | 창고 고르기 | `WarehouseSelect options centerId` | 4 | 창고 키 (고른 센터의 창고만, 센터 전에는 꺼짐) |
+| 구역 고르기 | `ZoneSelect options warehouseId` | 4 | 구역 키 (고른 창고의 구역만, 입력은 `allowNone`) |
+| 코드 범위 (검색) | `CodeRangeInput` | 4 | `'A-01~A-03'` (한쪽만 가능) |
 | 상속 칸 (위 단계 값 따름) | `InheritableField` + 입력 부품 | 입력 부품과 같게 | 비우면 위 단계 값 — 아래 "상속 칸" |
 | 1:N 목록 | `EditableSubTable` | 섹션 전체 | 행 배열 |
 

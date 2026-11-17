@@ -40,8 +40,9 @@ describe('센터 기본 구성 (시스템 기본 창고 3개 + 기본 로케이�
     ])
     for (const w of warehouses) {
       expect(w.systemCode).toMatch(/^WH\d{6}$/)
-      expect(w.locations.map((l) => [l.code, l.name])).toEqual([
-        [DEFAULT_LOCATION_CODE, DEFAULT_LOCATION_CODE],
+      // 시스템 기본 로케이션 DEFAULT (작업대기 유형, 0075)
+      expect(w.locations.map((l) => [l.code, l.systemYn, l.locType, l.centerId])).toEqual([
+        [DEFAULT_LOCATION_CODE, 'Y', 'STAGING', center.id],
       ])
       // 창고의 기본 로케이션 = DEFAULT
       expect(w.defaultLocId).toBe(w.locations[0].id)
@@ -62,7 +63,7 @@ describe('센터 기본 구성 (시스템 기본 창고 3개 + 기본 로케이�
         operatorId: TEST_OPERATOR_ID,
         warehouseId: inbound.id,
         code: 'DOCK1',
-        name: 'DOCK1',
+        centerId: center.id,
       },
     })
     await prisma.center.update({

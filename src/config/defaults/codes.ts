@@ -66,4 +66,53 @@ export const DEFAULT_CODE_GROUPS: readonly DefaultCodeGroup[] = [
       { code: 'AUTO', name: '자동화 설비' },
     ],
   },
+  // 구역·로케이션 (0075)
+  {
+    code: 'ZONE_TYPE',
+    name: '구역 유형',
+    description: '창고 안 구역의 운영 방식',
+    items: [
+      { code: 'STORAGE', name: '보관' },
+      { code: 'PICKING', name: '피킹' },
+      { code: 'RESERVE', name: '벌크·예비' },
+      { code: 'STAGING', name: '작업대기' },
+      { code: 'VAS', name: '유통가공' },
+      { code: 'ETC', name: '기타' },
+    ],
+  },
+  {
+    code: 'LOC_TYPE',
+    name: '로케이션 유형',
+    description: '로케이션(보관 칸)의 형태',
+    items: [
+      { code: 'RACK', name: '랙' },
+      { code: 'FLOOR', name: '평치' },
+      { code: 'SHELF', name: '선반' },
+      { code: 'BIN', name: '빈·소형칸' },
+      { code: 'DOCK', name: '도크' },
+      { code: 'STAGING', name: '작업대기' },
+      { code: 'VIRTUAL', name: '가상' },
+    ],
+  },
+  {
+    code: 'LOCK_REASON',
+    name: '로케이션 잠금 사유',
+    description: '로케이션을 잠근 이유',
+    items: [
+      { code: 'COUNT', name: '재고 실사' },
+      { code: 'DAMAGE', name: '설비 파손' },
+      { code: 'INSPECTION', name: '점검' },
+      { code: 'ETC', name: '기타' },
+    ],
+  },
+  {
+    code: 'ABC_CLASS',
+    name: '회전 등급',
+    description: '로케이션 회전 등급 (적치 추천용)',
+    items: [
+      { code: 'A', name: 'A' },
+      { code: 'B', name: 'B' },
+      { code: 'C', name: 'C' },
+    ],
+  },
 ]

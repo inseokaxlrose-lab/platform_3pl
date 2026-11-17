@@ -18,8 +18,10 @@ import {
   YnToggle,
   InheritableField,
   CenterSelect,
+  CodeRangeInput,
   LocationSelect,
   WarehouseSelect,
+  ZoneSelect,
   TimeInput,
   WeekdaySelect,
 } from '@/components/inputs'
@@ -81,6 +83,8 @@ function Sample({
 function InputSamples() {
   const [center, setCenter] = useState('')
   const [warehouse, setWarehouse] = useState('')
+  const [zone, setZone] = useState('')
+  const [codeRange, setCodeRange] = useState('A-01~A-03')
   const [bizNo, setBizNo] = useState('1234567891')
   const [corpNo, setCorpNo] = useState('')
   const [phone, setPhone] = useState('021234567')
@@ -230,6 +234,21 @@ function InputSamples() {
             { id: 'w3', centerId: 'c2', code: 'B', name: 'B동 냉장' },
           ]}
         />
+      </Sample>
+      <Sample title="ZoneSelect" note="span 4 · 위에서 고른 창고의 구역만" value={zone}>
+        <ZoneSelect
+          warehouseId={warehouse}
+          value={zone}
+          onChange={setZone}
+          allowNone
+          options={[
+            { id: 'z1', warehouseId: 'w2', code: 'A', name: 'A구역 랙 보관' },
+            { id: 'z2', warehouseId: 'w2', code: 'P1', name: '피킹' },
+          ]}
+        />
+      </Sample>
+      <Sample title="CodeRangeInput" note="span 4 · 코드 범위 검색 (시작~끝)" value={codeRange}>
+        <CodeRangeInput value={codeRange} onChange={setCodeRange} />
       </Sample>
       <Sample title="YnToggle" note="span 2~3 · 값은 boolean" value={yn}>
         <YnToggle value={yn} onChange={setYn} />

@@ -60,7 +60,7 @@ async function main() {
         operatorId: operator.id,
         warehouseId: warehouse.id,
         code: E2E_LOCATION.code,
-        name: E2E_LOCATION.code,
+        centerId: center.id,
       },
       update: {},
     })
