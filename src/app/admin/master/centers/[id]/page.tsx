@@ -65,6 +65,7 @@ export default async function EditCenterPage({ params }: PageProps<'/admin/maste
             <BackToListButton listPath="/admin/master/centers" />
             <CenterHeaderActions
               center={{ id: center.id, status: center.status, rowVersion: center.rowVersion }}
+              canViewWarehouses={canViewWarehouses}
               canViewLocations={canViewLocations}
               canChangeStatus={canUpdate && isOperatorUser}
               canDelete={canDelete && isOperatorUser}

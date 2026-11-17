@@ -77,7 +77,7 @@ const EMPTY: CenterCreateInput = {
   floorAreaM2: '',
   storageAreaM2: '',
   dockCount: null,
-  tempZones: [],
+  tempZones: ['AMBIENT'],
   bondedYn: false,
   workStartTime: '',
   workEndTime: '',
@@ -382,9 +382,10 @@ export function CenterForm({
           <Field
             label="취급 온도대"
             span={8}
+            required
             error={errors.tempZones}
             htmlFor={id('tempZones')}
-            hint="이 센터가 보관할 수 있는 온도대 (여러 개)"
+            hint="이 센터가 보관할 수 있는 온도대 (여러 개). 창고 온도대는 이 안에서 고릅니다"
           >
             <MultiSelect
               id={id('tempZones')}
