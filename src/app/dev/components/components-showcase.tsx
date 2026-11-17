@@ -13,6 +13,8 @@ import {
   EmailInput,
   NumberInput,
   QtyInput,
+  UnitSelect,
+  type UnitSelectOption,
   SearchSelect,
   PhoneInput,
   YnToggle,
@@ -93,6 +95,9 @@ function InputSamples() {
   const [duty, setDuty] = useState('OLD')
   const [weight, setWeight] = useState<number | null>(1234.5)
   const [qty, setQty] = useState('1440')
+  // UnitSelect + QtyInput: 고른 단위의 소수 자리수로 수량 입력 (0078)
+  const [unitId, setUnitId] = useState('KG')
+  const [unitQty, setUnitQty] = useState('')
   const [picked, setPicked] = useState('')
   const [date, setDate] = useState('')
   const [range, setRange] = useState({ from: '', to: '' })
@@ -145,6 +150,31 @@ function InputSamples() {
         value={qty}
       >
         <QtyInput aria-label="수량" value={qty} onChange={setQty} decimals={3} unit="KG" />
+      </Sample>
+      <Sample
+        title="UnitSelect + QtyInput"
+        note="단위를 고르면 그 단위의 소수 자리수로 수량 입력 (EA 0 · KG 3 · L 3), 사용 중지 단위(OLD)는 빠짐"
+        value={`${unitQty} ${SAMPLE_UNITS.find((u) => u.id === unitId)?.code ?? ''}`}
+      >
+        <div className="flex gap-2">
+          <div className="w-40">
+            <UnitSelect
+              options={SAMPLE_UNITS}
+              value={unitId}
+              onChange={(next) => {
+                setUnitId(next)
+                setUnitQty('')
+              }}
+            />
+          </div>
+          <QtyInput
+            aria-label="단위 수량"
+            value={unitQty}
+            onChange={setUnitQty}
+            decimals={SAMPLE_UNITS.find((u) => u.id === unitId)?.decimals ?? 0}
+            unit={SAMPLE_UNITS.find((u) => u.id === unitId)?.code}
+          />
+        </div>
       </Sample>
       <Sample title="SearchSelect" note="선택지가 많을 때 검색해서 하나 (품목 등)" value={picked}>
         <SearchSelect
@@ -388,6 +418,14 @@ function FormSample() {
   )
 }
 
+// UnitSelect 견본 단위 (실제 화면은 서버 getUnitOptions로 받는다)
+const SAMPLE_UNITS: UnitSelectOption[] = [
+  { id: 'EA', code: 'EA', name: '개', type: 'QTY', decimals: 0, isActive: true },
+  { id: 'BOX', code: 'BOX', name: '박스', type: 'PACK', decimals: 0, isActive: true },
+  { id: 'KG', code: 'KG', name: '킬로그램', type: 'WEIGHT', decimals: 3, isActive: true },
+  { id: 'L', code: 'L', name: '리터', type: 'VOLUME', decimals: 3, isActive: true },
+  { id: 'OLD', code: 'OLD', name: '안 쓰는 단위', type: 'QTY', decimals: 0, isActive: false },
+]
 export function ComponentsShowcase() {
   return (
     <CommonCodeProvider options={SAMPLE_CODES}>
