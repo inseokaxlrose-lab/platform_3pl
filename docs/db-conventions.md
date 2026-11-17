@@ -48,23 +48,23 @@
 | `updated_at` / `updated_by` | TIMESTAMP / VARCHAR(50) | 수정 일시·수정자 아이디 |
 | `row_version` | INT | 낙관적 락: 저장 때 같으면 +1, 다르면 "다른 사람이 먼저 고쳤습니다" |
 
-- 대상(11개 표): 사용자·권한그룹·센터·창고·로케이션·화주사·운영사·공통코드 그룹·공통코드·배송권역·단위. 부모와 통째로 바뀌는 하위 표(담당자·담당 지역·이용 센터·소속 등)는 부모 이력으로 본다. 사용자는 계정을 지우지 않으므로 `del_yn` 없음.
+- 대상(11개 표): 사용자·권한그룹·센터·창고·로케이션·화주사·운영사·공통코드 그룹·공통코드·단위(배송권역은 0076에서 제거). 부모와 통째로 바뀌는 하위 표(담당자·담당 지역·이용 센터·소속 등)는 부모 이력으로 본다. 사용자는 계정을 지우지 않으므로 `del_yn` 없음.
 - **등록·수정자 자동 기록 (2a 적용)**: 화면·기능 코드에서 넣지 않는다. `createAction`이 로그인 사용자 아이디로 `runAsActor`를 감싸고(`src/lib/actor.ts`), `prisma.ts`의 확장이 등록·수정 때 `created_by`/`updated_by`를 채우고 수정 때마다 `row_version +1` 한다. 시드는 `seed`, 감싸지 않은 곳은 `system`.
   - 주의: 안쪽 관계로 함께 만드는 줄(nested create)은 확장이 채우지 못한다 → 공통 칸이 있는 표는 바깥에서 직접 만든다.
   - 화면 표시: `actorLabel(아이디)` → '이름 (아이디)' / '시스템'.
-- **상태 `status_cd` (2b 적용)**: `is_active`를 대체, `'ACTIVE'`/`'INACTIVE'` + 검사 조건 (9개 표: 사용자·센터·창고·로케이션·화주사·공통코드 그룹·공통코드·배송권역·단위). 코드는 `src/lib/status.ts`.
+- **상태 `status_cd` (2b 적용)**: `is_active`를 대체, `'ACTIVE'`/`'INACTIVE'` + 검사 조건 (9개 표: 사용자·센터·창고·로케이션·화주사·공통코드 그룹·공통코드·단위). 코드는 `src/lib/status.ts`.
   - 화면·입력 규칙은 지금처럼 사용 여부 `isActive`(true/false). DB에 쓸 때 `toStatus`/`withStatus`, 읽을 때 `isActiveStatus`/`withIsActive`, 조건은 `ACTIVE_ONLY`, 목록 검색은 `statusWhere(filters)`.
   - 주의: 타입 검사가 못 보는 곳 — 목록 정렬 매핑(`sortable: { isActive: 'status' }`), 조건 목록 안의 객체, 입력값을 통째로 저장하는 `data`(반드시 `withStatus`).
   - Better Auth 사용자 추가 칸도 `status` (`ACTIVE`만 로그인).
 - **논리 삭제 `del_yn` (2c 적용)**: 10개 표(사용자 제외). 지우기는 `del_yn = 'Y'`로만 (`DELETED_ONLY`), 실제로 지우지 않는다.
   - 자동 제외: `prisma.ts`가 읽기·개수·수정·upsert 조건에 `delYn: 'N'`을 붙인다. 지운 것을 다루려면 조건에 `delYn`을 직접 적는다(`DELETED_ONLY`). **include·select 안의 관계 목록, `_count`, 관계 조건(`zone: {…}`)은 자동으로 안 걸리므로 `NOT_DELETED`를 직접 붙인다.**
   - 코드(이름) 고유는 삭제 안 된 것끼리만: Prisma `partialIndexes`(미리보기) `@@unique([...], where: raw("del_yn = 'N'"))`. 지운 코드는 새로 쓸 수 있다.
-  - 되살리기: 목록 상태 거르기 "삭제됨"(`DELETED_STATUS_OPTION`, 서버 `deletedWhere`) → [되살리기](`RestoreButton`). 공통코드는 [지운 항목] 팝업. 권한은 삭제 권한과 같다. 같은 코드가 다시 쓰이고 있거나(배송권역은 담당 지역도) 부모(코드 그룹)가 지워졌으면 거부 (`src/lib/soft-delete.ts`). 외부 코드는 되살아나지 않는다.
+  - 되살리기: 목록 상태 거르기 "삭제됨"(`DELETED_STATUS_OPTION`, 서버 `deletedWhere`) → [되살리기](`RestoreButton`). 공통코드는 [지운 항목] 팝업. 권한은 삭제 권한과 같다. 같은 코드가 다시 쓰이고 있거나 부모(코드 그룹)가 지워졌으면 거부 (`src/lib/soft-delete.ts`). 외부 코드는 되살아나지 않는다.
 - **동시 수정 막기 (2a 적용)**: 수정 화면·팝업은 불러올 때의 `rowVersion`을 들고 있다가 저장 때 보낸다(`useMasterForm`의 `version`, 결과의 새 버전으로 자동 갱신). 서버는 `assertRowVersion` + 수정 조건에 버전(`where: { id, rowVersion }`) + `withVersionGuard`(`src/lib/row-version.ts`). 사용 중지·일괄 처리는 검사 없이 버전만 올린다.
 
 ## 운영사 칸 `operator_id` (3단계 멀티테넌트, 0039)
 
-- 대상(11개 표): 사용자·권한그룹·센터·창고·로케이션·화주사·외부 코드·공통코드 그룹·공통코드·배송권역·단위. 하위 표는 부모를 따른다.
+- 대상(11개 표): 사용자·권한그룹·센터·창고·로케이션·화주사·외부 코드·공통코드 그룹·공통코드·단위. 하위 표는 부모를 따른다.
 - 고유 규칙은 같은 운영사 안에서만 (`@@unique([operatorId, code], …)`). 로그인 아이디·이메일은 전체에서 하나.
 - **서버 액션 안**: `createAction`이 운영사 출입증(`runInContext`, `src/lib/actor.ts`)을 만들고, `prisma.ts`가 11개 표의 읽기·수정·삭제에 지금 운영사 조건을 붙이고 등록에 운영사를 채운다. 새로 만드는 함수는 `requireOperatorId()`로 운영사를 받는다. 전체 고유 값(아이디·이메일) 중복 검사만 `acrossOperators()`.
 - **서버 액션 밖(화면 조회 함수)**: 자동 거르기가 없다 → `scopeFilter`(운영사 조건 자동)·`isInScope`(줄의 `operatorId` 검사 — `select`에 `operatorId`를 꼭 넣는다)·`operatorFilter(scope)`(센터·화주사로 나누지 않는 데이터)를 쓴다.
@@ -469,28 +469,7 @@
 | `createdAt` | `createdAt` | `created_at` |  |
 | `updatedAt` | `updatedAt` | `updated_at` |  |
 
-### tb_delivery_zone ← `delivery_zone` (코드 모델 `DeliveryZone`)
-
-| 코드(그대로) | 지금 DB | 새 DB | 비고 |
-| --- | --- | --- | --- |
-| `id` | `id` | `zone_id` | TEXT(cuid) → BIGINT |
-| `centerId` | `centerId` | `center_id` | TEXT(cuid) → BIGINT |
-| `systemCode` | `systemCode` | `sys_cd` |  |
-| `code` | `code` | `zone_cd` |  |
-| `name` | `name` | `zone_nm` |  |
-| `description` | `description` | `description` |  |
-| `priority` | (0072 추가) | `priority_no` | INT 1~999, 기본 100 — 다른 센터 권역과 같은 수준으로 겹칠 때 작은 번호가 먼저 |
-| `isActive` | `isActive` | `status_cd` | Boolean → status_cd (2단계, ACTIVE/INACTIVE) |
-| `createdAt` | `createdAt` | `created_at` |  |
-| `updatedAt` | `updatedAt` | `updated_at` |  |
-
-### tb_delivery_zone_region ← `delivery_zone_region` (코드 모델 `DeliveryZoneRegion`)
-
-| 코드(그대로) | 지금 DB | 새 DB | 비고 |
-| --- | --- | --- | --- |
-| `id` | `id` | `zone_region_id` | TEXT(cuid) → BIGINT |
-| `zoneId` | `zoneId` | `zone_id` | TEXT(cuid) → BIGINT |
-| `regionCode` | `regionCode` | `region_cd` |  |
+<!-- tb_delivery_zone·tb_delivery_zone_region: 0076 권역설정으로 교체되어 제거 (20261117180000_remove_delivery_zone) -->
 
 ### tb_unit ← `unit` (코드 모델 `Unit`)
 

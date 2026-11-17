@@ -1,7 +1,7 @@
 # 0033. 센터별 배송권역 관리
 
 - 날짜: 2026-11-15
-- 상태: 채택
+- 상태: **대체됨** → 0076 권역설정 (우편번호별 배정표 하나로 교체, 2026-11-17 표·화면·판단 함수 제거)
 - 관련: 0025 (코드 3층), 0026 (센터), 0031·0032 (입력·목록 화면 틀), 0016 (데이터 범위)
 - 화면: `/admin/master/delivery-zones` (목록·등록·수정), 센터 수정 화면의 "배송권역" 섹션
 - 코드: `src/lib/delivery-zones/`, `src/app/admin/master/delivery-zones/`, `src/config/korea-regions.ts`, `scripts/generate-korea-regions.py`
