@@ -320,6 +320,7 @@ export function CentersList({ actions, canExport }) {
 | `cell` (컬럼 속성) | 화면 전용 렌더러 | — |
 
 - 그 밖의 컬럼 속성: `pinned`(왼쪽 고정, 코드·명칭), `defaultHidden`(처음 숨김), `hideable: false`, `width`, `sortable`.
+- **제목 줄은 칸 정렬과 상관없이 모두 가운데**다. 칸 좌우 여백은 16px(`px-4`)이라 칸 사이가 32px다. 오른쪽 정렬 숫자 옆에 왼쪽 정렬 글자가 와도 붙어 보이지 않는다(`DataGrid` 공통, 화면에서 따로 정하지 않음).
 - 엑셀은 같은 format으로 변환한다 (숫자는 숫자 칸, 코드·상태는 이름, 번호는 하이픈).
 
 ## 4. 목록 API 공통 형식
