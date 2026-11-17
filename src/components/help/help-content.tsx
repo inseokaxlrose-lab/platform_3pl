@@ -9,6 +9,7 @@ import {
   type CalloutKind,
 } from '@/lib/help/remark-help'
 import { cn } from '@/lib/utils'
+import { HelpImage } from './help-image'
 
 // Markdown 요소별 모양: 바깥 상자에 "자손 선택자"([&_h2]:…)로 준다 (디자인 토큰만 사용)
 // HTML 태그를 직접 쓴 부분은 그리지 않는다 (react-markdown 기본: 안전)
@@ -47,6 +48,10 @@ const CALLOUT: Record<CalloutKind, { label: string; icon: React.ReactNode; class
 }
 
 const COMPONENTS: Components = {
+  // 화면 사진: 라이트·다크 두 장 + 크게 보기 (/help/ 아래 사진만)
+  img({ src, alt }) {
+    return <HelpImage src={typeof src === 'string' ? src : undefined} alt={alt} />
+  },
   // 경고 상자: 왼쪽 색 띠 + 아이콘·이름 (remarkHelpCallout가 aside로 바꿔 둔다)
   aside({ children, ...props }) {
     const kind = (props as { 'data-callout'?: CalloutKind })['data-callout']

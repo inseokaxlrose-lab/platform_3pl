@@ -66,3 +66,22 @@ describe('HelpContent', () => {
     expect(screen.queryByRole('navigation', { name: '도움말 목차' })).toBeNull()
   })
 })
+
+describe('HelpContent 화면 사진', () => {
+  it('/help/ 사진은 라이트·다크 두 장 + 크게 보기, 바깥 주소 사진은 설명 글자만', () => {
+    const { container } = render(
+      <HelpContent
+        document={doc(
+          '## 화면\n![배정 탭](/help/admin/master/regions/assign.png)\n\n![바깥](https://example.com/x.png)',
+        )}
+      />,
+    )
+    const images = [...container.querySelectorAll('img')].map((img) => img.getAttribute('src'))
+    expect(images).toEqual([
+      '/help/admin/master/regions/assign.png',
+      '/help/admin/master/regions/assign.dark.png',
+    ])
+    expect(screen.getByRole('button', { name: '배정 탭 크게 보기' })).toBeTruthy()
+    expect(screen.getByText('바깥')).toBeTruthy()
+  })
+})
