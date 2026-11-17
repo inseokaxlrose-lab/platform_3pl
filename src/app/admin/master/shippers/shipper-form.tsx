@@ -127,6 +127,8 @@ type ShipperFormProps = {
   readOnly: boolean
   // 소속 사용자 섹션: 사용자 메뉴 조회·등록 권한
   userAccess?: { canView: boolean; canAdd: boolean }
+  // API 키 섹션 내용 (API 키 조회 권한이 있을 때만 page에서 넘긴다, 0081)
+  apiKeys?: React.ReactNode
 }
 
 const LIST_HREF = '/admin/master/shippers'
@@ -160,6 +162,7 @@ export function ShipperForm({
   operator,
   readOnly,
   userAccess = { canView: false, canAdd: false },
+  apiKeys,
 }: ShipperFormProps) {
   const form = useMasterForm({
     initial: shipper?.input ?? EMPTY,
@@ -791,7 +794,7 @@ export function ShipperForm({
       id: 'interface',
       title: '연동',
       description:
-        'API 사용을 끄면 키가 있어도 모든 API 호출을 거부합니다. API 키 발급·관리는 연동 API 작업에서 이 섹션에 추가합니다.',
+        'API 사용을 끄면 키가 있어도 모든 API 호출을 거부합니다. 키는 아래 "API 키" 섹션에서 발급·관리합니다 (저장과 따로 바로 처리).',
       content: (
         <FormGrid>
           {select('ifMethod', '연동 방식', IF_METHOD.options, 4, '파일·EDI는 2차')}
@@ -811,6 +814,17 @@ export function ShipperForm({
       ),
     },
   ]
+
+  if (shipper && apiKeys) {
+    sections.push({
+      id: 'api-keys',
+      title: 'API 키',
+      standalone: true,
+      description:
+        '화주 시스템이 연동 API를 부를 때 쓰는 키입니다. 키 원문은 발급 직후 한 번만 보이고, DB에는 해시만 남습니다.',
+      content: apiKeys,
+    })
+  }
 
   if (shipper && userAccess.canView) {
     sections.push({

@@ -690,6 +690,8 @@ model Shipper {
   dedicatedWarehouses Warehouse[]
   // 전용 로케이션 (0075)
   dedicatedLocations  Location[]
+  // 연동 API 키 (0081)
+  apiClients          ApiClient[]
 
   // 코드는 삭제 안 된 것끼리만 겹치면 안 된다 (지운 것은 다시 쓸 수 있다, 0038)
   @@unique([operatorId, code], where: raw("del_yn = 'N'"), map: "tb_shipper_operator_id_shipper_cd_key")
@@ -938,6 +940,7 @@ model Operator {
   regionAutoGrade String              @default("D") @map("region_auto_grade") @db.Char(1)
   regionMaps      RegionCenterMap[]
   regionBatches   RegionChangeBatch[]
+  apiClients      ApiClient[]
 
   // 운영사코드는 삭제 안 된 것끼리만 겹치면 안 된다 (0038)
   @@unique([code], where: raw("del_yn = 'N'"), map: "tb_operator_operator_cd_key")
@@ -1921,4 +1924,163 @@ model AddressNormCache {
   createdAt    DateTime  @default(now()) @map("created_at")
 
   @@map("tb_address_norm_cache")
+}
+
+// ─────────────────────────────────────────────
+// 화주 연동 API (docs/decisions/0081, 정의서 docs/specs/shipper.md PART 2)
+// API 키 하나가 운영사·화주를 정한다. 키 원문은 저장하지 않고 HMAC-SHA256 해시만 (API_KEY_SECRET)
+// ─────────────────────────────────────────────
+
+// API 키: 형식 {환경}_{식별부}_{비밀부} (예: live_ak7f2c9x_…) — 식별부로 찾고 전체를 해시 비교
+// 화주·환경별 사용 중(ACTIVE) 키는 최대 2개 (교체 기간에 새 키·옛 키를 함께 쓰게)
+model ApiClient {
+  id              BigInt    @id @default(autoincrement()) @map("api_client_id")
+  operatorId      BigInt    @map("operator_id")
+  operator        Operator  @relation(fields: [operatorId], references: [id], onDelete: Restrict)
+  shipperId       BigInt    @map("shipper_id")
+  shipper         Shipper   @relation(fields: [shipperId], references: [id], onDelete: Restrict)
+  name            String    @map("key_nm") @db.VarChar(50)
+  // 환경: TEST(검증만, 저장 안 함 — dry-run) / LIVE
+  env             String    @map("env_cd") @db.VarChar(10)
+  keyPrefix       String    @unique @map("key_prefix") @db.VarChar(20)
+  keyHash         String    @map("key_hash") @db.Char(64)
+  // 상태: ACTIVE / REVOKED(폐기) / EXPIRED(만료 — 만료일 지난 키를 처음 쓸 때 바뀜)
+  status          String    @default("ACTIVE") @map("status_cd") @db.VarChar(20)
+  // 비어 있으면 무기한
+  expiresAt       DateTime? @map("expires_at")
+  rateLimitPerMin Int       @default(120) @map("rate_limit_per_min")
+  lastUsedAt      DateTime? @map("last_used_at")
+  lastUsedIp      String?   @map("last_used_ip") @db.VarChar(45)
+  issuedAt        DateTime  @default(now()) @map("issued_at")
+  issuedBy        String    @map("issued_by") @db.VarChar(50)
+  revokedAt       DateTime? @map("revoked_at")
+  revokedBy       String?   @map("revoked_by") @db.VarChar(50)
+  revokeReason    String?   @map("revoke_reason") @db.VarChar(200)
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
+  createdBy       String    @default("system") @map("created_by") @db.VarChar(50)
+  updatedBy       String    @default("system") @map("updated_by") @db.VarChar(50)
+  rowVersion      Int       @default(1) @map("row_version")
+
+  scopes ApiClientScope[]
+  ips    ApiClientIp[]
+  events ApiClientEvent[]
+
+  @@index([shipperId, env, status])
+  @@map("tb_api_client")
+}
+
+// 키 권한 (상수 API_SCOPE: PARTNER_READ … STOCK_READ)
+model ApiClientScope {
+  apiClientId BigInt    @map("api_client_id")
+  scope       String    @map("scope_cd") @db.VarChar(30)
+  apiClient   ApiClient @relation(fields: [apiClientId], references: [id], onDelete: Cascade)
+
+  @@id([apiClientId, scope])
+  @@map("tb_api_client_scope")
+}
+
+// 허용 IP (하나도 없으면 모든 IP 허용)
+model ApiClientIp {
+  id          BigInt    @id @default(autoincrement()) @map("api_client_ip_id")
+  apiClientId BigInt    @map("api_client_id")
+  ipCidr      String    @map("ip_cidr") @db.VarChar(50)
+  description String?   @db.VarChar(100)
+  apiClient   ApiClient @relation(fields: [apiClientId], references: [id], onDelete: Cascade)
+
+  @@index([apiClientId])
+  @@map("tb_api_client_ip")
+}
+
+// 키 이력 (감사 로그): 발급·수정·폐기·만료를 한 줄씩 (누가·언제·바뀐 내용)
+model ApiClientEvent {
+  id          BigInt    @id @default(autoincrement()) @map("event_id")
+  operatorId  BigInt    @map("operator_id")
+  apiClientId BigInt    @map("api_client_id")
+  apiClient   ApiClient @relation(fields: [apiClientId], references: [id], onDelete: Cascade)
+  // ISSUED / UPDATED / REVOKED / EXPIRED
+  event       String    @map("event_cd") @db.VarChar(20)
+  detail      Json?
+  actor       String    @db.VarChar(50)
+  createdAt   DateTime  @default(now()) @map("created_at")
+
+  @@index([apiClientId, createdAt])
+  @@map("tb_api_client_event")
+}
+
+// API 요청 로그: 요청 하나에 한 줄 (응답을 보낸 뒤 저장). 본문은 개인정보를 가린 뒤 저장하고 90일 뒤 비운다
+model ApiRequestLog {
+  // 응답에도 넣어 화주가 문의할 때 쓴다 (req_YYYYMMDD_무작위)
+  requestId      String   @id @map("request_id") @db.VarChar(40)
+  // 키 확인 전에 실패하면 비어 있다
+  operatorId     BigInt?  @map("operator_id")
+  shipperId      BigInt?  @map("shipper_id")
+  apiClientId    BigInt?  @map("api_client_id")
+  env            String?  @map("env_cd") @db.VarChar(10)
+  // API 구분 (예: ME, PARTNER_UPSERT, ORDER_CREATE)
+  apiCode        String   @map("api_cd") @db.VarChar(50)
+  httpMethod     String   @map("http_method") @db.VarChar(10)
+  path           String   @db.VarChar(300)
+  clientIp       String?  @map("client_ip") @db.VarChar(45)
+  idempotencyKey String?  @map("idempotency_key") @db.VarChar(100)
+  requestedAt    DateTime @map("req_at") @db.Timestamp(3)
+  durationMs     Int      @map("duration_ms")
+  httpStatus     Int      @map("http_status")
+  // SUCCESS / PARTIAL / FAIL
+  result         String   @map("result_cd") @db.VarChar(20)
+  totalCount     Int      @default(0) @map("total_cnt")
+  successCount   Int      @default(0) @map("success_cnt")
+  failCount      Int      @default(0) @map("fail_cnt")
+  errorCode      String?  @map("error_cd") @db.VarChar(30)
+  requestBody    String?  @map("req_body")
+  responseBody   String?  @map("resp_body")
+
+  items ApiRequestItem[]
+
+  @@index([operatorId, requestedAt])
+  @@index([shipperId, requestedAt])
+  @@index([apiClientId, requestedAt])
+  @@map("tb_api_request_log")
+}
+
+// 건별 결과 (등록 API의 배열 한 건마다)
+model ApiRequestItem {
+  requestId  String        @map("request_id") @db.VarChar(40)
+  seq        Int
+  // 화주 문서번호 (거래처코드·품목코드·ASN번호·주문번호)
+  extDocNo   String?       @map("ext_doc_no") @db.VarChar(50)
+  // CREATED / UPDATED / UNCHANGED / DUPLICATE / FAIL
+  result     String        @map("result_cd") @db.VarChar(20)
+  errorCode  String?       @map("error_cd") @db.VarChar(30)
+  errorMsg   String?       @map("error_msg") @db.VarChar(500)
+  internalId BigInt?       @map("internal_id")
+  request    ApiRequestLog @relation(fields: [requestId], references: [requestId], onDelete: Cascade)
+
+  @@id([requestId, seq])
+  @@map("tb_api_request_item")
+}
+
+// 멱등 처리: 같은 키 + 같은 Idempotency-Key → 처음 응답을 그대로 (24시간 뒤 지움)
+model ApiIdempotency {
+  apiClientId    BigInt   @map("api_client_id")
+  idempotencyKey String   @map("idempotency_key") @db.VarChar(100)
+  requestHash    String   @map("request_hash") @db.Char(64)
+  requestId      String   @map("request_id") @db.VarChar(40)
+  httpStatus     Int      @map("http_status")
+  responseBody   String   @map("response_body")
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  @@id([apiClientId, idempotencyKey])
+  @@index([createdAt])
+  @@map("tb_api_idempotency")
+}
+
+// 호출 한도 카운터: 키별 1분 구간마다 한 줄 (고정 구간, 지난 구간은 지움)
+model ApiRateBucket {
+  apiClientId BigInt   @map("api_client_id")
+  windowStart DateTime @map("window_start")
+  count       Int      @default(0) @map("req_cnt")
+
+  @@id([apiClientId, windowStart])
+  @@map("tb_api_rate_bucket")
 }

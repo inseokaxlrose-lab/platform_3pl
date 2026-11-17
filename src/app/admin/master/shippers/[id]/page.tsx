@@ -6,6 +6,8 @@ import { AccessDenied } from '@/components/permission'
 import { parseId } from '@/lib/id'
 import { getCurrentScope, hasPermission } from '@/lib/session'
 import { IF_METHOD, SHIPPER_STATUS_BADGE } from '@/lib/shippers/shipper-codes'
+import { ApiKeyPanel } from '@/components/api-keys/api-key-panel'
+import { getShipperApiKeys } from '@/lib/api/api-key-queries'
 import { getCenterChoices, getOperatorDefaults, getShipperForEdit } from '../queries'
 import { ShipperForm } from '../shipper-form'
 import { ShipperStatusDialog } from '../shipper-status-dialog'
@@ -21,15 +23,31 @@ export default async function EditShipperPage({
   const id = parseId((await params).id)
   if (id === null) notFound()
   const scope = await getCurrentScope()
-  const [shipper, centers, operator, canUpdate, canViewUsers, canAddUser] = await Promise.all([
+  const [
+    shipper,
+    centers,
+    operator,
+    canUpdate,
+    canViewUsers,
+    canAddUser,
+    canViewKeys,
+    canIssueKey,
+    canUpdateKey,
+  ] = await Promise.all([
     getShipperForEdit(id, scope),
     getCenterChoices(scope),
     getOperatorDefaults(scope),
     hasPermission('master.shippers.update'),
     hasPermission('system.users.read'),
     hasPermission('system.users.create'),
+    hasPermission('integration.api-keys.read'),
+    hasPermission('integration.api-keys.create'),
+    hasPermission('integration.api-keys.update'),
   ])
   if (!shipper) notFound()
+  // API 키 섹션: 키 조회 권한 + 운영사 사용자(전체 범위)만 (0081)
+  const showKeys = canViewKeys && scope.kind === 'ALL'
+  const apiKeys = showKeys ? await getShipperApiKeys(id, scope) : []
   const editable = canUpdate && scope.kind === 'ALL'
   const badge = SHIPPER_STATUS_BADGE[shipper.status]
   const api = shipper.input.apiEnabled
@@ -73,6 +91,21 @@ export default async function EditShipperPage({
       // 해지된 화주사는 고칠 수 없다 (다시 쓰려면 상태부터 바꾼다)
       readOnly={!editable || shipper.status === 'TERMINATED'}
       userAccess={{ canView: canViewUsers, canAdd: canAddUser }}
+      apiKeys={
+        showKeys && (
+          <ApiKeyPanel
+            shipperId={shipper.id}
+            keys={apiKeys}
+            canCreate={canIssueKey}
+            canUpdate={canUpdateKey}
+            disabledReason={
+              shipper.status === 'TERMINATED'
+                ? '해지된 화주사에는 키를 발급할 수 없습니다'
+                : undefined
+            }
+          />
+        )
+      }
     />
   )
 }

@@ -138,6 +138,15 @@ export const PERMISSION_MENUS = {
     actions: ['read', 'export'],
   },
 
+  // ── 운영사 화면 · 연동 (화주 연동 API, 0081): 기본은 슈퍼 관리자(운영사 관리자)만
+  // API 키: 조회 · 발급(등록) · 수정·폐기(수정). 키 관리는 화주사 편집 화면의 "연동" 섹션에서
+  'integration.api-keys': {
+    label: 'API 키',
+    group: '연동',
+    area: 'admin',
+    actions: ['read', 'create', 'update'],
+  },
+
   // ── 운영사 화면 · 시스템
   'system.users': {
     label: '사용자',

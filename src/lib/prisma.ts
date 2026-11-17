@@ -25,6 +25,8 @@ export const AUDITED_MODELS: ReadonlySet<string> = new Set([
   'Customer',
   'Asn',
   'RegionCenterMap',
+  // 화주 연동 API 키 (0081)
+  'ApiClient',
 ])
 
 // 논리 삭제(del_yn)가 있는 표 (사용자는 계정을 지우지 않으므로 없음)
@@ -76,6 +78,10 @@ export const TENANT_MODELS: ReadonlySet<string> = new Set([
   'Putaway',
   'StockAdjust',
   'StockAdjustLine',
+  // 화주 연동 API (0081): 키·키 이력·요청 로그 (권한·IP·멱등·호출 한도 표는 키 번호로만 찾는다)
+  'ApiClient',
+  'ApiClientEvent',
+  'ApiRequestLog',
 ])
 
 type Data = Record<string, unknown>
