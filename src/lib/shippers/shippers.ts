@@ -17,6 +17,7 @@ import {
   type ShipperData,
 } from './shipper-schema'
 import { isCenterSetupStatus } from '@/lib/centers/center-status'
+import { revokeShipperKeys } from '@/lib/api/api-keys'
 
 // 화주사 저장 (docs/decisions/0035, 0080). 권한·데이터 범위 검사는 서버 액션에서 한다
 
@@ -307,7 +308,7 @@ async function assertTerminable(db: Db, shipper: { id: bigint; code: string }) {
 }
 
 // 상태 변경 (헤더 [상태 변경] 팝업): 일시정지·해지는 사유, 해지는 재고·입고 확인
-// TODO(연동 API 작업, 정의서 PART 2): 해지하면 API 키를 모두 폐기한다
+// 해지하면 API 키를 모두 폐기한다 (0081, 같은 트랜잭션)
 export async function changeShipperStatus(
   id: bigint,
   rowVersion: number,
@@ -332,6 +333,9 @@ export async function changeShipperStatus(
         select: { rowVersion: true, status: true },
       }),
     )
+    if (input.status === 'TERMINATED') {
+      await revokeShipperKeys(tx, id, `화주 해지: ${input.reason ?? ''}`.slice(0, 200))
+    }
     return { id, ...saved }
   })
 }
