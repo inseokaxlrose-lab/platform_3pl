@@ -69,7 +69,8 @@ export async function AppShell({
                 initialClosedGroups={closedGroups}
                 onToggleFavorite={setFavoriteMenuAction}
               />
-              <SidebarInset>
+              {/* min-w-0: 넓은 표(재고 이력 등)가 본문을 창 밖으로 밀지 않고 표 안에서 옆으로 스크롤되게 */}
+              <SidebarInset className="min-w-0">
                 <AppHeader area={area} user={user} />
                 {actingOperator && <ActingOperatorBanner name={actingOperator.name} />}
                 <div className="flex-1 p-page">{children}</div>
