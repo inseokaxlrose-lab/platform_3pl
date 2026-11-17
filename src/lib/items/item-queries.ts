@@ -1,4 +1,5 @@
 import 'server-only'
+import { shipperDefaultsSelect, shipperItemDefaults } from '@/lib/shippers/shipper-defaults'
 import { textIds } from '@/lib/id'
 import type { ItemFormOptions } from '@/lib/items/item-form-options'
 import type { ItemInput } from '@/lib/items/item-schema'
@@ -14,6 +15,7 @@ import { isUnitActive, resolveUnitDecimals, unitStatusSelect } from '@/lib/units
 import { parseQty, qtyText } from '@/lib/units/convert'
 import { isYes } from '@/lib/yn'
 import { ITEM_SCOPE, SHIPPER_SCOPE } from './item-list'
+import { SHIPPER_SETUP_ONLY } from '@/lib/shippers/shipper-codes'
 
 // 품목 화면 조회 함수 (docs/decisions/0041) — 운영사 화면·화주 포털 공용. 서버 액션 밖이라 데이터 범위를 직접 건다
 
@@ -23,15 +25,14 @@ export async function getItemFormOptions(scope: DataScope): Promise<ItemFormOpti
   const [shippers, units] = await Promise.all([
     prisma.shipper.findMany({
       where: {
-        AND: [scopeFilter(scope, SHIPPER_SCOPE), ACTIVE_ONLY],
+        // 품목을 등록할 수 있는 화주사: 준비중·운영중 (0080)
+        AND: [scopeFilter(scope, SHIPPER_SCOPE), SHIPPER_SETUP_ONLY],
       },
       select: {
         id: true,
         code: true,
         name: true,
-        useLot: true,
-        useExpiry: true,
-        labelUnit: true,
+        ...shipperDefaultsSelect,
       },
       orderBy: { code: 'asc' },
     }),
@@ -53,10 +54,9 @@ export async function getItemFormOptions(scope: DataScope): Promise<ItemFormOpti
   // 소수 자리수: 시스템 단위는 이 운영사의 값 (0079)
   resolveUnitDecimals(units)
   return textIds({
-    shippers: shippers.map((s) => ({
+    shippers: shippers.map(({ operator, useLot, useExpiry, labelUnit, ...s }) => ({
       ...s,
-      useLot: isYes(s.useLot),
-      useExpiry: isYes(s.useExpiry),
+      ...shipperItemDefaults({ operator, useLot, useExpiry, labelUnit }),
     })),
     units: units.map(({ status, operatorId, operatorSettings, ...u }) => ({
       ...u,

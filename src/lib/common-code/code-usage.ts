@@ -27,6 +27,13 @@ const CODE_USAGES: Record<string, CountUsage> = {
     db.location.count({ where: { operatorId, lockReason: code } }),
   ABC_CLASS: async (db, operatorId, code) =>
     db.location.count({ where: { operatorId, abcClass: code } }),
+  // 화주사 유형·업종·정산 주기 (0080)
+  SHIPPER_TYPE: async (db, operatorId, code) =>
+    db.shipper.count({ where: { operatorId, shipperType: code } }),
+  SHIPPER_INDUSTRY: async (db, operatorId, code) =>
+    db.shipper.count({ where: { operatorId, industry: code } }),
+  SETTLE_CYCLE: async (db, operatorId, code) =>
+    db.shipper.count({ where: { operatorId, settleCycle: code } }),
   // 제공 서비스: 운영사 (0040)
   SERVICE_TYPE: async (db, operatorId, code) =>
     db.operatorService.count({ where: { operatorId, serviceCd: code } }),

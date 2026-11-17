@@ -6,11 +6,14 @@ import { username } from 'better-auth/plugins'
 import { prisma } from '@/lib/prisma'
 import { isOperatorActive } from '@/lib/operator/operator-status'
 import { isActiveStatus } from '@/lib/status'
+import { isShipperInScopeStatus } from '@/lib/shippers/shipper-codes'
 
 // 사용 중지 계정 로그인 시 오류 메시지 (로그인 화면에서 이 값으로 구분한다)
 export const ACCOUNT_DISABLED = 'ACCOUNT_DISABLED'
 // 운영사가 운영 중(ACTIVE)이 아닐 때 (대기·정지·해지, 0039)
 export const OPERATOR_DISABLED = 'OPERATOR_DISABLED'
+// 화주사 사용자의 화주사가 해지됐을 때 (0080)
+export const SHIPPER_DISABLED = 'SHIPPER_DISABLED'
 
 // 인증 설정 (Better Auth) — docs/decisions/0010-auth-and-permission-model.md
 // - 로그인: 아이디 + 비밀번호 (현장 작업자는 이메일이 없을 수 있음)
@@ -44,13 +47,22 @@ export const auth = betterAuth({
         before: async (session) => {
           const user = await prisma.user.findUnique({
             where: { id: BigInt(session.userId) },
-            select: { status: true, userType: true, operator: { select: { status: true } } },
+            select: {
+              status: true,
+              userType: true,
+              operator: { select: { status: true } },
+              shipper: { select: { status: true } },
+            },
           })
           if (!user || !isActiveStatus(user.status)) {
             throw new APIError('FORBIDDEN', { message: ACCOUNT_DISABLED })
           }
           if (user.userType !== 'PLATFORM' && !isOperatorActive(user.operator?.status)) {
             throw new APIError('FORBIDDEN', { message: OPERATOR_DISABLED })
+          }
+          // 화주사 사용자: 화주사가 해지되면 로그인할 수 없다 (일시정지는 조회만 가능)
+          if (user.userType === 'SHIPPER' && !isShipperInScopeStatus(user.shipper?.status ?? '')) {
+            throw new APIError('FORBIDDEN', { message: SHIPPER_DISABLED })
           }
         },
       },

@@ -14,6 +14,7 @@ import {
   type LocationPattern,
 } from './location-pattern'
 import type { LocationBulkData, LocationData } from './location-schema'
+import { assertDedicatedShipper } from '@/lib/shippers/dedicated-shipper'
 
 // 로케이션 저장 (docs/decisions/0028, 0075). 권한·데이터 범위 검사는 서버 액션에서 한다
 // - 코드·창고는 등록 후 바꿀 수 없다 (라벨이 붙어 있고 재고·적치 기록이 이 주소를 가리킨다)
@@ -137,6 +138,10 @@ export async function createLocation(warehouse: TargetWarehouse, code: string, d
     if (exists) throw new ActionError('CONFLICT', `이 창고에 이미 있는 로케이션입니다: ${code}`)
     const zone = await resolveZone(tx, warehouse.id, data.zoneId)
     await assertLocationCodes(tx, data)
+    // 전용 화주사: 이 센터를 이용 중인 화주사만 (0080)
+    if (data.dedicatedShipperId) {
+      await assertDedicatedShipper(tx, data.dedicatedShipperId, warehouse.centerId)
+    }
     const location = await tx.location.create({
       data: {
         operatorId: requireOperatorId(),
@@ -159,11 +164,13 @@ export async function updateLocation(id: bigint, rowVersion: number, data: Locat
     const found = await tx.location.findUnique({
       where: { id },
       select: {
+        centerId: true,
         warehouseId: true,
         zoneId: true,
         code: true,
         systemYn: true,
         lockYn: true,
+        dedicatedShipperId: true,
         rowVersion: true,
       },
     })
@@ -177,6 +184,10 @@ export async function updateLocation(id: bigint, rowVersion: number, data: Locat
       const zone = await resolveZone(tx, current.warehouseId, data.zoneId, current.zoneId)
       await assertLocationCodes(tx, data)
       await assertStockFitsRules(tx, id, { locType: data.locType, mixClient: data.mixClient })
+      // 전용 화주사를 새로 정하거나 바꿀 때: 이 센터를 이용 중인 화주사만 (0080)
+      if (data.dedicatedShipperId && data.dedicatedShipperId !== current.dedicatedShipperId) {
+        await assertDedicatedShipper(tx, data.dedicatedShipperId, current.centerId)
+      }
       fields = {
         ...locationFields(data),
         zoneId: zone?.id ?? null,

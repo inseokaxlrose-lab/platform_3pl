@@ -12,6 +12,7 @@ import { DELETED_ONLY, NOT_DELETED, toStatus } from '@/lib/status'
 import { isYes, toYn } from '@/lib/yn'
 import { saveZones } from '@/lib/zones/zones'
 import type { WarehouseCreateData, WarehouseData } from './warehouse-schema'
+import { assertDedicatedShipper } from '@/lib/shippers/dedicated-shipper'
 
 // 창고 저장 (docs/decisions/0027, 0074). 권한·데이터 범위·센터 상태 검사는 서버 액션에서 한다
 // - 창고코드·센터는 등록 후 바꿀 수 없다
@@ -74,8 +75,8 @@ function assertFitsCenter(
   }
 }
 
-// 2차 참조 값: 담당자·전용 화주사는 같은 운영사 것만 (다른 운영사 것은 조회되지 않는다), 보관 방식은 공통코드
-async function assertReferences(db: Db, data: WarehouseCreateData) {
+// 2차 참조 값: 담당자·전용 화주사는 같은 운영사 것만, 전용 화주사는 이 센터를 이용하는 화주만 (다른 운영사 것은 조회되지 않는다), 보관 방식은 공통코드
+async function assertReferences(db: Db, data: WarehouseCreateData, centerId: bigint) {
   if (data.managerUserId) {
     const user = await db.user.findUnique({
       where: { id: data.managerUserId },
@@ -83,13 +84,8 @@ async function assertReferences(db: Db, data: WarehouseCreateData) {
     })
     if (!user) throw new ActionError('VALIDATION', '관리 담당자를 찾을 수 없습니다.')
   }
-  if (data.dedicatedShipperId) {
-    const shipper = await db.shipper.findUnique({
-      where: { id: data.dedicatedShipperId },
-      select: { id: true },
-    })
-    if (!shipper) throw new ActionError('VALIDATION', '전용 화주사를 찾을 수 없습니다.')
-  }
+  // 전용 화주사: 이 센터를 이용 중인 화주사만 (0080)
+  if (data.dedicatedShipperId) await assertDedicatedShipper(db, data.dedicatedShipperId, centerId)
   if (data.storageMethod) {
     await assertCodeValues(db, 'STORAGE_METHOD', [data.storageMethod], { label: '보관 방식' })
   }
@@ -167,7 +163,7 @@ export async function createWarehouse(centerId: bigint, code: string, data: Ware
     const center = await loadCenter(tx, centerId)
     await assertWarehouseCode(tx, centerId, code)
     assertFitsCenter(center, data)
-    await assertReferences(tx, data)
+    await assertReferences(tx, data, centerId)
     const systemCode = await nextSystemCode('WAREHOUSE', tx)
     const warehouse = await tx.warehouse.create({
       data: {
@@ -208,7 +204,7 @@ export async function updateWarehouse(id: bigint, rowVersion: number, data: Ware
       : await (async () => {
           const center = await loadCenter(tx, current.centerId)
           assertFitsCenter(center, data)
-          await assertReferences(tx, data)
+          await assertReferences(tx, data, current.centerId)
           await assertDefaultLocation(tx, id, data.defaultLocId)
           const changes = [
             data.type !== current.type && '창고 유형',

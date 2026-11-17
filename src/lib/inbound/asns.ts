@@ -1,4 +1,9 @@
 import 'server-only'
+import {
+  shipperDefaultsSelect,
+  shipperItemDefaults,
+  type ShipperDefaultsRow,
+} from '@/lib/shippers/shipper-defaults'
 import { resolveUnitDecimals, unitDecimalsSelect } from '@/lib/units/unit-status'
 import { ActionError } from '@/lib/actions/action-error'
 import { currentActor, requireOperatorId } from '@/lib/actor'
@@ -65,7 +70,7 @@ export const asnItemSelect = (operatorId: bigint) =>
         unit: { select: { code: true, ...unitDecimalsSelect(operatorId) } },
       },
     },
-    shipper: { select: { useLot: true, useExpiry: true, labelUnit: true } },
+    shipper: { select: shipperDefaultsSelect },
   }) as const
 
 export type AsnLineItem = {
@@ -77,7 +82,7 @@ export type AsnLineItem = {
   labelUnit: 'PLT' | 'BOX' | null
   baseUnit: { code: string; decimals: number }
   units: { convQty: { toString(): string }; unit: { code: string; decimals: number } }[]
-  shipper: { useLot: string; useExpiry: string; labelUnit: 'PLT' | 'BOX' }
+  shipper: ShipperDefaultsRow
 }
 
 type AsnLineValue = AsnData['lines'][number]
@@ -115,11 +120,7 @@ export function itemLotOptions(item: AsnLineItem) {
       useExpiry: item.useExpiry as 'Y' | 'N' | null,
       labelUnit: item.labelUnit,
     },
-    {
-      useLot: isYes(item.shipper.useLot),
-      useExpiry: isYes(item.shipper.useExpiry),
-      labelUnit: item.shipper.labelUnit,
-    },
+    shipperItemDefaults(item.shipper),
   )
 }
 
@@ -193,7 +194,11 @@ export async function createAsnInTx(
     where: { id: data.shipperId, ...ACTIVE_ONLY },
     select: { id: true },
   })
-  if (!shipper) throw new ActionError('VALIDATION', '사용 중인 화주사를 골라 주세요.')
+  if (!shipper)
+    throw new ActionError(
+      'VALIDATION',
+      '운영중인 화주사를 골라 주세요. (준비중·일시정지 화주사는 입고를 받지 않습니다)',
+    )
   await assertCenter(tx, data.shipperId, data.centerId, scope)
   const lines = await lineRows(tx, data.shipperId, data.lines)
   const asn = await tx.asn.create({

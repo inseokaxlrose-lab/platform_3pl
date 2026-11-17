@@ -1,4 +1,9 @@
 import 'server-only'
+import {
+  shipperDefaultsSelect,
+  shipperItemDefaults,
+  type ShipperDefaultsRow,
+} from '@/lib/shippers/shipper-defaults'
 import { Prisma } from '@/generated/prisma/client'
 import { looksLikeSystemCode } from '@/config/master-codes'
 import { ActionError } from '@/lib/actions/action-error'
@@ -14,6 +19,7 @@ import { isUnitActive, resolveUnitDecimals, unitStatusSelect } from '@/lib/units
 import { checkQtyDecimals } from '@/lib/units/convert'
 import { isYes } from '@/lib/yn'
 import { effectiveItemOptions, type ItemCreateData, type ItemData } from './item-schema'
+import { isShipperSetupStatus } from '@/lib/shippers/shipper-codes'
 
 // 외부 코드는 외부코드 매핑 메뉴에서 (0068) — 품목 저장은 매핑을 건드리지 않는다
 type SaveItemData = ItemData
@@ -100,15 +106,8 @@ async function assertUnits(db: Db, data: SaveItemData, keep: bigint[] = []) {
 
 // DB 칸으로 옮길 값 (관리 옵션은 '' → null = 화주사 기본값 따름)
 // 유통기한을 실제로 쓰지 않으면 임박 기준 일수는 비운다
-function fieldsOf(
-  data: SaveItemData,
-  shipper: { useLot: string; useExpiry: string; labelUnit: 'PLT' | 'BOX' },
-) {
-  const options = effectiveItemOptions(data, {
-    useLot: isYes(shipper.useLot),
-    useExpiry: isYes(shipper.useExpiry),
-    labelUnit: shipper.labelUnit,
-  })
+function fieldsOf(data: SaveItemData, shipper: ShipperDefaultsRow) {
+  const options = effectiveItemOptions(data, shipperItemDefaults(shipper))
   return {
     name: data.name,
     spec: data.spec,
@@ -130,7 +129,7 @@ const unitRows = (itemId: bigint, units: ItemData['units']) =>
     sortOrder: index,
   }))
 
-const SHIPPER_DEFAULTS = { useLot: true, useExpiry: true, labelUnit: true, status: true } as const
+const SHIPPER_DEFAULTS = { ...shipperDefaultsSelect, status: true } as const
 
 // 등록 (한 트랜잭션: 시스템 코드 → 품목 → 환산단위 → 외부 코드)
 export async function createItem(data: CreateItemData) {
@@ -140,8 +139,8 @@ export async function createItem(data: CreateItemData) {
       select: SHIPPER_DEFAULTS,
     })
     if (!shipper) throw new ActionError('NOT_FOUND', '화주사를 찾을 수 없습니다.')
-    if (!isActiveStatus(shipper.status)) {
-      throw new ActionError('CONFLICT', '사용 중지된 화주사에는 품목을 등록할 수 없습니다.')
+    if (!isShipperSetupStatus(shipper.status)) {
+      throw new ActionError('CONFLICT', '준비중·운영중인 화주사에만 품목을 등록할 수 있습니다.')
     }
     const systemCode = await nextSystemCode('ITEM', tx)
     const code = data.code || systemCode
