@@ -101,7 +101,7 @@ export function RegionChangeDialog({
         return
       }
       onSaved(
-        `${result.data.changeCount}건을 반영했습니다.${result.data.invalidCount ? ` (제외 ${result.data.invalidCount}건)` : ''}`,
+        `${result.data.changeCount}건을 반영했습니다.${result.data.invalidCount ? ` (제외 ${result.data.invalidCount}건)` : ''}${result.data.shipToNotice}`,
       )
     })
 
@@ -170,6 +170,16 @@ export function RegionChangeDialog({
                     </li>
                   ))}
                 </ul>
+              )}
+              {/* 납품처 영향 (0082): 저장하면 바로 다시 정한다 */}
+              {preview.shipToImpact && (
+                <p className="rounded-md bg-muted p-2 text-xs">
+                  <span className="font-medium">납품처 영향</span> · {preview.shipToImpact}
+                  <span className="block text-muted-foreground">
+                    저장하면 자동 지정 납품처는 새 권역으로 다시 정하고, 수동·연동 지정은 센터를
+                    그대로 두고 권역 불일치만 표시합니다.
+                  </span>
+                </p>
               )}
               {unassigning && preview.changeCount > 0 && (
                 <p className="rounded-md border border-dashed p-2 text-xs text-muted-foreground">
