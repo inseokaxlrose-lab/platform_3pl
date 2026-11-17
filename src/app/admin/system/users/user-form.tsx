@@ -1,6 +1,5 @@
 'use client'
 
-import { useRouter } from 'next/navigation'
 import type { z } from 'zod'
 import { StatusBadge } from '@/components/common'
 import { CheckboxList, EmailInput } from '@/components/inputs'
@@ -52,9 +51,8 @@ function SectionError({ message }: { message?: string }) {
 }
 
 // 사용자 등록·수정 (docs/decisions/0018, 입력 화면 틀 0031)
-// 유형·아이디는 등록할 때만 정한다. 등록하면 수정 화면으로 이동
+// 유형·아이디는 등록할 때만 정한다. 등록하면 [계속 등록]·[등록한 항목 보기]
 export function UserForm({ options, user, extraSections = [], header }: UserFormProps) {
-  const router = useRouter()
   const { can } = usePermission()
   const isNew = !user
   const readOnly = isNew ? !can('system.users.create') : !can('system.users.update')
@@ -94,9 +92,9 @@ export function UserForm({ options, user, extraSections = [], header }: UserForm
           })
         : createUserAction({ ...value, ...affiliation })
     },
-    onSuccess: user
+    createdHref: user
       ? undefined
-      : (created) => router.push(`/admin/system/users/${(created as { id: string }).id}`),
+      : (created) => `/admin/system/users/${(created as { id: string }).id}`,
   })
   const { value, set, errors } = form
   const disabled = readOnly || form.pending

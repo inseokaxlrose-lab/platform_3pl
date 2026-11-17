@@ -1,7 +1,6 @@
 'use client'
 
 import Link from 'next/link'
-import { useRouter } from 'next/navigation'
 
 import {
   AddressInput,
@@ -108,7 +107,7 @@ type TimeKey = 'workStartTime' | 'workEndTime' | 'inboundCutoffTime'
 type LocationKey = 'defaultInboundLocId' | 'defaultOutboundLocId' | 'defaultReturnLocId'
 
 // 센터 등록·수정 (docs/decisions/0026·0073, 입력 화면 틀 0031)
-// 등록하면 수정 화면으로 이동, 수정은 그 자리에서 저장. 운영 상태는 헤더의 [상태 변경]에서 따로
+// 등록하면 [계속 등록]·[등록한 항목 보기], 수정은 그 자리에서 저장. 운영 상태는 헤더의 [상태 변경]에서 따로
 export function CenterForm({
   header,
   center,
@@ -117,7 +116,6 @@ export function CenterForm({
   warehouseAccess = { canView: false, canAdd: false },
   canViewRegions = false,
 }: CenterFormProps) {
-  const router = useRouter()
   // 저장 결과: 등록은 새 센터 키, 수정은 새 버전과 담당자 줄 키
   const form = useMasterForm<
     typeof centerCreateSchema,
@@ -142,7 +140,7 @@ export function CenterForm({
         ? { ...value, contacts: value.contacts.map((c, i) => ({ ...c, id: ids[i] ?? c.id })) }
         : value
     },
-    onSuccess: center ? undefined : (created) => router.push(`/admin/master/centers/${created.id}`),
+    createdHref: center ? undefined : (created) => `/admin/master/centers/${created.id}`,
   })
   const { value, set, errors } = form
   const disabled = readOnly || form.pending

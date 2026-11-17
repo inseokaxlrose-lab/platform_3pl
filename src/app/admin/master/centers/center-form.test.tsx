@@ -67,7 +67,7 @@ const CENTER = {
 } as unknown as CenterForEdit
 
 describe('CenterForm', () => {
-  it('등록: 코드·이름·주소를 넣고 저장하면 만든 센터의 수정 화면으로, 전화는 숫자만 보낸다', async () => {
+  it('등록: 코드·이름·주소를 넣고 저장하면 그 자리에서 [등록한 항목 보기](만든 센터)·[계속 등록], 전화는 숫자만 보낸다', async () => {
     vi.mocked(createCenterAction).mockResolvedValue({
       ok: true,
       data: { id: 'new-id', rowVersion: 2 },
@@ -100,7 +100,11 @@ describe('CenterForm', () => {
     expect(createCenterAction).toHaveBeenCalledWith(
       expect.objectContaining({ code: 'gmh', name: '김해센터', phone: '0551234567' }),
     )
-    expect(push).toHaveBeenCalledWith('/admin/master/centers/new-id')
+    expect(push).not.toHaveBeenCalled()
+    expect(screen.getByRole('link', { name: '등록한 항목 보기' }).getAttribute('href')).toBe(
+      '/admin/master/centers/new-id',
+    )
+    expect(screen.getByRole('button', { name: '계속 등록' })).toBeTruthy()
     // 기본 로케이션 고르기는 수정 화면에서만
     expect(screen.queryByText('기본 입고 로케이션')).toBeNull()
   })

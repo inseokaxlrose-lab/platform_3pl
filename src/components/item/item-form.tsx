@@ -132,9 +132,7 @@ export function ItemForm({
         ? updateAction({ ...value, id: item.id, rowVersion: version ?? item.rowVersion })
         : createAction(value),
     afterSave: toFormValues,
-    onSuccess: item
-      ? undefined
-      : (created) => router.push(`${basePath}/${(created as { id: string }).id}`),
+    createdHref: item ? undefined : (created) => `${basePath}/${(created as { id: string }).id}`,
   })
   const { value, set, errors } = form
   const disabled = readOnly || form.pending

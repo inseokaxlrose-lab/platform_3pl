@@ -1,6 +1,5 @@
 'use client'
 
-import { useRouter } from 'next/navigation'
 import { BizNoInput } from '@/components/inputs'
 import {
   Field,
@@ -37,15 +36,12 @@ const EMPTY: OperatorRegisterInput = {
 // 운영사 등록 폼 (0039 3c, 0040): 운영사코드·회사명·유형·사업자등록번호·대표자
 // 나머지 칸은 기본값으로 들어가고, 등록 후 편집 화면에서 채운다. 관리자는 admin.{운영사코드 소문자}
 export function OperatorRegisterForm({ header }: { header: MasterFormHeader }) {
-  const router = useRouter()
   const form = useMasterForm({
     initial: EMPTY,
     schema: operatorRegisterSchema,
     save: (value: OperatorRegisterInput) => createOperatorAction(value),
-    // 등록 화면이라 저장 후 값은 쓰지 않는다 (바로 목록으로)
-    afterSave: () => EMPTY,
-    // 등록하면 편집 화면으로 (나머지 칸을 이어서 채운다)
-    onSuccess: (created) => router.push(`/platform/operators/${(created as { id: string }).id}`),
+    // 등록하면 [계속 등록]·[등록한 항목 보기](편집 화면에서 나머지 칸을 이어서 채운다)
+    createdHref: (created) => `/platform/operators/${(created as { id: string }).id}`,
   })
   const { value, set, errors } = form
   const disabled = form.pending

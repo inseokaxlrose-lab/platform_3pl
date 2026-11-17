@@ -101,9 +101,9 @@ export function ShipperForm({
             ...value,
           })
         : createShipperAction(value),
-    onSuccess: shipper
+    createdHref: shipper
       ? undefined
-      : (created) => router.push(`${LIST_HREF}/${(created as { id: string }).id}`),
+      : (created) => `${LIST_HREF}/${(created as { id: string }).id}`,
   })
   const { value, set, errors } = form
   const disabled = readOnly || form.pending

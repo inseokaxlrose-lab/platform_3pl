@@ -1,6 +1,5 @@
 'use client'
 
-import { useRouter } from 'next/navigation'
 import { useState } from 'react'
 import { STOCK_STATUS, TEMP_ZONE, type TempZoneKey } from '@/config/operator-codes'
 import { CenterSelect, LocationSelect, NumberInput, YnToggle } from '@/components/inputs'
@@ -76,7 +75,6 @@ const defaultTempZone = (zones: readonly string[]) =>
 // - 유형을 고르면 운영 속성을 유형 기본값으로 채운다. 이미 고친 값이 있으면 바꿀지 묻는다
 // - 시스템 기본 창고: 설명·정렬순서·비고만 고칠 수 있다
 export function WarehouseForm(props: WarehouseFormProps) {
-  const router = useRouter()
   const editing = props.mode === 'edit' ? props.warehouse : null
   const isSystem = editing?.isSystem ?? false
   const readOnly = props.mode === 'edit' && props.readOnly
@@ -124,9 +122,9 @@ export function WarehouseForm(props: WarehouseFormProps) {
         ? { ...value, zones: value.zones.map((z, i) => ({ ...z, id: ids[i] ?? z.id })) }
         : value
     },
-    onSuccess: editing
+    createdHref: editing
       ? undefined
-      : (created) => router.push(`/admin/master/warehouses/${(created as { id: string }).id}`),
+      : (created) => `/admin/master/warehouses/${(created as { id: string }).id}`,
   })
   const { value, set, errors } = form
   const disabled = readOnly || form.pending
