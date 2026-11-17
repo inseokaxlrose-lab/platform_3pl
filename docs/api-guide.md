@@ -110,6 +110,42 @@ curl -s https://wms.example.com/api/v1/me -H "X-API-Key: $WMS_API_KEY"
 
 운영사가 화주의 "API 사용"을 끄면 키가 있어도 모든 호출이 `API_DISABLED`입니다.
 
-## 10. 문의
+## 10. 거래처 · 납품처 API
+
+거래처(partner)는 화주가 물건을 파는 상대, 납품처(shipTo)는 실제로 물건을 받는 곳입니다. 출고요청은 거래처와 납품처 코드로 들어오므로, **주문보다 먼저 거래처를 연동**하세요. 필드와 화면 칸의 대응은 [`docs/api-partner-fields.md`](api-partner-fields.md)에 있습니다.
+
+| 메서드 | 경로 | 권한 | 설명 |
+| --- | --- | --- | --- |
+| POST | `/partners` | `PARTNER_WRITE` | 거래처 upsert (납품처 배열 포함 가능), 최대 500건 |
+| GET | `/partners` | `PARTNER_READ` | 목록 (`updatedAfter`·`cursor`·`limit`) |
+| GET | `/partners/{partnerCd}` | `PARTNER_READ` | 상세 (납품처 포함) |
+| POST | `/partners/{partnerCd}/ship-tos` | `PARTNER_WRITE` | 납품처 upsert, 최대 500건 (건 하나 = 납품처 하나) |
+| GET | `/partners/{partnerCd}/ship-tos` | `PARTNER_READ` | 납품처 목록 |
+
+**upsert 규칙 (꼭 읽어 주세요)**
+
+1. 업무 키는 `partnerCd`(화주 안에서 고유), 납품처는 `partnerCd + shipToCd`입니다. 둘 다 **등록 후 바꿀 수 없습니다.**
+2. 이미 있는 거래처는 **보낸 필드만 고칩니다.** 안 보낸 필드는 그대로이고, `null`을 보내면 그 값을 지웁니다(필수 필드는 지울 수 없음).
+3. `shipTos`는 **보낸 납품처만** 추가·수정합니다. 배열에 없는 기존 납품처는 건드리지 않습니다. 쓰지 않는 납품처는 `"status": "INACTIVE"`로 보내세요.
+4. 새 거래처에 `shipTos`가 없으면 거래처 주소로 **기본 납품처**를 만듭니다(코드·이름은 거래처와 같게). 주소도 없으면 `PARTNER_ADDRESS_REQUIRED`.
+5. 기본 납품처는 거래처당 정확히 1곳입니다. `"default": true`로 보내면 나머지는 기본에서 풀립니다.
+6. 배송센터: `centerCd`가 있으면 그 센터(이용 센터여야 함), `null`이면 주소로 자동 지정, 안 보내면 지금 지정 그대로입니다. 정하지 못했을 때의 처리는 화주 정책에 따릅니다(대응표 문서 마지막 표).
+7. 내용이 지금과 같으면 `UNCHANGED`입니다(수정일이 바뀌지 않음). 같은 요청을 다시 보내도 안전합니다.
+
+**응답 건별 결과** — 거래처 결과 안에 납품처별 결과가 함께 옵니다.
+
+```json
+{ "seq": 1, "docNo": "P10023", "result": "CREATED", "id": "1201",
+  "shipTos": [
+    { "shipToCd": "P10023-01", "result": "CREATED", "addrGrade": "A", "zipCd": "06236",
+      "centerCd": "ICN", "centerAssignType": "AUTO", "centerAssignStatus": "ASSIGNED", "regionMismatch": false }
+  ] }
+```
+
+- `centerAssignStatus`가 `NEED_CONFIRM`이면 `confirmReason`이 함께 옵니다. 운영사가 확인해 센터를 정하면 조회 API에 반영됩니다.
+- 정책으로 반려된 납품처는 `shipTos[].result = "FAIL"`과 `errors`가 오고, 거래처는 정상 처리됩니다. 단, 그 때문에 기본 납품처가 없어지는 새 거래처는 거래처도 `FAIL`입니다.
+- TEST 키는 같은 결과(자동 지정될 배송센터 포함)를 계산만 하고 저장하지 않습니다.
+
+## 11. 문의
 
 문제가 생기면 **`requestId`**, 호출 일시, 엔드포인트를 운영사에 알려 주세요. 운영사는 "연동 → API 호출 이력"에서 요청·응답 본문(개인정보는 가려 저장)과 건별 결과를 확인합니다.
