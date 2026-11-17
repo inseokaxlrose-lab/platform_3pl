@@ -42,21 +42,16 @@ export async function getCenterForEdit(id: bigint, scope: DataScope) {
         // 창고 정렬순서(기본 창고 입고 → 출고 → 반품이 앞) → 코드
         orderBy: [{ sortOrder: 'asc' }, { code: 'asc' }],
       },
-      deliveryZones: {
-        where: NOT_DELETED,
-        select: {
-          id: true,
-          code: true,
-          name: true,
-          status: true,
-          regions: { select: { regionCode: true } },
-        },
-        orderBy: { code: 'asc' },
-      },
     },
   })
   // 범위(운영사·소속 센터) 밖이면 없는 것으로
   if (!center || !isInScope(scope, center, { center: 'id' })) return null
+  // 권역설정에서 이 센터에 배정된 우편번호 수 (온도대별, 0076)
+  const regionMaps = await prisma.regionCenterMap.groupBy({
+    by: ['tempZone'],
+    where: { centerId: id },
+    _count: true,
+  })
 
   const [operator, locations] = await Promise.all([
     getOperatorDefaults(center.operatorId),
@@ -138,10 +133,7 @@ export async function getCenterForEdit(id: bigint, scope: DataScope) {
       ...w,
       locationCount: _count.locations,
     })),
-    deliveryZones: center.deliveryZones.map(withIsActive).map(({ regions, ...z }) => ({
-      ...z,
-      regionCodes: regions.map((r) => r.regionCode),
-    })),
+    regionAssignments: regionMaps.map((m) => ({ tempZone: m.tempZone, count: m._count })),
   })
 }
 

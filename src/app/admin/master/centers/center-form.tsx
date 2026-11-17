@@ -1,9 +1,8 @@
 'use client'
 
-import { PlusIcon } from 'lucide-react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { StatusBadge } from '@/components/common'
+
 import {
   AddressInput,
   BizNoInput,
@@ -49,7 +48,6 @@ import {
   type CenterCreateInput,
 } from '@/lib/centers/center-schema'
 import { CENTER_TYPE, isCenterSetupStatus } from '@/lib/centers/center-status'
-import { summarizeRegions } from '@/lib/delivery-zones/regions'
 import { createCenterAction, updateCenterAction } from './actions'
 import type { CenterForEdit } from './queries'
 import { AddWarehouseButton, WarehouseSummary } from './warehouse-summary'
@@ -101,8 +99,8 @@ type CenterFormProps = {
   readOnly: boolean
   // 창고 섹션: 조회 권한이면 창고로 이동, 등록 권한이면 [창고 추가]
   warehouseAccess?: { canView: boolean; canAdd: boolean }
-  // 배송권역 섹션: 조회 권한이면 섹션을 보여주고 권역으로 이동, 등록 권한이면 [권역 추가]
-  zoneAccess?: { canView: boolean; canAdd: boolean }
+  // 권역설정 섹션: 조회 권한이면 이 센터에 배정된 우편번호 수와 [권역설정으로]
+  canViewRegions?: boolean
 }
 
 type TextKey = 'code' | 'name' | 'nameEn' | 'shortName' | 'subBizNo' | 'addressJibun' | 'regionName'
@@ -117,7 +115,7 @@ export function CenterForm({
   operator = center?.operator,
   readOnly,
   warehouseAccess = { canView: false, canAdd: false },
-  zoneAccess = { canView: false, canAdd: false },
+  canViewRegions = false,
 }: CenterFormProps) {
   const router = useRouter()
   // 저장 결과: 등록은 새 센터 키, 수정은 새 버전과 담당자 줄 키
@@ -500,7 +498,7 @@ export function CenterForm({
     },
   ]
 
-  // 수정 화면에서만: 창고 목록, 배송권역
+  // 수정 화면에서만: 창고 목록, 권역설정 요약
   if (center) {
     // 창고·권역 추가는 준비중·운영중 센터만 (0073)
     const canSetup = isCenterSetupStatus(center.status)
@@ -514,42 +512,31 @@ export function CenterForm({
         <WarehouseSummary warehouses={center.warehouses} canView={warehouseAccess.canView} />
       ),
     })
-    // 배송권역 요약 (0033)
-    if (zoneAccess.canView) {
+    // 권역설정 요약 (0076): 이 센터가 배송을 맡은 우편번호 수 (온도대별)
+    if (canViewRegions) {
+      const total = center.regionAssignments.reduce((sum, r) => sum + r.count, 0)
       sections.push({
-        id: 'delivery-zones',
-        title: `배송권역 (${center.deliveryZones.length})`,
+        id: 'regions',
+        title: `권역설정 (우편번호 ${total.toLocaleString()}개)`,
         standalone: true,
-        description: '이 센터가 배송을 담당하는 지역입니다.',
-        action: zoneAccess.canAdd && canSetup && (
+        description:
+          '이 센터가 배송을 맡은 우편번호입니다. 권역설정 화면에서 지역·우편번호 단위로 정합니다.',
+        action: (
           <Button asChild type="button" variant="outline" size="sm">
-            <Link href={`/admin/master/delivery-zones/new?centerId=${center.id}`}>
-              <PlusIcon />
-              권역 추가
-            </Link>
+            <Link href="/admin/master/regions">권역설정으로</Link>
           </Button>
         ),
         content:
-          center.deliveryZones.length === 0 ? (
-            <p className="text-sm text-muted-foreground">등록된 배송권역이 없습니다.</p>
+          total === 0 ? (
+            <p className="text-sm text-muted-foreground">배정된 우편번호가 없습니다.</p>
           ) : (
-            <ul className="divide-y rounded-md border text-sm">
-              {center.deliveryZones.map((z) => (
-                <li key={z.id}>
-                  <Link
-                    href={`/admin/master/delivery-zones/${z.id}`}
-                    className="flex items-center justify-between gap-3 px-3 py-2 hover:bg-muted/50"
-                  >
-                    <div className="min-w-0">
-                      <p className="truncate font-medium">
-                        {z.name} <span className="text-muted-foreground">({z.code})</span>
-                      </p>
-                      <p className="truncate text-xs text-muted-foreground">
-                        {summarizeRegions(z.regionCodes, 4)}
-                      </p>
-                    </div>
-                    {!z.isActive && <StatusBadge tone="danger">사용 중지</StatusBadge>}
-                  </Link>
+            <ul className="flex flex-wrap gap-2 text-sm">
+              {center.regionAssignments.map((r) => (
+                <li key={r.tempZone} className="rounded-md border px-3 py-1">
+                  {r.tempZone === 'ALL'
+                    ? '전체 온도대'
+                    : TEMP_ZONE.labels[r.tempZone as keyof typeof TEMP_ZONE.labels]}{' '}
+                  <span className="font-medium">{r.count.toLocaleString()}</span>
                 </li>
               ))}
             </ul>

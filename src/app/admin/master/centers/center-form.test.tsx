@@ -63,7 +63,7 @@ const CENTER = {
   operator: { shipCutoffTime: '17:00' },
   locationOptions: [{ value: '1', label: 'DEFAULT', description: '입고대기 · 입고대기' }],
   warehouses: [],
-  deliveryZones: [],
+  regionAssignments: [],
 } as unknown as CenterForEdit
 
 describe('CenterForm', () => {
