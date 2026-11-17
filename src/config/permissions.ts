@@ -146,6 +146,13 @@ export const PERMISSION_MENUS = {
     area: 'admin',
     actions: ['read', 'create', 'update'],
   },
+  // API 호출 이력: 요청 로그·건별 결과 (본문은 개인정보를 가린 값)
+  'integration.api-logs': {
+    label: 'API 호출 이력',
+    group: '연동',
+    area: 'admin',
+    actions: ['read', 'export'],
+  },
 
   // ── 운영사 화면 · 시스템
   'system.users': {
