@@ -234,20 +234,37 @@
 | `areaM2` / `minTemp` / `maxTemp` | `area_m2` / `min_temp` / `max_temp` | DECIMAL | 2차 |
 | 등록·수정 | `created_at`·`updated_at`·`created_by`·`updated_by` | | |
 
-### tb_warehouse ← `warehouse` (코드 모델 `Warehouse`)
+### tb_warehouse ← `warehouse` (코드 모델 `Warehouse`, 0027·0074)
 
-| 코드(그대로) | 지금 DB | 새 DB | 비고 |
-| --- | --- | --- | --- |
-| `id` | `id` | `warehouse_id` | TEXT(cuid) → BIGINT |
-| `centerId` | `centerId` | `center_id` | TEXT(cuid) → BIGINT |
-| `systemCode` | `systemCode` | `sys_cd` |  |
-| `code` | `code` | `warehouse_cd` |  |
-| `name` | `name` | `warehouse_nm` |  |
-| `type` | `type` | `warehouse_type_cd` | GENERAL / 대기 창고 INBOUND·OUTBOUND·RETURN_STAGING (센터마다 유형별 1개, 0073) |
-| `storageCondition` | `storageCondition` | `temp_zone_cd` |  |
-| `isActive` | `isActive` | `status_cd` | Boolean → status_cd (2단계, ACTIVE/INACTIVE) |
-| `createdAt` | `createdAt` | `created_at` |  |
-| `updatedAt` | `updatedAt` | `updated_at` |  |
+1차 = DB·API·화면, 2차 = DB·API만. 유형·온도대·상태·기본 재고상태는 플랫폼 상수 + 검사 조건 (`warehouse-codes.ts`, `operator-codes.ts`).
+
+| 코드 | DB | 형식 | 구분 | 비고 |
+| --- | --- | --- | --- | --- |
+| `id` | `warehouse_id` | BIGINT | | |
+| `operatorId` | `operator_id` | BIGINT | | 운영사 (0039) |
+| `centerId` | `center_id` | BIGINT | 1차 | 등록 후 불변 |
+| `systemCode` | `sys_cd` | VARCHAR | 1차 | 자동·불변 `WH000001` |
+| `code` | `warehouse_cd` | VARCHAR(20) | 1차 | **필수·불변**, 영문 대문자·숫자·밑줄, 센터 안 고유 |
+| `name` | `warehouse_nm` | VARCHAR(100) | 1차 | 필수 |
+| `type` | `warehouse_type_cd` | VARCHAR(20) | 1차 | STORAGE·INBOUND·OUTBOUND·RETURN·QC·DAMAGED·VAS·CROSSDOCK, 기본 STORAGE |
+| `tempZone` | `temp_zone_cd` | VARCHAR(20) | 1차 | AMBIENT·CHILLED·FROZEN·CONSTANT, 센터 취급 온도대 중 |
+| `status` | `status_cd` | VARCHAR(20) | 1차 | ACTIVE·INACTIVE |
+| `systemYn` | `system_yn` | CHAR(1) | 1차 | 시스템 기본 창고 (입고·출고·반품 대기, 센터마다 유형별 1개) |
+| `description` | `description` | VARCHAR(200) | 1차 | 목록 코드 옆 보조 문구 |
+| `sortOrder` | `sort_seq` | INT | 1차 | 기본 10 (기본 창고 1·2·3) |
+| `buildingName` / `floorNo` / `areaM2` | `building_nm` / `floor_no` / `area_m2` | VARCHAR(50) / VARCHAR(10) / DECIMAL(12,2) | 1차 | |
+| `ceilingHeightM` / `palletCapacity` | `ceiling_height_m` / `pallet_capa_cnt` | DECIMAL(5,2) / INT | 2차 | ≥ 0 |
+| `storageMethod` | `storage_method_cd` | VARCHAR(20) | 2차 | 공통코드 `STORAGE_METHOD` |
+| `bondedYn` / `hazmatYn` | `bonded_yn` / `hazmat_yn` | CHAR(1) | 2차 | 센터 자격이 있을 때만 Y |
+| `inboundYn` / `outboundYn` / `allocatableYn` | `inbound_yn` / `outbound_yn` / `allocatable_yn` | CHAR(1) | 1차 | 유형별 기본값 (0074 표) |
+| `defaultStockStatus` | `default_stock_status_cd` | VARCHAR(20) | 1차 | NORMAL·HOLD·DAMAGED·QUARANTINE |
+| `allocPriority` | `alloc_priority` | INT | 1차 | 1~999, 작을수록 먼저, 기본 100 |
+| `defaultLocId` | `default_loc_id` | BIGINT → `tb_location` | 1차 | 이 창고의 사용 중 로케이션 (기본 창고는 DEFAULT) |
+| `managerUserId` | `manager_user_id` | BIGINT → `tb_user` | 2차 | 지우면 NULL |
+| `dedicatedShipperId` | `dedicated_shipper_id` | BIGINT → `tb_shipper` | 2차 | NULL = 공용 창고 |
+| `locCodePrefix` / `locCodeSeparator` | `loc_cd_prefix` / `loc_cd_separator` | VARCHAR(10) / CHAR(1) | 2차 | 로케이션 일괄 생성용 (구분자 없으면 '-') |
+| `remark` / `extAttr` | `remark` / `ext_attr` | VARCHAR(1000) / JSONB | 1차 / 2차 | |
+| 공통 칸 | `created_at`·`updated_at`·`created_by`·`updated_by`·`row_version`·`del_yn` | | | 0038 |
 
 ### tb_location ← `location` (코드 모델 `Location`)
 
