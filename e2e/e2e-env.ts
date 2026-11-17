@@ -12,6 +12,7 @@ export function e2eDatabaseUrl(base = process.env.DATABASE_URL): string {
 
 // 견본 계정 (prisma/seed-samples.ts) — 비밀번호는 .env의 SEED_SAMPLE_PASSWORD
 export const E2E_ACCOUNTS = {
+  admin: 'ops.admin',
   shipper: 'shipper.user',
   manager: 'center.manager',
   worker: 'center.worker',

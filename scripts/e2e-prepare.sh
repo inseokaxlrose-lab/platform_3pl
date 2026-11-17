@@ -24,3 +24,4 @@ echo "[시드]"
 DIRECT_URL="$E2E_URL" DATABASE_URL="$E2E_URL" npx prisma db seed 2>&1 | grep -v "^$" | tail -5
 echo "[테스트용 데이터]"
 DIRECT_URL="$E2E_URL" DATABASE_URL="$E2E_URL" npx tsx e2e/setup-data.ts
+DIRECT_URL="$E2E_URL" DATABASE_URL="$E2E_URL" npx tsx --conditions=react-server e2e/setup-regions.ts
