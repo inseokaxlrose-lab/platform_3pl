@@ -10,6 +10,7 @@ import { assertRowVersion, withVersionGuard } from '@/lib/row-version'
 import { assertAllFound, assertNoCodeConflict } from '@/lib/soft-delete'
 import { DELETED_ONLY, NOT_DELETED, isActiveStatus, toStatus } from '@/lib/status'
 import { isItemBaseType } from '@/lib/units/unit-labels'
+import { isUnitActive, unitStatusSelect } from '@/lib/units/unit-status'
 import { checkQtyDecimals } from '@/lib/units/convert'
 import { isYes } from '@/lib/yn'
 import { effectiveItemOptions, type ItemCreateData, type ItemData } from './item-schema'
@@ -58,12 +59,19 @@ async function assertUnits(db: Db, data: SaveItemData, keep: bigint[] = []) {
   const ids = [data.baseUnitId, ...data.units.map((u) => u.unitId)]
   const units = await db.unit.findMany({
     where: { id: { in: ids } },
-    select: { id: true, code: true, type: true, decimals: true, status: true },
+    // 실제 사용 여부: 시스템 단위는 이 운영사의 설정 (0079)
+    select: {
+      id: true,
+      code: true,
+      type: true,
+      decimals: true,
+      ...unitStatusSelect(requireOperatorId()),
+    },
   })
   const byId = new Map(units.map((u) => [u.id, u]))
   const usable = (id: bigint) => {
     const unit = byId.get(id)
-    return unit && (isActiveStatus(unit.status) || keep.includes(id)) ? unit : null
+    return unit && (isUnitActive(unit) || keep.includes(id)) ? unit : null
   }
   const base = usable(data.baseUnitId)
   if (!base || !isItemBaseType(base.type)) {

@@ -324,7 +324,10 @@ export function UnitForm({
               {ACTIVE_STATUS[String(value.isActive)]?.label ?? ''}
             </StatusBadge>
             {unit.isSystem && (
-              <span>시스템 기본 단위는 모든 운영사가 함께 쓰며 고칠 수 없습니다.</span>
+              <span>
+                시스템 기본 단위는 모든 운영사가 함께 쓰며 고칠 수 없습니다. 사용 여부는 목록에서
+                운영사별로 바꿉니다.
+              </span>
             )}
           </>
         ),

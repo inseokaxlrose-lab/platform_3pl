@@ -9,7 +9,9 @@ import { stockTransaction } from '@/lib/stock/stock-transaction'
 import type { UnitCreateInput } from '@/lib/units/unit-schema'
 import { systemUnit, versionOf } from '@/test/factories'
 import { createInboundFixture } from '@/test/inbound-fixtures'
-import { resetDatabase, TEST_OPERATOR_ID } from '@/test/reset-database'
+import { createTestOperator, resetDatabase, TEST_OPERATOR_ID } from '@/test/reset-database'
+import { getItemFormOptions } from '@/lib/items/item-queries'
+import { getUnitOptions } from '@/lib/units/unit-options'
 import {
   createUnitAction,
   deleteUnitsAction,
@@ -301,5 +303,76 @@ describe('논리 삭제 · 되살리기 (0038)', () => {
       ok: false,
       error: { code: 'FORBIDDEN' },
     })
+  })
+})
+
+describe('운영사별 시스템 단위 사용 여부 (0079)', () => {
+  const ALL = (operatorId: bigint) => ({ kind: 'ALL' as const, operatorId })
+  const statusOf = async (code: string) => {
+    const result = await listUnitsAction({
+      ...createDataGridState({ pageSize: 100 }),
+      filters: { keyword: code },
+    })
+    return result.ok ? result.data.rows.find((r) => r.code === code)?.isActive : result.error
+  }
+
+  it('시스템 단위를 이 운영사에서만 사용 중지·다시 사용 (다른 운영사·시스템 단위 자체는 그대로)', async () => {
+    const lb = await systemUnit('LB')
+    const other = await createTestOperator('B물류')
+
+    expect(await setUnitsActiveAction({ ids: [String(lb.id)], isActive: false })).toMatchObject({
+      ok: true,
+      data: { count: 1 },
+    })
+    expect(await statusOf('LB')).toBe(false)
+    expect(await codesOf({ status: 'INACTIVE' })).toEqual(['LB'])
+    expect(await codesOf({ status: 'ACTIVE' })).not.toContain('LB')
+    // 시스템 단위 자체는 사용, 설정 줄만 생긴다
+    expect((await systemUnit('LB')).status).toBe('ACTIVE')
+    expect(
+      await prisma.operatorUnit.findMany({ select: { operatorId: true, status: true } }),
+    ).toEqual([{ operatorId: TEST_OPERATOR_ID, status: 'INACTIVE' }])
+    // 단위 고르기·품목 화면 선택지에서도 사용 중지
+    const options = await getUnitOptions(ALL(TEST_OPERATOR_ID))
+    expect(options.find((u) => u.code === 'LB')?.isActive).toBe(false)
+    const itemOptions = await getItemFormOptions(ALL(TEST_OPERATOR_ID))
+    expect(itemOptions.units.find((u) => u.code === 'LB')?.isActive).toBe(false)
+
+    // 다른 운영사에서는 그대로 사용
+    vi.mocked(getCurrentScope).mockResolvedValue(ALL(other.id))
+    expect(await statusOf('LB')).toBe(true)
+    expect((await getUnitOptions(ALL(other.id))).find((u) => u.code === 'LB')?.isActive).toBe(true)
+
+    // 다시 사용
+    vi.mocked(getCurrentScope).mockResolvedValue(ALL(TEST_OPERATOR_ID))
+    expect(await setUnitsActiveAction({ ids: [String(lb.id)], isActive: true })).toMatchObject({
+      ok: true,
+    })
+    expect(await statusOf('LB')).toBe(true)
+  })
+
+  it('EA·BOX·PLT와 운영사 중량·길이 표시 단위는 사용 중지할 수 없다 (섞이면 전체 거부)', async () => {
+    const [ea, kg, lb] = await Promise.all([systemUnit('EA'), systemUnit('KG'), systemUnit('LB')])
+    expect(
+      await setUnitsActiveAction({ ids: [String(ea.id), String(lb.id)], isActive: false }),
+    ).toMatchObject({
+      ok: false,
+      error: { code: 'FORBIDDEN', message: expect.stringContaining('EA') },
+    })
+    // 운영사 표시 단위 = KG (기본)
+    expect(await setUnitsActiveAction({ ids: [String(kg.id)], isActive: false })).toMatchObject({
+      ok: false,
+      error: { code: 'FORBIDDEN', message: expect.stringContaining('표시 단위') },
+    })
+    expect(await prisma.operatorUnit.count()).toBe(0)
+  })
+
+  it('운영사별 설정은 시스템 단위에만 둘 수 있다 (DB 트리거)', async () => {
+    const gn = await create()
+    await expect(
+      prisma.operatorUnit.create({
+        data: { operatorId: TEST_OPERATOR_ID, unitId: BigInt(gn.id), status: 'INACTIVE' },
+      }),
+    ).rejects.toThrow(/시스템 기본 단위만/)
   })
 })

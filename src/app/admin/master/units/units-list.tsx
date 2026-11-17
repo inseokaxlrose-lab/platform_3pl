@@ -167,10 +167,10 @@ export function UnitsList({ can }: { can: { create: boolean; update: boolean; de
         title={`단위 ${ids.length}개를 ${label}할까요?`}
         description={
           kind === 'delete'
-            ? '어디에서도 쓰지 않는 단위만 지워집니다. 쓰고 있으면 사용 중지하세요. 상태 거르기의 "삭제됨"에서 되살릴 수 있습니다.'
+            ? '운영사가 추가한 단위 중 어디에서도 쓰지 않는 단위만 지워집니다(시스템 기본 단위는 지울 수 없음). 쓰고 있으면 사용 중지하세요. 상태 거르기의 "삭제됨"에서 되살릴 수 있습니다.'
             : kind === 'deactivate'
-              ? '새로 고르는 목록에서 빠집니다. 이미 쓰고 있는 데이터는 그대로 보입니다.'
-              : undefined
+              ? '새로 고르는 목록에서 빠집니다. 이미 쓰고 있는 데이터는 그대로 보입니다. 시스템 기본 단위는 이 운영사에서만 사용 중지되고, EA·BOX·PLT와 운영사 중량·길이 표시 단위는 사용 중지할 수 없습니다.'
+              : '시스템 기본 단위는 이 운영사에서만 다시 사용합니다.'
         }
         confirmLabel={label}
         destructive={kind !== 'activate'}
@@ -202,8 +202,6 @@ export function UnitsList({ can }: { can: { create: boolean; update: boolean; de
       list={list}
       columns={COLUMNS}
       getRowId={(row) => row.id}
-      // 시스템 기본 단위는 일괄 처리 대상이 아니다 (고칠 수 없음)
-      canSelectRow={(row) => !row.isSystem}
       bulkActions={
         // "삭제됨" 보기에서는 [되살리기]만 (삭제 권한)
         isDeletedView(list.values)
