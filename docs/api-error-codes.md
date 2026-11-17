@@ -35,6 +35,18 @@
 | `STATUS_NOT_ALLOWED` | 409 | 상태 불가 | 지금 상태에서는 할 수 없음 (예: 입고 시작된 ASN 수정) |
 | `DUPLICATE` | 409 | 중복 | 이미 있는 문서번호 (ASN번호·주문번호) — 건별 결과 |
 | `POLICY_VIOLATION` | 422 | 정책 위반 | 화주 정책에 맞지 않음 (예: 미등록 품목 주문 불허) |
+| `PARTNER_CD_INVALID` | 400 | 형식 | `partnerCd`가 영문·숫자·`-`·`_` 30자를 벗어남 — 건별 |
+| `SHIP_TO_CD_INVALID` | 400 | 형식 | `shipToCd` 형식 오류 또는 한 거래처 안에서 두 번 보냄 — 건별 |
+| `PARTNER_ADDRESS_REQUIRED` | 422 | 정책 위반 | 새 거래처에 `shipTos`도 주소도 없음 → 주소(`addr1`)를 보내거나 납품처를 함께 |
+| `DEFAULT_SHIP_TO_REQUIRED` | 422 | 정책 위반 | 기본 납품처가 0곳·2곳이 되는 요청 (기본 납품처가 반려되어 없어진 새 거래처 포함) |
+| `LAST_SHIP_TO_INACTIVE` | 422 | 정책 위반 | 기본·마지막 사용 중 납품처를 `INACTIVE`로 바꾸는 요청 → 다른 납품처를 먼저 기본으로 |
+| `CENTER_REQUIRED` | 422 | 정책 위반 | 화주 정책이 "배송센터 필수"인데 `centerCd`가 없음 — 납품처 건별 |
+| `INVALID_CENTER_CD` | 404 | 참조 없음 | 없는 센터코드 — 납품처 건별 (정책이 자동 보류면 반려 대신 "확인 필요"로 저장) |
+| `NOT_CLIENT_CENTER` | 422 | 정책 위반 | 화주가 이용하지 않는 센터 — 납품처 건별 |
+| `CENTER_INACTIVE` | 409 | 상태 불가 | 일시중지·폐쇄된 센터 — 납품처 건별 |
+| `ADDRESS_NOT_RESOLVED` | 422 | 정책 위반 | 주소를 확인하지 못함(정제 실패·자동 지정 등급 미만) — 정책이 자동 반려일 때 납품처 건별 |
+| `REGION_UNASSIGNED` | 422 | 정책 위반 | 권역설정에 배정되지 않은 지역 — 정책이 자동 반려일 때 납품처 건별 |
+| `REGION_MIXED` | 422 | 정책 위반 | 여러 센터가 섞인 지역 → `centerCd`를 보내세요 — 정책이 자동 반려일 때 납품처 건별 |
 | `IDEMPOTENCY_CONFLICT` | 409 | 중복 | 같은 `Idempotency-Key`로 다른 본문을 보냄 |
 | `TOO_MANY_ITEMS` | 413 | 한도 | 한 번에 보낼 수 있는 건수(500) 초과 |
 | `RATE_LIMITED` | 429 | 한도 | 분당 호출 한도 초과 → `Retry-After`초 뒤 다시 |

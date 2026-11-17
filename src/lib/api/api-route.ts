@@ -22,7 +22,12 @@ import { saveRequestLog, type ApiItemResult } from './request-log'
 export type ApiHandlerResult =
   | { data: unknown; items?: undefined }
   | {
-      items: (ApiItemResult & { id?: string | null; errors?: ApiFieldError[] })[]
+      // extra: 건별 결과에 덧붙일 값 (예: 거래처의 납품처별 결과 shipTos)
+      items: (ApiItemResult & {
+        id?: string | null
+        errors?: ApiFieldError[]
+        extra?: Record<string, unknown>
+      })[]
       data?: undefined
     }
 
@@ -36,6 +41,8 @@ export type ApiHandlerContext = {
   body: unknown
   // TEST 키 = 검증만 하고 저장하지 않는다 (writeTransaction이 되돌린다)
   dryRun: boolean
+  // 주소의 경로 값 (예: /partners/{partnerCd} → { partnerCd })
+  params: Record<string, string>
 }
 
 type ApiRouteOptions = {
@@ -125,16 +132,20 @@ function envelope(requestId: string, result: ApiHandlerResult, dryRun: boolean) 
     result:
       fail === 0 ? ('SUCCESS' as const) : fail === total ? ('FAIL' as const) : ('PARTIAL' as const),
     summary: { total, success: total - fail, fail },
-    items: result.items.map(({ seq, docNo, result: itemResult, id, errors, internalId }) => ({
-      seq,
-      docNo: docNo ?? null,
-      result: itemResult,
-      ...(itemResult === 'FAIL'
-        ? { errors: errors ?? [] }
-        : {
-            id: id ?? (internalId !== undefined && internalId !== null ? String(internalId) : null),
-          }),
-    })),
+    items: result.items.map(
+      ({ seq, docNo, result: itemResult, id, errors, internalId, extra }) => ({
+        seq,
+        docNo: docNo ?? null,
+        result: itemResult,
+        ...(itemResult === 'FAIL'
+          ? { errors: errors ?? [] }
+          : {
+              id:
+                id ?? (internalId !== undefined && internalId !== null ? String(internalId) : null),
+            }),
+        ...extra,
+      }),
+    ),
   }
 }
 
@@ -175,8 +186,11 @@ export async function writeTransaction<T>(ctx: ApiHandlerContext, fn: (tx: Db) =
 }
 
 // 라우트 핸들러 만들기: export const GET = apiRoute({ apiCode: 'ME', handler: … })
+// 경로 값이 있는 라우트(/partners/[partnerCd])는 Next가 두 번째 인자로 params를 준다
+type RouteContext = { params?: Promise<Record<string, string | string[]>> }
+
 export function apiRoute(options: ApiRouteOptions) {
-  return async (request: Request): Promise<Response> => {
+  return async (request: Request, route?: RouteContext): Promise<Response> => {
     const requestId = newRequestId()
     const startedAt = new Date()
     const clientIp = clientIpOf(request)
@@ -226,12 +240,14 @@ export function apiRoute(options: ApiRouteOptions) {
             throw new ApiError('INVALID_JSON')
           }
         }
+        const rawParams = (await route?.params) ?? {}
         const ctx: ApiHandlerContext = {
           api,
           requestId,
           request,
           body,
           dryRun: api.env === 'TEST',
+          params: Object.fromEntries(Object.entries(rawParams).map(([k, v]) => [k, String(v)])),
         }
         const result = await runInContext(
           { actor: `api:${api.keyPrefix}`, operatorId: api.operatorId },
