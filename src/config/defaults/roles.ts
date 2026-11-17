@@ -51,7 +51,7 @@ export const DEFAULT_GROUPS: readonly DefaultGroup[] = [
         'master.centers',
         'master.warehouses',
         'master.locations',
-        'master.delivery-zones',
+        'master.regions',
         'master.units',
         'master.shippers',
       ),
