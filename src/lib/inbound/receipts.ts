@@ -20,7 +20,7 @@ async function stagingLocationId(db: Db, centerId: bigint) {
   const location = await db.location.findFirst({
     where: {
       code: DEFAULT_LOCATION_CODE,
-      warehouse: { centerId, type: 'INBOUND_STAGING', delYn: 'N' },
+      warehouse: { centerId, type: 'INBOUND', systemYn: 'Y', delYn: 'N' },
     },
     select: { id: true },
   })

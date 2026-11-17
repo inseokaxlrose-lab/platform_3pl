@@ -1,19 +1,28 @@
 'use client'
 
-import { LayersIcon, PowerIcon } from 'lucide-react'
-import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { ConfirmDialog, StatusBadge } from '@/components/common'
+import { useState } from 'react'
+import { STOCK_STATUS, TEMP_ZONE, type TempZoneKey } from '@/config/operator-codes'
+import { CenterSelect, LocationSelect, NumberInput, YnToggle } from '@/components/inputs'
 import {
   Field,
   FormGrid,
   MasterFormPage,
   useMasterForm,
-  type MasterFormSection,
+  type FieldSpan,
   type MasterFormHeader,
+  type MasterFormSection,
 } from '@/components/master-form'
-import { usePermission } from '@/components/permission'
-import { Button } from '@/components/ui/button'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
 import { Input } from '@/components/ui/input'
 import {
   Select,
@@ -22,15 +31,14 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { unwrap } from '@/lib/actions'
+import { Textarea } from '@/components/ui/textarea'
 import {
-  STORAGE_CONDITION_LABELS,
-  STORAGE_CONDITIONS,
-  WAREHOUSE_TYPE_LABELS,
-  isStagingWarehouse,
-} from '@/lib/warehouses/warehouse-labels'
-import { createWarehouseSchema, type WarehouseCreateInput } from '@/lib/warehouses/warehouse-schema'
-import { createWarehouseAction, setWarehouseActiveAction, updateWarehouseAction } from './actions'
+  WAREHOUSE_TYPE,
+  WAREHOUSE_TYPE_DEFAULTS,
+  type WarehouseTypeKey,
+} from '@/lib/warehouses/warehouse-codes'
+import { warehouseCreateSchema, type WarehouseFormValue } from '@/lib/warehouses/warehouse-schema'
+import { createWarehouseAction, updateWarehouseAction } from './actions'
 import type { CenterOption, WarehouseForEdit } from './queries'
 
 type WarehouseFormProps = { header: MasterFormHeader } & (
@@ -47,49 +55,123 @@ type WarehouseFormProps = { header: MasterFormHeader } & (
     }
 )
 
-type StorageCondition = WarehouseCreateInput['storageCondition']
+type Ops = Pick<WarehouseFormValue, 'inbound' | 'outbound' | 'allocatable' | 'defaultStockStatus'>
+const OPS_KEYS = ['inbound', 'outbound', 'allocatable', 'defaultStockStatus'] as const
 
-// 창고 등록·수정 (docs/decisions/0027, 입력 화면 틀 0031)
-// 등록하면 수정 화면으로, 수정은 그 자리에서 저장. 상태·로케이션은 따로 처리하는 섹션
-// 대기 창고(입고·출고·반품): 코드가 잠기고 사용 중지 버튼이 없다
+// 유형별 운영 속성 기본값 (화면 값 모양)
+const opsOf = (type: string): Ops => {
+  const ops = WAREHOUSE_TYPE_DEFAULTS[type as WarehouseTypeKey] ?? WAREHOUSE_TYPE_DEFAULTS.STORAGE
+  return { ...ops }
+}
+const sameOps = (a: Ops, b: Ops) => OPS_KEYS.every((key) => a[key] === b[key])
+
+// 센터 취급 온도대 → 기본 온도대 (하나면 그것, 상온이 있으면 상온)
+const defaultTempZone = (zones: readonly string[]) =>
+  zones.length === 1 ? zones[0] : zones.includes('AMBIENT') ? 'AMBIENT' : ''
+
+// 창고 등록·수정 (docs/decisions/0027, 0074, 입력 화면 틀 0031)
+// 섹션: 기본 정보 / 위치·시설 / 운영 속성. 상태 변경·삭제는 헤더 버튼(warehouse-header-actions)
+// - 유형을 고르면 운영 속성을 유형 기본값으로 채운다. 이미 고친 값이 있으면 바꿀지 묻는다
+// - 시스템 기본 창고: 설명·정렬순서·비고만 고칠 수 있다
 export function WarehouseForm(props: WarehouseFormProps) {
   const router = useRouter()
-  const { can } = usePermission()
   const editing = props.mode === 'edit' ? props.warehouse : null
-  const isStaging = editing ? isStagingWarehouse(editing.type) : false
+  const isSystem = editing?.isSystem ?? false
   const readOnly = props.mode === 'edit' && props.readOnly
+  const centers = props.mode === 'create' ? props.centers : []
+
+  const initialCenterId = props.mode === 'create' ? (props.initialCenterId ?? '') : ''
+  const zonesOfCenter = (centerId: string) =>
+    editing ? editing.center.tempZones : (centers.find((c) => c.id === centerId)?.tempZones ?? [])
 
   const form = useMasterForm({
     initial: editing
-      ? { centerId: editing.center.id, ...editing.input }
-      : {
-          centerId: props.mode === 'create' ? (props.initialCenterId ?? '') : '',
+      ? editing.input
+      : ({
+          centerId: initialCenterId,
           code: '',
           name: '',
-          storageCondition: 'AMBIENT' as StorageCondition,
-        },
-    // 등록·수정 모두 같은 규칙 (수정에서는 센터가 이미 정해져 있다)
+          type: 'STORAGE',
+          tempZone: defaultTempZone(zonesOfCenter(initialCenterId)),
+          description: '',
+          sortOrder: 10,
+          remark: '',
+          buildingName: '',
+          floorNo: '',
+          areaM2: '',
+          ...opsOf('STORAGE'),
+          allocPriority: 100,
+          defaultLocId: '',
+        } satisfies WarehouseFormValue),
     version: editing?.rowVersion,
-    schema: createWarehouseSchema,
-    save: ({ centerId, ...data }: WarehouseCreateInput, version) =>
+    schema: warehouseCreateSchema,
+    save: ({ centerId, code, ...data }: WarehouseFormValue, version) =>
       editing
         ? updateWarehouseAction({
             id: editing.id,
             rowVersion: version ?? editing.rowVersion,
             ...data,
           })
-        : createWarehouseAction({ centerId, ...data }),
-    afterSave: (saved) => ({
-      ...saved,
-      // 검사를 거친 값은 키가 bigint라 화면 값(글자)으로 되돌린다
-      centerId: String(saved.centerId),
-    }),
+        : createWarehouseAction({ centerId, code, ...data }),
+    // 검사를 거친 값은 글자·키 모양이 바뀌므로 화면 값은 입력한 그대로 둔다
+    afterSave: (_saved, _result, value) => value,
     onSuccess: editing
       ? undefined
       : (created) => router.push(`/admin/master/warehouses/${(created as { id: string }).id}`),
   })
   const { value, set, errors } = form
   const disabled = readOnly || form.pending
+  // 시스템 기본 창고에서 잠그는 칸
+  const locked = disabled || isSystem
+  const id = (key: string) => `warehouse-${key}`
+
+  // 유형 변경: 운영 속성을 아직 고치지 않았으면 바로 기본값, 고쳤으면 묻는다
+  const [pendingType, setPendingType] = useState<string | null>(null)
+  const changeType = (type: string) => {
+    if (type === value.type) return
+    if (sameOps(value, opsOf(value.type))) set({ type, ...opsOf(type) })
+    else setPendingType(type)
+  }
+
+  const centerZones = zonesOfCenter(value.centerId)
+  const tempZoneOptions = TEMP_ZONE.options.filter((o) => centerZones.includes(o.value))
+
+  // 글자 한 칸
+  type TextKey = 'name' | 'description' | 'buildingName' | 'floorNo'
+  const text = (
+    key: TextKey,
+    label: string,
+    span: FieldSpan,
+    options: { required?: boolean; placeholder?: string; lock?: boolean; maxLength?: number } = {},
+  ) => (
+    <Field
+      label={label}
+      span={span}
+      required={options.required}
+      error={errors[key]}
+      htmlFor={id(key)}
+    >
+      <Input
+        id={id(key)}
+        value={value[key] ?? ''}
+        disabled={options.lock ? locked : disabled}
+        placeholder={options.placeholder}
+        maxLength={options.maxLength}
+        aria-invalid={Boolean(errors[key])}
+        onChange={(e) => set({ [key]: e.target.value })}
+      />
+    </Field>
+  )
+  const yn = (key: 'inbound' | 'outbound' | 'allocatable', label: string, hint: string) => (
+    <Field label={label} span={3} error={errors[key]} htmlFor={id(key)} hint={hint}>
+      <YnToggle
+        id={id(key)}
+        value={value[key]}
+        onChange={(checked) => set({ [key]: checked })}
+        disabled={locked}
+      />
+    </Field>
+  )
 
   const sections: MasterFormSection[] = [
     {
@@ -99,236 +181,301 @@ export function WarehouseForm(props: WarehouseFormProps) {
         <FormGrid>
           <Field
             label="센터"
-            span={6}
+            span={4}
             required
             error={errors.centerId}
-            htmlFor="warehouse-center"
+            htmlFor={id('centerId')}
             hint={editing ? '센터는 등록 후 바꿀 수 없습니다.' : undefined}
           >
             {editing ? (
               <Input
-                id="warehouse-center"
+                id={id('centerId')}
                 value={`${editing.center.name} (${editing.center.code})`}
                 disabled
                 readOnly
               />
             ) : (
-              <Select
+              <CenterSelect
+                id={id('centerId')}
+                options={centers}
                 value={value.centerId}
-                onValueChange={(centerId) => set({ centerId })}
+                // 센터가 바뀌면 그 센터의 취급 온도대로 온도대를 다시 고른다
+                onChange={(centerId) =>
+                  set({ centerId, tempZone: defaultTempZone(zonesOfCenter(centerId)) })
+                }
                 disabled={disabled}
-              >
-                <SelectTrigger
-                  id="warehouse-center"
-                  className="w-full"
-                  aria-invalid={Boolean(errors.centerId)}
-                >
-                  <SelectValue placeholder="센터 선택" />
-                </SelectTrigger>
-                <SelectContent>
-                  {props.mode === 'create' &&
-                    props.centers.map((c) => (
-                      <SelectItem key={c.id} value={c.id}>
-                        {c.name} ({c.code})
-                      </SelectItem>
-                    ))}
-                </SelectContent>
-              </Select>
+                invalid={Boolean(errors.centerId)}
+              />
             )}
           </Field>
           <Field
-            label="창고명"
-            span={8}
+            label="창고코드"
+            span={3}
             required
-            newRow
-            error={errors.name}
-            htmlFor="warehouse-name"
+            error={errors.code}
+            htmlFor={id('code')}
+            hint={editing ? '등록 후 바꿀 수 없습니다.' : '영문 대문자·숫자·밑줄(_)'}
           >
             <Input
-              id="warehouse-name"
-              value={value.name}
-              onChange={(e) => set({ name: e.target.value })}
-              disabled={disabled}
-              aria-invalid={Boolean(errors.name)}
-            />
-          </Field>
-          <Field label="창고 코드" span={4} error={errors.code} htmlFor="warehouse-code">
-            <Input
-              id="warehouse-code"
+              id={id('code')}
               value={value.code}
-              onChange={(e) => set({ code: e.target.value })}
-              // 대기 창고의 코드는 고정
-              disabled={disabled || isStaging}
-              placeholder="비우면 시스템 코드 사용"
+              onChange={(e) => set({ code: e.target.value.toUpperCase() })}
+              disabled={disabled || Boolean(editing)}
+              maxLength={20}
+              placeholder="예: A, COLD1"
               aria-invalid={Boolean(errors.code)}
             />
           </Field>
-          <Field label="시스템 코드" span={4} htmlFor="warehouse-system-code">
+          {text('name', '창고명', 5, {
+            required: true,
+            lock: true,
+            maxLength: 100,
+            placeholder: '예: A동 상온',
+          })}
+          <Field
+            label="창고 유형"
+            span={4}
+            required
+            newRow
+            error={errors.type}
+            htmlFor={id('type')}
+            hint={
+              isSystem
+                ? '시스템 기본 창고는 유형을 바꿀 수 없습니다.'
+                : '고르면 아래 운영 속성이 유형 기본값으로 채워집니다.'
+            }
+          >
+            <Select value={value.type} onValueChange={changeType} disabled={locked}>
+              <SelectTrigger id={id('type')} className="w-full">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {WAREHOUSE_TYPE.options.map((o) => (
+                  <SelectItem key={o.value} value={o.value}>
+                    {o.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </Field>
+          <Field
+            label="온도대"
+            span={3}
+            required
+            error={errors.tempZone}
+            htmlFor={id('tempZone')}
+            hint="센터 취급 온도대 중에서"
+          >
+            <Select
+              value={value.tempZone}
+              onValueChange={(tempZone) => set({ tempZone })}
+              disabled={locked || tempZoneOptions.length === 0}
+            >
+              <SelectTrigger
+                id={id('tempZone')}
+                className="w-full"
+                aria-invalid={Boolean(errors.tempZone)}
+              >
+                <SelectValue placeholder={value.centerId ? '선택' : '센터를 먼저 고르세요'}>
+                  {TEMP_ZONE.labels[value.tempZone as TempZoneKey]}
+                </SelectValue>
+              </SelectTrigger>
+              <SelectContent>
+                {tempZoneOptions.map((o) => (
+                  <SelectItem key={o.value} value={o.value}>
+                    {o.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </Field>
+          <Field
+            label="정렬순서"
+            span={2}
+            required
+            error={errors.sortOrder}
+            htmlFor={id('sortOrder')}
+            hint="작을수록 위"
+          >
+            <NumberInput
+              id={id('sortOrder')}
+              value={value.sortOrder}
+              onChange={(n) => set({ sortOrder: n ?? 0 })}
+              min={0}
+              disabled={disabled}
+            />
+          </Field>
+          <Field label="시스템 코드" span={3} htmlFor={id('systemCode')}>
             <Input
-              id="warehouse-system-code"
+              id={id('systemCode')}
               value={editing?.systemCode ?? '저장하면 자동으로 부여됩니다'}
               disabled
               readOnly
+            />
+          </Field>
+          {text('description', '설명', 12, {
+            maxLength: 200,
+            placeholder: '목록에서 코드 옆에 작게 보입니다',
+          })}
+          <Field label="비고" span={12} error={errors.remark} htmlFor={id('remark')}>
+            <Textarea
+              id={id('remark')}
+              value={value.remark ?? ''}
+              rows={3}
+              maxLength={1000}
+              disabled={disabled}
+              onChange={(e) => set({ remark: e.target.value })}
             />
           </Field>
         </FormGrid>
       ),
     },
     {
-      id: 'nature',
-      title: '창고 성격',
+      id: 'facility',
+      title: '위치·시설',
       content: (
         <FormGrid>
-          <Field
-            label="유형"
-            span={4}
-            htmlFor="warehouse-type"
-            hint={
-              isStaging
-                ? '센터마다 1개, 자동으로 만들어진 창고입니다.'
-                : '대기 창고(입고·출고·반품)는 센터 등록 때 자동으로만 만들어집니다.'
-            }
-          >
-            <Input
-              id="warehouse-type"
-              value={WAREHOUSE_TYPE_LABELS[editing?.type ?? 'GENERAL']}
-              disabled
-              readOnly
+          {text('buildingName', '동', 3, {
+            lock: true,
+            maxLength: 50,
+            placeholder: '예: A동, 본관',
+          })}
+          {text('floorNo', '층', 2, { lock: true, maxLength: 10, placeholder: '예: B1, 1' })}
+          <Field label="면적" span={3} error={errors.areaM2} htmlFor={id('areaM2')}>
+            <NumberInput
+              id={id('areaM2')}
+              value={value.areaM2 === '' ? null : Number(value.areaM2)}
+              onChange={(n) => set({ areaM2: n === null ? '' : String(n) })}
+              decimals={2}
+              min={0}
+              unit="m²"
+              disabled={locked}
             />
           </Field>
+        </FormGrid>
+      ),
+    },
+    {
+      id: 'operation',
+      title: '운영 속성',
+      description: isSystem
+        ? '시스템 기본 창고의 운영 속성은 유형에 따라 정해져 있습니다.'
+        : '유형을 고르면 기본값이 채워지고, 필요하면 고칠 수 있습니다.',
+      content: (
+        <FormGrid>
+          {yn('inbound', '입고 가능', '입고 적치 대상')}
+          {yn('outbound', '출고 가능', '출고 피킹 대상')}
+          {yn('allocatable', '출고 할당 가능', '이 창고 재고를 주문에 할당')}
           <Field
-            label="보관 조건"
-            span={4}
+            label="기본 재고상태"
+            span={3}
             required
-            error={errors.storageCondition}
-            htmlFor="warehouse-storage"
+            error={errors.defaultStockStatus}
+            htmlFor={id('defaultStockStatus')}
+            hint="적치될 때의 재고상태"
           >
             <Select
-              value={value.storageCondition}
-              onValueChange={(storageCondition) =>
-                set({ storageCondition: storageCondition as StorageCondition })
-              }
-              disabled={disabled}
+              value={value.defaultStockStatus}
+              onValueChange={(defaultStockStatus) => set({ defaultStockStatus })}
+              disabled={locked}
             >
-              <SelectTrigger id="warehouse-storage" className="w-full">
+              <SelectTrigger id={id('defaultStockStatus')} className="w-full">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                {STORAGE_CONDITIONS.map((condition) => (
-                  <SelectItem key={condition} value={condition}>
-                    {STORAGE_CONDITION_LABELS[condition]}
+                {STOCK_STATUS.options.map((o) => (
+                  <SelectItem key={o.value} value={o.value}>
+                    {o.label}
                   </SelectItem>
                 ))}
               </SelectContent>
             </Select>
           </Field>
+          <Field
+            label="할당 우선순위"
+            span={2}
+            required
+            newRow
+            error={errors.allocPriority}
+            htmlFor={id('allocPriority')}
+            hint="작을수록 먼저 (1~999)"
+          >
+            <NumberInput
+              id={id('allocPriority')}
+              value={value.allocPriority}
+              onChange={(n) => set({ allocPriority: n ?? 100 })}
+              min={1}
+              max={999}
+              disabled={locked}
+            />
+          </Field>
+          {editing && (
+            <Field
+              label="기본 로케이션"
+              span={4}
+              error={errors.defaultLocId}
+              htmlFor={id('defaultLocId')}
+              hint="로케이션을 정하지 않고 적치할 때 쓰는 곳"
+            >
+              <LocationSelect
+                id={id('defaultLocId')}
+                options={[{ value: '', label: '(없음)' }, ...editing.locationOptions]}
+                value={value.defaultLocId ?? ''}
+                onChange={(defaultLocId) => set({ defaultLocId })}
+                disabled={locked}
+                placeholder="로케이션 선택"
+              />
+            </Field>
+          )}
         </FormGrid>
       ),
     },
   ]
 
-  // 수정 화면에서만: 상태(바로 처리), 로케이션 요약
-  if (editing) {
-    sections.push(
-      {
-        id: 'status',
-        title: '상태',
-        standalone: true,
-        content: (
-          <div className="flex flex-wrap items-center gap-3">
-            {editing.isActive ? (
-              <StatusBadge tone="success">사용</StatusBadge>
-            ) : (
-              <StatusBadge tone="danger">사용 중지</StatusBadge>
-            )}
-            {isStaging ? (
-              <p className="text-xs text-muted-foreground">
-                대기 창고(입고·출고·반품)는 사용 중지할 수 없습니다.
-              </p>
-            ) : (
-              !readOnly && (
-                <ConfirmDialog
-                  trigger={
-                    <Button
-                      type="button"
-                      size="sm"
-                      variant={editing.isActive ? 'destructive' : 'outline'}
-                    >
-                      <PowerIcon />
-                      {editing.isActive ? '사용 중지' : '다시 사용'}
-                    </Button>
-                  }
-                  title={
-                    editing.isActive ? '이 창고를 사용 중지할까요?' : '이 창고를 다시 사용할까요?'
-                  }
-                  description={
-                    editing.isActive
-                      ? '이 창고와 로케이션에 새로 적치할 수 없게 됩니다. 기록은 남습니다.'
-                      : '이 창고를 다시 쓸 수 있게 됩니다.'
-                  }
-                  confirmLabel={editing.isActive ? '사용 중지' : '다시 사용'}
-                  destructive={editing.isActive}
-                  onConfirm={async () => {
-                    unwrap(
-                      await setWarehouseActiveAction({
-                        id: editing.id,
-                        isActive: !editing.isActive,
-                      }),
-                    )
-                    router.refresh()
-                  }}
-                />
-              )
-            )}
-          </div>
-        ),
-      },
-      {
-        id: 'locations',
-        title: `로케이션 (${editing.locationCount})`,
-        standalone: true,
-        description: isStaging
-          ? '대기 창고는 기본 로케이션 하나만 씁니다.'
-          : '로케이션 추가·일괄 생성은 로케이션 메뉴에서 합니다.',
-        action: (
-          <div className="flex gap-2">
-            {can('master.locations.read') && (
-              <Button asChild type="button" variant="outline" size="sm">
-                <Link href={`/admin/master/locations?warehouse=${editing.id}`}>로케이션 관리</Link>
-              </Button>
-            )}
-            {!isStaging && editing.isActive && can('master.locations.create') && (
-              <Button asChild type="button" size="sm">
-                <Link href={`/admin/master/locations/bulk?warehouseId=${editing.id}`}>
-                  <LayersIcon />
-                  일괄 생성
-                </Link>
-              </Button>
-            )}
-          </div>
-        ),
-        content:
-          editing.locations.length === 0 ? (
-            <p className="text-sm text-muted-foreground">등록된 로케이션이 없습니다.</p>
-          ) : (
-            <div className="flex flex-wrap gap-1.5">
-              {editing.locations.map((l) => (
-                <StatusBadge key={l.code} tone={l.isActive ? 'neutral' : 'danger'}>
-                  {l.code}
-                </StatusBadge>
-              ))}
-              {editing.locationCount > editing.locations.length && (
-                <span className="text-xs text-muted-foreground">
-                  외 {editing.locationCount - editing.locations.length}개
-                </span>
-              )}
-            </div>
-          ),
-      },
-    )
-  }
-
   return (
-    <MasterFormPage header={props.header} form={form} readOnly={readOnly} sections={sections} />
+    <>
+      <MasterFormPage header={props.header} form={form} readOnly={readOnly} sections={sections} />
+      {/* 유형을 바꿨는데 운영 속성을 이미 고친 경우: 유형 기본값으로 바꿀지 묻는다 */}
+      <AlertDialog
+        open={pendingType !== null}
+        onOpenChange={(open) => !open && setPendingType(null)}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>운영 속성을 유형 기본값으로 바꿀까요?</AlertDialogTitle>
+            <AlertDialogDescription>
+              {pendingType &&
+                `'${WAREHOUSE_TYPE.labels[pendingType as WarehouseTypeKey]}' 유형의 기본값: 입고 ${
+                  opsOf(pendingType).inbound ? '가능' : '불가'
+                } · 출고 ${opsOf(pendingType).outbound ? '가능' : '불가'} · 할당 ${
+                  opsOf(pendingType).allocatable ? '가능' : '불가'
+                } · 재고상태 ${
+                  STOCK_STATUS.labels[
+                    opsOf(pendingType).defaultStockStatus as keyof typeof STOCK_STATUS.labels
+                  ]
+                }`}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel
+              onClick={() => {
+                if (pendingType) set({ type: pendingType })
+                setPendingType(null)
+              }}
+            >
+              현재 값 유지
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                if (pendingType) set({ type: pendingType, ...opsOf(pendingType) })
+                setPendingType(null)
+              }}
+            >
+              유형 기본값으로 바꾸기
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </>
   )
 }

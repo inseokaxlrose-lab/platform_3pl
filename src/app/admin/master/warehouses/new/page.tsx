@@ -12,7 +12,8 @@ export default async function NewWarehousePage({
   searchParams,
 }: PageProps<'/admin/master/warehouses/new'>) {
   if (!(await hasPermission('master.warehouses.create'))) return <AccessDenied />
-  const centers = await getCenterOptions(await getCurrentScope())
+  // 기준정보 준비가 되는 센터(준비중·운영중)만
+  const centers = await getCenterOptions(await getCurrentScope(), { setupOnly: true })
   const { centerId } = await searchParams
   // 고를 수 있는 센터일 때만 미리 고른다 (범위 밖 id를 넣어도 무시)
   const initialCenterId =
@@ -23,7 +24,7 @@ export default async function NewWarehousePage({
       header={{
         actions: <BackToListButton listPath="/admin/master/warehouses" />,
         title: '창고 등록',
-        description: '창고 코드를 비우면 자동으로 부여되는 시스템 코드를 그대로 씁니다.',
+        description: '창고코드는 센터 안에서 겹치지 않게 정하며, 등록 후에는 바꿀 수 없습니다.',
       }}
       mode="create"
       centers={centers}

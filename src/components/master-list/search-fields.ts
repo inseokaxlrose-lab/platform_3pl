@@ -42,6 +42,8 @@ export type SearchFieldDef = {
     id: string
     value: string
     onChange: (value: string) => void
+    // 지금 입력 중인 모든 조건 값 (예: 창고 칸이 위에서 고른 센터를 본다)
+    values: SearchValues
   }) => React.ReactNode
 }
 

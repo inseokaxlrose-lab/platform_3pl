@@ -228,7 +228,7 @@ function SearchInput({
       )
     }
     case 'custom':
-      return <>{field.render?.({ id, value, onChange })}</>
+      return <>{field.render?.({ id, value, onChange, values })}</>
   }
 }
 

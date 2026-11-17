@@ -12,6 +12,7 @@ import {
   optionalEmail,
   optionalPhone,
   optionalText,
+  oneOf,
   optionalTime,
   requiredText,
 } from '@/lib/validation/common-fields'
@@ -19,9 +20,6 @@ import { CENTER_STATUS, CENTER_STATUSES_NEEDING_REASON, CENTER_TYPE } from './ce
 
 // 센터 입력 규칙 — 화면·서버 공용 (docs/decisions/0073, docs/specs/center.md)
 // 1차 칸은 화면에서 입력, 2차 칸은 API만 받는다(보내지 않으면 그대로 둔다 → .optional())
-
-const oneOf = <T extends string>(values: readonly T[], message: string) =>
-  z.string().refine((value): value is T => (values as readonly string[]).includes(value), message)
 
 // 센터코드: 영문 대문자·숫자 1~20자, 필수 (소문자는 대문자로). 등록 후 바꿀 수 없다 (서버가 무시)
 export const centerCodeField = z
@@ -78,8 +76,10 @@ export const centerShape = {
   floorAreaM2: optionalDecimal(12, 2),
   storageAreaM2: optionalDecimal(12, 2),
   dockCount: optionalCount,
+  // 하나 이상 (창고 온도대는 이 안에서 고른다, 0074)
   tempZones: z
     .array(oneOf(TEMP_ZONE.values, '알 수 없는 온도대입니다.'))
+    .min(1, '취급 온도대를 하나 이상 골라 주세요.')
     .transform((values) => [...new Set(values)]),
   // ④ 시설 자격 (1차)
   bondedYn: yn,

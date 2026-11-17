@@ -23,7 +23,6 @@ import { assertInScope, scopeFilter, type DataScope } from '@/lib/scope/data-sco
 import { rowVersionField } from '@/lib/row-version'
 import { idSchema } from '@/lib/id'
 import { NOT_DELETED } from '@/lib/status'
-import { STAGING_WAREHOUSE_TYPES } from '@/lib/warehouses/warehouse-labels'
 
 // 센터 관리 서버 액션 (docs/decisions/0026, 0073)
 // 데이터 범위: 센터 직원은 소속 센터만 보고 고칠 수 있다. 등록·상태 변경·삭제는 전체 범위(운영사)만
@@ -109,11 +108,11 @@ export const listCentersAction = createAction({
       }),
       prisma.center.count({ where }),
     ])
-    // 로케이션 수: 보관 창고(대기 창고 제외)의 사용 중인 로케이션
+    // 로케이션 수: 시스템 기본 창고(입고·출고·반품 대기)를 뺀 창고의 로케이션
     const locationCounts = await prisma.warehouse.findMany({
       where: {
         centerId: { in: rows.map((r) => r.id) },
-        type: { notIn: [...STAGING_WAREHOUSE_TYPES] },
+        systemYn: 'N',
       },
       select: { centerId: true, _count: { select: { locations: { where: NOT_DELETED } } } },
     })

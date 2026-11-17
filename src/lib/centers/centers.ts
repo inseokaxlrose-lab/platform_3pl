@@ -1,5 +1,6 @@
 import 'server-only'
 import { looksLikeSystemCode } from '@/config/master-codes'
+import { TEMP_ZONE, type TempZoneKey } from '@/config/operator-codes'
 import { ActionError } from '@/lib/actions/action-error'
 import { currentActor, requireOperatorId } from '@/lib/actor'
 import { assertCodeValues } from '@/lib/common-code/common-codes'
@@ -9,7 +10,6 @@ import { assertRowVersion, withVersionGuard } from '@/lib/row-version'
 import { prisma, type Db } from '@/lib/prisma'
 import { DELETED_ONLY } from '@/lib/status'
 import { toYn } from '@/lib/yn'
-import { isStagingWarehouse } from '@/lib/warehouses/warehouse-labels'
 import { ensureCenterDefaults } from './center-defaults'
 import {
   CENTER_CONTACT_ROLE_GROUP,
@@ -158,7 +158,22 @@ async function saveContacts(db: Db, centerId: bigint, contacts: CenterData['cont
 }
 
 // 취급 온도대 저장: 빠진 것은 지우고 새것만 만든다 (있던 것은 등록 정보 유지)
+// 창고 온도대는 센터 취급 온도대 안에서만 (0074): 창고가 쓰는 온도대는 뺄 수 없다
 async function saveTempZones(db: Db, centerId: bigint, zones: readonly string[]) {
+  const inUse = await db.warehouse.findMany({
+    where: { centerId, tempZone: { notIn: [...zones] } },
+    select: { tempZone: true, name: true },
+  })
+  if (inUse.length > 0) {
+    const names = [...new Set(inUse.map((w) => TEMP_ZONE.labels[w.tempZone as TempZoneKey]))]
+    throw new ActionError(
+      'CONFLICT',
+      `창고가 쓰고 있는 온도대는 뺄 수 없습니다: ${names.join(', ')} (${inUse
+        .slice(0, 3)
+        .map((w) => w.name)
+        .join(', ')}${inUse.length > 3 ? ` 외 ${inUse.length - 3}곳` : ''})`,
+    )
+  }
   await db.centerTempZone.deleteMany({ where: { centerId, tempZoneCd: { notIn: [...zones] } } })
   const existing = await db.centerTempZone.findMany({
     where: { centerId },
@@ -316,15 +331,14 @@ export async function changeCentersStatus(
 
 // 삭제할 수 없는 이유: 쓰인 적 있으면 (일반 창고·재고 이력·입고·배송권역·이용 화주사·소속 사용자)
 async function deleteBlockers(db: Db, centerId: bigint) {
-  const [warehouses, stock, asns, zones, shippers, users] = await Promise.all([
-    db.warehouse.findMany({ where: { centerId }, select: { type: true } }),
+  const [general, stock, asns, zones, shippers, users] = await Promise.all([
+    db.warehouse.count({ where: { centerId, systemYn: 'N' } }),
     db.stock.count({ where: { centerId } }),
     db.asn.count({ where: { centerId } }),
     db.deliveryZone.count({ where: { centerId } }),
     db.shipperCenter.count({ where: { centerId } }),
     db.userCenter.count({ where: { centerId } }),
   ])
-  const general = warehouses.filter((w) => !isStagingWarehouse(w.type)).length
   return [
     general > 0 && `보관 창고 ${general}개`,
     stock > 0 && `재고 이력`,

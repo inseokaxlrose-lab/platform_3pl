@@ -12,10 +12,11 @@ export const metadata: Metadata = { title: '창고' }
 // 창고 목록 (docs/decisions/0027): 센터 직원은 소속 센터의 창고만 보인다
 export default async function WarehousesPage() {
   if (!(await hasPermission('master.warehouses.read'))) return <AccessDenied />
-  const [centers, canCreate, canUpdate, canExport] = await Promise.all([
+  const [centers, canCreate, canUpdate, canDelete, canExport] = await Promise.all([
     getCenterOptions(await getCurrentScope()),
     hasPermission('master.warehouses.create'),
     hasPermission('master.warehouses.update'),
+    hasPermission('master.warehouses.delete'),
     hasPermission('master.warehouses.export'),
   ])
 
@@ -27,13 +28,12 @@ export default async function WarehousesPage() {
           <Button asChild>
             <Link href="/admin/master/warehouses/new">
               <PlusIcon />
-              창고 등록
+              창고 추가
             </Link>
           </Button>
         )
       }
-      canBulkUpdate={canUpdate}
-      canExport={canExport}
+      can={{ update: canUpdate, delete: canDelete, export: canExport }}
     />
   )
 }

@@ -52,6 +52,7 @@ export async function createInboundFixture() {
         systemCode: `WH-T-${code}`,
         code,
         name: code,
+        tempZone: 'AMBIENT',
       },
     })
     const ids: bigint[] = []

@@ -51,6 +51,15 @@ export const TEMP_ZONE = codeSet({
   FROZEN: '냉동',
   CONSTANT: '항온',
 })
+export type TempZoneKey = (typeof TEMP_ZONE.values)[number]
+
+// 재고상태 (0074): 창고의 기본 재고상태. 재고 표 연결·할당 로직은 재고·출고 기능 때 (재고 기능과 공유)
+export const STOCK_STATUS = codeSet({
+  NORMAL: '정상',
+  HOLD: '보류',
+  DAMAGED: '불량',
+  QUARANTINE: '격리',
+})
 
 // 정지·해지로 바꿀 때는 사유가 필수 (DB 검사 조건 tb_operator_status_reason_check)
 export const STATUSES_NEEDING_REASON: readonly string[] = ['SUSPENDED', 'TERMINATED']

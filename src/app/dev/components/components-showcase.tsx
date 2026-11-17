@@ -17,7 +17,9 @@ import {
   PhoneInput,
   YnToggle,
   InheritableField,
+  CenterSelect,
   LocationSelect,
+  WarehouseSelect,
   TimeInput,
   WeekdaySelect,
 } from '@/components/inputs'
@@ -77,6 +79,8 @@ function Sample({
 }
 
 function InputSamples() {
+  const [center, setCenter] = useState('')
+  const [warehouse, setWarehouse] = useState('')
   const [bizNo, setBizNo] = useState('1234567891')
   const [corpNo, setCorpNo] = useState('')
   const [phone, setPhone] = useState('021234567')
@@ -199,6 +203,31 @@ function InputSamples() {
             { value: '1', label: 'DEFAULT', description: '입고대기 · 입고대기 창고' },
             { value: '2', label: 'A-01-01', description: '일반 · 상온 1창고', keywords: 'A01' },
             { value: '3', label: 'A-01-02', description: '일반 · 상온 1창고', keywords: 'A01' },
+          ]}
+        />
+      </Sample>
+      <Sample title="CenterSelect" note="span 4 · 하나뿐이면 저절로 고름" value={center}>
+        <CenterSelect
+          value={center}
+          onChange={(next) => {
+            setCenter(next)
+            setWarehouse('')
+          }}
+          options={[
+            { id: 'c1', code: 'ICN', name: '이천센터' },
+            { id: 'c2', code: 'GMH', name: '김해센터' },
+          ]}
+        />
+      </Sample>
+      <Sample title="WarehouseSelect" note="span 4 · 위에서 고른 센터의 창고만" value={warehouse}>
+        <WarehouseSelect
+          centerId={center}
+          value={warehouse}
+          onChange={setWarehouse}
+          options={[
+            { id: 'w1', centerId: 'c1', code: 'INBOUND', name: '입고대기', description: '기본' },
+            { id: 'w2', centerId: 'c1', code: 'A', name: 'A동 상온' },
+            { id: 'w3', centerId: 'c2', code: 'B', name: 'B동 냉장' },
           ]}
         />
       </Sample>

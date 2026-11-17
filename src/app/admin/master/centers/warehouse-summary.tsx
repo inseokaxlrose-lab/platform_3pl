@@ -2,11 +2,8 @@ import { PlusIcon } from 'lucide-react'
 import Link from 'next/link'
 import { StatusBadge } from '@/components/common'
 import { Button } from '@/components/ui/button'
-import {
-  STORAGE_CONDITION_LABELS,
-  WAREHOUSE_TYPE_LABELS,
-  isStagingWarehouse,
-} from '@/lib/warehouses/warehouse-labels'
+import { TEMP_ZONE } from '@/config/operator-codes'
+import { WAREHOUSE_TYPE, isSystemWarehouse } from '@/lib/warehouses/warehouse-codes'
 import type { CenterForEdit } from './queries'
 
 // 센터 수정 화면의 "창고" 섹션 내용: 이 센터의 창고 목록 (창고 메뉴와 연결)
@@ -28,13 +25,15 @@ export function WarehouseSummary({
                 {w.name} <span className="text-muted-foreground">({w.code})</span>
               </p>
               <p className="text-xs text-muted-foreground">
-                {w.systemCode} · {STORAGE_CONDITION_LABELS[w.storageCondition]} · 로케이션{' '}
-                {w.locationCount}개
+                {w.systemCode} ·{' '}
+                {TEMP_ZONE.labels[w.tempZone as keyof typeof TEMP_ZONE.labels] ?? w.tempZone} ·
+                로케이션 {w.locationCount}개
               </p>
             </div>
             <div className="flex shrink-0 gap-1.5">
-              <StatusBadge tone={isStagingWarehouse(w.type) ? 'info' : 'neutral'}>
-                {WAREHOUSE_TYPE_LABELS[w.type]}
+              {isSystemWarehouse(w) && <StatusBadge tone="info">기본</StatusBadge>}
+              <StatusBadge tone="neutral">
+                {WAREHOUSE_TYPE.labels[w.type as keyof typeof WAREHOUSE_TYPE.labels] ?? w.type}
               </StatusBadge>
               {!w.isActive && <StatusBadge tone="danger">사용 중지</StatusBadge>}
             </div>

@@ -1,6 +1,6 @@
 'use client'
 
-import { MapPinnedIcon, Trash2Icon } from 'lucide-react'
+import { MapPinnedIcon, Trash2Icon, WarehouseIcon } from 'lucide-react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { ConfirmDialog } from '@/components/common'
@@ -9,14 +9,16 @@ import { unwrap } from '@/lib/actions'
 import { deleteCenterAction } from './actions'
 import { CenterStatusDialog } from './center-status-dialog'
 
-// 센터 수정 화면 헤더의 보조 버튼: [로케이션 보기] [삭제] [상태 변경] (0073)
+// 센터 수정 화면 헤더의 보조 버튼: [창고 보기] [로케이션 보기] [삭제] [상태 변경] (0073, 0074)
 export function CenterHeaderActions({
   center,
+  canViewWarehouses,
   canViewLocations,
   canChangeStatus,
   canDelete,
 }: {
   center: { id: string; status: string; rowVersion: number }
+  canViewWarehouses: boolean
   canViewLocations: boolean
   canChangeStatus: boolean
   canDelete: boolean
@@ -24,6 +26,14 @@ export function CenterHeaderActions({
   const router = useRouter()
   return (
     <>
+      {canViewWarehouses && (
+        <Button asChild type="button" variant="outline">
+          <Link href={`/admin/master/warehouses?center=${center.id}`}>
+            <WarehouseIcon />
+            창고 보기
+          </Link>
+        </Button>
+      )}
       {canViewLocations && (
         <Button asChild type="button" variant="outline">
           <Link href={`/admin/master/locations?center=${center.id}`}>

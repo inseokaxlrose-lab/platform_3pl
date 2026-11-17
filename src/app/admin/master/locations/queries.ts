@@ -1,7 +1,8 @@
 import 'server-only'
 import { textIds } from '@/lib/id'
 import { prisma } from '@/lib/prisma'
-import { ACTIVE_ONLY, isActiveStatus } from '@/lib/status'
+import { ACTIVE_ONLY } from '@/lib/status'
+import { isSystemWarehouse } from '@/lib/warehouses/warehouse-codes'
 import { scopeFilter, type DataScope } from '@/lib/scope/data-scope'
 
 // 고를 수 있는 창고: 데이터 범위 안 + 사용 중인 센터의 창고 (센터 → 창고 → 구역 순서로 고르기)
@@ -18,25 +19,37 @@ export async function getWarehouseOptions(scope: DataScope) {
   const zonesOf = (warehouseId: bigint) =>
     zoneRows.filter((z) => z.warehouseId === warehouseId).map((z) => z.zone!)
   const warehouses = await prisma.warehouse.findMany({
-    where: { AND: [scopeFilter(scope, { center: 'centerId' }), { center: ACTIVE_ONLY }] },
+    // 사용 중인 센터의 사용 중인 창고만, 센터 정렬순서 → 창고 정렬순서 → 코드 순 (0074)
+    where: {
+      AND: [scopeFilter(scope, { center: 'centerId' }), { center: ACTIVE_ONLY }, ACTIVE_ONLY],
+    },
     select: {
       id: true,
       code: true,
       name: true,
-      type: true,
-      status: true,
+      systemYn: true,
       center: { select: { id: true, code: true, name: true } },
     },
-    orderBy: [{ center: { code: 'asc' } }, { code: 'asc' }],
+    orderBy: [
+      { center: { sortOrder: 'asc' } },
+      { center: { code: 'asc' } },
+      { sortOrder: 'asc' },
+      { code: 'asc' },
+    ],
   })
   // 화면으로 보낼 값이라 키는 글자로
   return textIds(
     warehouses.map((w) => ({
       id: w.id,
+      code: w.code,
+      name: w.name,
       label: `${w.name} (${w.code})`,
       centerId: w.center.id,
+      centerCode: w.center.code,
+      centerName: w.center.name,
       centerLabel: `${w.center.name} (${w.center.code})`,
-      addable: w.type === 'GENERAL' && isActiveStatus(w.status),
+      // 시스템 기본 창고에는 로케이션을 더 만들 수 없다 (DEFAULT 하나만)
+      addable: !isSystemWarehouse(w),
       zones: zonesOf(w.id),
     })),
   )

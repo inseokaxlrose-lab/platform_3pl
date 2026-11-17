@@ -98,14 +98,14 @@ describe('센터 등록', () => {
       orderBy: { type: 'asc' },
     })
     expect(warehouses.map((w) => [w.code, w.type, w.locations.map((l) => l.code)])).toEqual([
-      ['INBOUND', 'INBOUND_STAGING', ['DEFAULT']],
-      ['OUTBOUND', 'OUTBOUND_STAGING', ['DEFAULT']],
-      ['RETURN', 'RETURN_STAGING', ['DEFAULT']],
+      ['INBOUND', 'INBOUND', ['DEFAULT']],
+      ['OUTBOUND', 'OUTBOUND', ['DEFAULT']],
+      ['RETURN', 'RETURN', ['DEFAULT']],
     ])
     const locationOf = (type: string) => warehouses.find((w) => w.type === type)!.locations[0].id
-    expect(saved.defaultInboundLocId).toBe(locationOf('INBOUND_STAGING'))
-    expect(saved.defaultOutboundLocId).toBe(locationOf('OUTBOUND_STAGING'))
-    expect(saved.defaultReturnLocId).toBe(locationOf('RETURN_STAGING'))
+    expect(saved.defaultInboundLocId).toBe(locationOf('INBOUND'))
+    expect(saved.defaultOutboundLocId).toBe(locationOf('OUTBOUND'))
+    expect(saved.defaultReturnLocId).toBe(locationOf('RETURN'))
     // 기본 로케이션 연결로 올라간 버전을 돌려줘야 바로 수정할 수 있다
     expect(center.rowVersion).toBe(saved.rowVersion)
   })

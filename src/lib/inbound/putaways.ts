@@ -1,4 +1,5 @@
 import 'server-only'
+import { isYes } from '@/lib/yn'
 import { ActionError } from '@/lib/actions/action-error'
 import { currentActor, requireOperatorId } from '@/lib/actor'
 import type { Db } from '@/lib/prisma'
@@ -58,18 +59,21 @@ export async function registerPutaway(data: PutawayData) {
       if (!receiptLine || receiptLine.receipt.asnId !== asn.id) {
         throw new ActionError('NOT_FOUND', `${at}: 이 ASN의 입고확정 줄이 아닙니다.`)
       }
-      // 보관 로케이션: 같은 센터의 일반 창고 (입고대기 창고로는 적치하지 않는다)
+      // 보관 로케이션: 같은 센터의 입고 가능 창고 (시스템 기본 창고=대기 창고로는 적치하지 않는다, 0074)
       const target = await tx.location.findUnique({
         where: { id: line.toLocationId },
-        select: { code: true, warehouse: { select: { centerId: true, type: true } } },
+        select: {
+          code: true,
+          warehouse: { select: { centerId: true, systemYn: true, inboundYn: true } },
+        },
       })
       if (!target || target.warehouse.centerId !== asn.centerId) {
         throw new ActionError('VALIDATION', `${at}: 이 센터의 로케이션을 골라 주세요.`)
       }
-      if (target.warehouse.type !== 'GENERAL') {
+      if (isYes(target.warehouse.systemYn) || !isYes(target.warehouse.inboundYn)) {
         throw new ActionError(
           'VALIDATION',
-          `${at}: 입고대기 창고가 아닌 보관 로케이션을 골라 주세요.`,
+          `${at}: 입고 가능한 창고의 보관 로케이션을 골라 주세요. (대기 창고 제외)`,
         )
       }
 

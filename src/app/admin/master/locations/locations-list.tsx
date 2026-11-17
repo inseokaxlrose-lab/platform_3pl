@@ -14,6 +14,7 @@ import {
   useListQuery,
 } from '@/components/master-list'
 import { ExcelUploadDialog } from '@/components/excel-upload'
+import { CenterSelect, WarehouseSelect } from '@/components/inputs'
 import { Button } from '@/components/ui/button'
 import { unwrap } from '@/lib/actions'
 import { locationUploadTemplate } from '@/lib/locations/location-upload-template'
@@ -103,29 +104,41 @@ export function LocationsList({
   warehouses: WarehouseOption[]
   can: { create: boolean; update: boolean; delete: boolean; export: boolean }
 }) {
-  // 센터 선택지: 창고 목록에서 센터만 추린다
-  const centers = [...new Map(warehouses.map((w) => [w.centerId, w.centerLabel])).entries()]
+  // 센터 선택지: 창고 목록에서 센터만 추린다 (순서는 서버가 정한 센터 정렬순서 그대로)
+  const centers = [
+    ...new Map(
+      warehouses.map((w) => [
+        w.centerId,
+        { id: w.centerId, code: w.centerCode, name: w.centerName },
+      ]),
+    ).values(),
+  ]
   const fields: SearchFieldDef[] = [
     { key: 'keyword', label: '코드·명칭', type: 'keyword', span: 3, placeholder: '예: A-01, 도크' },
     {
       key: 'center',
       label: '센터',
-      type: 'select',
-      options: centers.map(([value, label]) => ({ value, label })),
+      type: 'custom',
+      render: ({ id, value, onChange }) => (
+        <CenterSelect id={id} options={centers} value={value} onChange={onChange} allowAll />
+      ),
     },
     {
       key: 'warehouse',
       label: '창고',
-      type: 'select',
+      type: 'custom',
       dependsOn: ['center'],
-      // 센터를 골랐으면 그 센터의 창고만
-      options: (values) =>
-        warehouses
-          .filter((w) => !values.center || w.centerId === values.center)
-          .map((w) => ({
-            value: w.id,
-            label: values.center ? w.label : `${w.centerLabel} · ${w.label}`,
-          })),
+      // 센터를 고른 뒤 그 센터의 창고만 (센터에 딸림: 센터가 바뀌면 비운다)
+      render: ({ id, value, onChange, values }) => (
+        <WarehouseSelect
+          id={id}
+          options={warehouses}
+          centerId={values.center ?? ''}
+          value={value}
+          onChange={onChange}
+          allowAll
+        />
+      ),
     },
     {
       key: 'zone',
