@@ -123,15 +123,63 @@ type CustomerRef = {
   addressDetail: string | null
 }
 
+const EXISTING_SHIP_TO_SELECT = {
+  id: true,
+  code: true,
+  name: true,
+  isDefault: true,
+  addrSyncYn: true,
+  status: true,
+  sortOrder: true,
+  receiverName: true,
+  receiverPhone: true,
+  receiverPhone2: true,
+  deliveryMemo: true,
+  remark: true,
+  rawZipCode: true,
+  rawAddress: true,
+  addressDetail: true,
+  deliveryCenterId: true,
+  deliveryCenter: { select: { code: true } },
+  centerAssignType: true,
+  centerAssignStatus: true,
+} as const
+
 type ExistingShipTo = {
   id: bigint
   code: string
+  name: string
+  isDefault: string
+  addrSyncYn: string
+  status: string
+  sortOrder: number
+  receiverName: string | null
+  receiverPhone: string | null
+  receiverPhone2: string | null
+  deliveryMemo: string | null
+  remark: string | null
   rawZipCode: string | null
   rawAddress: string
   addressDetail: string | null
   deliveryCenterId: bigint | null
+  deliveryCenter: { code: string } | null
   centerAssignType: string | null
   centerAssignStatus: string
+}
+
+// 납품처 한 곳의 저장 결과 (API 건별 결과의 shipTos — 0082 ③)
+export type ShipToSaveResult = {
+  code: string
+  result: 'CREATED' | 'UPDATED' | 'UNCHANGED' | 'FAIL'
+  // FAIL: 화주 정책으로 반려 (CENTER_REQUIRED·INVALID_CENTER_CD·NOT_CLIENT_CENTER·…)
+  error?: { code: string; message: string }
+  addressGrade?: string
+  zipCode?: string | null
+  centerCode?: string | null
+  centerAssignType?: string | null
+  centerAssignStatus?: string
+  centerConfirmReason?: string | null
+  regionMismatch?: boolean
 }
 
 // 기존 납품처를 그대로 둘지 (주소·센터 선택이 그대로이고 이미 지정됐으면 다시 계산하지 않는다 — 연동 IF 지정 보존)
@@ -143,30 +191,36 @@ function keepsAssignment(
   if (existing.centerAssignStatus !== 'ASSIGNED') return false
   if (existing.rawAddress !== raw.address || (existing.rawZipCode ?? null) !== raw.zip) return false
   if ((existing.addressDetail ?? null) !== raw.detail) return false
+  if (row.centerMode === 'AUTO') return existing.centerAssignType === 'AUTO'
+  if (row.centerMode === 'IF') {
+    return (
+      existing.centerAssignType === 'IF' &&
+      existing.deliveryCenter?.code.toUpperCase() === row.centerCode?.toUpperCase()
+    )
+  }
   const wasManual = existing.centerAssignType === 'MANUAL' || existing.centerAssignType === 'IF'
-  if (row.centerMode === 'AUTO') return !wasManual
   return wasManual && existing.deliveryCenterId === row.deliveryCenterId
 }
 
-// 납품처 맞추기: 보낸 목록대로 고치고·만들고, 목록에서 빠진 납품처는 지운다(논리 삭제)
+export type SyncOptions = CustomerSaveOptions & {
+  // true(연동·업로드): 목록에 없는 기존 납품처를 지우지 않는다 (보낸 납품처만 고침)
+  partial?: boolean
+  // true(연동): 화주 정책으로 반려된 납품처는 저장하지 않고 결과에 FAIL로 남긴다 (거래처는 저장)
+  // false(화면): 반려되면 저장 전체를 막는다
+  collectRejects?: boolean
+}
+
+// 납품처 맞추기: 보낸 목록대로 고치고·만들고, 목록에서 빠진 납품처는 지운다(논리 삭제, partial이면 두고)
+// 바뀐 것이 없는 납품처는 쓰지 않는다 (수정일·버전 그대로 — API의 UNCHANGED)
 async function syncShipTos(
   db: Db,
   customer: CustomerRef,
   rows: ShipToData[],
-  options: CustomerSaveOptions,
+  options: SyncOptions,
 ) {
-  const existing = await db.shipTo.findMany({
+  const existing: ExistingShipTo[] = await db.shipTo.findMany({
     where: { customerId: customer.id },
-    select: {
-      id: true,
-      code: true,
-      rawZipCode: true,
-      rawAddress: true,
-      addressDetail: true,
-      deliveryCenterId: true,
-      centerAssignType: true,
-      centerAssignStatus: true,
-    },
+    select: EXISTING_SHIP_TO_SELECT,
   })
   const byId = new Map(existing.map((s) => [s.id, s]))
   for (const row of rows) {
@@ -181,18 +235,25 @@ async function syncShipTos(
     }
   }
   // 빠진 납품처 지우기 (주문 이력 검사는 출고 작업에서 — findUsedShipToIds)
-  const keepIds = new Set(rows.flatMap((r) => (r.id !== null ? [r.id] : [])))
-  const removed = existing.filter((s) => !keepIds.has(s.id))
-  if (removed.length > 0) {
-    await db.shipTo.updateMany({
-      where: { id: { in: removed.map((s) => s.id) } },
-      data: { ...DELETED_ONLY, isDefault: 'N' },
-    })
+  if (!options.partial) {
+    const keepIds = new Set(rows.flatMap((r) => (r.id !== null ? [r.id] : [])))
+    const removed = existing.filter((s) => !keepIds.has(s.id))
+    if (removed.length > 0) {
+      await db.shipTo.updateMany({
+        where: { id: { in: removed.map((s) => s.id) } },
+        data: { ...DELETED_ONLY, isDefault: 'N' },
+      })
+    }
   }
-  // 기본 납품처를 바꿀 수 있게 먼저 모두 기본 해제 (기본은 거래처당 하나 — 부분 고유)
-  await db.shipTo.updateMany({ where: { customerId: customer.id }, data: { isDefault: 'N' } })
+  // 기본 납품처가 바뀌면 옛 기본을 먼저 해제 (기본은 거래처당 하나 — 부분 고유)
+  const oldDefault = existing.find((s) => s.isDefault === 'Y')
+  const newDefault = rows.find((r) => r.isDefault)
+  const defaultMoves = Boolean(oldDefault && newDefault && newDefault.id !== oldDefault.id)
+  if (oldDefault && defaultMoves) {
+    await db.shipTo.update({ where: { id: oldDefault.id }, data: { isDefault: 'N' } })
+  }
 
-  const needConfirm: string[] = []
+  const results: ShipToSaveResult[] = []
   const operatorId = requireOperatorId()
   const actor = currentActor()
   for (const [index, row] of rows.entries()) {
@@ -204,21 +265,35 @@ async function syncShipTos(
     const raw = sync
       ? { zip: customer.zipCode, address: customer.address!, detail: customer.addressDetail }
       : { zip: row.zipCode || null, address: row.address, detail: row.addressDetail }
+    const found = row.id !== null ? byId.get(row.id)! : null
+    // partial이면 순서는 기존 자리 그대로, 새 납품처는 뒤에
+    const sortOrder = options.partial ? (found?.sortOrder ?? existing.length + index) : index
     const common = {
       name: row.name,
       isDefault: toYn(row.isDefault),
       addrSyncYn: toYn(sync),
       status: row.status,
-      sortOrder: index,
+      sortOrder,
       receiverName: row.receiverName,
       receiverPhone: row.receiverPhone,
       receiverPhone2: row.receiverPhone2,
       deliveryMemo: row.deliveryMemo,
       remark: row.remark,
     }
-    const found = row.id !== null ? byId.get(row.id)! : null
     if (found && keepsAssignment(row, found, raw)) {
-      await db.shipTo.update({ where: { id: found.id }, data: common })
+      const same = (Object.keys(common) as (keyof typeof common)[]).every(
+        (key) => (found[key] ?? null) === (common[key] ?? null),
+      )
+      if (!same) {
+        await db.shipTo.update({
+          where: { id: found.id },
+          data: {
+            ...common,
+            ...(options.requestId && { lastIfAt: new Date(), lastRequestId: options.requestId }),
+          },
+        })
+      }
+      results.push({ code: row.code, result: same ? 'UNCHANGED' : 'UPDATED' })
       continue
     }
     const assigned = await assignShipToCenter(db, {
@@ -228,16 +303,25 @@ async function syncShipTos(
       rawAddress: raw.address,
       addressDetail: raw.detail,
       centerId: row.centerMode === 'MANUAL' ? row.deliveryCenterId : null,
-      inputType: 'MANUAL',
+      centerCode: row.centerMode === 'IF' ? row.centerCode : null,
+      inputType: row.centerMode === 'IF' ? 'IF' : 'MANUAL',
       policy: options.policy,
       searcher: options.searcher,
       actor,
     })
     if (assigned.rejected) {
-      throw new ActionError('VALIDATION', `${row.code}: ${assigned.rejected.message}`)
+      if (!options.collectRejects) {
+        throw new ActionError('VALIDATION', `${row.code}: ${assigned.rejected.message}`)
+      }
+      results.push({ code: row.code, result: 'FAIL', error: assigned.rejected })
+      continue
     }
-    if (assigned.fields.centerAssignStatus === 'NEED_CONFIRM') needConfirm.push(row.code)
-    const data = { ...common, ...assigned.fields }
+    const f = assigned.fields
+    const data = {
+      ...common,
+      ...f,
+      ...(options.requestId && { lastIfAt: new Date(), lastRequestId: options.requestId }),
+    }
     if (found) {
       await db.shipTo.update({ where: { id: found.id }, data })
     } else {
@@ -249,13 +333,35 @@ async function syncShipTos(
           customerId: customer.id,
           code: row.code,
           source: options.source ?? 'SCREEN',
-          lastRequestId: options.requestId ?? null,
         },
       })
     }
+    results.push({
+      code: row.code,
+      result: found ? 'UPDATED' : 'CREATED',
+      addressGrade: f.addressGrade,
+      zipCode: f.zipCode,
+      centerCode: assigned.centerCode,
+      centerAssignType: f.centerAssignType,
+      centerAssignStatus: f.centerAssignStatus,
+      centerConfirmReason: f.centerConfirmReason,
+      regionMismatch: f.regionMismatchYn === 'Y',
+    })
   }
-  return needConfirm
+  // 새 기본 납품처가 반려됐으면 옛 기본으로 되돌린다 (기본은 꼭 1곳)
+  if (
+    oldDefault &&
+    defaultMoves &&
+    results.find((r) => r.code === newDefault!.code)?.result === 'FAIL'
+  ) {
+    await db.shipTo.update({ where: { id: oldDefault.id }, data: { isDefault: 'Y' } })
+  }
+  return results
 }
+
+// 확인 필요로 남은 납품처 코드 (화면 저장 알림)
+const needConfirmCodes = (results: ShipToSaveResult[]) =>
+  results.filter((r) => r.centerAssignStatus === 'NEED_CONFIRM').map((r) => r.code)
 
 // 거래처 주소로 만드는 기본 납품처 (납품처 없이 등록할 때)
 const defaultShipToRow = (customer: CustomerRef): ShipToData => ({
@@ -282,7 +388,7 @@ const defaultShipToRow = (customer: CustomerRef): ShipToData => ({
 export async function createCustomerIn(
   db: Db,
   data: CustomerCreateData,
-  options: CustomerSaveOptions = {},
+  options: SyncOptions = {},
 ) {
   const shipper = await db.shipper.findUnique({
     where: { id: data.shipperId },
@@ -321,7 +427,7 @@ export async function createCustomerIn(
   await db.customerContact.createMany({ data: contactRows(customer.id, data.contacts) })
   const rows = data.shipTos.length > 0 ? data.shipTos : [defaultShipToRow(customer)]
   // 납품처를 함께 보냈으면 그중 기본 표시, 기본 납품처를 자동으로 만들면 시스템 생성
-  const needConfirm = await syncShipTos(db, customer, rows, options)
+  const shipTos = await syncShipTos(db, customer, rows, options)
   if (data.shipTos.length === 0) {
     await db.shipTo.updateMany({
       where: { customerId: customer.id, code: customer.code },
@@ -333,7 +439,8 @@ export async function createCustomerIn(
     systemCode: customer.systemCode,
     code: customer.code,
     rowVersion: customer.rowVersion,
-    notice: assignNotice(needConfirm),
+    notice: assignNotice(needConfirmCodes(shipTos)),
+    shipTos,
   }
 }
 
@@ -344,7 +451,7 @@ export async function updateCustomerIn(
   id: bigint,
   rowVersion: number,
   data: CustomerData,
-  options: CustomerSaveOptions = {},
+  options: SyncOptions = {},
 ) {
   const found = await db.customer.findUnique({
     where: { id },
@@ -390,8 +497,14 @@ export async function updateCustomerIn(
   )
   await db.customerContact.deleteMany({ where: { customerId: id } })
   await db.customerContact.createMany({ data: contactRows(id, data.contacts) })
-  const needConfirm = await syncShipTos(db, saved, data.shipTos, options)
-  return { id, code: saved.code, rowVersion: saved.rowVersion, notice: assignNotice(needConfirm) }
+  const shipTos = await syncShipTos(db, saved, data.shipTos, options)
+  return {
+    id,
+    code: saved.code,
+    rowVersion: saved.rowVersion,
+    notice: assignNotice(needConfirmCodes(shipTos)),
+    shipTos,
+  }
 }
 
 export const createCustomer = (data: CustomerCreateData, options?: CustomerSaveOptions) =>

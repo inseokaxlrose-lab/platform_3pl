@@ -12,6 +12,8 @@ import {
   setCustomersStatus,
   updateCustomer,
 } from '@/lib/customers/customers'
+import { commitCustomerUpload, previewCustomerUpload } from '@/lib/customers/customer-upload'
+import { uploadRowsSchema } from '@/lib/excel/upload'
 import { getDefaultCenter } from '@/lib/regions/center-resolve'
 import { listQuerySchema } from '@/lib/grid/grid-query'
 import { idSchema } from '@/lib/id'
@@ -104,4 +106,29 @@ export const restoreCustomersAction = createAction({
   input: z.object({ ids: idsSchema }),
   handler: async ({ input, scope }) =>
     restoreCustomers(await assertCustomersInScope(input.ids, scope, true)),
+})
+
+// 엑셀 업로드 (0082 ③): 거래처를 만들고 고치므로 등록·수정 권한 둘 다 필요
+const assertUploadPermission = (permissions: ReadonlySet<string>) => {
+  if (!permissions.has('master.customers.update')) {
+    throw new ActionError('FORBIDDEN', '거래처 수정 권한이 없습니다.')
+  }
+}
+
+export const validateCustomerUploadAction = createAction({
+  permission: 'master.customers.create',
+  input: uploadRowsSchema,
+  handler: async ({ input, scope, permissions }) => {
+    assertUploadPermission(permissions)
+    return previewCustomerUpload(input, scope)
+  },
+})
+
+export const commitCustomerUploadAction = createAction({
+  permission: 'master.customers.create',
+  input: uploadRowsSchema,
+  handler: async ({ input, scope, permissions }) => {
+    assertUploadPermission(permissions)
+    return commitCustomerUpload(input, scope)
+  },
 })

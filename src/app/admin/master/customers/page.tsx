@@ -22,7 +22,12 @@ export default async function CustomersPage() {
   return (
     <CustomersList
       shippers={shippers}
-      can={{ update: canUpdate, delete: canDelete, export: canExport }}
+      can={{
+        update: canUpdate,
+        delete: canDelete,
+        export: canExport,
+        upload: canCreate && canUpdate,
+      }}
       actions={
         canCreate && (
           <Button asChild>

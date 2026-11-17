@@ -40,6 +40,63 @@ export const API_ERRORS = {
   },
   DUPLICATE: { status: 409, category: '중복', message: '이미 있는 문서번호입니다.' },
   POLICY_VIOLATION: { status: 422, category: '정책 위반', message: '화주 정책에 맞지 않습니다.' },
+  // ── 거래처·납품처 (0082 ③) — 건별 결과(items[].errors[]·shipTos[].error)로 온다
+  PARTNER_CD_INVALID: {
+    status: 400,
+    category: '형식',
+    message: 'partnerCd는 영문·숫자·하이픈·밑줄 30자 이하입니다.',
+  },
+  SHIP_TO_CD_INVALID: {
+    status: 400,
+    category: '형식',
+    message: 'shipToCd가 형식에 맞지 않거나 한 요청에 두 번 있습니다.',
+  },
+  PARTNER_ADDRESS_REQUIRED: {
+    status: 422,
+    category: '정책 위반',
+    message: '납품처 없이 등록하려면 거래처 주소가 필요합니다.',
+  },
+  DEFAULT_SHIP_TO_REQUIRED: {
+    status: 422,
+    category: '정책 위반',
+    message: '기본 납품처는 꼭 1곳이어야 합니다.',
+  },
+  LAST_SHIP_TO_INACTIVE: {
+    status: 422,
+    category: '정책 위반',
+    message: '사용 중인 납품처(기본 포함)가 1곳 이상 있어야 합니다.',
+  },
+  CENTER_REQUIRED: {
+    status: 422,
+    category: '정책 위반',
+    message: '이 화주는 납품처 배송센터(centerCd)를 꼭 보내야 합니다.',
+  },
+  INVALID_CENTER_CD: { status: 404, category: '참조 없음', message: '없는 센터코드입니다.' },
+  NOT_CLIENT_CENTER: {
+    status: 422,
+    category: '정책 위반',
+    message: '화주가 이용하지 않는 센터입니다.',
+  },
+  CENTER_INACTIVE: {
+    status: 409,
+    category: '상태 불가',
+    message: '일시중지·폐쇄된 센터입니다.',
+  },
+  ADDRESS_NOT_RESOLVED: {
+    status: 422,
+    category: '정책 위반',
+    message: '주소를 확인하지 못해 배송센터를 정할 수 없습니다.',
+  },
+  REGION_UNASSIGNED: {
+    status: 422,
+    category: '정책 위반',
+    message: '권역설정에 배정되지 않은 지역이라 배송센터를 정할 수 없습니다.',
+  },
+  REGION_MIXED: {
+    status: 422,
+    category: '정책 위반',
+    message: '여러 센터가 섞인 지역이라 배송센터를 정할 수 없습니다. centerCd를 보내 주세요.',
+  },
   // ── 멱등 · 한도
   IDEMPOTENCY_CONFLICT: {
     status: 409,

@@ -47,6 +47,11 @@ export const IDEMPOTENCY_HOURS = 24
 // 키 확인 전에 실패한 요청도 이 이름으로 남는다
 export const API_CODE_LABELS: Record<string, string> = {
   ME: '내 정보 (GET /me)',
+  PARTNER_UPSERT: '거래처 등록·수정 (POST /partners)',
+  PARTNER_LIST: '거래처 목록 (GET /partners)',
+  PARTNER_GET: '거래처 상세 (GET /partners/{partnerCd})',
+  SHIP_TO_UPSERT: '납품처 등록·수정 (POST /partners/{partnerCd}/ship-tos)',
+  SHIP_TO_LIST: '납품처 목록 (GET /partners/{partnerCd}/ship-tos)',
 }
 
 // 요청 로그 결과

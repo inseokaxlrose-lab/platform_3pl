@@ -1,11 +1,12 @@
 # 0082. 거래처 정의서 반영 — 납품처(tb_ship_to) · 배송센터 지정
 
 - 날짜: 2026-11-17
-- 상태: 채택 (①② 단계 완료, ③ 예정)
+- 상태: 채택 (①②③ 단계 완료)
 - 관련: 0043 (거래처 첫 설계), 0072·0076 (거래처 배송센터·권역설정), 0080 (화주사 상태), 0081 (연동 API 틀), 0038 (논리 삭제·버전)
 - 정의서: `docs/specs/customer.md` (`tb_partner`는 `tb_customer`로 읽음)
 - 코드: `src/lib/customers/` (`ship-to-center.ts` 배송센터 지정, `customers.ts` 저장, `ship-to-region.ts` 다시 정하기, `ship-to-list.ts` 납품처 목록), `src/app/admin/master/customers/` (화면·납품처 드로어), `src/app/admin/master/ship-tos/` (납품처 목록)
 - 마이그레이션: `20261118030000_customer_ship_to`
+- 연동 문서: `docs/api-guide.md` 10장, `docs/api-partner-fields.md` (필드 대응표), `docs/api-error-codes.md`
 
 ## 사용자 결정 (모두 추천안)
 
@@ -82,6 +83,37 @@
 
 - 빠른 보기 [확인 필요] [권역 불일치] [정제 등급 C 이하] + 화주·배송센터·지정 상태, 상세 조건(지정 구분·사유·불일치·등급·시군구·등록 경로·상태).
 - 일괄 처리 결과(지정 완료·확인 필요·건너뜀)는 도구줄에 글로 보여 준다.
+
+## ③ 단계 결정 (2026-11-17, 모두 사용자 결정)
+
+| 항목 | 결정 |
+| --- | --- |
+| API 이름 | **정의서대로 `/partners`·`partnerCd`·`shipToCd`** — 화주에게 주는 연동 약속은 정의서를 따르고 권한 코드 `PARTNER_READ/WRITE`와도 맞춘다. 내부(`customer`)와의 대응은 필드 대응표에 |
+| 엑셀 양식 | **한 시트에 반복 행** — 한 줄 = 납품처 하나, 화주사코드+거래처코드가 같은 줄이 거래처 하나 (ASN 업로드와 같은 방식, 공통 업로드 대화상자 그대로) |
+| 업로드 오류 | **오류가 하나라도 있으면 파일 전체 거부** (0049 공통 규칙). 배송센터 미지정은 오류가 아니라 확인 필요 |
+
+### 하나의 upsert 서비스 (`upsertPartner`, `customer-upsert.ts`)
+
+- API와 엑셀 업로드가 같은 함수를 쓴다. 입력은 연동 이름(`partnerSchema`), 저장은 화면과 같은 `createCustomerIn`·`updateCustomerIn`.
+- **보낸 칸만**: 지금 값(`customerInputOf` — 수정 화면과 같은 변환)에 보낸 칸만 덮어쓴 뒤 화면과 같은 입력 규칙으로 검사한다. `null`은 지우기, 안 보낸 칸은 그대로.
+- **보낸 납품처만**: 지금 납품처 목록에 보낸 납품처를 덮어쓰거나 뒤에 붙인 전체 목록으로 저장한다(`partial` — 빠진 것을 지우지 않음).
+- **UNCHANGED**: 입력 규칙을 거친 값(하이픈 없는 전화 등)으로 비교해 같으면 아무것도 쓰지 않는다. 납품처 저장도 바뀌지 않은 줄은 쓰지 않는다(수정일·버전 그대로).
+- **연동 센터코드**: 납품처 입력에 `centerMode: 'IF'` + `centerCode`를 더했다(화면은 AUTO·MANUAL만). 같은 센터코드를 다시 보내면 지정을 그대로 둔다.
+- **정책 반려**: `collectRejects`면 반려된 납품처만 저장하지 않고 결과에 FAIL. 새 기본 납품처가 반려되면 옛 기본으로 되돌리고, 기본이 없어지면(새 거래처의 유일한 납품처 반려 등) 거래처도 실패시킨다.
+- 오류코드: 입력 규칙의 `params.apiCode`(기본 1곳·사용 중 1곳·주소 필수)와 칸 위치(코드 형식)로 `DEFAULT_SHIP_TO_REQUIRED`·`LAST_SHIP_TO_INACTIVE`·`PARTNER_ADDRESS_REQUIRED`·`PARTNER_CD_INVALID`·`SHIP_TO_CD_INVALID`를 정한다. 센터 반려 사유는 그대로 코드(`ADDR_NOT_RESOLVED`만 `ADDRESS_NOT_RESOLVED`). 정의서의 9개에 `CENTER_INACTIVE`·`REGION_UNASSIGNED`·`REGION_MIXED`를 더했다(자동 반려 사유를 구분).
+
+### API (`src/lib/api/endpoints/partners.ts`)
+
+- 등록은 **건마다 따로 트랜잭션**(`writeTransaction`) — 한 건 실패가 다른 건을 되돌리지 않는다. TEST 키는 건마다 계산 후 되돌린다.
+- API 틀 확장: 경로 값(`ctx.params`, Next 라우트의 두 번째 인자)과 건별 덧붙임 결과(`extra` → `items[].shipTos`).
+- 목록은 키 순서 + `cursor`(마지막 키), `updatedAfter`는 수정일시 조건. 응답의 전화·사업자번호는 숫자만.
+- 연락처·이름은 요청 로그에서 가린다(기존 마스킹 규칙: `receiverNm`·`receiverTelNo`·`addr*`).
+
+### 엑셀 업로드 (`customer-upload.ts`)
+
+- 검증도 **파일 전체를 한 트랜잭션에서 실제로 처리해 본 뒤 되돌린다** → 미리보기에 신규·수정·변경 없음·배송센터 지정/확인 필요 건수.
+- 등록 경로 `UPLOAD`, 화주 정책은 쓰지 않는다(운영사가 올림).
+- 엑셀은 빈 칸 = 안 보냄이라 값을 지울 수 없다(화면에서 지운다).
 
 ## 버린 안
 
