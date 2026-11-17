@@ -427,6 +427,15 @@ describe('DataGrid 목록 공통 기능', () => {
     expect(screen.getAllByText('완료')[0].closest('td')!.className).toContain('text-center')
     expect(screen.getByText('품목1').closest('td')!.className).not.toContain('text-center')
   })
+
+  it('제목은 칸 정렬과 상관없이 모두 가운데, 칸은 좌우 여백 px-4 (칸 사이 32px)', () => {
+    render(<Harness />)
+    const headers = screen.getAllByRole('columnheader').filter((th) => th.textContent)
+    expect(headers.length).toBeGreaterThan(1)
+    for (const th of headers) expect(th.className).toContain('text-center')
+    expect(screen.getByText('1,000').closest('td')!.className).toContain('px-4')
+    expect(screen.getByText('품목1').closest('td')!.className).toContain('px-4')
+  })
 })
 
 describe('DataGrid 페이지 범위 표시', () => {

@@ -310,7 +310,8 @@ export function DataGrid<TData extends RowData>({
   const rows = table.getRowModel().rows
   const isFirstLoading = loading && data.length === 0
   const isEmpty = !loading && data.length === 0
-  const cellPadding = density === 'compact' ? 'py-1.5' : 'py-3'
+  // 칸 여백: 좌우 16px(px-4) → 칸 사이 32px. 오른쪽 정렬 숫자 옆의 왼쪽 정렬 글자가 붙어 보이지 않게
+  const cellPadding = cn('px-4', density === 'compact' ? 'py-1.5' : 'py-3')
 
   // 엑셀 내보내기: 현재 조건의 전체 결과(fetchRows), 화면에 보이는 컬럼만 보이는 순서대로
   async function handleExport(mode: ExportMode) {
@@ -439,7 +440,6 @@ export function DataGrid<TData extends RowData>({
                   )
                 }
                 const def = columnById.get(column.id)!
-                const align = def.align ?? defaultAlign(def.format)
                 const sorted = column.getIsSorted()
                 return (
                   <TableHead
@@ -460,8 +460,8 @@ export function DataGrid<TData extends RowData>({
                       // 고정(pinned)된 코드·번호 컬럼은 너비를 정하지 않았으면 내용에 맞게 좁힌다
                       // 표가 화면 폭을 채우며 남는 폭을 나눠 가져 코드 칸이 넓어지는 것을 막는다 (w-px = 내용 너비까지만)
                       !fixedLayout && isFitColumn(def) && !widthOf(column.id) && 'w-px',
-                      align === 'right' && 'text-right',
-                      align === 'center' && 'text-center',
+                      // 제목은 칸 정렬과 상관없이 모두 가운데, 좌우 여백은 칸과 같게
+                      'px-4 text-center',
                     )}
                     aria-sort={
                       sorted === 'asc' ? 'ascending' : sorted === 'desc' ? 'descending' : undefined
@@ -471,10 +471,7 @@ export function DataGrid<TData extends RowData>({
                       <button
                         type="button"
                         onClick={column.getToggleSortingHandler()}
-                        className={cn(
-                          'inline-flex items-center gap-1 rounded-sm hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:outline-none',
-                          align === 'right' && 'flex-row-reverse',
-                        )}
+                        className="inline-flex items-center justify-center gap-1 rounded-sm hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:outline-none"
                       >
                         {def.header}
                         {sorted === 'asc' ? (
