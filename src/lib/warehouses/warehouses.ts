@@ -10,7 +10,8 @@ import { prisma, type Db } from '@/lib/prisma'
 import { assertAllFound, assertNoCodeConflict } from '@/lib/soft-delete'
 import { DELETED_ONLY, NOT_DELETED, toStatus } from '@/lib/status'
 import { isYes, toYn } from '@/lib/yn'
-import type { WarehouseData } from './warehouse-schema'
+import { saveZones } from '@/lib/zones/zones'
+import type { WarehouseCreateData, WarehouseData } from './warehouse-schema'
 
 // 창고 저장 (docs/decisions/0027, 0074). 권한·데이터 범위·센터 상태 검사는 서버 액션에서 한다
 // - 창고코드·센터는 등록 후 바꿀 수 없다
@@ -74,7 +75,7 @@ function assertFitsCenter(
 }
 
 // 2차 참조 값: 담당자·전용 화주사는 같은 운영사 것만 (다른 운영사 것은 조회되지 않는다), 보관 방식은 공통코드
-async function assertReferences(db: Db, data: WarehouseData) {
+async function assertReferences(db: Db, data: WarehouseCreateData) {
   if (data.managerUserId) {
     const user = await db.user.findUnique({
       where: { id: data.managerUserId },
@@ -121,7 +122,7 @@ export async function findStockedWarehouseIds(db: Db, ids: bigint[]) {
 }
 
 // DB 칸 값 (1차 + 보낸 2차만)
-function warehouseFields(data: WarehouseData) {
+function warehouseFields(data: WarehouseCreateData) {
   return {
     name: data.name,
     type: data.type,
@@ -161,7 +162,7 @@ async function allocatableNotice(db: Db, centerId: bigint) {
 }
 
 // 등록 (한 트랜잭션: 시스템 코드 → 창고). 사용자가 만드는 창고는 시스템 기본 창고가 아니다
-export async function createWarehouse(centerId: bigint, code: string, data: WarehouseData) {
+export async function createWarehouse(centerId: bigint, code: string, data: WarehouseCreateData) {
   return prisma.$transaction(async (tx) => {
     const center = await loadCenter(tx, centerId)
     await assertWarehouseCode(tx, centerId, code)
@@ -178,7 +179,7 @@ export async function createWarehouse(centerId: bigint, code: string, data: Ware
       },
       select: { id: true, systemCode: true, code: true, rowVersion: true },
     })
-    return { ...warehouse, notice: await allocatableNotice(tx, centerId) }
+    return { ...warehouse, zoneIds: undefined, notice: await allocatableNotice(tx, centerId) }
   })
 }
 
@@ -189,6 +190,7 @@ export async function updateWarehouse(id: bigint, rowVersion: number, data: Ware
     const found = await tx.warehouse.findUnique({
       where: { id },
       select: {
+        operatorId: true,
         centerId: true,
         code: true,
         type: true,
@@ -228,10 +230,20 @@ export async function updateWarehouse(id: bigint, rowVersion: number, data: Ware
         select: { rowVersion: true },
       }),
     )
+    // 구역 표 (시스템 기본 창고는 구역을 쓰지 않는다)
+    const zoneIds =
+      data.zones && !isYes(current.systemYn)
+        ? await saveZones(
+            tx,
+            { id, centerId: current.centerId, operatorId: current.operatorId },
+            data.zones,
+          )
+        : undefined
     return {
       id,
       code: current.code,
       rowVersion: saved.rowVersion,
+      zoneIds,
       notice: await allocatableNotice(tx, current.centerId),
     }
   })
@@ -301,8 +313,10 @@ export async function deleteWarehouses(warehouses: WarehouseRef[]) {
       `로케이션이나 재고 기록이 있는 창고는 삭제할 수 없습니다. 사용 중지해 주세요: ${codes.join(', ')}`,
     )
   }
-  const [, result] = await prisma.$transaction([
+  const [, , result] = await prisma.$transaction([
     prisma.externalCode.deleteMany({ where: { entityType: 'WAREHOUSE', entityId: { in: ids } } }),
+    // 로케이션이 없는 창고의 구역도 함께 숨긴다 (0075)
+    prisma.zone.updateMany({ where: { warehouseId: { in: ids } }, data: DELETED_ONLY }),
     prisma.warehouse.updateMany({ where: { id: { in: ids } }, data: DELETED_ONLY }),
   ])
   return { deleted: result.count }

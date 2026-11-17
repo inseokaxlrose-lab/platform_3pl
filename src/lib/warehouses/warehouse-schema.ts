@@ -8,6 +8,7 @@ import {
   optionalText,
   requiredText,
 } from '@/lib/validation/common-fields'
+import { zonesSchema } from '@/lib/zones/zone-schema'
 import { WAREHOUSE_TYPE } from './warehouse-codes'
 
 // 창고 입력 규칙 — 화면·서버 공용 (docs/decisions/0074, docs/specs/warehouse.md)
@@ -68,8 +69,9 @@ export const warehouseShape = {
     .regex(/^[A-Z0-9]*$/, '영문 대문자·숫자만 씁니다.')
     .transform((value) => value || null)
     .optional(),
+  // 로케이션 코드에 쓸 수 있는 구분자는 하이픈뿐 (없음 = 붙여 쓰기)
   locCodeSeparator: z
-    .enum(['-', '_', '.', ''])
+    .enum(['-', ''])
     .transform((value) => value || null)
     .optional(),
 }
@@ -81,9 +83,12 @@ export const warehouseCreateSchema = z.object({
   ...warehouseShape,
 })
 
-export const warehouseUpdateSchema = z.object(warehouseShape)
+// 수정: 구역 표 함께 (보내지 않으면 구역은 그대로, 0075)
+export const warehouseUpdateSchema = z.object({ ...warehouseShape, zones: zonesSchema.optional() })
 
 export type WarehouseCreateInput = z.input<typeof warehouseCreateSchema>
 export type WarehouseData = z.output<typeof warehouseUpdateSchema>
-// 화면 값 (등록·수정 공용 모양: 수정에서는 센터·코드가 읽기 전용)
-export type WarehouseFormValue = z.input<typeof warehouseCreateSchema>
+export type WarehouseCreateData = Omit<WarehouseData, 'zones'>
+// 화면 값 (등록·수정 공용 모양: 수정에서는 센터·코드가 읽기 전용, 구역 표는 수정에서만)
+export const warehouseFormSchema = warehouseCreateSchema.extend({ zones: zonesSchema.optional() })
+export type WarehouseFormValue = z.input<typeof warehouseFormSchema>

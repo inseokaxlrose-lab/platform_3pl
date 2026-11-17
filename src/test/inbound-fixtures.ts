@@ -64,7 +64,7 @@ export async function createInboundFixture() {
               operatorId: TEST_OPERATOR_ID,
               warehouseId: warehouse.id,
               code: location,
-              name: location,
+              centerId,
             },
           })
         ).id,

@@ -86,12 +86,15 @@ export async function ensureCenterDefaults(db: Db, centerId: bigint) {
     }
     const location = await db.location.upsert({
       where: { warehouseId_code: { warehouseId: warehouse.id, code: DEFAULT_LOCATION_CODE } },
-      // 명칭은 코드와 같게 (0071)
+      // 시스템 기본 로케이션: 작업대기 유형, 사용 중지·삭제 불가 (0075)
       create: {
         operatorId,
+        centerId,
         warehouseId: warehouse.id,
         code: DEFAULT_LOCATION_CODE,
-        name: DEFAULT_LOCATION_CODE,
+        description: `${staging.name} 기본`,
+        locType: 'STAGING',
+        systemYn: 'Y',
       },
       update: {},
       select: { id: true },

@@ -11,28 +11,29 @@ import {
 import { prisma } from '@/lib/prisma'
 import { scopeFilter, type DataScope } from '@/lib/scope/data-scope'
 import { isActiveStatus } from '@/lib/status'
-import { locationCodeField, locationNameField, locationRemarkField } from './location-range'
-import {
-  locationUploadTemplate,
-  UPLOAD_NUMBER_PATTERN,
-  UPLOAD_ZONE_PATTERN,
-} from './location-upload-template'
+import { optionalText } from '@/lib/validation/common-fields'
+import { locationCodeField } from './location-pattern'
+import { locationUploadTemplate, UPLOAD_POSITION_PATTERN } from './location-upload-template'
 import { isSystemWarehouse } from '@/lib/warehouses/warehouse-codes'
 
-// 로케이션 엑셀 일괄 업로드 검증·등록 (docs/decisions/0071)
+// 로케이션 엑셀 일괄 업로드 검증·등록 (docs/decisions/0071, 0075)
 // 검증: 줄마다 문제를 모은다 (저장 안 함). 등록: 다시 검증하고, 문제가 없을 때만 한 번에 만든다
 // 이미 있는 로케이션은 오류가 아니라 건너뛴다 ([일괄 생성]과 같다)
 
 type PlannedLocation = {
-  rowNo: number
+  lineNo: number
+  centerId: bigint
   warehouseId: bigint
+  zoneId: bigint | null
   code: string
-  name: string
+  description: string | null
   remark: string | null
-  zone: string | null
-  aisle: string | null
-  level: string | null
+  rowNo: string | null
+  levelNo: string | null
 }
+
+const descriptionField = optionalText(200)
+const remarkField = optionalText(1000)
 
 const firstError = (result: { success: boolean; error?: { issues: { message: string }[] } }) =>
   result.error?.issues[0]?.message ?? '값을 확인해 주세요.'
@@ -51,7 +52,15 @@ export async function checkLocationUpload(
     select: {
       id: true,
       code: true,
-      warehouses: { select: { id: true, code: true, systemYn: true, status: true } },
+      warehouses: {
+        select: {
+          id: true,
+          code: true,
+          systemYn: true,
+          status: true,
+          zones: { where: { delYn: 'N' }, select: { id: true, code: true, status: true } },
+        },
+      },
     },
   })
   const centerByCode = new Map(centers.map((c) => [c.code.toUpperCase(), c]))
@@ -89,32 +98,37 @@ export async function checkLocationUpload(
       add(row, 'code', firstError(code))
       ok = false
     }
-    const name = locationNameField.safeParse(v.name ?? '')
-    if (!name.success) {
-      add(row, 'name', firstError(name))
+    const description = descriptionField.safeParse(v.description ?? '')
+    if (!description.success) {
+      add(row, 'description', firstError(description))
       ok = false
     }
-    const remark = locationRemarkField.safeParse(v.remark ?? '')
+    const remark = remarkField.safeParse(v.remark ?? '')
     if (!remark.success) {
       add(row, 'remark', firstError(remark))
       ok = false
     }
-    const zone = (v.zone ?? '').trim().toUpperCase()
-    if (zone && !UPLOAD_ZONE_PATTERN.test(zone)) {
-      add(row, 'zone', '구역은 영문 1~3자입니다.')
+    // 구역: 그 창고에 있는 사용 중인 구역코드만
+    const zoneCode = (v.zone ?? '').trim().toUpperCase()
+    const zone = zoneCode ? warehouse.zones.find((z) => z.code === zoneCode) : null
+    if (zoneCode && !zone) {
+      add(row, 'zone', '이 창고에 없는 구역입니다. 창고 화면에서 구역을 먼저 만드세요.')
+      ok = false
+    } else if (zone && !isActiveStatus(zone.status)) {
+      add(row, 'zone', '사용 중지된 구역입니다.')
       ok = false
     }
-    const aisle = (v.aisle ?? '').trim()
-    if (aisle && !UPLOAD_NUMBER_PATTERN.test(aisle)) {
-      add(row, 'aisle', '열은 숫자 1~3자리입니다.')
+    const rowText = (v.row ?? '').trim().toUpperCase()
+    if (rowText && !UPLOAD_POSITION_PATTERN.test(rowText)) {
+      add(row, 'row', '열은 영문·숫자 1~10자입니다.')
       ok = false
     }
-    const level = (v.level ?? '').trim()
-    if (level && !UPLOAD_NUMBER_PATTERN.test(level)) {
-      add(row, 'level', '단은 숫자 1~3자리입니다.')
+    const level = (v.level ?? '').trim().toUpperCase()
+    if (level && !UPLOAD_POSITION_PATTERN.test(level)) {
+      add(row, 'level', '단은 영문·숫자 1~10자입니다.')
       ok = false
     }
-    if (!ok || !code.success) continue
+    if (!ok || !code.success || !description.success || !remark.success) continue
 
     // 같은 파일 안에서 같은 창고·같은 코드가 두 번
     const key = `${warehouse.id}:${code.data}`
@@ -124,14 +138,15 @@ export async function checkLocationUpload(
     }
     seen.add(key)
     planned.push({
-      rowNo: row.rowNo,
+      lineNo: row.rowNo,
+      centerId: center.id,
       warehouseId: warehouse.id,
+      zoneId: zone?.id ?? null,
       code: code.data,
-      name: name.data || code.data,
-      remark: remark.data || null,
-      zone: zone || null,
-      aisle: aisle || null,
-      level: level || null,
+      description: description.data,
+      remark: remark.data,
+      rowNo: rowText || null,
+      levelNo: level || null,
     })
   }
 
@@ -173,8 +188,8 @@ export async function commitLocationUpload(rows: UploadRow[], scope: DataScope) 
   }
   const operatorId = requireOperatorId()
   const { count } = await prisma.location.createMany({
-    data: planned.map(({ rowNo, ...location }) => {
-      void rowNo
+    data: planned.map(({ lineNo, ...location }) => {
+      void lineNo
       return { ...location, operatorId }
     }),
     // 미리 거른 뒤에도 동시에 누가 만들었을 수 있어 한 번 더 건너뛴다

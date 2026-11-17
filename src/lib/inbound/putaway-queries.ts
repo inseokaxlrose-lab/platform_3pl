@@ -44,19 +44,24 @@ export async function getPutawayWork(asnId: bigint, scope: DataScope) {
   })
   if (!asn || !isInScope(scope, asn, ASN_SCOPE)) return null
 
-  // 보관 로케이션 (같은 센터의 입고 가능 창고, 시스템 기본 창고 제외, 사용 중, 0074)
+  // 보관 로케이션: 같은 센터의 사용 중인 창고(시스템 기본 창고 제외)·구역·로케이션, 잠기지 않음,
+  // 실제 적치 가능 = 로케이션 값, 비어 있으면 창고 값 (0074, 0075 — isLocationUsable 'PUTAWAY'와 같은 조건)
   const locations = await prisma.location.findMany({
     where: {
       ...ACTIVE_ONLY,
-      warehouse: {
-        centerId: asn.centerId,
-        systemYn: 'N',
-        inboundYn: 'Y',
-        delYn: 'N',
-        ...ACTIVE_ONLY,
-      },
+      lockYn: 'N',
+      warehouse: { centerId: asn.centerId, systemYn: 'N', delYn: 'N', ...ACTIVE_ONLY },
+      AND: [
+        { OR: [{ inboundYn: 'Y' }, { inboundYn: null, warehouse: { inboundYn: 'Y' } }] },
+        { OR: [{ zoneId: null }, { zone: { ...ACTIVE_ONLY, delYn: 'N' } }] },
+      ],
     },
-    select: { id: true, code: true, zone: true, warehouse: { select: { code: true, name: true } } },
+    select: {
+      id: true,
+      code: true,
+      zone: { select: { code: true } },
+      warehouse: { select: { code: true, name: true } },
+    },
     orderBy: [{ warehouse: { sortOrder: 'asc' } }, { warehouse: { code: 'asc' } }, { code: 'asc' }],
   })
   const locationLabel = new Map(locations.map((l) => [l.id, `${l.warehouse.code} / ${l.code}`]))
@@ -96,7 +101,9 @@ export async function getPutawayWork(asnId: bigint, scope: DataScope) {
     locations: locations.map((l) => ({
       id: l.id,
       label: `${l.warehouse.code} / ${l.code}`,
-      description: [l.warehouse.name, l.zone ? `구역 ${l.zone}` : null].filter(Boolean).join(' · '),
+      description: [l.warehouse.name, l.zone ? `구역 ${l.zone.code}` : null]
+        .filter(Boolean)
+        .join(' · '),
     })),
     // 적치할 수 있는 입고확정 줄 (남은 수량 > 0)
     pending: receiptLines.filter((l) => l.availableQty !== '0'),

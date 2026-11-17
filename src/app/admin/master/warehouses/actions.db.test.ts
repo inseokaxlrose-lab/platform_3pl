@@ -8,7 +8,7 @@ import { getCurrentPermissions, getCurrentScope, getCurrentUser } from '@/lib/se
 import { receiveStock } from '@/lib/stock/stock-change'
 import { stockTransaction } from '@/lib/stock/stock-transaction'
 import type { WarehouseCreateInput } from '@/lib/warehouses/warehouse-schema'
-import { versionOf } from '@/test/factories'
+import { createTestCodeGroup, versionOf } from '@/test/factories'
 import { createInboundFixture, type InboundFixture } from '@/test/inbound-fixtures'
 import { resetDatabase, TEST_OPERATOR_ID } from '@/test/reset-database'
 import {
@@ -434,5 +434,91 @@ describe('목록 · 데이터 범위 · 권한', () => {
     expect(await listWarehousesAction({ ...createDataGridState(), exportAll: true })).toMatchObject(
       { ok: false, error: { code: 'FORBIDDEN' } },
     )
+  })
+})
+
+describe('구역 표 (창고 수정과 함께 저장, 0075)', () => {
+  const zone = (overrides: Record<string, string> = {}) => ({
+    id: '',
+    code: 'a',
+    name: 'A구역',
+    type: 'STORAGE',
+    pickSeq: '',
+    sortOrder: '10',
+    status: 'ACTIVE' as 'ACTIVE' | 'INACTIVE',
+    ...overrides,
+  })
+  const saveZones = async (warehouseId: bigint, zones: ReturnType<typeof zone>[]) =>
+    updateWarehouseAction({
+      id: String(warehouseId),
+      rowVersion: await versionOf('warehouse', warehouseId),
+      ...updateInput({ code: 'GEN', name: 'GEN' }),
+      zones,
+    })
+
+  beforeEach(async () => {
+    await createTestCodeGroup('ZONE_TYPE', [{ code: 'STORAGE' }, { code: 'PICKING' }])
+  })
+
+  it('새 줄은 만들고(코드 대문자, 센터 키) 줄 키를 돌려준다, 저장된 구역의 코드는 바꿀 수 없다', async () => {
+    const gen = await genWarehouse()
+    const result = await saveZones(gen.id, [
+      zone(),
+      zone({ code: 'p1', name: '피킹', type: 'PICKING', pickSeq: '1' }),
+    ])
+    if (!result.ok) throw new Error(result.error.message)
+    expect(result.data.zoneIds).toHaveLength(2)
+    const saved = await prisma.zone.findMany({
+      where: { warehouseId: gen.id },
+      orderBy: { code: 'asc' },
+    })
+    expect(saved.map((z) => [z.code, z.type, z.pickSeq, z.centerId])).toEqual([
+      ['A', 'STORAGE', null, f.icn],
+      ['P1', 'PICKING', 1, f.icn],
+    ])
+    const [aId, pId] = result.data.zoneIds!
+    expect(
+      await saveZones(gen.id, [zone({ id: aId, code: 'B' }), zone({ id: pId, code: 'P1' })]),
+    ).toMatchObject({
+      ok: false,
+      error: { code: 'VALIDATION', message: expect.stringContaining('바꿀 수 없습니다') },
+    })
+    // 표 안에서 같은 코드
+    expect(await saveZones(gen.id, [zone(), zone()])).toMatchObject({
+      ok: false,
+      error: { code: 'VALIDATION' },
+    })
+  })
+
+  it('로케이션이 있는 구역은 지울 수 없고, 재고가 있는 구역은 사용 중지할 수 없다', async () => {
+    const gen = await genWarehouse()
+    const result = await saveZones(gen.id, [zone()])
+    if (!result.ok) throw new Error(result.error.message)
+    const zoneId = result.data.zoneIds![0]
+    await prisma.location.update({ where: { id: f.a01 }, data: { zoneId: BigInt(zoneId) } })
+
+    expect(await saveZones(gen.id, [])).toMatchObject({
+      ok: false,
+      error: { code: 'CONFLICT', message: expect.stringContaining('로케이션이 있는 구역') },
+    })
+    await stockUp()
+    expect(
+      await saveZones(gen.id, [zone({ id: zoneId, code: 'A', status: 'INACTIVE' })]),
+    ).toMatchObject({
+      ok: false,
+      error: { code: 'CONFLICT', message: expect.stringContaining('재고') },
+    })
+  })
+
+  it('시스템 기본 창고는 구역 표를 받지 않는다 (보내도 무시)', async () => {
+    const inbound = await systemOf(f.icn, 'INBOUND')
+    const result = await updateWarehouseAction({
+      id: String(inbound.id),
+      rowVersion: await versionOf('warehouse', inbound.id),
+      ...updateInput(),
+      zones: [zone()],
+    })
+    expect(result.ok).toBe(true)
+    expect(await prisma.zone.count({ where: { warehouseId: inbound.id } })).toBe(0)
   })
 })

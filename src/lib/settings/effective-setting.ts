@@ -25,7 +25,8 @@ type SettingValue<K extends InheritedSettingKey> = K extends 'useLot' | 'useExpi
   ? boolean
   : string | null
 
-export type SettingSource = 'SHIPPER' | 'CENTER' | 'OPERATOR'
+// 출처: 운영사 → 센터 → 화주사 설정, 창고 → 로케이션 운영 속성 (0075)
+export type SettingSource = 'SHIPPER' | 'CENTER' | 'OPERATOR' | 'LOCATION' | 'WAREHOUSE'
 
 // 단계별 값 (그 단계에 칸이 없으면 undefined, 칸은 있는데 비었으면 null)
 export type SettingLevels<T> = { shipper?: T | null; center?: T | null; operator: T }
@@ -78,4 +79,38 @@ export async function getEffectiveSetting<K extends InheritedSettingKey>(
     operator: normalize(key, row.operator[key]),
   })
   return resolved as { value: SettingValue<K>; source: SettingSource }
+}
+
+// ── 로케이션 운영 속성 (0075): 실제 값 = 로케이션 값 ?? 창고 값 ──────────────
+// 적치·피킹·할당 가능은 로케이션이 비워 두면(NULL) 창고 값을 따른다
+export const LOCATION_INHERITED_OPS = ['inbound', 'outbound', 'allocatable'] as const
+export type LocationOpKey = (typeof LOCATION_INHERITED_OPS)[number]
+type OpsRow = { inboundYn: string | null; outboundYn: string | null; allocatableYn: string | null }
+const OP_COLUMN = {
+  inbound: 'inboundYn',
+  outbound: 'outboundYn',
+  allocatable: 'allocatableYn',
+} as const
+
+// 순수 함수: 로케이션·창고 칸 값 → 실제 값과 출처 (목록의 "적용값", 화면 상속 칸 안내)
+export function resolveLocationOps(location: OpsRow, warehouse: OpsRow) {
+  const result = {} as Record<LocationOpKey, { value: boolean; source: SettingSource }>
+  for (const key of LOCATION_INHERITED_OPS) {
+    const own = location[OP_COLUMN[key]]
+    result[key] =
+      own !== null
+        ? { value: isYes(own), source: 'LOCATION' }
+        : { value: isYes(warehouse[OP_COLUMN[key]] ?? 'N'), source: 'WAREHOUSE' }
+  }
+  return result
+}
+
+// 로케이션 한 칸의 실제 운영 속성 (업무 코드는 칸을 직접 읽지 말고 이 함수로)
+export async function getEffectiveLocationOps(locationId: bigint, db: Db = prisma) {
+  const ops = { inboundYn: true, outboundYn: true, allocatableYn: true } as const
+  const location = await db.location.findUniqueOrThrow({
+    where: { id: locationId },
+    select: { ...ops, warehouse: { select: ops } },
+  })
+  return resolveLocationOps(location, location.warehouse)
 }

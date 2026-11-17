@@ -1,12 +1,18 @@
 import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { createDataGridState } from '@/components/data-grid/state'
 import type { PermissionCode } from '@/config/permissions'
-import { ensureCenterDefaults } from '@/lib/centers/center-defaults'
-import { nextSystemCode } from '@/lib/master-code/system-code'
+import { runInContext } from '@/lib/actor'
+import { isLocationUsable } from '@/lib/locations/location-usable'
+import type { LocationBulkInput, LocationCreateInput } from '@/lib/locations/location-schema'
+import { DEFAULT_BULK_ATTRIBUTES } from '@/lib/locations/location-schema'
 import { prisma } from '@/lib/prisma'
 import type { DataScope } from '@/lib/scope/data-scope'
 import { getCurrentPermissions, getCurrentScope, getCurrentUser } from '@/lib/session'
-import { createTestCenter, versionOf } from '@/test/factories'
+import { getEffectiveLocationOps } from '@/lib/settings/effective-setting'
+import { receiveStock } from '@/lib/stock/stock-change'
+import { stockTransaction } from '@/lib/stock/stock-transaction'
+import { createTestCodeGroup, versionOf } from '@/test/factories'
+import { createInboundFixture, type InboundFixture } from '@/test/inbound-fixtures'
 import { resetDatabase, TEST_OPERATOR_ID } from '@/test/reset-database'
 import {
   bulkCreateLocationsAction,
@@ -15,11 +21,13 @@ import {
   deleteLocationsAction,
   listLocationsAction,
   previewBulkLocationsAction,
+  restoreLocationsAction,
   setLocationsActiveAction,
   updateLocationAction,
   validateLocationUploadAction,
 } from './actions'
-import { getWarehouseOptions } from './queries'
+
+// 로케이션 서버 액션 (docs/decisions/0028, 0071, 0075)
 
 vi.mock('@/lib/session', () => ({
   getCurrentUser: vi.fn(),
@@ -45,51 +53,87 @@ function signIn(scope: DataScope = { kind: 'ALL', operatorId: TEST_OPERATOR_ID }
   vi.mocked(getCurrentScope).mockResolvedValue(scope)
 }
 
-let icnId = 0n
-let gmhId = 0n
-let icnWarehouseId = 0n // 이천 일반 창고
-let gmhWarehouseId = 0n // 김해 일반 창고
-let icnStagingId = 0n // 이천 입고대기 창고
+let f: InboundFixture
+let gen: bigint // 이천 GEN 창고 (A-01·A-02)
+let zoneA: bigint // GEN 창고 A구역
+let gmhGen: bigint // 김해 GMHGEN 창고
 
-const RANGE = {
-  zoneFrom: 'A',
-  zoneTo: 'B',
-  aisleFrom: 1,
-  aisleTo: 2,
-  aisleDigits: 2,
-  levelFrom: 1,
-  levelTo: 3,
-  levelDigits: 2,
-  separator: '-' as const,
-}
+const ids = (list: (bigint | string)[]) => list.map(String)
 
-async function generalWarehouse(centerId: bigint, code: string) {
-  const w = await prisma.warehouse.create({
-    data: {
-      operatorId: TEST_OPERATOR_ID,
-      centerId,
-      systemCode: await nextSystemCode('WAREHOUSE'),
-      code,
-      name: code,
-      tempZone: 'AMBIENT',
-    },
-  })
-  return w.id
-}
+// 한 칸 추가 입력 (기본값 + 바꿀 것)
+const input = (overrides: Partial<LocationCreateInput> = {}): LocationCreateInput => ({
+  warehouseId: String(gen),
+  code: 'R-01-01',
+  zoneId: '',
+  description: '',
+  locType: 'RACK',
+  remark: '',
+  rowNo: '',
+  levelNo: '',
+  widthCm: '',
+  depthCm: '',
+  heightCm: '',
+  maxCbm: '',
+  maxWeightKg: '',
+  maxPalletCnt: null,
+  inbound: null,
+  outbound: null,
+  allocatable: null,
+  mixItem: true,
+  mixLot: true,
+  mixClient: false,
+  putawaySeq: null,
+  pickSeq: null,
+  ...overrides,
+})
+
+// 일괄 생성 입력: A구역 열 1~2 × 단 1~3 = 6개
+const bulk = (overrides: Partial<LocationBulkInput['pattern']> = {}): LocationBulkInput => ({
+  warehouseId: String(gen),
+  zoneId: String(zoneA),
+  pattern: {
+    zoneCode: '',
+    pattern: '{ZONE}-{ROW}-{LEVEL}',
+    row: { from: 1, to: 2, digits: 2 },
+    level: { from: 1, to: 3, digits: 2 },
+    bay: null,
+    cell: null,
+    ...overrides,
+  },
+  attributes: { ...DEFAULT_BULK_ATTRIBUTES, locType: 'FLOOR', mixClient: true },
+})
 
 const codesOf = async (warehouseId: bigint) =>
   (await prisma.location.findMany({ where: { warehouseId }, orderBy: { code: 'asc' } })).map(
     (l) => l.code,
   )
 
+// A-01에 재고 넣기
+const stockUp = (locationId = f.a01) =>
+  runInContext({ actor: 'kim', operatorId: TEST_OPERATOR_ID }, () =>
+    stockTransaction((tx) =>
+      receiveStock(tx, { address: { locationId, itemId: f.water }, qty: '10' }),
+    ),
+  )
+
 beforeEach(async () => {
   await resetDatabase()
-  icnId = (await createTestCenter('ICN')).id
-  gmhId = (await createTestCenter('GMH')).id
-  icnStagingId = (await ensureCenterDefaults(prisma, icnId)).id
-  await ensureCenterDefaults(prisma, gmhId)
-  icnWarehouseId = await generalWarehouse(icnId, 'A')
-  gmhWarehouseId = await generalWarehouse(gmhId, 'A')
+  f = await createInboundFixture()
+  await createTestCodeGroup('LOC_TYPE', [{ code: 'RACK' }, { code: 'FLOOR' }, { code: 'STAGING' }])
+  await createTestCodeGroup('LOCK_REASON', [{ code: 'COUNT' }])
+  gen = (await prisma.warehouse.findFirstOrThrow({ where: { code: 'GEN' } })).id
+  gmhGen = (await prisma.warehouse.findFirstOrThrow({ where: { code: 'GMHGEN' } })).id
+  zoneA = (
+    await prisma.zone.create({
+      data: {
+        operatorId: TEST_OPERATOR_ID,
+        centerId: f.icn,
+        warehouseId: gen,
+        code: 'A',
+        name: 'A구역',
+      },
+    })
+  ).id
   signIn()
 })
 
@@ -97,378 +141,355 @@ afterAll(async () => {
   await prisma.$disconnect()
 })
 
-describe('한 칸 등록', () => {
-  it('대문자로 저장하고, 같은 창고의 같은 코드는 거부 (다른 창고는 허용)', async () => {
-    expect(
-      await createLocationAction({ warehouseId: String(icnWarehouseId), code: 'x-01' }),
-    ).toMatchObject({
-      ok: true,
-      data: { code: 'X-01' },
+describe('한 칸 추가 · 수정', () => {
+  it('코드는 대문자로, 센터 키는 창고의 센터, 용량·운영 속성 저장 (상속 칸은 비워 둠)', async () => {
+    const result = await createLocationAction(
+      input({
+        code: 'a-09-01',
+        zoneId: String(zoneA),
+        rowNo: '09',
+        levelNo: '01',
+        description: '입구 옆',
+        widthCm: '120',
+        depthCm: '100',
+        heightCm: '150',
+        maxCbm: '1.8',
+        maxWeightKg: '1000',
+        allocatable: false,
+      }),
+    )
+    expect(result.ok).toBe(true)
+    const saved = await prisma.location.findFirstOrThrow({ where: { code: 'A-09-01' } })
+    expect(saved).toMatchObject({
+      centerId: f.icn,
+      zoneId: zoneA,
+      rowNo: '09',
+      levelNo: '01',
+      description: '입구 옆',
+      locType: 'RACK',
+      inboundYn: null,
+      allocatableYn: 'N',
+      mixClientYn: 'N',
+      systemYn: 'N',
     })
-    expect(
-      await createLocationAction({ warehouseId: String(icnWarehouseId), code: 'X-01' }),
-    ).toMatchObject({
+    expect(saved.maxCbm?.toString()).toBe('1.8')
+    // 실제 적용값: 적치는 창고 값(가능), 할당은 로케이션 값(불가)
+    expect(await getEffectiveLocationOps(saved.id)).toMatchObject({
+      inbound: { value: true, source: 'WAREHOUSE' },
+      allocatable: { value: false, source: 'LOCATION' },
+    })
+  })
+
+  it('거부: 같은 창고에 있는 코드, 다른 창고의 구역, 시스템 기본 창고, 없는 유형 코드', async () => {
+    expect(await createLocationAction(input({ code: 'A-01' }))).toMatchObject({
       ok: false,
       error: { code: 'CONFLICT' },
     })
+    // 다른 창고에는 같은 코드 가능 (중복 금지는 창고 단위)
     expect(
-      (await createLocationAction({ warehouseId: String(gmhWarehouseId), code: 'X-01' })).ok,
+      (await createLocationAction(input({ warehouseId: String(gmhGen), code: 'A-01' }))).ok,
     ).toBe(true)
-  })
-
-  it('입고대기 창고·사용 중지된 창고에는 추가할 수 없다', async () => {
     expect(
-      await createLocationAction({ warehouseId: String(icnStagingId), code: 'S-01' }),
+      await createLocationAction(
+        input({ warehouseId: String(gmhGen), code: 'Z-1', zoneId: String(zoneA) }),
+      ),
     ).toMatchObject({
       ok: false,
-      error: { code: 'CONFLICT', message: expect.stringContaining('대기 창고') },
+      error: { code: 'VALIDATION', message: expect.stringContaining('같은 창고') },
     })
-    await prisma.warehouse.update({ where: { id: icnWarehouseId }, data: { status: 'INACTIVE' } })
-    expect(
-      await createLocationAction({ warehouseId: String(icnWarehouseId), code: 'S-01' }),
-    ).toMatchObject({
+    const inbound = await prisma.warehouse.findFirstOrThrow({
+      where: { centerId: f.icn, type: 'INBOUND', systemYn: 'Y' },
+    })
+    expect(await createLocationAction(input({ warehouseId: String(inbound.id) }))).toMatchObject({
       ok: false,
-      error: { code: 'CONFLICT', message: expect.stringContaining('사용 중지') },
+      error: { code: 'CONFLICT', message: expect.stringContaining('시스템 기본 창고') },
+    })
+    expect(await createLocationAction(input({ locType: 'HOT' }))).toMatchObject({
+      ok: false,
+      error: { code: 'VALIDATION' },
     })
   })
-})
 
-describe('명칭·비고 (0071)', () => {
-  it('명칭을 비우면 코드와 같게, 넣으면 그대로 (한글 가능) · 비고는 선택', async () => {
-    const a = await createLocationAction({ warehouseId: String(icnWarehouseId), code: 'f1-07' })
-    const b = await createLocationAction({
-      warehouseId: String(icnWarehouseId),
-      code: 'DOCK-01',
-      name: ' 1번 도크 ',
-      remark: '냉동실 입구 옆',
+  it('수정: 코드는 그대로, 시스템 기본 로케이션은 설명·비고만, 잠그면 사유 필수', async () => {
+    const a01 = await prisma.location.findUniqueOrThrow({ where: { id: f.a01 } })
+    const { warehouseId, code, ...rest } = input({
+      description: '바뀐 설명',
+      zoneId: String(zoneA),
     })
-    expect(a.ok && b.ok).toBe(true)
-    const rows = await prisma.location.findMany({
-      where: { warehouseId: icnWarehouseId, code: { in: ['F1-07', 'DOCK-01'] } },
-      orderBy: { code: 'asc' },
-      select: { code: true, name: true, remark: true },
+    void warehouseId
+    void code
+    const result = await updateLocationAction({
+      id: String(a01.id),
+      rowVersion: await versionOf('location', a01.id),
+      ...rest,
     })
-    expect(rows).toEqual([
-      { code: 'DOCK-01', name: '1번 도크', remark: '냉동실 입구 옆' },
-      { code: 'F1-07', name: 'F1-07', remark: null },
-    ])
-
-    // 목록 검색어로 명칭도 찾는다
-    const found = await listLocationsAction({ ...createDataGridState(), search: '도크' })
-    expect(found.ok && found.data.rows.map((r) => r.code)).toEqual(['DOCK-01'])
-  })
-
-  it('명칭·비고 수정: 비우면 명칭은 코드로, 버전이 다르면 거부, 범위 밖은 찾을 수 없음', async () => {
-    const created = await createLocationAction({
-      warehouseId: String(icnWarehouseId),
-      code: 'R-01',
-      name: '랙1',
+    expect(result.ok).toBe(true)
+    expect(await prisma.location.findUniqueOrThrow({ where: { id: a01.id } })).toMatchObject({
+      code: 'A-01',
+      description: '바뀐 설명',
+      zoneId: zoneA,
     })
-    if (!created.ok) throw new Error(created.error.message)
-    const id = created.data.id
-    const version = await versionOf('location', id)
 
-    expect(
-      await updateLocationAction({ id, rowVersion: version, name: '', remark: '수리 중' }),
-    ).toMatchObject({ ok: true })
-    expect(
-      await prisma.location.findUniqueOrThrow({
-        where: { id: BigInt(id) },
-        select: { name: true, remark: true },
-      }),
-    ).toEqual({ name: 'R-01', remark: '수리 중' })
-
-    // 예전 버전으로 다시 저장 → 다른 사람이 먼저 고친 것으로 보고 거부
-    expect(
-      await updateLocationAction({ id, rowVersion: version, name: 'X', remark: '' }),
-    ).toMatchObject({ ok: false, error: { code: 'CONFLICT' } })
-
-    signIn({ kind: 'CENTERS', operatorId: TEST_OPERATOR_ID, centerIds: [] })
+    // 2차 칸: 잠그면 사유 필수, 사유를 주면 잠금 일시를 남긴다
     expect(
       await updateLocationAction({
-        id,
-        rowVersion: await versionOf('location', id),
-        name: 'X',
-        remark: '',
+        id: String(a01.id),
+        rowVersion: await versionOf('location', a01.id),
+        ...rest,
+        lock: true,
       }),
-    ).toMatchObject({ ok: false, error: { code: 'NOT_FOUND' } })
+    ).toMatchObject({ ok: false, error: { code: 'VALIDATION' } })
+    expect(
+      (
+        await updateLocationAction({
+          id: String(a01.id),
+          rowVersion: await versionOf('location', a01.id),
+          ...rest,
+          lock: true,
+          lockReason: 'COUNT',
+        })
+      ).ok,
+    ).toBe(true)
+    const locked = await prisma.location.findUniqueOrThrow({ where: { id: a01.id } })
+    expect(locked).toMatchObject({ lockYn: 'Y', lockReason: 'COUNT' })
+    expect(locked.lockAt).not.toBeNull()
+
+    // 시스템 기본 로케이션
+    const system = await prisma.location.findFirstOrThrow({
+      where: { centerId: f.icn, systemYn: 'Y' },
+    })
+    await updateLocationAction({
+      id: String(system.id),
+      rowVersion: await versionOf('location', system.id),
+      ...rest,
+      locType: 'RACK',
+      mixClient: true,
+      description: '입고 확정 재고',
+    })
+    expect(await prisma.location.findUniqueOrThrow({ where: { id: system.id } })).toMatchObject({
+      locType: 'STAGING',
+      mixClientYn: 'N',
+      description: '입고 확정 재고',
+    })
   })
 })
 
 describe('일괄 생성', () => {
-  it('미리보기는 만들지 않고 개수·처음·마지막을 알려준다', async () => {
-    const preview = await previewBulkLocationsAction({
-      warehouseId: String(icnWarehouseId),
-      range: RANGE,
-    })
+  it('패턴으로 만들고 이미 있는 코드는 건너뛴다 (미리보기 → 생성), 공통 속성·열·단 저장', async () => {
+    await createLocationAction(input({ code: 'A-01-02' }))
+    const preview = await previewBulkLocationsAction(bulk())
     expect(preview).toEqual({
       ok: true,
       data: {
-        total: 12,
-        skipped: 0,
-        toCreate: 12,
-        first: ['A-01-01', 'A-01-02', 'A-01-03', 'A-02-01', 'A-02-02'],
-        last: ['B-02-01', 'B-02-02', 'B-02-03'],
+        total: 6,
+        skipped: 1,
+        toCreate: 5,
+        first: ['A-01-01', 'A-01-03', 'A-02-01', 'A-02-02', 'A-02-03'],
+        last: [],
       },
     })
-    expect(await prisma.location.count({ where: { warehouseId: icnWarehouseId } })).toBe(0)
+    expect(await bulkCreateLocationsAction(bulk())).toMatchObject({
+      ok: true,
+      data: { created: 5, skipped: 1 },
+    })
+    const made = await prisma.location.findFirstOrThrow({ where: { code: 'A-02-03' } })
+    expect(made).toMatchObject({
+      zoneId: zoneA,
+      centerId: f.icn,
+      rowNo: '02',
+      levelNo: '03',
+      locType: 'FLOOR',
+      mixClientYn: 'Y',
+    })
+    // 같은 범위를 다시 실행해도 안전
+    expect(await bulkCreateLocationsAction(bulk())).toMatchObject({
+      ok: true,
+      data: { created: 0, skipped: 6 },
+    })
   })
 
-  it('없는 코드만 만들고 구역·열·단을 함께 저장(명칭 = 코드), 다시 실행하면 전부 건너뛴다', async () => {
-    await createLocationAction({ warehouseId: String(icnWarehouseId), code: 'A-01-02' })
-
-    expect(
-      await bulkCreateLocationsAction({ warehouseId: String(icnWarehouseId), range: RANGE }),
-    ).toEqual({
-      ok: true,
-      data: { created: 11, skipped: 1 },
-    })
-    const located = await prisma.location.findUniqueOrThrow({
-      where: { warehouseId_code: { warehouseId: icnWarehouseId, code: 'B-02-03' } },
-    })
-    expect(located).toMatchObject({ zone: 'B', aisle: '02', level: '03', name: 'B-02-03' })
-
-    expect(
-      await bulkCreateLocationsAction({ warehouseId: String(icnWarehouseId), range: RANGE }),
-    ).toEqual({
-      ok: true,
-      data: { created: 0, skipped: 12 },
-    })
-    expect(await codesOf(icnWarehouseId)).toHaveLength(12)
-  })
-
-  it('범위 규칙 위반·입고대기 창고는 거부', async () => {
-    expect(
-      await bulkCreateLocationsAction({
-        warehouseId: String(icnWarehouseId),
-        range: { ...RANGE, zoneTo: 'Z', aisleTo: 99, levelTo: 9 },
+  it('연 사용·구분자 없음 패턴, 다른 창고의 구역·범위 초과·패턴 오류는 거부', async () => {
+    const result = await bulkCreateLocationsAction(
+      bulk({
+        pattern: '{ZONE}{ROW}{BAY}{LEVEL}',
+        row: { from: 1, to: 1, digits: 2 },
+        bay: { from: 1, to: 2, digits: 1 },
+        level: { from: 1, to: 1, digits: 1 },
       }),
-    ).toMatchObject({ ok: false, error: { code: 'VALIDATION' } })
-    expect(
-      await bulkCreateLocationsAction({ warehouseId: String(icnStagingId), range: RANGE }),
-    ).toMatchObject({
-      ok: false,
-      error: { code: 'CONFLICT' },
-    })
-  })
-})
-
-describe('사용 중지 · 삭제 (여러 개)', () => {
-  it('골라서 사용 중지 / 다시 사용, 삭제', async () => {
-    await bulkCreateLocationsAction({ warehouseId: String(icnWarehouseId), range: RANGE })
-    const ids = (
-      await prisma.location.findMany({ where: { warehouseId: icnWarehouseId, zone: 'A' } })
-    ).map((l) => l.id)
-
-    expect(await setLocationsActiveAction({ ids: ids.map(String), isActive: false })).toEqual({
-      ok: true,
-      data: { updated: 6 },
-    })
-    expect(
-      await prisma.location.count({ where: { warehouseId: icnWarehouseId, status: 'INACTIVE' } }),
-    ).toBe(6)
-
-    expect(await deleteLocationsAction({ ids: ids.map(String) })).toEqual({
-      ok: true,
-      data: { deleted: 6 },
-    })
-    expect(await codesOf(icnWarehouseId)).toHaveLength(6)
-  })
-
-  it('입고대기 창고의 기본 로케이션은 사용 중지·삭제할 수 없다 (섞여 있으면 전체 거부)', async () => {
-    const defaultLocation = await prisma.location.findFirstOrThrow({
-      where: { warehouseId: icnStagingId },
-    })
-    const normal = await createLocationAction({ warehouseId: String(icnWarehouseId), code: 'N-01' })
-    const ids = [String(defaultLocation.id), normal.ok ? normal.data.id : '']
-
-    expect(await setLocationsActiveAction({ ids, isActive: false })).toMatchObject({
-      ok: false,
-      error: { code: 'CONFLICT', message: expect.stringContaining('기본 로케이션') },
-    })
-    expect(await deleteLocationsAction({ ids })).toMatchObject({
-      ok: false,
-      error: { code: 'CONFLICT' },
-    })
-    expect(await prisma.location.count({ where: { status: 'INACTIVE' } })).toBe(0)
-    expect(await prisma.location.count({ where: { id: { in: ids.map(BigInt) } } })).toBe(2)
-  })
-})
-
-describe('목록 · 데이터 범위 · 권한', () => {
-  it('창고·구역 거르기, 기본 정렬은 센터 → 창고 → 코드, 구역 목록', async () => {
-    await bulkCreateLocationsAction({ warehouseId: String(icnWarehouseId), range: RANGE })
-
-    const result = await listLocationsAction({
-      ...createDataGridState({ pageSize: 50 }),
-      filters: { warehouse: String(icnWarehouseId), zone: 'B' },
-    })
-    expect(result.ok && result.data.rows.map((r) => r.code)).toEqual([
-      'B-01-01',
-      'B-01-02',
-      'B-01-03',
-      'B-02-01',
-      'B-02-02',
-      'B-02-03',
-    ])
-    // 구역 선택지: 창고마다 그 창고의 구역
-    const options = await getWarehouseOptions({ kind: 'ALL', operatorId: TEST_OPERATOR_ID })
-    expect(options.find((w) => w.id === String(icnWarehouseId))?.zones).toEqual(['A', 'B'])
-    // 상태 거르기
-    const inactive = await listLocationsAction({
-      ...createDataGridState(),
-      filters: { warehouse: String(icnWarehouseId), status: 'INACTIVE' },
-    })
-    expect(inactive.ok && inactive.data.rowCount).toBe(0)
-
-    const all = await listLocationsAction(createDataGridState({ pageSize: 50 }))
-    // 센터 2곳 × 대기 창고 3개(입고·출고·반품)의 DEFAULT
-    expect(all.ok && all.data.rows.filter((r) => r.protected).map((r) => r.code)).toEqual(
-      Array(6).fill('DEFAULT'),
     )
-  })
-
-  it('센터 직원: 소속 센터 로케이션만, 다른 센터 창고·로케이션은 다룰 수 없다', async () => {
-    const gmhLocation = await createLocationAction({
-      warehouseId: String(gmhWarehouseId),
-      code: 'G-01',
+    expect(result).toMatchObject({ ok: true, data: { created: 2 } })
+    expect(await prisma.location.findFirst({ where: { code: 'A0121' } })).toMatchObject({
+      bayNo: '2',
     })
-    const gmhLocationId = gmhLocation.ok ? gmhLocation.data.id : ''
-    signIn({ kind: 'CENTERS', operatorId: TEST_OPERATOR_ID, centerIds: [icnId] })
-
-    const result = await listLocationsAction(createDataGridState({ pageSize: 50 }))
-    expect(result.ok && new Set(result.data.rows.map((r) => r.center))).toEqual(
-      new Set(['ICN 센터 (ICN)']),
-    )
 
     expect(
-      await createLocationAction({ warehouseId: String(gmhWarehouseId), code: 'X' }),
+      await bulkCreateLocationsAction({ ...bulk(), warehouseId: String(gmhGen) }),
     ).toMatchObject({
-      ok: false,
-      error: { code: 'NOT_FOUND' },
-    })
-    expect(await setLocationsActiveAction({ ids: [gmhLocationId], isActive: false })).toMatchObject(
-      {
-        ok: false,
-        error: { code: 'NOT_FOUND' },
-      },
-    )
-    expect(await deleteLocationsAction({ ids: [gmhLocationId] })).toMatchObject({
-      ok: false,
-      error: { code: 'NOT_FOUND' },
-    })
-  })
-
-  it('조회 권한만 있으면 등록·수정·삭제 불가', async () => {
-    signIn({ kind: 'ALL', operatorId: TEST_OPERATOR_ID }, ['master.locations.read'])
-    expect(
-      await createLocationAction({ warehouseId: String(icnWarehouseId), code: 'X' }),
-    ).toMatchObject({
-      ok: false,
-      error: { code: 'FORBIDDEN' },
-    })
-    expect(await deleteLocationsAction({ ids: ['999999'] })).toMatchObject({
-      ok: false,
-      error: { code: 'FORBIDDEN' },
-    })
-  })
-})
-
-describe('엑셀', () => {
-  it('엑셀 전체 읽기는 엑셀 권한이 필요하다', async () => {
-    expect(await listLocationsAction({ ...createDataGridState(), exportAll: true })).toMatchObject({
-      ok: false,
-      error: { code: 'FORBIDDEN' },
-    })
-  })
-})
-
-describe('엑셀 일괄 업로드 (0071)', () => {
-  // 엑셀 한 줄 (행 번호는 머리글 다음부터)
-  const row = (rowNo: number, values: Record<string, string>) => ({
-    rowNo,
-    values: { centerCode: 'icn', warehouseCode: 'a', ...values },
-  })
-
-  it('미리보기는 저장하지 않고, 등록하면 명칭(비우면 코드)·구역·열·단·비고를 저장, 이미 있는 코드는 건너뛴다', async () => {
-    await createLocationAction({ warehouseId: String(icnWarehouseId), code: 'DOCK-01' })
-    const rows = [
-      row(2, { code: 'f1-rack-07', name: '냉동실 입구 옆', zone: 'f', aisle: '07', level: '3' }),
-      row(3, { code: 'DOCK-01' }),
-      row(4, { code: 'DOCK-02', remark: '2번 도크' }),
-    ]
-
-    const preview = await validateLocationUploadAction(rows)
-    expect(preview).toMatchObject({
-      ok: true,
-      data: { errorCount: 0, summary: expect.stringContaining('새로 2개') },
-    })
-    expect(await codesOf(icnWarehouseId)).toEqual(['DOCK-01'])
-
-    expect(await commitLocationUploadAction(rows)).toMatchObject({
-      ok: true,
-      data: { created: 2, skipped: 1 },
-    })
-    const saved = await prisma.location.findMany({
-      where: { warehouseId: icnWarehouseId },
-      orderBy: { code: 'asc' },
-      select: { code: true, name: true, zone: true, aisle: true, level: true, remark: true },
-    })
-    expect(saved).toEqual([
-      { code: 'DOCK-01', name: 'DOCK-01', zone: null, aisle: null, level: null, remark: null },
-      {
-        code: 'DOCK-02',
-        name: 'DOCK-02',
-        zone: null,
-        aisle: null,
-        level: null,
-        remark: '2번 도크',
-      },
-      {
-        code: 'F1-RACK-07',
-        name: '냉동실 입구 옆',
-        zone: 'F',
-        aisle: '07',
-        level: '3',
-        remark: null,
-      },
-    ])
-  })
-
-  it('줄마다 오류: 없는 센터·창고, 입고대기 창고, 코드·구역·열·단 규칙, 파일 안 중복 → 하나라도 있으면 등록 거부', async () => {
-    const rows = [
-      row(2, { centerCode: 'XXX', code: 'A-1' }),
-      row(3, { warehouseCode: 'NOPE', code: 'A-1' }),
-      row(4, { warehouseCode: 'INBOUND', code: 'A-1' }),
-      row(5, { code: '가-01' }),
-      row(6, { code: 'B-1', zone: 'A1', aisle: 'x', level: '1234' }),
-      row(7, { code: 'C-1' }),
-      row(8, { code: 'c-1' }),
-      row(9, { code: '' }),
-    ]
-    const preview = await validateLocationUploadAction(rows)
-    if (!preview.ok) throw new Error(preview.error.message)
-    const errorsOf = (rowNo: number) =>
-      preview.data.rows.find((r) => r.rowNo === rowNo)?.errors.join(' / ') ?? ''
-    expect(errorsOf(2)).toContain('센터')
-    expect(errorsOf(3)).toContain('없는 창고')
-    expect(errorsOf(4)).toContain('대기 창고')
-    expect(errorsOf(5)).toContain('영문·숫자·하이픈')
-    expect(errorsOf(6)).toMatch(/구역.*열.*단/)
-    expect(errorsOf(7)).toBe('')
-    expect(errorsOf(8)).toContain('같은 창고·같은 코드')
-    expect(errorsOf(9)).not.toBe('')
-
-    expect(await commitLocationUploadAction(rows)).toMatchObject({
       ok: false,
       error: { code: 'VALIDATION' },
     })
-    expect(await codesOf(icnWarehouseId)).toEqual([])
+    expect(
+      await previewBulkLocationsAction(
+        bulk({ row: { from: 1, to: 100, digits: 3 }, level: { from: 1, to: 60, digits: 2 } }),
+      ),
+    ).toMatchObject({ ok: false, error: { code: 'VALIDATION' } })
+    // 단 범위가 있는데 패턴에 {LEVEL}이 없으면 코드가 겹친다
+    expect(await previewBulkLocationsAction(bulk({ pattern: '{ZONE}-{ROW}' }))).toMatchObject({
+      ok: false,
+      error: { code: 'VALIDATION' },
+    })
+  })
+})
+
+describe('사용 중지 · 삭제 · 되살리기', () => {
+  it('재고가 있으면 사용 중지 불가, 재고 기록이 있으면 삭제 불가, 시스템 기본 로케이션은 둘 다 불가', async () => {
+    await stockUp()
+    expect(await setLocationsActiveAction({ ids: ids([f.a01]), isActive: false })).toMatchObject({
+      ok: false,
+      error: { code: 'CONFLICT', message: expect.stringContaining('재고') },
+    })
+    expect(await setLocationsActiveAction({ ids: ids([f.a02]), isActive: false })).toEqual({
+      ok: true,
+      data: { updated: 1 },
+    })
+    expect(await deleteLocationsAction({ ids: ids([f.a01]) })).toMatchObject({
+      ok: false,
+      error: { code: 'CONFLICT' },
+    })
+    expect(
+      await setLocationsActiveAction({ ids: ids([f.icnStaging]), isActive: false }),
+    ).toMatchObject({
+      ok: false,
+      error: { code: 'CONFLICT', message: expect.stringContaining('시스템 기본') },
+    })
+    expect(await deleteLocationsAction({ ids: ids([f.icnStaging]) })).toMatchObject({
+      ok: false,
+      error: { code: 'CONFLICT' },
+    })
+
+    expect(await deleteLocationsAction({ ids: ids([f.a02]) })).toEqual({
+      ok: true,
+      data: { deleted: 1 },
+    })
+    expect(await restoreLocationsAction({ ids: ids([f.a02]) })).toEqual({
+      ok: true,
+      data: { count: 1 },
+    })
+  })
+})
+
+describe('목록', () => {
+  const codes = async (filters: Record<string, string>) => {
+    const result = await listLocationsAction({ ...createDataGridState(), filters })
+    return result.ok ? result.data.rows.map((r) => r.code) : result.error
+  }
+
+  beforeEach(async () => {
+    await bulkCreateLocationsAction(
+      bulk({ row: { from: 1, to: 3, digits: 2 }, level: { from: 1, to: 2, digits: 2 } }),
+    )
   })
 
-  it('데이터 범위: 센터 직원은 소속 센터 창고에만 올릴 수 있다', async () => {
-    signIn({ kind: 'CENTERS', operatorId: TEST_OPERATOR_ID, centerIds: [gmhId] })
-    const preview = await validateLocationUploadAction([row(2, { code: 'A-1' })])
-    expect(preview.ok && preview.data.errorCount).toBe(1)
+  it('코드 앞부분·범위, 구역, 재고 유무로 거른다', async () => {
+    const gen_ = { warehouse: String(gen) }
+    // 준비 데이터의 A-02(구역 없음)도 'A-02'로 시작한다 (구역 있는 것 먼저)
+    expect(await codes({ ...gen_, code: 'a-02' })).toEqual(['A-02-01', 'A-02-02', 'A-02'])
+    expect(await codes({ ...gen_, codeRange: 'A-01-02~A-02' })).toEqual([
+      'A-01-02',
+      'A-02-01',
+      'A-02-02',
+      'A-02',
+    ])
+    expect(await codes({ ...gen_, zone: String(zoneA), row: '03' })).toEqual(['A-03-01', 'A-03-02'])
+    await stockUp()
+    expect(await codes({ ...gen_, stock: 'HAS' })).toEqual(['A-01'])
+    expect((await codes({ ...gen_, stock: 'EMPTY' })) as string[]).toHaveLength(7)
+  })
+
+  it('줄: 기본 배지·구역·출고 할당 적용값(창고 값 상속)·재고 여부, 기본 순서 = 구역 정렬 → 코드', async () => {
+    await prisma.warehouse.update({ where: { id: gen }, data: { allocatableYn: 'N' } })
+    const result = await listLocationsAction({
+      ...createDataGridState(),
+      filters: { warehouse: String(gen) },
+    })
+    if (!result.ok) throw new Error(result.error.message)
+    // 구역 없는 A-01·A-02가 마지막 (구역 정렬이 비어 있음)
+    expect(result.data.rows.map((r) => r.code).slice(0, 2)).toEqual(['A-01-01', 'A-01-02'])
+    expect(result.data.rows[0]).toMatchObject({
+      zone: 'A',
+      isSystem: false,
+      allocatable: false,
+      hasStock: false,
+      rowNo: '01',
+    })
+  })
+
+  it('센터 직원: 소속 센터 로케이션만, 다른 센터 로케이션은 고칠 수 없다', async () => {
+    signIn({ kind: 'CENTERS', operatorId: TEST_OPERATOR_ID, centerIds: [f.gmh] })
+    const result = await listLocationsAction(createDataGridState())
+    expect(result.ok && result.data.rows.every((r) => r.center.includes('김해'))).toBe(true)
+    expect(await setLocationsActiveAction({ ids: ids([f.a01]), isActive: false })).toMatchObject({
+      ok: false,
+      error: { code: 'NOT_FOUND' },
+    })
+    expect(await createLocationAction(input())).toMatchObject({
+      ok: false,
+      error: { code: 'NOT_FOUND' },
+    })
+  })
+})
+
+describe('사용 가능 판단 (isLocationUsable)', () => {
+  it('위 단계 사용 중지·잠금·운영 속성(창고 값 상속)을 따진다', async () => {
+    expect(await isLocationUsable(f.a01, 'PUTAWAY')).toEqual({ usable: true, reason: null })
+    await prisma.location.update({ where: { id: f.a01 }, data: { outboundYn: 'N' } })
+    expect(await isLocationUsable(f.a01, 'PICK')).toMatchObject({
+      usable: false,
+      reason: expect.stringContaining('피킹'),
+    })
+    // 입고대기 창고 DEFAULT: 창고 값이 출고 할당 불가
+    expect(await isLocationUsable(f.icnStaging, 'ALLOCATE')).toMatchObject({ usable: false })
+    await prisma.location.update({
+      where: { id: f.a02 },
+      data: { lockYn: 'Y', lockReason: 'COUNT' },
+    })
+    expect(await isLocationUsable(f.a02, 'PUTAWAY')).toMatchObject({
+      reason: expect.stringContaining('잠긴'),
+    })
+    await prisma.warehouse.update({ where: { id: gen }, data: { status: 'INACTIVE' } })
+    expect(await isLocationUsable(f.a01, 'PUTAWAY')).toMatchObject({
+      reason: '사용 중지된 창고입니다.',
+    })
+  })
+})
+
+describe('엑셀 업로드', () => {
+  const row = (rowNo: number, values: Record<string, string>) => ({
+    rowNo,
+    values: { centerCode: 'icn', warehouseCode: 'gen', ...values },
+  })
+
+  it('설명·구역(그 창고의 구역코드)·열·단으로 만들고, 없는 구역은 오류', async () => {
+    const rows = [
+      row(2, { code: 'f1-07', description: '냉동실 입구 옆', zone: 'a', row: '07', level: '3' }),
+      row(3, { code: 'DOCK-01' }),
+    ]
+    expect(await validateLocationUploadAction(rows)).toMatchObject({
+      ok: true,
+      data: { errorCount: 0 },
+    })
+    expect(await commitLocationUploadAction(rows)).toMatchObject({ ok: true, data: { created: 2 } })
+    expect(await prisma.location.findFirstOrThrow({ where: { code: 'F1-07' } })).toMatchObject({
+      description: '냉동실 입구 옆',
+      zoneId: zoneA,
+      rowNo: '07',
+      levelNo: '3',
+      centerId: f.icn,
+    })
+
+    const bad = await validateLocationUploadAction([row(2, { code: 'X-1', zone: 'Q' })])
+    if (!bad.ok) throw new Error(bad.error.message)
+    expect(bad.data.rows[0].errors.join(' ')).toContain('없는 구역')
+    expect(await codesOf(gen)).toContain('DOCK-01')
   })
 })
