@@ -107,6 +107,75 @@ describe('runNormalize', () => {
     expect(r.candidates).toHaveLength(2)
   })
 
+  it('여러 건 중 검색어와 정확히 같은 주소가 하나뿐이면 A (API의 부분 일치 결과는 버림)', async () => {
+    // 실제 API: '용봉로 77' → 용봉로 77 + 용봉로138번길 77
+    const yongbong = hit('61186', '1230010700', '전남광주통합특별시 북구 용봉로 77')
+    const r = await runNormalize(
+      { address: '광주광역시 북구 용봉로 77' },
+      deps(
+        searcher({
+          '광주광역시 북구 용봉로 77': ok(
+            yongbong,
+            hit('61217', '1230010100', '전남광주통합특별시 북구 용봉로138번길 77'),
+          ),
+        }),
+      ),
+    )
+    expect(r).toMatchObject({ grade: 'A', method: 'API_EXACT', zipCode: '61186' })
+  })
+
+  it('지번 주소도 정확히 같은 1건이면 A (지번 뒤 건물명은 무시), 같은 주소가 둘이면 정하지 않는다', async () => {
+    const withJibun = (zip: string, bjd: string, jibun: string) => ({
+      ...hit(zip, bjd),
+      jibunAddress: jibun,
+    })
+    const jibun = await runNormalize(
+      { address: '서울 강남구 역삼동 737' },
+      deps(
+        searcher({
+          '서울 강남구 역삼동 737': ok(
+            withJibun('06236', '1168010100', '서울특별시 강남구 역삼동 737 강남파이낸스센터'),
+            withJibun('06234', '1168010100', '서울특별시 강남구 역삼동 737-1'),
+          ),
+        }),
+      ),
+    )
+    expect(jibun).toMatchObject({ grade: 'A', zipCode: '06236' })
+
+    // 다른 시의 같은 도로명·번호 → 고르지 않고 후보로
+    const twice = await runNormalize(
+      { address: '중앙로 10' },
+      deps(
+        searcher({
+          '중앙로 10': ok(
+            hit('16613', '4111312900', '경기도 수원시 권선구 중앙로 10'),
+            hit('06236', '1168010100', '서울특별시 강남구 중앙로 10'),
+          ),
+        }),
+      ),
+    )
+    expect(twice.grade).not.toBe('A')
+    expect(twice.candidates).toHaveLength(2)
+
+    // 받은 후보가 전체가 아니면(다음 쪽이 있으면) 정하지 않는다
+    const partial = await runNormalize(
+      { address: '광주광역시 북구 용봉로 77' },
+      deps(
+        searcher({
+          '광주광역시 북구 용봉로 77': {
+            status: 'OK',
+            total: 30,
+            hits: [
+              hit('61186', '1230010700', '전남광주통합특별시 북구 용봉로 77'),
+              hit('61217', '1230010100'),
+            ],
+          },
+        }),
+      ),
+    )
+    expect(partial.grade).not.toBe('A')
+  })
+
   it('④ 검색이 안 되면 글자 해석으로 법정동 C, ⑤ 시군구까지만 D', async () => {
     const s = searcher({})
     expect(

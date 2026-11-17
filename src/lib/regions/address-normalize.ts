@@ -78,6 +78,24 @@ const fromHit = (hit: AddressHit) => ({
 const same = (values: string[]) =>
   values.length && values.every((v) => v === values[0]) ? values[0] : null
 
+// 검색어 끝의 '도로명 + 건물번호'(용봉로 77) 또는 '동·리 + 번지'(역삼동 737, 이치리 산 12)
+const ADDRESS_TAIL = /([가-힣A-Za-z0-9·]+(?:로|길|동|가|리))\s*((?:산\s*)?\d+(?:-\d+)?)$/
+
+// 여러 건 중 검색어 끝과 '정확히' 같은 주소가 하나뿐이면 그 건
+// API는 부분 일치도 함께 준다: '용봉로 77' → 용봉로 77 + 용봉로138번길 77
+// 같은 이름이 두 곳 이상이면(다른 시의 중앙로 10) 정하지 않는다
+export function exactHit(keyword: string, hits: AddressHit[]): AddressHit | null {
+  const tail = ADDRESS_TAIL.exec(keyword.trim())
+  if (!tail) return null
+  const name = tail[1]
+  const number = tail[2].replace(/\s+/g, ' ')
+  const escape = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+  // 앞은 띄어쓰기·처음, 뒤는 띄어쓰기·끝 (지번 주소 뒤에는 건물명이 붙을 수 있다)
+  const pattern = new RegExp(`(^|\\s)${escape(name)}\\s+${escape(number)}(\\s|$)`)
+  const matched = hits.filter((h) => pattern.test(h.roadAddress) || pattern.test(h.jibunAddress))
+  return matched.length === 1 ? matched[0] : null
+}
+
 export async function runNormalize(input: AddressInput, deps: NormalizeDeps): Promise<NormResult> {
   const base = empty(input)
   const { zip5 } = cleanZip(input.zipCode)
@@ -106,6 +124,10 @@ export async function runNormalize(input: AddressInput, deps: NormalizeDeps): Pr
     if (result.hits.length === 1 && result.total === 1) {
       return done({ ...base, ...fromHit(result.hits[0]), grade: 'A', method: search.method })
     }
+    // 여러 건이라도 받은 후보가 전체이고, 검색어와 정확히 같은 주소가 하나뿐이면 A
+    const complete = result.total <= result.hits.length
+    const exact = complete && result.hits.length > 1 ? exactHit(search.keyword, result.hits) : null
+    if (exact) return done({ ...base, ...fromHit(exact), grade: 'A', method: search.method })
     // 여러 건: 정리 후 검색 결과를 더 믿는다 (나중 것이 앞 것을 덮음)
     if (result.hits.length > 1) {
       multi = result.hits
