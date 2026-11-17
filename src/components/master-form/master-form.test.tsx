@@ -285,3 +285,73 @@ describe('MasterFormPage 따로 처리하는 섹션 · 저장 후 동작', () =>
     expect(refresh).not.toHaveBeenCalled()
   })
 })
+
+describe('등록 화면: 저장 후 [계속 등록]', () => {
+  function CreateHarness({ save }: { save: () => Promise<{ ok: true; data: { id: string } }> }) {
+    const form = useMasterForm({
+      initial: { name: '', phone: '', email: 'a@b.c' },
+      schema,
+      save,
+      createdHref: (created) => `/admin/test/${created.id}`,
+    })
+    return (
+      <MasterFormPage
+        header={{ title: '견본 등록' }}
+        form={form}
+        sections={[
+          {
+            id: 'basic',
+            title: '기본 정보',
+            content: (
+              <input
+                aria-label="이름"
+                value={form.value.name}
+                onChange={(e) => form.set({ name: e.target.value })}
+              />
+            ),
+          },
+        ]}
+      />
+    )
+  }
+
+  it('등록하면 머물며 칸을 잠그고 [등록한 항목 보기]·[계속 등록], [계속 등록]은 빈 양식 + 첫 칸 초점', async () => {
+    window.scrollTo = vi.fn()
+    const save = vi
+      .fn()
+      .mockResolvedValueOnce({ ok: true, data: { id: '7' } })
+      .mockResolvedValueOnce({ ok: true, data: { id: '8' } })
+    render(<CreateHarness save={save} />)
+    fireEvent.change(screen.getByLabelText('이름'), { target: { value: '첫째' } })
+    await act(async () => fireEvent.click(screen.getByRole('button', { name: '저장' })))
+
+    // 이동하지 않고 그 자리에서: 등록 문구, 방금 넣은 값이 잠긴 채, 저장·취소 대신 두 버튼
+    expect(push).not.toHaveBeenCalled()
+    expect(refresh).not.toHaveBeenCalled()
+    expect(screen.getByRole('status').textContent).toBe('등록했습니다.')
+    const name = screen.getByLabelText('이름') as HTMLInputElement
+    expect(name.value).toBe('첫째')
+    expect(name.closest('fieldset')?.disabled).toBe(true)
+    expect(screen.queryByRole('button', { name: '저장' })).toBeNull()
+    expect(screen.getByRole('link', { name: '등록한 항목 보기' }).getAttribute('href')).toBe(
+      '/admin/test/7',
+    )
+
+    fireEvent.click(screen.getByRole('button', { name: '계속 등록' }))
+    const fresh = screen.getByLabelText('이름') as HTMLInputElement
+    expect(fresh.value).toBe('')
+    expect(fresh.closest('fieldset')?.disabled).toBe(false)
+    await waitFor(() => expect(document.activeElement).toBe(fresh))
+    // 빈 양식이라 변경 없음 → 떠나도 확인 창 없음, [저장]은 꺼짐
+    expect(screen.queryByText('변경사항 있음')).toBeNull()
+    expect(screen.getByRole('button', { name: '저장' })).toHaveProperty('disabled', true)
+
+    // 두 번째 등록도 같은 흐름 (등록 화면은 버전 없이 보낸다)
+    fireEvent.change(fresh, { target: { value: '둘째' } })
+    await act(async () => fireEvent.click(screen.getByRole('button', { name: '저장' })))
+    expect(save.mock.calls[1]).toEqual([{ name: '둘째', phone: '', email: 'a@b.c' }, null])
+    expect(screen.getByRole('link', { name: '등록한 항목 보기' }).getAttribute('href')).toBe(
+      '/admin/test/8',
+    )
+  })
+})

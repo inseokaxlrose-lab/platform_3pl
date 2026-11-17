@@ -1,6 +1,7 @@
 'use client'
 
-import { RotateCcwIcon, SaveIcon } from 'lucide-react'
+import { ArrowRightIcon, PlusIcon, RotateCcwIcon, SaveIcon } from 'lucide-react'
+import Link from 'next/link'
 import { useEffect, useId, useRef, useState } from 'react'
 import { AppPage } from '@/components/app-page'
 import { StatusBadge } from '@/components/common'
@@ -118,35 +119,69 @@ export function MasterFormPage({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [form.submitCount, form.errors])
 
-  // 헤더 오른쪽 저장 영역: 결과 문구 또는 "변경사항 있음" · [취소] · [저장](주 버튼, 맨 오른쪽)
-  const saveControls = editable && (
+  // [계속 등록] 뒤: 맨 위로 올리고 첫 입력 칸에 초점 (입력 칸은 key로 새로 그려져 비어 있다)
+  useEffect(() => {
+    if (form.resetCount === 0) return
+    window.scrollTo({ top: 0 })
+    formRef.current
+      ?.querySelector<HTMLElement>(
+        'input:not([type="hidden"]):not([disabled]), textarea:not([disabled]), [role="combobox"]:not([disabled])',
+      )
+      ?.focus()
+  }, [form.resetCount])
+
+  // 등록을 마친 상태: 결과 문구 · [등록한 항목 보기] · [계속 등록](주 버튼)
+  const createdControls = editable && form.created && (
     <>
-      {form.message ? (
-        <p
-          role={form.message.ok ? 'status' : 'alert'}
-          className={cn('text-sm', form.message.ok ? 'text-success' : 'text-destructive')}
-        >
+      {form.message && (
+        <p role="status" className="text-sm text-success">
           {form.message.text}
         </p>
-      ) : (
-        form.dirty && <StatusBadge tone="warning">변경사항 있음</StatusBadge>
       )}
-      <Button
-        type="button"
-        variant="outline"
-        disabled={!form.dirty || form.pending}
-        onClick={form.cancel}
-      >
-        <RotateCcwIcon />
-        취소
+      <Button asChild variant="outline">
+        <Link href={form.created.href}>
+          <ArrowRightIcon />
+          등록한 항목 보기
+        </Link>
       </Button>
-      {/* 헤더는 폼 밖에 있어서 form 속성으로 폼과 잇는다 */}
-      <Button type="submit" form={formId} disabled={!form.dirty || form.pending}>
-        <SaveIcon />
-        {form.pending ? '저장 중…' : '저장'}
+      <Button type="button" onClick={form.startNext}>
+        <PlusIcon />
+        계속 등록
       </Button>
     </>
   )
+
+  // 헤더 오른쪽 저장 영역: 결과 문구 또는 "변경사항 있음" · [취소] · [저장](주 버튼, 맨 오른쪽)
+  const saveControls =
+    createdControls ||
+    (editable && (
+      <>
+        {form.message ? (
+          <p
+            role={form.message.ok ? 'status' : 'alert'}
+            className={cn('text-sm', form.message.ok ? 'text-success' : 'text-destructive')}
+          >
+            {form.message.text}
+          </p>
+        ) : (
+          form.dirty && <StatusBadge tone="warning">변경사항 있음</StatusBadge>
+        )}
+        <Button
+          type="button"
+          variant="outline"
+          disabled={!form.dirty || form.pending}
+          onClick={form.cancel}
+        >
+          <RotateCcwIcon />
+          취소
+        </Button>
+        {/* 헤더는 폼 밖에 있어서 form 속성으로 폼과 잇는다 */}
+        <Button type="submit" form={formId} disabled={!form.dirty || form.pending}>
+          <SaveIcon />
+          {form.pending ? '저장 중…' : '저장'}
+        </Button>
+      </>
+    ))
 
   const toc = (
     <nav aria-label="섹션 목차" className="sticky" style={{ top: BELOW_HEADER }}>
@@ -198,7 +233,10 @@ export function MasterFormPage({
       aside={toc}
     >
       <form id={formId} ref={formRef} onSubmit={form.submit} noValidate>
-        {formSections.map((section, index) => renderSection(section, index))}
+        {/* 등록을 마치면 입력 칸을 잠근다(방금 등록한 값 확인용). [계속 등록]마다 key가 바뀌어 칸을 새로 그린다 */}
+        <fieldset key={form.resetCount} disabled={form.created !== null} className="contents">
+          {formSections.map((section, index) => renderSection(section, index))}
+        </fieldset>
       </form>
       {standaloneSections.map((section, index) =>
         renderSection(section, formSections.length + index),
