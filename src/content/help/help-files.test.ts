@@ -1,8 +1,9 @@
-import { readdirSync, readFileSync } from 'node:fs'
+import { existsSync, readdirSync, readFileSync } from 'node:fs'
 import { join, relative } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import { navigation } from '@/config/navigation'
 import { isPermissionCode } from '@/config/permissions'
+import { darkImageOf, helpImageSources, isHelpImage } from '@/lib/help/help-images'
 import { findMenu, HELP_DIR, helpFilePath } from '@/lib/help/load-help'
 import { parseHelpDocument } from '@/lib/help/parse-help'
 
@@ -20,7 +21,8 @@ const helpFiles = readdirSync(HELP_DIR, { recursive: true, withFileTypes: true }
   .map((entry) => {
     const path = join(entry.parentPath, entry.name)
     const href = `/${relative(HELP_DIR, path).replace(/\\/g, '/').replace(/\.md$/, '')}`
-    return { href, document: parseHelpDocument(readFileSync(path, 'utf8')) }
+    const raw = readFileSync(path, 'utf8')
+    return { href, raw, document: parseHelpDocument(raw) }
   })
 
 // 'system.users.read' → 'system.users'
@@ -52,6 +54,22 @@ describe('화면 도움말 파일', () => {
         if (!permission) continue
         expect(isPermissionCode(permission), `없는 권한 코드: ${permission}`).toBe(true)
         expect(menuOfCode(permission), `다른 메뉴의 권한: ${permission}`).toBe(ownMenu)
+      }
+    },
+  )
+
+  it.each(helpFiles.map((file) => [file.href, file] as const))(
+    '%s: 화면 사진은 자기 메뉴 폴더(public/help/…)에 라이트·다크 두 장이 있다 (0077)',
+    (href, { raw }) => {
+      for (const src of helpImageSources(raw)) {
+        expect(isHelpImage(src), `/help/ 아래 .png만 씁니다: ${src}`).toBe(true)
+        expect(src.startsWith(`/help${href}/`), `다른 메뉴 폴더의 사진: ${src}`).toBe(true)
+        for (const file of [src, darkImageOf(src)]) {
+          expect(
+            existsSync(join(process.cwd(), 'public', file)),
+            `사진 없음: public${file} (npm run help:shots)`,
+          ).toBe(true)
+        }
       }
     },
   )

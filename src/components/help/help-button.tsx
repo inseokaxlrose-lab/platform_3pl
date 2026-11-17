@@ -69,7 +69,7 @@ export function HelpButton() {
           도움말
         </Button>
       </SheetTrigger>
-      <SheetContent className="w-full gap-0 sm:max-w-md">
+      <SheetContent className="gap-0 data-[side=right]:w-full data-[side=right]:sm:max-w-xl">
         <SheetHeader className="border-b">
           <SheetTitle>도움말: {title}</SheetTitle>
           <SheetDescription>{summary ?? '이 화면의 사용 방법입니다.'}</SheetDescription>

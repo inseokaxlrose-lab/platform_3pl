@@ -12,6 +12,8 @@ const port = 3100
 
 export default defineConfig({
   testDir: './e2e',
+  // 도움말 사진 촬영(help-shots)은 npm run help:shots 때만 (0077)
+  testIgnore: process.env.HELP_SHOTS ? [] : ['**/help-shots.spec.ts'],
   // 한 흐름이 앞 단계의 결과를 이어 쓰므로 차례대로
   fullyParallel: false,
   workers: 1,
