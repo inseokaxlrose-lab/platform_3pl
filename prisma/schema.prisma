@@ -65,6 +65,8 @@ model User {
   prefs               UserPref[]
   // 사이드바 즐겨찾기 메뉴
   favoriteMenus       UserFavoriteMenu[]
+  // 관리 담당 창고 (0074)
+  managedWarehouses   Warehouse[]
 
   @@unique([email])
   @@unique([username])
@@ -339,9 +341,9 @@ model CenterContact {
   updatedBy    String   @default("system") @map("updated_by") @db.VarChar(50)
   center       Center   @relation(fields: [centerId], references: [id], onDelete: Cascade)
 
-  @@index([centerId, sortOrder])
   // 센터당 대표 1명
   @@unique([centerId], where: raw("primary_yn = 'Y'"), map: "tb_center_contact_primary_key")
+  @@index([centerId, sortOrder])
   @@map("tb_center_contact")
 }
 
@@ -363,94 +365,119 @@ model CenterTempZone {
   @@map("tb_center_temp_zone")
 }
 
-// 창고 보관 조건 (docs/decisions/0027): 냉장 물건을 상온 창고에 적치하는 실수를 나중에 경고하는 데 쓴다
-enum StorageCondition {
-  // 상온
-  AMBIENT
-  // 냉장
-  CHILLED
-  // 냉동
-  FROZEN
-}
-
-enum WarehouseType {
-  // 일반 보관 창고
-  GENERAL
-  // 입고대기 창고: 입고 확정 후 적치 전까지 재고가 머무는 곳 (센터마다 1개, 센터 등록 시 자동 생성)
-  INBOUND_STAGING
-  // 출고대기 창고: 피킹·검수 후 출고 전까지 (센터마다 1개, 0073)
-  OUTBOUND_STAGING
-  // 반품대기 창고: 반품 입고 후 판정 전까지 (센터마다 1개, 0073)
-  RETURN_STAGING
-}
-
-// 창고: 센터 안의 보관 구역 (관리 화면은 "센터별 창고 관리" 작업에서)
+// 창고: 센터 안에서 용도와 재고 성격이 같은 공간의 묶음 (docs/decisions/0027, 0074, docs/db-conventions.md)
+// 유형(WAREHOUSE_TYPE)·온도대(TEMP_ZONE)·상태·기본 재고상태는 플랫폼 상수 + DB 검사 조건 (src/config/operator-codes.ts)
 model Warehouse {
-  id               BigInt           @id @default(autoincrement()) @map("warehouse_id")
+  id                 BigInt     @id @default(autoincrement()) @map("warehouse_id")
   // 운영사 (멀티테넌트: 같은 운영사 사람만 보고 고친다, docs/decisions/0039)
-  operatorId       BigInt           @map("operator_id")
-  operator         Operator         @relation(fields: [operatorId], references: [id], onDelete: Restrict)
-  centerId         BigInt           @map("center_id")
+  operatorId         BigInt     @map("operator_id")
+  operator           Operator   @relation(fields: [operatorId], references: [id], onDelete: Restrict)
+  // 등록 후 바꿀 수 없다
+  centerId           BigInt     @map("center_id")
   // 시스템 코드: WH000001
-  systemCode       String           @unique @map("sys_cd")
-  // 사용자 코드: 같은 센터 안에서 중복 금지
-  code             String           @map("warehouse_cd")
-  name             String           @map("warehouse_nm")
-  type             WarehouseType    @default(GENERAL) @map("warehouse_type_cd")
-  storageCondition StorageCondition @default(AMBIENT) @map("temp_zone_cd")
-  status           String           @default("ACTIVE") @map("status_cd") @db.VarChar(10)
-  createdAt        DateTime         @default(now()) @map("created_at")
-  updatedAt        DateTime         @updatedAt @map("updated_at")
+  systemCode         String     @unique @map("sys_cd")
+  // 창고코드: 필수, 같은 센터 안에서 중복 금지, 등록 후 수정 불가 (영문 대문자·숫자·밑줄)
+  code               String     @map("warehouse_cd") @db.VarChar(20)
+  name               String     @map("warehouse_nm") @db.VarChar(100)
+  // ① 기본 정보 [1차]
+  type               String     @default("STORAGE") @map("warehouse_type_cd") @db.VarChar(20)
+  // 센터 취급 온도대(tb_center_temp_zone) 중 하나
+  tempZone           String     @map("temp_zone_cd") @db.VarChar(20)
+  status             String     @default("ACTIVE") @map("status_cd") @db.VarChar(20)
+  // 시스템 기본 창고 (센터 등록 때 자동 생성되는 입고·출고·반품 대기): 삭제·코드·유형·명칭 변경·사용 중지 불가
+  systemYn           String     @default("N") @map("system_yn") @db.Char(1)
+  description        String?    @db.VarChar(200)
+  sortOrder          Int        @default(10) @map("sort_seq")
+  // ② 위치·시설 [1차: 동·층·면적 / 2차: 나머지]
+  buildingName       String?    @map("building_nm") @db.VarChar(50)
+  floorNo            String?    @map("floor_no") @db.VarChar(10)
+  areaM2             Decimal?   @map("area_m2") @db.Decimal(12, 2)
+  ceilingHeightM     Decimal?   @map("ceiling_height_m") @db.Decimal(5, 2)
+  palletCapacity     Int?       @map("pallet_capa_cnt")
+  // 보관 방식: 운영사 공통코드 STORAGE_METHOD
+  storageMethod      String?    @map("storage_method_cd") @db.VarChar(20)
+  // 센터가 보세·위험물 자격이 있을 때만 Y
+  bondedYn           String     @default("N") @map("bonded_yn") @db.Char(1)
+  hazmatYn           String     @default("N") @map("hazmat_yn") @db.Char(1)
+  // ③ 운영 속성 [1차]: 유형을 고르면 유형별 기본값(WAREHOUSE_TYPE_DEFAULTS)으로 채우고 고칠 수 있다
+  inboundYn          String     @default("Y") @map("inbound_yn") @db.Char(1)
+  outboundYn         String     @default("Y") @map("outbound_yn") @db.Char(1)
+  // 이 창고 재고를 주문에 할당할 수 있는지 (가용재고 포함 여부)
+  allocatableYn      String     @default("Y") @map("allocatable_yn") @db.Char(1)
+  // 이 창고에 적치될 때 기본 재고상태 (STOCK_STATUS)
+  defaultStockStatus String     @default("NORMAL") @map("default_stock_status_cd") @db.VarChar(20)
+  // 여러 창고에 재고가 있을 때 작은 값 먼저 (1~999)
+  allocPriority      Int        @default(100) @map("alloc_priority")
+  // 로케이션을 정하지 않고 적치할 때 쓰는 곳 (시스템 기본 창고는 DEFAULT 로케이션)
+  defaultLocId       BigInt?    @map("default_loc_id")
+  defaultLocation    Location?  @relation("WarehouseDefaultLocation", fields: [defaultLocId], references: [id], onDelete: Restrict)
+  // ④ 관리·담당 [2차]
+  managerUserId      BigInt?    @map("manager_user_id")
+  managerUser        User?      @relation(fields: [managerUserId], references: [id], onDelete: SetNull)
+  // 전용 화주사 (NULL = 공용 창고)
+  dedicatedShipperId BigInt?    @map("dedicated_shipper_id")
+  dedicatedShipper   Shipper?   @relation(fields: [dedicatedShipperId], references: [id], onDelete: Restrict)
+  // 로케이션 일괄 생성 때 쓰는 접두어·구분자 (구분자가 없으면 '-')
+  locCodePrefix      String?    @map("loc_cd_prefix") @db.VarChar(10)
+  locCodeSeparator   String?    @map("loc_cd_separator") @db.Char(1)
+  // ⑤ 확장
+  remark             String?    @db.VarChar(1000)
+  extAttr            Json?      @map("ext_attr")
+  createdAt          DateTime   @default(now()) @map("created_at")
+  updatedAt          DateTime   @updatedAt @map("updated_at")
   // 등록·수정한 사람 아이디(username, 자동: 현재 작업자 / 시드 seed / 기존 데이터 system), 동시 수정 막기용 버전 (docs/db-conventions.md 공통 칸)
-  createdBy        String           @default("system") @map("created_by") @db.VarChar(50)
-  updatedBy        String           @default("system") @map("updated_by") @db.VarChar(50)
-  rowVersion       Int              @default(1) @map("row_version")
-  center           Center           @relation(fields: [centerId], references: [id], onDelete: Restrict)
-  locations        Location[]
-  stocks           Stock[]
+  createdBy          String     @default("system") @map("created_by") @db.VarChar(50)
+  updatedBy          String     @default("system") @map("updated_by") @db.VarChar(50)
+  rowVersion         Int        @default(1) @map("row_version")
+  center             Center     @relation(fields: [centerId], references: [id], onDelete: Restrict)
+  locations          Location[]
+  stocks             Stock[]
 
   // 코드는 삭제 안 된 것끼리만 겹치면 안 된다 (지운 코드는 다시 쓸 수 있다, 0038)
   // 논리 삭제: 'Y'면 지운 것 (목록·조회에서 빠지고 되살릴 수 있다, 0038)
   delYn String @default("N") @map("del_yn") @db.Char(1)
 
   @@unique([centerId, code], where: raw("del_yn = 'N'"), map: "tb_warehouse_center_id_warehouse_cd_key")
-  // 센터마다 대기 창고(입고·출고·반품)는 유형별로 1개 (부분 고유 인덱스, 0073)
-  @@unique([centerId, type], where: raw("warehouse_type_cd <> 'GENERAL'::\"WarehouseType\""), map: "tb_warehouse_one_staging_per_center")
+  // 센터마다 시스템 기본 창고는 유형별 1개 (부분 고유 인덱스, 0074)
+  @@unique([centerId, type], where: raw("system_yn = 'Y'"), map: "tb_warehouse_one_system_per_center")
   @@index([centerId])
   @@index([operatorId])
+  @@index([defaultLocId])
   @@map("tb_warehouse")
 }
 
 // 로케이션: 창고 안의 보관 위치. 코드 자체가 위치라 시스템 코드는 없다 (0025)
 // 코드는 등록 후 바꿀 수 없다 (재고·적치 기록이 이 주소를 가리킨다, 0028)
 model Location {
-  id                BigInt    @id @default(autoincrement()) @map("location_id")
+  id                  BigInt      @id @default(autoincrement()) @map("location_id")
   // 운영사 (멀티테넌트: 같은 운영사 사람만 보고 고친다, docs/decisions/0039)
-  operatorId        BigInt    @map("operator_id")
-  operator          Operator  @relation(fields: [operatorId], references: [id], onDelete: Restrict)
-  warehouseId       BigInt    @map("warehouse_id")
+  operatorId          BigInt      @map("operator_id")
+  operator            Operator    @relation(fields: [operatorId], references: [id], onDelete: Restrict)
+  warehouseId         BigInt      @map("warehouse_id")
   // 같은 창고 안에서 중복 금지 (예: A-01-01, DEFAULT)
-  code              String    @map("location_cd")
+  code                String      @map("location_cd")
   // 로케이션 명칭 (한글 가능, 0071): 비우면 코드와 같게 — 일괄 생성·기존 줄도 코드와 같다
-  name              String    @map("location_nm") @db.VarChar(100)
-  remark            String?   @db.VarChar(1000)
+  name                String      @map("location_nm") @db.VarChar(100)
+  remark              String?     @db.VarChar(1000)
   // 일괄 생성으로 만들면 함께 저장: 구역(A) / 열(01) / 단(02) — 구역별 거르기·정렬용 (docs/decisions/0028)
-  zone              String?   @map("zone_cd")
-  aisle             String?   @map("aisle_cd")
-  level             String?   @map("level_cd")
-  status            String    @default("ACTIVE") @map("status_cd") @db.VarChar(10)
-  createdAt         DateTime  @default(now()) @map("created_at")
-  updatedAt         DateTime  @updatedAt @map("updated_at")
+  zone                String?     @map("zone_cd")
+  aisle               String?     @map("aisle_cd")
+  level               String?     @map("level_cd")
+  status              String      @default("ACTIVE") @map("status_cd") @db.VarChar(10)
+  createdAt           DateTime    @default(now()) @map("created_at")
+  updatedAt           DateTime    @updatedAt @map("updated_at")
   // 등록·수정한 사람 아이디(username, 자동: 현재 작업자 / 시드 seed / 기존 데이터 system), 동시 수정 막기용 버전 (docs/db-conventions.md 공통 칸)
-  createdBy         String    @default("system") @map("created_by") @db.VarChar(50)
-  updatedBy         String    @default("system") @map("updated_by") @db.VarChar(50)
-  rowVersion        Int       @default(1) @map("row_version")
-  warehouse         Warehouse @relation(fields: [warehouseId], references: [id], onDelete: Restrict)
-  stocks            Stock[]
+  createdBy           String      @default("system") @map("created_by") @db.VarChar(50)
+  updatedBy           String      @default("system") @map("updated_by") @db.VarChar(50)
+  rowVersion          Int         @default(1) @map("row_version")
+  warehouse           Warehouse   @relation(fields: [warehouseId], references: [id], onDelete: Restrict)
+  stocks              Stock[]
   // 센터 기본 로케이션으로 연결된 곳 (0073)
-  defaultInboundOf  Center[]  @relation("CenterDefaultInbound")
-  defaultOutboundOf Center[]  @relation("CenterDefaultOutbound")
-  defaultReturnOf   Center[]  @relation("CenterDefaultReturn")
+  defaultInboundOf    Center[]    @relation("CenterDefaultInbound")
+  defaultOutboundOf   Center[]    @relation("CenterDefaultOutbound")
+  defaultReturnOf     Center[]    @relation("CenterDefaultReturn")
+  // 창고 기본 로케이션으로 연결된 곳 (0074)
+  defaultOfWarehouses Warehouse[] @relation("WarehouseDefaultLocation")
 
   // 코드는 삭제 안 된 것끼리만 겹치면 안 된다 (지운 코드는 다시 쓸 수 있다, 0038)
   // 논리 삭제: 'Y'면 지운 것 (목록·조회에서 빠지고 되살릴 수 있다, 0038)
@@ -512,7 +539,9 @@ model Shipper {
   asns      Asn[]
 
   // 논리 삭제: 'Y'면 지운 것 (목록·조회에서 빠지고 되살릴 수 있다, 0038)
-  delYn String @default("N") @map("del_yn") @db.Char(1)
+  delYn               String      @default("N") @map("del_yn") @db.Char(1)
+  // 전용 창고 (0074)
+  dedicatedWarehouses Warehouse[]
 
   // 코드는 삭제 안 된 것끼리만 겹치면 안 된다 (지운 것은 다시 쓸 수 있다, 0038)
   @@unique([operatorId, code], where: raw("del_yn = 'N'"), map: "tb_shipper_operator_id_shipper_cd_key")

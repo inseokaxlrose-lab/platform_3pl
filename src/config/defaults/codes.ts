@@ -54,4 +54,16 @@ export const DEFAULT_CODE_GROUPS: readonly DefaultCodeGroup[] = [
       { code: 'TRANSPORT', name: '운송' },
     ],
   },
+  {
+    code: 'STORAGE_METHOD',
+    name: '보관 방식',
+    description: '창고의 주된 보관 방식',
+    items: [
+      { code: 'RACK', name: '랙' },
+      { code: 'FLOOR', name: '평치' },
+      { code: 'SHELF', name: '선반' },
+      { code: 'MEZZANINE', name: '복층' },
+      { code: 'AUTO', name: '자동화 설비' },
+    ],
+  },
 ]

@@ -16,6 +16,9 @@ const CODE_USAGES: Record<string, CountUsage> = {
   // 센터 담당 업무: 센터 담당자 (0073)
   CENTER_CONTACT_ROLE: async (db, operatorId, code) =>
     db.centerContact.count({ where: { center: { operatorId }, duty: code } }),
+  // 보관 방식: 창고 (0074)
+  STORAGE_METHOD: async (db, operatorId, code) =>
+    db.warehouse.count({ where: { operatorId, storageMethod: code } }),
   // 제공 서비스: 운영사 (0040)
   SERVICE_TYPE: async (db, operatorId, code) =>
     db.operatorService.count({ where: { operatorId, serviceCd: code } }),
