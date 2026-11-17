@@ -28,7 +28,7 @@ describe('RegionPicker (담당 지역 고르기)', () => {
   it('시·도 전체를 고르면 그 시·도의 시·군·구는 빠지고 잠긴다', () => {
     render(<Harness initial={['11110', '26']} />)
     fireEvent.click(screen.getByRole('checkbox', { name: '서울특별시 전체' }))
-    expect(value()).toBe('11,26')
+    expect(value()).toBe('26,11')
     const jongno = screen.getByRole('checkbox', { name: '종로구' })
     expect(jongno.getAttribute('data-state')).toBe('checked')
     expect(jongno).toHaveProperty('disabled', true)

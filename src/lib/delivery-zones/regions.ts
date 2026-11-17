@@ -33,9 +33,23 @@ export function overlapsWithin(codes: readonly string[]) {
   return pairs
 }
 
-// 정렬: 법정동코드 순서 (시·도 → 그 시·도의 시·군·구)
+// 가나다순 비교 (한국어 기준)
+const byName = (a: string, b: string) => a.localeCompare(b, 'ko')
+
+// 지역 고르기 화면용 목록: 시·도 가나다순, 한 시·도의 시·군·구 가나다순
+export const SIDO_BY_NAME = [...SIDO_LIST].sort((a, b) => byName(a.name, b.name))
+export const sigungusByName = (sidoCode: string) =>
+  SIGUNGU_LIST.filter((s) => s.sidoCode === sidoCode).sort((a, b) => byName(a.name, b.name))
+
+// 정렬: 시·도 이름 가나다순 → 같은 시·도 안에서는 "전체" 먼저, 그다음 시·군·구 이름 가나다순 (모르는 코드는 맨 뒤)
+const sidoName = (code: string) => sidoByCode.get(code.slice(0, 2))?.name ?? '\uffff'
 export const sortRegions = (codes: readonly string[]) =>
-  [...codes].sort((a, b) => (a < b ? -1 : a > b ? 1 : 0))
+  [...codes].sort(
+    (a, b) =>
+      byName(sidoName(a), sidoName(b)) ||
+      Number(!isWholeSido(a)) - Number(!isWholeSido(b)) ||
+      byName(sigunguByCode.get(a)?.name ?? a, sigunguByCode.get(b)?.name ?? b),
+  )
 
 // 목록 요약: '서울특별시 전체, 경기도 성남시 외 3곳'
 export function summarizeRegions(codes: readonly string[], max = 2) {

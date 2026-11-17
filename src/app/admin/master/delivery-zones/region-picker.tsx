@@ -12,8 +12,14 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { SIDO_LIST, SIGUNGU_LIST } from '@/config/korea-regions'
-import { regionLabel, regionsOverlap, sortRegions } from '@/lib/delivery-zones/regions'
+import { SIDO_LIST } from '@/config/korea-regions'
+import {
+  regionLabel,
+  regionsOverlap,
+  SIDO_BY_NAME,
+  sigungusByName,
+  sortRegions,
+} from '@/lib/delivery-zones/regions'
 import { cn } from '@/lib/utils'
 
 type RegionPickerProps = {
@@ -31,7 +37,7 @@ type RegionPickerProps = {
 // 시·도를 고르면 그 시·군·구 체크 목록. "전체"를 체크하면 그 시·도의 시·군·구는 고를 필요가 없어 잠긴다
 export function RegionPicker({ value, onChange, taken, disabled, invalid, id }: RegionPickerProps) {
   const [sido, setSido] = useState(() => value[0]?.slice(0, 2) ?? SIDO_LIST[0].code)
-  const sigungus = SIGUNGU_LIST.filter((s) => s.sidoCode === sido)
+  const sigungus = sigungusByName(sido)
   const wholeChecked = value.includes(sido)
   // 다른 권역이 이 지역(또는 겹치는 지역)을 담당 중이면 그 권역 이름
   const takenBy = (code: string) =>
@@ -99,7 +105,7 @@ export function RegionPicker({ value, onChange, taken, disabled, invalid, id }: 
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              {SIDO_LIST.map((s) => (
+              {SIDO_BY_NAME.map((s) => (
                 <SelectItem key={s.code} value={s.code}>
                   {s.name}
                   {countIn(s.code) > 0 && (
