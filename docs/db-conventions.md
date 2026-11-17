@@ -266,21 +266,48 @@
 | `remark` / `extAttr` | `remark` / `ext_attr` | VARCHAR(1000) / JSONB | 1차 / 2차 | |
 | 공통 칸 | `created_at`·`updated_at`·`created_by`·`updated_by`·`row_version`·`del_yn` | | | 0038 |
 
-### tb_location ← `location` (코드 모델 `Location`)
+### tb_zone ← 구역 (코드 모델 `Zone`, 0075)
 
-| 코드(그대로) | 지금 DB | 새 DB | 비고 |
+창고 안에서 같은 방식으로 운영되는 로케이션 묶음. 창고 수정 화면의 "구역" 표에서 관리한다.
+
+| 코드 | DB | 형식 | 비고 |
 | --- | --- | --- | --- |
-| `id` | `id` | `location_id` | TEXT(cuid) → BIGINT |
-| `warehouseId` | `warehouseId` | `warehouse_id` | TEXT(cuid) → BIGINT |
-| `code` | `code` | `location_cd` |  |
-| `name` | (0071 추가) | `location_nm` | VARCHAR(100), 필수 — 기존 줄·일괄 생성은 코드와 같게 |
-| `remark` | (0071 추가) | `remark` | VARCHAR(1000), 선택 |
-| `zone` | `zone` | `zone_cd` |  |
-| `aisle` | `aisle` | `aisle_cd` |  |
-| `level` | `level` | `level_cd` |  |
-| `isActive` | `isActive` | `status_cd` | Boolean → status_cd (2단계, ACTIVE/INACTIVE) |
-| `createdAt` | `createdAt` | `created_at` |  |
-| `updatedAt` | `updatedAt` | `updated_at` |  |
+| `id` | `zone_id` | BIGINT | |
+| `operatorId` / `centerId` / `warehouseId` | `operator_id` / `center_id` / `warehouse_id` | BIGINT | 센터는 창고의 센터, 창고는 등록 후 불변 |
+| `code` | `zone_cd` | VARCHAR(10) | 영문 대문자·숫자, 창고 안 고유, 저장 후 불변 (로케이션 코드 앞자리) |
+| `name` | `zone_nm` | VARCHAR(100) | 필수 |
+| `type` | `zone_type_cd` | VARCHAR(20) | 공통코드 `ZONE_TYPE`, 기본 STORAGE |
+| `status` | `status_cd` | VARCHAR(20) | ACTIVE·INACTIVE |
+| `pickSeq` / `sortOrder` | `pick_seq` / `sort_seq` | INT | 피킹 동선 순서 / 정렬순서(기본 10) |
+| `description` / `remark` / `extAttr` | `description` / `remark` / `ext_attr` | VARCHAR(200/1000) / JSONB | |
+| 공통 칸 | `created_at`·`updated_at`·`created_by`·`updated_by`·`row_version`·`del_yn` | | 0038 |
+
+### tb_location ← `location` (코드 모델 `Location`, 0028·0071·0075)
+
+1차 = DB·API·화면, 2차 = DB·API만. 상속 = NULL이면 창고 값 (`resolveLocationOps`·`getEffectiveLocationOps`).
+
+| 코드 | DB | 형식 | 구분 | 비고 |
+| --- | --- | --- | --- | --- |
+| `id` | `location_id` | BIGINT | | |
+| `operatorId` / `centerId` / `warehouseId` | `operator_id` / `center_id` / `warehouse_id` | BIGINT | 1차 | 센터는 창고의 센터(조회·범위용), 창고 불변 |
+| `zoneId` | `zone_id` | BIGINT → `tb_zone` | 1차 | 같은 창고의 구역, 시스템 기본 로케이션 등은 NULL |
+| `code` | `location_cd` | VARCHAR(30) **COLLATE "C"** | 1차 | 영문 대문자·숫자·하이픈, **창고 안 고유**(사용자 결정), 불변. C 정렬이라 앞부분·범위 검색이 인덱스 `(center_id, location_cd)`를 쓴다 |
+| `description` | `description` | VARCHAR(200) | 1차 | 예전 명칭 `location_nm`(0071) — 코드와 같던 값은 비움 |
+| `locType` | `loc_type_cd` | VARCHAR(20) | 1차 | 공통코드 `LOC_TYPE`, 기본 RACK (시스템 기본은 STAGING) |
+| `status` / `systemYn` | `status_cd` / `system_yn` | VARCHAR(20) / CHAR(1) | 1차 | 시스템 기본 로케이션은 사용 중만 |
+| `rowNo` / `levelNo` | `row_no` / `level_no` | VARCHAR(10) | 1차 | 예전 `aisle_cd`·`level_cd`. 일괄 생성은 0을 채워 글자 순서 = 숫자 순서 |
+| `bayNo` / `cellNo` / `posX` / `posY` | `bay_no` / `cell_no` / `pos_x` / `pos_y` | VARCHAR(10) / DECIMAL(10,2) | 2차 | |
+| `widthCm` / `depthCm` / `heightCm` | `width_cm` / `depth_cm` / `height_cm` | DECIMAL(8,2) | 1차 | 저장은 cm (화면은 운영사 단위) |
+| `maxCbm` / `maxWeightKg` / `maxPalletCnt` | `max_cbm` / `max_weight_kg` / `max_pallet_cnt` | DECIMAL(10,4) / DECIMAL(10,2) / INT | 1차 | 무게 저장은 kg |
+| `inboundYn` / `outboundYn` / `allocatableYn` | `inbound_yn` / `outbound_yn` / `allocatable_yn` | CHAR(1) NULL | 1차·상속 | NULL = 창고 값 |
+| `mixItemYn` / `mixLotYn` / `mixClientYn` | `mix_item_yn` / `mix_lot_yn` / `mix_client_yn` | CHAR(1) | 1차 | 기본 Y / Y / **N** |
+| `putawaySeq` / `pickSeq` | `putaway_seq` / `pick_seq` | INT | 1차 | |
+| `lockYn` / `lockReason` / `lockAt` | `lock_yn` / `lock_reason_cd` / `lock_at` | | 2차 | 잠그면 사유(공통코드 `LOCK_REASON`) 필수 (검사 조건) |
+| `abcClass` / `dedicatedShipperId` / `checkDigit` / `lastCountOn` | `abc_class_cd` / `dedicated_shipper_id` / `check_digit` / `last_count_dt` | | 2차 | 공통코드 `ABC_CLASS` / 화주사 FK |
+| `remark` / `extAttr` | `remark` / `ext_attr` | VARCHAR(1000) / JSONB | 1차 / 2차 | |
+| 공통 칸 | `created_at`·`updated_at`·`created_by`·`updated_by`·`row_version`·`del_yn` | | | 0038 |
+
+인덱스: 고유 `(warehouse_id, location_cd) WHERE del_yn='N'`, `(center_id, location_cd)`, `(warehouse_id, zone_id, status_cd)`, `(center_id, status_cd, del_yn)`, `(zone_id)`.
 
 ### tb_shipper ← `shipper` (코드 모델 `Shipper`)
 
