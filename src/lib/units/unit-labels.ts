@@ -14,13 +14,22 @@ export const UNIT_TYPE_LABELS: Record<UnitTypeValue, string> = {
   AREA: '면적',
 }
 
+// 새 단위의 소수 자리수 기본값 (유형을 고르면 채운다 — 시스템 기준단위와 같게, 고칠 수 있음)
+export const DEFAULT_UNIT_DECIMALS: Record<UnitTypeValue, number> = {
+  QTY: 0,
+  PACK: 0,
+  WEIGHT: 3,
+  VOLUME: 3,
+  LENGTH: 2,
+  AREA: 2,
+}
+
 // 물리 단위: 유형 기준단위 × 환산계수로 서로 바꿀 수 있는 유형
 export const PHYSICAL_UNIT_TYPES = ['WEIGHT', 'VOLUME', 'LENGTH', 'AREA'] as const
 export const isPhysicalType = (type: string) =>
   (PHYSICAL_UNIT_TYPES as readonly string[]).includes(type)
 
 // 품목 기본단위(재고를 세는 단위)로 고를 수 있는 유형: 포장 단위가 아닌 것
-export const ITEM_BASE_UNIT_TYPES = ['QTY', 'WEIGHT', 'VOLUME', 'LENGTH', 'AREA'] as const
 export const isItemBaseType = (type: string) => type !== 'PACK'
 
 export const UNIT_TYPE_STATUS: StatusFormat = {

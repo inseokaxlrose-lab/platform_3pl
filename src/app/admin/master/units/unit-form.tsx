@@ -22,6 +22,7 @@ import {
 } from '@/components/ui/select'
 import { Textarea } from '@/components/ui/textarea'
 import {
+  DEFAULT_UNIT_DECIMALS,
   isPhysicalType,
   UNIT_TYPE_LABELS,
   UNIT_TYPES,
@@ -152,7 +153,13 @@ export function UnitForm({
             <Select
               value={value.type}
               disabled={disabled || Boolean(unit)}
-              onValueChange={(next) => set({ type: next as UnitTypeValue, baseFactor: '' })}
+              onValueChange={(next) =>
+                set({
+                  type: next as UnitTypeValue,
+                  baseFactor: '',
+                  decimals: DEFAULT_UNIT_DECIMALS[next as UnitTypeValue],
+                })
+              }
             >
               <SelectTrigger id={id('type')} className="w-full" aria-invalid={Boolean(errors.type)}>
                 <SelectValue />
