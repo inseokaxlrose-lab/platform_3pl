@@ -22,6 +22,7 @@ import {
   UsersIcon,
   WarehouseIcon,
   type LucideIcon,
+  KeyRoundIcon,
 } from 'lucide-react'
 import type { PermissionCode } from './permissions'
 
@@ -206,6 +207,19 @@ const adminNavigation: NavArea = {
           icon: HistoryIcon,
           ready: true,
           permission: 'stock.history.read',
+        },
+      ],
+    },
+    {
+      // 화주 연동 API (0081)
+      label: '연동',
+      items: [
+        {
+          title: 'API 키',
+          href: '/admin/integration/api-keys',
+          icon: KeyRoundIcon,
+          ready: true,
+          permission: 'integration.api-keys.read',
         },
       ],
     },
