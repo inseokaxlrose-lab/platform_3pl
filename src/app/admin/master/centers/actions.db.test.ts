@@ -323,6 +323,51 @@ describe('운영 상태', () => {
     })
   })
 
+  it('권역설정에 배정된 우편번호가 있으면 폐쇄할 수 없고, 배정에 쓰인 온도대는 뺄 수 없다 (0076)', async () => {
+    const center = await create({ tempZones: ['AMBIENT', 'FROZEN'] })
+    const centerId = BigInt(center.id)
+    await prisma.regionZip.create({
+      data: {
+        code: '06236',
+        sidoCode: '11',
+        sigunguCode: '11680',
+        firstLoadVer: 'T',
+        lastLoadVer: 'T',
+      },
+    })
+    const batch = await prisma.regionChangeBatch.create({
+      data: { operatorId: TEST_OPERATOR_ID, changeType: 'GRID_ASSIGN', scopeDesc: '테스트' },
+    })
+    await prisma.regionCenterMap.create({
+      data: {
+        operatorId: TEST_OPERATOR_ID,
+        zipCode: '06236',
+        tempZone: 'FROZEN',
+        centerId,
+        lastBatchId: batch.id,
+      },
+    })
+    expect(
+      await changeCenterStatusAction({
+        id: center.id,
+        rowVersion: await versionOf('center', center.id),
+        status: 'CLOSED',
+        reason: '이전',
+        closedOn: '2026-12-31',
+      }),
+    ).toMatchObject({
+      ok: false,
+      error: {
+        code: 'CONFLICT',
+        message: expect.stringContaining('권역설정에 배정된 우편번호 1개'),
+      },
+    })
+    expect(await update(center.id, { tempZones: ['AMBIENT'] })).toMatchObject({
+      ok: false,
+      error: { code: 'CONFLICT', message: expect.stringContaining('냉동 1건') },
+    })
+  })
+
   it('일괄 운영중·일시중지: 운영사만, 일시중지는 사유, 폐쇄된 센터는 건너뜀, 하나라도 없으면 전체 거부', async () => {
     const a = await create({ code: 'AAA' })
     const b = await create({ code: 'BBB' })

@@ -18,7 +18,6 @@ function targetScope(target: ExternalTarget, scope: DataScope): Where {
     case 'CENTER':
       return scopeFilter(scope, { center: 'id' })
     case 'WAREHOUSE':
-    case 'DELIVERY_ZONE':
       return scopeFilter(scope, { center: 'centerId' })
     case 'SHIPPER':
       return scopeFilter(scope, { center: 'centers.some.centerId', shipper: 'id' })
@@ -58,16 +57,6 @@ async function findTargets(
           select: { ...BASE, center: { select: { name: true } } },
         }),
         prisma.warehouse.count({ where }),
-      ])
-      return { rows: rows.map((r) => ({ ...r, owner: withOwner(r) })), rowCount }
-    }
-    case 'DELIVERY_ZONE': {
-      const [rows, rowCount] = await prisma.$transaction([
-        prisma.deliveryZone.findMany({
-          ...args,
-          select: { ...BASE, center: { select: { name: true } } },
-        }),
-        prisma.deliveryZone.count({ where }),
       ])
       return { rows: rows.map((r) => ({ ...r, owner: withOwner(r) })), rowCount }
     }

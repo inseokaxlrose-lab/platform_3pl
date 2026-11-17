@@ -88,7 +88,7 @@ type TextKey = 'code' | 'name' | 'ceoName' | 'receiverName'
 const NO_CENTER = '__none__'
 
 // 거래처 등록·수정 (docs/decisions/0043, 입력 화면 틀 0031)
-// 배송지 주소를 검색하면 법정동코드가 자동으로 저장된다 (배송권역과 맞춰 보는 데 쓴다, 화면 미노출)
+// 배송지 주소를 검색하면 법정동코드가 자동으로 저장된다 (우편번호가 없을 때 권역설정과 맞춰 보는 데 쓴다, 화면 미노출)
 export function CustomerForm({
   header,
   shippers,
@@ -254,7 +254,8 @@ export function CustomerForm({
     {
       id: 'delivery',
       title: '배송지',
-      description: '주소를 검색하면 배송권역을 맞춰 볼 지역 코드가 함께 저장됩니다.',
+      description:
+        '주소를 검색하면 우편번호와 지역 코드가 함께 저장되어 권역설정의 배송센터를 찾는 데 씁니다.',
       content: (
         <FormGrid>
           <Field label="주소" span={12} htmlFor={id('address-address')}>
@@ -280,7 +281,7 @@ export function CustomerForm({
             span={4}
             error={errors.deliveryCenterId}
             htmlFor={id('deliveryCenterId')}
-            hint="배송권역이 겹칠 때 이 센터로 배송합니다. 비우면 권역 규칙으로"
+            hint="이 센터로 배송합니다. 비우면 권역설정(배송지 우편번호)으로 정합니다"
           >
             <Select
               value={value.deliveryCenterId || NO_CENTER}

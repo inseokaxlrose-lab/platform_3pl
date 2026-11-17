@@ -56,11 +56,12 @@ export const PERMISSION_MENUS = {
     area: 'admin',
     actions: [...CRUD, 'export'],
   },
-  'master.delivery-zones': {
-    label: '배송권역',
+  // 권역설정 (0076): 우편번호별 배송센터 배정. 지정·해제·추천 확인·엑셀 업로드 = 수정
+  'master.regions': {
+    label: '권역설정',
     group: '기준정보',
     area: 'admin',
-    actions: [...CRUD, 'export'],
+    actions: ['read', 'update', 'export'],
   },
   'master.units': { label: '단위', group: '기준정보', area: 'admin', actions: CRUD },
   'master.shippers': {

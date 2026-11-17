@@ -25,7 +25,7 @@ type AddressInputProps = {
   idPrefix?: string // 주소 검색으로 고르면 지번주소를 알려 준다 (지번주소를 따로 저장하는 화면만, 예: 운영사 addr_jibun)
   // 직접 입력으로 주소를 바꾸면 빈 글자를 알려 준다 (검색 결과와 어긋나지 않게)
   onJibunAddress?: (jibunAddress: string) => void
-  // 주소 검색으로 고르면 법정동코드 10자리를 알려 준다 (예: 거래처 — 배송권역 맞추기, 0043). 직접 고치면 빈 글자
+  // 주소 검색으로 고르면 법정동코드 10자리를 알려 준다 (예: 거래처 — 권역설정 맞추기, 0076). 직접 고치면 빈 글자
   onRegionCode?: (regionCode: string) => void
   // 주소 검색으로 고르면 지역명 '시·도 시·군·구'를 알려 준다 (예: 센터 region_nm, 0073). 직접 고치면 빈 글자
   onRegionName?: (regionName: string) => void

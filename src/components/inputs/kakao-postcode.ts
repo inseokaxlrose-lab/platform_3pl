@@ -71,7 +71,7 @@ export function toAddress(data: KakaoPostcodeResult) {
     address: extras.length > 0 ? `${base} (${extras.join(', ')})` : base,
     // 지번주소 (따로 저장하는 화면만 쓴다, 예: 운영사 addr_jibun)
     jibunAddress: data.jibunAddress || data.autoJibunAddress || '',
-    // 법정동코드 (따로 저장하는 화면만 쓴다, 예: 거래처 region_cd — 배송권역과 맞춰 본다)
+    // 법정동코드 (따로 저장하는 화면만 쓴다, 예: 거래처 region_cd — 권역설정과 맞춰 본다)
     regionCode: data.bcode ?? '',
     // 지역명 '시·도 시·군·구' (따로 저장하는 화면만, 예: 센터 region_nm — 목록 표시·검색)
     regionName: [data.sido, data.sigungu].filter(Boolean).join(' '),

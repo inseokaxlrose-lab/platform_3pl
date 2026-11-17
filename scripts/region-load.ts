@@ -7,6 +7,7 @@ import { readdirSync } from 'node:fs'
 import { join } from 'node:path'
 import { prisma } from '../src/lib/prisma'
 import { loadRegionMaster } from '../src/lib/regions/region-load'
+import { suggestNewZips } from '../src/lib/regions/region-suggest'
 
 function arg(name: string, fallback?: string) {
   const index = process.argv.indexOf(`--${name}`)
@@ -50,6 +51,14 @@ async function main() {
       `시군구를 넘는 우편번호 ${result.crossSigunguZips.length}건${result.crossSigunguZips.length ? `: ${result.crossSigunguZips.slice(0, 10).join(', ')}` : ''}`,
     ].join('\n'),
   )
+
+  // 갱신 배치: 신규 우편번호 추천 배정 (운영사별), 폐지 우편번호에 남은 배정 수
+  const suggestions = await suggestNewZips(prisma, result.newZips)
+  for (const s of suggestions) {
+    console.log(
+      `운영사 ${s.operatorId}: 신규 우편번호 추천 배정 ${s.suggested}건, 폐지 우편번호에 남은 배정 ${s.abolishedAssigned}건`,
+    )
+  }
 }
 
 main()

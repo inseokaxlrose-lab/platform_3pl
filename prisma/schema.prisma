@@ -302,7 +302,6 @@ model Center {
 
   users             UserCenter[]
   warehouses        Warehouse[]
-  deliveryZones     DeliveryZone[]
   shippers          ShipperCenter[]
   stocks            Stock[]
   asns              Asn[]
@@ -843,7 +842,6 @@ model Operator {
   externalCodes    ExternalCode[]
   codeGroups       CodeGroup[]
   codeItems        CodeItem[]
-  deliveryZones    DeliveryZone[]
   units            Unit[]
   items            Item[]
   customers        Customer[]
@@ -944,7 +942,6 @@ enum ExternalEntityType {
   SHIPPER
   ITEM
   CUSTOMER
-  DELIVERY_ZONE
   UNIT
 }
 
@@ -1010,54 +1007,6 @@ model CodeItem {
   @@index([groupId, sortOrder])
   @@index([operatorId])
   @@map("tb_code_item")
-}
-
-// ── 배송권역 (docs/decisions/0033): 센터가 배송을 담당하는 지역 묶음
-// 코드 3층 (0025): systemCode DZ000001(자동·불변) / code(사용자 코드, 같은 센터 안 중복 금지) / 외부 코드(ExternalCode)
-model DeliveryZone {
-  id          BigInt               @id @default(autoincrement()) @map("zone_id")
-  // 운영사 (멀티테넌트: 같은 운영사 사람만 보고 고친다, docs/decisions/0039)
-  operatorId  BigInt               @map("operator_id")
-  operator    Operator             @relation(fields: [operatorId], references: [id], onDelete: Restrict)
-  centerId    BigInt               @map("center_id")
-  systemCode  String               @unique @map("sys_cd")
-  code        String               @map("zone_cd")
-  name        String               @map("zone_nm")
-  description String?
-  // 우선순위 (0072): 다른 센터 권역과 같은 수준으로 겹칠 때 작은 번호가 먼저 (1~999, 기본 100)
-  priority    Int                  @default(100) @map("priority_no")
-  status      String               @default("ACTIVE") @map("status_cd") @db.VarChar(10)
-  createdAt   DateTime             @default(now()) @map("created_at")
-  updatedAt   DateTime             @updatedAt @map("updated_at")
-  // 등록·수정한 사람 아이디(username, 자동: 현재 작업자 / 시드 seed / 기존 데이터 system), 동시 수정 막기용 버전 (docs/db-conventions.md 공통 칸)
-  createdBy   String               @default("system") @map("created_by") @db.VarChar(50)
-  updatedBy   String               @default("system") @map("updated_by") @db.VarChar(50)
-  rowVersion  Int                  @default(1) @map("row_version")
-  center      Center               @relation(fields: [centerId], references: [id], onDelete: Restrict)
-  regions     DeliveryZoneRegion[]
-
-  // 코드는 삭제 안 된 것끼리만 겹치면 안 된다 (지운 코드는 다시 쓸 수 있다, 0038)
-  // 논리 삭제: 'Y'면 지운 것 (목록·조회에서 빠지고 되살릴 수 있다, 0038)
-  delYn String @default("N") @map("del_yn") @db.Char(1)
-
-  @@unique([centerId, code], where: raw("del_yn = 'N'"), map: "tb_delivery_zone_center_id_zone_cd_key")
-  @@index([centerId])
-  @@index([operatorId])
-  @@map("tb_delivery_zone")
-}
-
-// 배송권역의 담당 지역: 법정동코드 앞자리 (시·도 2자리 = 그 시·도 전체, 시·군·구 5자리)
-// 같은 센터 안에서는 한 지역이 권역 하나에만 (서울 전체 + 서울 종로구처럼 겹치는 것도 금지) — 저장할 때 검사
-// 센터끼리는 겹쳐도 된다 (출고 때 화주사 이용 센터 기준으로 고른다)
-model DeliveryZoneRegion {
-  id         BigInt       @id @default(autoincrement()) @map("zone_region_id")
-  zoneId     BigInt       @map("zone_id")
-  regionCode String       @map("region_cd")
-  zone       DeliveryZone @relation(fields: [zoneId], references: [id], onDelete: Cascade)
-
-  @@unique([zoneId, regionCode])
-  @@index([regionCode])
-  @@map("tb_delivery_zone_region")
 }
 
 // ── 단위 (docs/decisions/0034): 품목의 기본단위·환산단위로 고르는 목록

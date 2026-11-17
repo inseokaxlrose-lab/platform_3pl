@@ -25,8 +25,7 @@ export default async function EditCenterPage({ params }: PageProps<'/admin/maste
     canViewLocations,
     canViewWarehouses,
     canAddWarehouse,
-    canViewZones,
-    canAddZone,
+    canViewRegions,
   ] = await Promise.all([
     getCurrentScope(),
     hasPermission('master.centers.update'),
@@ -34,8 +33,7 @@ export default async function EditCenterPage({ params }: PageProps<'/admin/maste
     hasPermission('master.locations.read'),
     hasPermission('master.warehouses.read'),
     hasPermission('master.warehouses.create'),
-    hasPermission('master.delivery-zones.read'),
-    hasPermission('master.delivery-zones.create'),
+    hasPermission('master.regions.read'),
   ])
   const center = await getCenterForEdit(id, scope)
   if (!center) notFound()
@@ -77,7 +75,7 @@ export default async function EditCenterPage({ params }: PageProps<'/admin/maste
       // 폐쇄된 센터는 고칠 수 없다 (다시 운영하려면 상태부터 바꾼다)
       readOnly={!canUpdate || center.status === 'CLOSED'}
       warehouseAccess={{ canView: canViewWarehouses, canAdd: canAddWarehouse }}
-      zoneAccess={{ canView: canViewZones, canAdd: canAddZone }}
+      canViewRegions={canViewRegions}
     />
   )
 }

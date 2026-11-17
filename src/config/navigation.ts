@@ -93,11 +93,11 @@ const adminNavigation: NavArea = {
           permission: 'master.locations.read',
         },
         {
-          title: '배송권역',
-          href: '/admin/master/delivery-zones',
+          title: '권역설정',
+          href: '/admin/master/regions',
           icon: MapIcon,
           ready: true,
-          permission: 'master.delivery-zones.read',
+          permission: 'master.regions.read',
         },
         {
           title: '단위',

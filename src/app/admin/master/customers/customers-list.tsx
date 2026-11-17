@@ -32,7 +32,6 @@ type Row = {
   receiverName: string | null
   receiverPhone: string | null
   shipper: string
-  zones: string | null
   deliveryCenter: string | null
   isActive: boolean
   createdAt: Date
@@ -68,15 +67,13 @@ const COLUMNS: DataGridColumn<Row>[] = [
     format: 'phone',
     defaultHidden: true,
   },
-  // 배송지가 드는 배송권역 (화주사가 이용하는 센터별, 0043)
-  { id: 'zones', header: '배송권역', accessor: 'zones' },
-  // 출고 때 배송할 센터 (0072): 거래처 지정 → 더 구체적인 지역 → 우선순위, 못 정하면 배정 대기
+  // 배송할 센터 (0076): 거래처 지정 → 권역설정(배송지 우편번호), 못 정하면 미배정
   {
     id: 'deliveryCenter',
     header: '배송 센터',
     accessor: 'deliveryCenter',
     cell: (row) =>
-      row.deliveryCenter?.startsWith('배정 대기') ? (
+      row.deliveryCenter === '미배정' ? (
         <span className="font-medium text-destructive">{row.deliveryCenter}</span>
       ) : (
         (row.deliveryCenter ?? '-')
@@ -188,7 +185,7 @@ export function CustomersList({
   return (
     <MasterListPage
       title="거래처"
-      description="화주사의 고객사입니다. 출고할 때 물건을 받는 곳이며, 배송지 주소로 배송권역을 맞춰 봅니다."
+      description="화주사의 고객사입니다. 출고할 때 물건을 받는 곳이며, 배송지 우편번호로 권역설정의 배송센터를 찾습니다."
       actions={actions}
       gridId="master-customers"
       searchFields={searchFields}

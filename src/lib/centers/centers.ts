@@ -174,6 +174,20 @@ async function saveTempZones(db: Db, centerId: bigint, zones: readonly string[])
         .join(', ')}${inUse.length > 3 ? ` 외 ${inUse.length - 3}곳` : ''})`,
     )
   }
+  // 권역설정에서 이 센터에 온도대별로 배정한 우편번호가 있으면 그 온도대도 뺄 수 없다 (0076)
+  const assigned = await db.regionCenterMap.groupBy({
+    by: ['tempZone'],
+    where: { centerId, tempZone: { notIn: [...zones, 'ALL'] } },
+    _count: true,
+  })
+  if (assigned.length > 0) {
+    throw new ActionError(
+      'CONFLICT',
+      `권역설정에 배정된 온도대는 뺄 수 없습니다: ${assigned
+        .map((a) => `${TEMP_ZONE.labels[a.tempZone as TempZoneKey] ?? a.tempZone} ${a._count}건`)
+        .join(', ')}. 권역설정에서 먼저 다른 센터로 옮기세요.`,
+    )
+  }
   await db.centerTempZone.deleteMany({ where: { centerId, tempZoneCd: { notIn: [...zones] } } })
   const existing = await db.centerTempZone.findMany({
     where: { centerId },
@@ -264,15 +278,17 @@ export async function updateCenter(id: bigint, rowVersion: number, data: CenterD
   })
 }
 
-// 폐쇄할 수 없는 이유 (재고가 남았거나, 끝나지 않은 입고가 있으면)
+// 폐쇄할 수 없는 이유 (재고가 남았거나, 끝나지 않은 입고가 있거나, 권역설정에 배정된 우편번호가 있으면)
 async function closeBlockers(db: Db, centerId: bigint) {
-  const [stock, openAsns] = await Promise.all([
+  const [stock, openAsns, regionMaps] = await Promise.all([
     db.stock.count({ where: { centerId, qty: { gt: 0 } } }),
     db.asn.count({ where: { centerId, status: { notIn: ['COMPLETED', 'CLOSED'] } } }),
+    db.regionCenterMap.count({ where: { centerId } }),
   ])
   const reasons: string[] = []
   if (stock > 0) reasons.push(`재고가 남은 줄 ${stock}개`)
   if (openAsns > 0) reasons.push(`끝나지 않은 입고(ASN) ${openAsns}건`)
+  if (regionMaps > 0) reasons.push(`권역설정에 배정된 우편번호 ${regionMaps}개(권역 재배정 필요)`)
   return reasons
 }
 
@@ -293,7 +309,7 @@ export async function changeCenterStatus(
       if (reasons.length > 0) {
         throw new ActionError(
           'CONFLICT',
-          `폐쇄할 수 없습니다: ${reasons.join(', ')}. 재고를 옮기고 입고를 마감한 뒤 다시 시도하세요.`,
+          `폐쇄할 수 없습니다: ${reasons.join(', ')}. 정리한 뒤 다시 시도하세요.`,
         )
       }
     }
@@ -329,13 +345,13 @@ export async function changeCentersStatus(
   return { count }
 }
 
-// 삭제할 수 없는 이유: 쓰인 적 있으면 (일반 창고·재고 이력·입고·배송권역·이용 화주사·소속 사용자)
+// 삭제할 수 없는 이유: 쓰인 적 있으면 (일반 창고·재고 이력·입고·권역설정 배정·이용 화주사·소속 사용자)
 async function deleteBlockers(db: Db, centerId: bigint) {
   const [general, stock, asns, zones, shippers, users] = await Promise.all([
     db.warehouse.count({ where: { centerId, systemYn: 'N' } }),
     db.stock.count({ where: { centerId } }),
     db.asn.count({ where: { centerId } }),
-    db.deliveryZone.count({ where: { centerId } }),
+    db.regionCenterMap.count({ where: { centerId } }),
     db.shipperCenter.count({ where: { centerId } }),
     db.userCenter.count({ where: { centerId } }),
   ])
@@ -343,7 +359,7 @@ async function deleteBlockers(db: Db, centerId: bigint) {
     general > 0 && `보관 창고 ${general}개`,
     stock > 0 && `재고 이력`,
     asns > 0 && `입고(ASN) ${asns}건`,
-    zones > 0 && `배송권역 ${zones}개`,
+    zones > 0 && `권역설정 배정 우편번호 ${zones}개`,
     shippers > 0 && `이용 화주사 ${shippers}곳`,
     users > 0 && `소속 사용자 ${users}명`,
   ].filter((reason): reason is string => Boolean(reason))

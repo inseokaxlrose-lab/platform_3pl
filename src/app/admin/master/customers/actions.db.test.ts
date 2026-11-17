@@ -76,19 +76,49 @@ async function create(overrides: Partial<CustomerCreateInput> = {}) {
   return result.data
 }
 
-// 센터의 배송권역 + 담당 지역
-async function createZone(centerId: bigint, name: string, regionCodes: string[]) {
-  const zone = await prisma.deliveryZone.create({
-    data: {
-      operatorId: TEST_OPERATOR_ID,
-      centerId,
-      systemCode: `DZ-T-${name}`,
-      code: name,
-      name,
-      regions: { create: regionCodes.map((regionCode) => ({ regionCode })) },
+// 권역설정 배정 (0076): 우편번호(지역 마스터) + 배정표. bjdCode를 주면 우편번호↔법정동도
+async function assignZip(zipCode: string, centerId: bigint | null, bjdCode?: string) {
+  await prisma.regionZip.upsert({
+    where: { code: zipCode },
+    create: {
+      code: zipCode,
+      sidoCode: zipCode.slice(0, 2),
+      sigunguCode: '00000',
+      firstLoadVer: 'T',
+      lastLoadVer: 'T',
     },
+    update: {},
   })
-  return zone.id
+  if (bjdCode) {
+    await prisma.regionBjd.upsert({
+      where: { code: bjdCode },
+      create: {
+        code: bjdCode,
+        sidoCode: bjdCode.slice(0, 2),
+        sidoName: '시도',
+        sigunguCode: bjdCode.slice(0, 5),
+        level: 3,
+        loadVer: 'T',
+      },
+      update: {},
+    })
+    await prisma.regionZipBjd.upsert({
+      where: { zipCode_bjdCode: { zipCode, bjdCode } },
+      create: { zipCode, bjdCode, addressCount: 1 },
+      update: {},
+    })
+  }
+  if (!centerId) return
+  const batch = await prisma.regionChangeBatch.create({
+    data: { operatorId: TEST_OPERATOR_ID, changeType: 'GRID_ASSIGN', scopeDesc: '테스트' },
+  })
+  await prisma.regionCenterMap.upsert({
+    where: {
+      operatorId_zipCode_tempZone: { operatorId: TEST_OPERATOR_ID, zipCode, tempZone: 'ALL' },
+    },
+    create: { operatorId: TEST_OPERATOR_ID, zipCode, centerId, lastBatchId: batch.id },
+    update: { centerId, lastBatchId: batch.id },
+  })
 }
 
 beforeEach(async () => {
@@ -180,37 +210,6 @@ describe('거래처 등록 · 수정', () => {
   })
 })
 
-describe('목록 · 배송권역 맞추기', () => {
-  it('배송지가 드는 배송권역을 화주사가 이용하는 센터별로 보여 준다 (시·도 2자리, 시·군·구 5자리)', async () => {
-    await createZone(icn, '분당권', ['41135']) // 이천센터: 성남 분당구
-    await createZone(gmh, '경기권', ['41']) // 김해센터: 경기도 전체
-    await createZone(icn, '서울권', ['11']) // 맞지 않음
-    await create({ code: 'GANA-C' }) // 가나: 이천센터만 이용
-    await create({ shipperId: String(dara), code: 'DARA-C' }) // 다라: 이천·김해 이용
-    await create({ code: 'NOREGION', regionCode: '' })
-
-    const result = await listCustomersAction(createDataGridState())
-    const zones = Object.fromEntries(
-      (result.ok ? result.data.rows : []).map((r) => [r.code, r.zones]),
-    )
-    expect(zones).toEqual({
-      'GANA-C': '이천센터: 분당권',
-      'DARA-C': expect.stringMatching(
-        /이천센터: 분당권.*김해센터: 경기권|김해센터: 경기권.*이천센터: 분당권/,
-      ),
-      NOREGION: null,
-    })
-  })
-
-  it('사용 중지·지운 권역은 맞추지 않는다', async () => {
-    const zoneId = await createZone(icn, '분당권', ['41135'])
-    await create({ code: 'C1' })
-    await prisma.deliveryZone.update({ where: { id: zoneId }, data: { status: 'INACTIVE' } })
-    const result = await listCustomersAction(createDataGridState())
-    expect(result.ok && result.data.rows[0].zones).toBeNull()
-  })
-})
-
 describe('데이터 범위 · 삭제', () => {
   it('센터 직원: 소속 센터를 이용하는 화주사의 거래처만', async () => {
     await create({ code: 'GANA-C' })
@@ -250,7 +249,6 @@ describe('데이터 범위 · 삭제', () => {
 
 describe('배송 센터 (0072)', () => {
   const GANGNAM = '1168010100' // 서울 강남구
-  const GANGDONG = '1174010100' // 서울 강동구
 
   it('배송 센터는 그 화주사의 이용 센터만 저장되고, 비우면 null', async () => {
     // 가나식품은 이천센터만 이용
@@ -266,18 +264,21 @@ describe('배송 센터 (0072)', () => {
     expect(await centerOf(free.id)).toBeNull()
   })
 
-  it('목록의 배송 센터: 지정 → 더 구체적인 지역(자동) → 같으면 배정 대기', async () => {
-    // 다라상사는 이천·김해 이용. 이천 = 서울 전체, 김해 = 경기 + 서울 강남구
-    await createZone(icn, '서울권', ['11'])
-    const gmhZone = await createZone(gmh, '서울남부', ['41', '11680'])
-    await create({ code: 'GD', shipperId: String(dara), regionCode: GANGDONG })
-    await create({ code: 'GN', shipperId: String(dara), regionCode: GANGNAM })
+  it('목록의 배송 센터: 지정 → 권역설정(배송지 우편번호, 없으면 법정동) → 미배정', async () => {
+    // 다라상사는 이천·김해 이용
+    await assignZip('13529', icn)
+    await assignZip('06236', null, GANGNAM)
+    await create({ code: 'ZIP', shipperId: String(dara) }) // 13529
+    await create({ code: 'NOMAP', shipperId: String(dara), zipCode: '06236', regionCode: GANGNAM })
     await create({
-      code: 'GN-FIX',
+      code: 'FIX',
       shipperId: String(dara),
+      zipCode: '06236',
       regionCode: GANGNAM,
-      deliveryCenterId: String(icn),
+      deliveryCenterId: String(gmh),
     })
+    await create({ code: 'BJD', shipperId: String(dara), zipCode: '', regionCode: GANGNAM })
+    await create({ code: 'NONE', shipperId: String(dara), zipCode: '', regionCode: '' })
 
     const centers = async () => {
       const result = await listCustomersAction(createDataGridState())
@@ -286,17 +287,14 @@ describe('배송 센터 (0072)', () => {
       )
     }
     expect(await centers()).toEqual({
-      GD: '이천센터 (자동)',
-      GN: '김해센터 (자동)',
-      'GN-FIX': '이천센터 (지정)',
+      ZIP: '이천센터 (권역)',
+      NOMAP: '미배정',
+      FIX: '김해센터 (지정)',
+      BJD: '미배정',
+      NONE: null,
     })
-
-    // 김해 권역을 서울 전체로 바꾸면 같은 수준·같은 우선순위 → 배정 대기
-    await prisma.deliveryZoneRegion.deleteMany({ where: { zoneId: gmhZone } })
-    await prisma.deliveryZoneRegion.create({ data: { zoneId: gmhZone, regionCode: '11' } })
-    expect((await centers()).GN).toBe('배정 대기 (2곳)')
-    // 우선순위를 낮추면(작은 번호) 김해로
-    await prisma.deliveryZone.update({ where: { id: gmhZone }, data: { priority: 10 } })
-    expect((await centers()).GN).toBe('김해센터 (자동)')
+    // 06236을 김해로 배정하면 우편번호·법정동 모두 김해
+    await assignZip('06236', gmh)
+    expect(await centers()).toMatchObject({ NOMAP: '김해센터 (권역)', BJD: '김해센터 (권역)' })
   })
 })

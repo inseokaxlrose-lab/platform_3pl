@@ -31,7 +31,7 @@ export const CENTER_STATUSES_NEEDING_REASON: readonly string[] = ['SUSPENDED', '
 
 // 상태별로 센터를 어디에 쓸 수 있나
 // - 새 업무(입고·재고·출고·배송 센터): 운영중만 → 조회 조건은 ACTIVE_ONLY ({ status: 'ACTIVE' })
-// - 기준정보 준비(창고·배송권역 추가, 화주사 이용 센터, 사용자 소속): 준비중 + 운영중
+// - 기준정보 준비(창고 추가·권역 배정, 화주사 이용 센터, 사용자 소속): 준비중 + 운영중
 // - 데이터 범위(소속 직원이 그 센터 데이터를 보는지): 폐쇄만 뺀다
 export const CENTER_SETUP_STATUSES = ['PREPARING', 'ACTIVE'] as const
 export const CENTER_SETUP_ONLY = { status: { in: [...CENTER_SETUP_STATUSES] } }
