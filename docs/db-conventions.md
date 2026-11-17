@@ -451,7 +451,12 @@
 | `description` | `description` | `description` |  |
 | `sortOrder` | `sortOrder` | `sort_seq` |  |
 | `isActive` | `isActive` | `status_cd` | Boolean → status_cd (2단계, ACTIVE/INACTIVE) |
-| `isSystem` | `isSystem` | `system_yn` |  |
+| `isSystem` | `isSystem` | `system_yn` | 0078: `operator_id`가 비어 있는 시스템 기본 단위만 Y |
+| `operatorId` | — | `operator_id` | 0078: NULL 허용 (NULL = 시스템 기본 단위, 모든 운영사 공유) |
+| `type` | — | `unit_type_cd` | 0078: QTY·PACK·WEIGHT·VOLUME·LENGTH·AREA |
+| `nameEn` / `printName` | — | `unit_nm_en` / `print_nm` | 0078 |
+| `isBase` / `baseUnitId` / `baseFactor` | — | `base_yn` / `base_unit_id` / `base_factor` | 0078: 물리 단위 환산 (DECIMAL(20,10)) |
+| `stdCode` / `description` / `extAttr` / `remark` | — | `std_unit_cd` / `description` / `ext_attr` / `remark` | 0078: UN/ECE Rec.20, 확장속성 JSONB |
 | `createdAt` | `createdAt` | `created_at` |  |
 | `updatedAt` | `updatedAt` | `updated_at` |  |
 
@@ -478,10 +483,15 @@
 | `id` | `id` | `unit_id` | TEXT(cuid) → BIGINT |
 | `code` | `code` | `unit_cd` |  |
 | `name` | `name` | `unit_nm` |  |
-| `kind` | `kind` | `unit_kind_cd` |  |
+| `kind` | `kind` | ~~`unit_kind_cd`~~ | 0078에서 `type`(`unit_type_cd`, enum UnitType)으로 바뀜 |
 | `decimals` | `decimals` | `decimal_cnt` |  |
 | `sortOrder` | `sortOrder` | `sort_seq` |  |
 | `isActive` | `isActive` | `status_cd` | Boolean → status_cd (2단계, ACTIVE/INACTIVE) |
-| `isSystem` | `isSystem` | `system_yn` |  |
+| `isSystem` | `isSystem` | `system_yn` | 0078: `operator_id`가 비어 있는 시스템 기본 단위만 Y |
+| `operatorId` | — | `operator_id` | 0078: NULL 허용 (NULL = 시스템 기본 단위, 모든 운영사 공유) |
+| `type` | — | `unit_type_cd` | 0078: QTY·PACK·WEIGHT·VOLUME·LENGTH·AREA |
+| `nameEn` / `printName` | — | `unit_nm_en` / `print_nm` | 0078 |
+| `isBase` / `baseUnitId` / `baseFactor` | — | `base_yn` / `base_unit_id` / `base_factor` | 0078: 물리 단위 환산 (DECIMAL(20,10)) |
+| `stdCode` / `description` / `extAttr` / `remark` | — | `std_unit_cd` / `description` / `ext_attr` / `remark` | 0078: UN/ECE Rec.20, 확장속성 JSONB |
 | `createdAt` | `createdAt` | `created_at` |  |
 | `updatedAt` | `updatedAt` | `updated_at` |  |
