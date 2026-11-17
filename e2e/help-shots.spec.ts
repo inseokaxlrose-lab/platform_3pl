@@ -101,6 +101,25 @@ const SHOTS: Shot[] = [
   list('/admin/master/items'),
   list('/admin/master/customers'),
   list('/admin/master/units'),
+  {
+    // 운영사 추가 단위 '근' (중량): 환산 섹션과 "1 근 = 0.6 KG" 미리보기가 보이게
+    src: '/help/admin/master/units/new.png',
+    url: '/admin/master/units/new',
+    account: 'admin',
+    prepare: async (page) => {
+      await page.locator('#unit-code').fill('GN')
+      await page.locator('#unit-name').fill('근')
+      await page.locator('#unit-type').click()
+      await page.getByRole('option', { name: '중량' }).click()
+      await page.locator('#unit-baseFactor').fill('0.6')
+      await expect(page.getByText('1 근 = 0.6 KG')).toBeVisible()
+    },
+    markers: [
+      { label: '1', target: (page) => page.locator('#unit-type') },
+      { label: '2', target: (page) => page.locator('#section-conversion') },
+      { label: '3', target: (page) => page.getByRole('button', { name: '저장' }) },
+    ],
+  },
   list('/admin/master/external-codes'),
   // ── 입고 (목록·등록. 단계 화면은 아래 입고 흐름에서)
   {
