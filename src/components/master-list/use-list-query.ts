@@ -23,6 +23,8 @@ type UseListQueryOptions<TRow> = {
   autoSearch?: boolean
   // 사용자가 정렬을 고르지 않았을 때 (서버의 기본 정렬과 같게)
   defaultSort?: DataGridSort[]
+  // 사용자가 건수를 고르지 않았을 때 한 페이지 건수 (기본 20, 건수가 많은 목록은 50 — 예: 로케이션)
+  defaultPageSize?: number
 }
 
 // 목록으로 돌아갈 주소 저장 키 (상세 화면의 [목록] 버튼이 읽는다)
@@ -56,6 +58,7 @@ export function useListQuery<TRow>({
   fetch,
   autoSearch = true,
   defaultSort = [],
+  defaultPageSize = DEFAULT_PAGE_SIZE,
 }: UseListQueryOptions<TRow>) {
   const router = useRouter()
   const pathname = usePathname()
@@ -63,7 +66,7 @@ export function useListQuery<TRow>({
   const saved = useGridSettingsStore().get(gridId)
   const defaults: ListDefaults = useMemo(
     () => ({
-      pageSize: saved?.pageSize ?? DEFAULT_PAGE_SIZE,
+      pageSize: saved?.pageSize ?? defaultPageSize,
       sorting: saved?.sorting ?? defaultSort,
     }),
     // 저장값은 화면에 들어올 때 한 번만 기준으로 삼는다

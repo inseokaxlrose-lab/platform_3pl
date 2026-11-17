@@ -1,10 +1,12 @@
-import { render, screen } from '@testing-library/react'
+import { fireEvent, render, screen } from '@testing-library/react'
 import { useState } from 'react'
 import { describe, expect, it } from 'vitest'
 import { CenterSelect } from './center-select'
+import { CodeRangeInput } from './code-range-input'
+import { ZoneSelect } from './zone-select'
 import { WarehouseSelect } from './warehouse-select'
 
-// 센터·창고 고르기 (docs/decisions/0074)
+// 센터·창고·구역 고르기, 코드 범위 입력 (docs/decisions/0074, 0075)
 
 const CENTERS = [{ id: 'c1', code: 'ICN', name: '이천센터' }]
 const WAREHOUSES = [
@@ -47,5 +49,39 @@ describe('CenterSelect · WarehouseSelect', () => {
     render(<Harness allowAll />)
     expect(screen.getByTestId('values').textContent).toBe('/')
     expect(document.getElementById('warehouse')).toHaveProperty('disabled', true)
+  })
+})
+
+describe('ZoneSelect · CodeRangeInput', () => {
+  it('창고를 고르기 전에는 구역이 꺼진다', () => {
+    render(
+      <ZoneSelect
+        id="zone"
+        options={[{ id: 'z1', warehouseId: 'w1', code: 'A', name: 'A구역' }]}
+        warehouseId=""
+        value=""
+        onChange={() => {}}
+      />,
+    )
+    expect(document.getElementById('zone')).toHaveProperty('disabled', true)
+  })
+
+  it('시작~끝을 한 글자로 (대문자로), 둘 다 비면 빈 값', () => {
+    function Harness() {
+      const [value, setValue] = useState('')
+      return (
+        <>
+          <CodeRangeInput value={value} onChange={setValue} />
+          <output data-testid="range">{value}</output>
+        </>
+      )
+    }
+    render(<Harness />)
+    fireEvent.change(screen.getByLabelText('시작 코드'), { target: { value: 'a-01' } })
+    fireEvent.change(screen.getByLabelText('끝 코드'), { target: { value: 'a-03' } })
+    expect(screen.getByTestId('range').textContent).toBe('A-01~A-03')
+    fireEvent.change(screen.getByLabelText('시작 코드'), { target: { value: '' } })
+    fireEvent.change(screen.getByLabelText('끝 코드'), { target: { value: '' } })
+    expect(screen.getByTestId('range').textContent).toBe('')
   })
 })
