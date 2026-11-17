@@ -24,6 +24,7 @@ export const AUDITED_MODELS: ReadonlySet<string> = new Set([
   'Item',
   'Customer',
   'Asn',
+  'RegionCenterMap',
 ])
 
 // 논리 삭제(del_yn)가 있는 표 (사용자는 계정을 지우지 않으므로 없음)
@@ -47,6 +48,10 @@ export const SOFT_DELETE_MODELS: ReadonlySet<string> = new Set([
 // 운영사 데이터가 들어가는 표 (operator_id가 있는 표, docs/decisions/0039)
 // 서버 액션 안(운영사 출입증이 있을 때)에서는 읽기·수정·삭제에 이 운영사 조건이 자동으로 붙고, 등록에 운영사가 자동으로 채워진다
 export const TENANT_MODELS: ReadonlySet<string> = new Set([
+  // 권역설정 (0076): 배정표·작업 단위·변경 이력
+  'RegionCenterMap',
+  'RegionChangeBatch',
+  'RegionCenterMapHist',
   'User',
   'PermissionGroup',
   'Center',
