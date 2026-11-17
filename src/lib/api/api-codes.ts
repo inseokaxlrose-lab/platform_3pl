@@ -42,3 +42,12 @@ export const MAX_ITEMS_PER_REQUEST = 500
 export const LOG_BODY_DAYS = 90
 export const LOG_KEEP_DAYS = 365
 export const IDEMPOTENCY_HOURS = 24
+
+// API 구분 (요청 로그·호출 이력의 api_cd): 새 엔드포인트를 만들면 여기에 이름을 더한다
+// 키 확인 전에 실패한 요청도 이 이름으로 남는다
+export const API_CODE_LABELS: Record<string, string> = {
+  ME: '내 정보 (GET /me)',
+}
+
+// 요청 로그 결과
+export const API_LOG_RESULT = codeSet({ SUCCESS: '성공', PARTIAL: '부분 성공', FAIL: '실패' })

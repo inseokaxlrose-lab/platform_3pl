@@ -33,6 +33,7 @@ export default async function EditShipperPage({
     canViewKeys,
     canIssueKey,
     canUpdateKey,
+    canViewLogs,
   ] = await Promise.all([
     getShipperForEdit(id, scope),
     getCenterChoices(scope),
@@ -43,6 +44,7 @@ export default async function EditShipperPage({
     hasPermission('integration.api-keys.read'),
     hasPermission('integration.api-keys.create'),
     hasPermission('integration.api-keys.update'),
+    hasPermission('integration.api-logs.read'),
   ])
   if (!shipper) notFound()
   // API 키 섹션: 키 조회 권한 + 운영사 사용자(전체 범위)만 (0081)
@@ -98,6 +100,7 @@ export default async function EditShipperPage({
             keys={apiKeys}
             canCreate={canIssueKey}
             canUpdate={canUpdateKey}
+            canViewLogs={canViewLogs}
             disabledReason={
               shipper.status === 'TERMINATED'
                 ? '해지된 화주사에는 키를 발급할 수 없습니다'

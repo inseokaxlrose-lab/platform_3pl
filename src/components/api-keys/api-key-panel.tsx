@@ -1,6 +1,7 @@
 'use client'
 
-import { BanIcon, KeyRoundIcon, PencilIcon } from 'lucide-react'
+import { ActivityIcon, BanIcon, KeyRoundIcon, PencilIcon } from 'lucide-react'
+import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useState } from 'react'
 import { ConfirmDialog, StatusBadge } from '@/components/common'
@@ -21,12 +22,15 @@ export function ApiKeyPanel({
   keys,
   canCreate,
   canUpdate,
+  canViewLogs = false,
   disabledReason,
 }: {
   shipperId: string
   keys: ShipperApiKey[]
   canCreate: boolean
   canUpdate: boolean
+  // API 호출 이력 조회 권한: 줄마다 [호출 이력] (이 키의 최근 7일)
+  canViewLogs?: boolean
   // 발급할 수 없는 이유 (해지된 화주 등)
   disabledReason?: string
 }) {
@@ -101,36 +105,46 @@ export function ApiKeyPanel({
                     {key.revokeReason && ` · 폐기 사유: ${key.revokeReason}`}
                   </p>
                 </div>
-                {canUpdate && active && (
-                  <div className="flex shrink-0 gap-1.5">
-                    <Button
-                      type="button"
-                      size="sm"
-                      variant="outline"
-                      onClick={() => setEditing(key)}
-                    >
-                      <PencilIcon />
-                      수정
+                <div className="flex shrink-0 gap-1.5">
+                  {canViewLogs && (
+                    <Button asChild size="sm" variant="outline">
+                      <Link href={`/admin/integration/api-logs?apiClient=${key.id}`}>
+                        <ActivityIcon />
+                        호출 이력
+                      </Link>
                     </Button>
-                    <ConfirmDialog
-                      trigger={
-                        <Button type="button" size="sm" variant="outline">
-                          <BanIcon />
-                          폐기
-                        </Button>
-                      }
-                      title={`${key.name} 키를 폐기할까요?`}
-                      description="즉시 효력이 생겨 이 키로 오는 다음 호출부터 거부(401)됩니다. 되돌릴 수 없습니다."
-                      confirmLabel="폐기"
-                      destructive
-                      reason={{ label: '폐기 사유', placeholder: '예: 키 교체, 유출 의심' }}
-                      onConfirm={async (reason) => {
-                        unwrap(await revokeApiKeyAction({ id: key.id, reason: reason ?? '' }))
-                        router.refresh()
-                      }}
-                    />
-                  </div>
-                )}
+                  )}
+                  {canUpdate && active && (
+                    <>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        onClick={() => setEditing(key)}
+                      >
+                        <PencilIcon />
+                        수정
+                      </Button>
+                      <ConfirmDialog
+                        trigger={
+                          <Button type="button" size="sm" variant="outline">
+                            <BanIcon />
+                            폐기
+                          </Button>
+                        }
+                        title={`${key.name} 키를 폐기할까요?`}
+                        description="즉시 효력이 생겨 이 키로 오는 다음 호출부터 거부(401)됩니다. 되돌릴 수 없습니다. 유출이 의심되면 [호출 이력]에서 이 키의 최근 7일 호출(IP·시각)을 먼저 확인하세요."
+                        confirmLabel="폐기"
+                        destructive
+                        reason={{ label: '폐기 사유', placeholder: '예: 키 교체, 유출 의심' }}
+                        onConfirm={async (reason) => {
+                          unwrap(await revokeApiKeyAction({ id: key.id, reason: reason ?? '' }))
+                          router.refresh()
+                        }}
+                      />
+                    </>
+                  )}
+                </div>
               </li>
             )
           })}

@@ -23,6 +23,7 @@ import {
   WarehouseIcon,
   type LucideIcon,
   KeyRoundIcon,
+  ActivityIcon,
 } from 'lucide-react'
 import type { PermissionCode } from './permissions'
 
@@ -220,6 +221,13 @@ const adminNavigation: NavArea = {
           icon: KeyRoundIcon,
           ready: true,
           permission: 'integration.api-keys.read',
+        },
+        {
+          title: 'API 호출 이력',
+          href: '/admin/integration/api-logs',
+          icon: ActivityIcon,
+          ready: true,
+          permission: 'integration.api-logs.read',
         },
       ],
     },

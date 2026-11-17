@@ -99,6 +99,7 @@ const SHOTS: Shot[] = [
   list('/admin/master/locations'),
   list('/admin/master/shippers'),
   list('/admin/integration/api-keys'),
+  list('/admin/integration/api-logs'),
   {
     // 화주사 등록: ① 섹션 목차 ② 기본 정보 ③ [저장] (0080)
     src: '/help/admin/master/shippers/new.png',
