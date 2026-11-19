@@ -1684,8 +1684,8 @@
 | 26 | `category2` | 분류2 |  | VARCHAR(50) | Y |  |  |
 | 27 | `category3` | 분류3 |  | VARCHAR(50) | Y |  |  |
 | 28 | `currency_cd` | 통화 코드 |  | CHAR(3) | Y |  |  |
-| 29 | `default_inbound_unit_id` | 기본 입고 단위 ID |  | BIGINT | N |  | FK → tb_unit.unit_id |
-| 30 | `default_order_unit_id` | 기본 주문 단위 ID |  | BIGINT | N |  | FK → tb_unit.unit_id |
+| 29 | `default_inbound_unit_id` | 기본 입고 단위 ID | 기본 입고·주문단위: NULL = 자동 (입고 = BOX, 없으면 기본단위 / 주문 = 기본단위) | BIGINT | Y |  | FK → tb_unit.unit_id |
+| 30 | `default_order_unit_id` | 기본 주문 단위 ID |  | BIGINT | Y |  | FK → tb_unit.unit_id |
 | 31 | `expiry_input_cd` | 기한 입력 코드 |  | VARCHAR(20) | Y |  |  |
 | 32 | `expiry_type_cd` | 기한 유형 코드 |  | VARCHAR(20) | Y |  |  |
 | 33 | `ext_attr` | 확장속성 | 확장 속성 (JSON) | JSONB | Y |  |  |
