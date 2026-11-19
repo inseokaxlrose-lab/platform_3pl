@@ -3,6 +3,7 @@
 - 상태: 1a(이름 바꾸기) **적용 완료** — 마이그레이션 `20261115075033_naming_convention` / 1b(BIGINT 키) **적용 완료** — `20261115083253_bigint_keys` / 1c(Y/N) **적용 완료** — `_yn_char`. 2단계(공통 칸)는 아래 규칙대로 진행 예정
 - 결정: 사용자 결정 2026-11-15 — 정의서 규칙을 모든 표에 적용, `_yn`은 CHAR(1) 'Y'/'N', 내부 키 BIGINT, 코드 쪽 이름은 camelCase 유지
 - 관련: `docs/specs/operator.md`(운영사 컬럼 정의서), 0037(명명 규칙)·0038(공통 칸)·0039(멀티테넌트)
+- **테이블 정의서**: `docs/db/DB_테이블정의서.xlsx`(엑셀) · `docs/db/table-definitions.md` — `npm run db:doc`가 실제 DB 구조와 `prisma/schema.prisma` 주석으로 만든다. 손으로 고치지 않고, **마이그레이션을 적용하면 다시 돌려 함께 커밋**한다. 칼럼 설명은 스키마 주석, 한글명은 `scripts/db-doc-words.ts` 사전에서 온다
 
 ## 규칙
 
