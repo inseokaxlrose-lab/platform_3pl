@@ -24,7 +24,11 @@ const ITEM_SELECT = {
   spec: true,
   expiryAlertDays: true,
   baseUnit: { select: { code: true } },
-  units: { select: { convQty: true, unit: { select: { code: true } } } },
+  // 환산단위 (기본단위 행은 빼고, 0083)
+  units: {
+    where: { level: { not: 'BASE' } },
+    select: { convQty: true, unit: { select: { code: true } } },
+  },
 } as const
 
 type ItemInfo = {
@@ -69,14 +73,7 @@ export async function listStock(input: ListQuery, scope: DataScope) {
   const view = parseView(filters.view)
   const today = kstToday()
   const query = toPrismaQuery(input, {
-    searchFields: [
-      'item.code',
-      'item.name',
-      'item.barcode',
-      'location.code',
-      'lotNo',
-      'shipper.name',
-    ],
+    searchFields: ['item.code', 'item.name', 'location.code', 'lotNo', 'shipper.name'],
     sortable: {
       center: 'center.code',
       warehouse: 'warehouse.code',
@@ -90,9 +87,15 @@ export async function listStock(input: ListQuery, scope: DataScope) {
     },
     defaultOrderBy: { updatedAt: 'desc' },
   })
+  // 검색어는 품목 바코드(어느 단위든)로도 찾는다 (바코드는 tb_item_barcode, 0083)
+  const keyword = input.search.trim()
   const where = {
     AND: [
-      query.where,
+      keyword
+        ? {
+            OR: [query.where, { item: { barcodes: { some: { barcode: { contains: keyword } } } } }],
+          }
+        : query.where,
       scopeFilter(scope, STOCK_SCOPE),
       idFilter(filters, 'center') ? { centerId: idFilter(filters, 'center') } : {},
       idFilter(filters, 'warehouse') ? { warehouseId: idFilter(filters, 'warehouse') } : {},

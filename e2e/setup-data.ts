@@ -29,13 +29,15 @@ async function main() {
           expiryAlertDays: 30,
         },
       }))
-    for (const [pack, convQty] of [
-      [box, '24'],
-      [plt, '1440'],
+    // 단위 레벨별 1행 (BASE = 기본단위, 0083)
+    for (const [pack, convQty, level, sortOrder] of [
+      [ea, '1', 'BASE', 0],
+      [box, '24', 'BOX', 1],
+      [plt, '1440', 'PLT', 2],
     ] as const) {
       await prisma.itemUnit.upsert({
         where: { itemId_unitId: { itemId: item.id, unitId: pack.id } },
-        create: { itemId: item.id, unitId: pack.id, convQty, sortOrder: 0 },
+        create: { itemId: item.id, unitId: pack.id, convQty, level, sortOrder },
         update: {},
       })
     }

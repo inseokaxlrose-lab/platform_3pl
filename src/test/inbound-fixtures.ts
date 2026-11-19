@@ -3,6 +3,7 @@ import { prisma } from '@/lib/prisma'
 import { systemUnit } from '@/test/factories'
 import { createTestCenter, createTestShipper } from './factories'
 import { TEST_OPERATOR_ID } from './reset-database'
+import { MILK_OPTIONS } from '@/test/item-input'
 
 // 입고 테스트 공통 준비 데이터 (resetDatabase 다음에 부른다)
 // 이천센터(ICN)·김해센터(GMH) (각각 입고대기 창고) / 화주사 가나(이천 이용)·다라(김해 이용)
@@ -89,13 +90,13 @@ export async function createInboundFixture() {
       await item(gana.id, 'WATER', ea.id, {
         units: {
           create: [
-            { unitId: box.id, convQty: '24' },
-            { unitId: plt.id, convQty: '1440' },
+            { unitId: box.id, convQty: '24', level: 'BOX' },
+            { unitId: plt.id, convQty: '1440', level: 'PLT' },
           ],
         },
       })
     ).id,
-    milk: (await item(gana.id, 'MILK', ea.id, { useLot: 'Y', useExpiry: 'Y' })).id,
+    milk: (await item(gana.id, 'MILK', ea.id, MILK_OPTIONS)).id,
     rice: (await item(gana.id, 'RICE', kg.id)).id,
     daraItem: (await item(dara.id, 'DARA1', ea.id)).id,
   }

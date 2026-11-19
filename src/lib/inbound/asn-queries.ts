@@ -7,7 +7,6 @@ import { prisma } from '@/lib/prisma'
 import { isInScope, scopeFilter, type DataScope } from '@/lib/scope/data-scope'
 import { ACTIVE_ONLY } from '@/lib/status'
 import { qtyText, parseQty } from '@/lib/units/convert'
-import { isYes } from '@/lib/yn'
 import type { AsnFormOptions, AsnItemOption } from './asn-options'
 import { lineProgress } from './asn-progress'
 import type { AsnInput } from './asn-schema'
@@ -63,12 +62,18 @@ export async function getAsnItemOptions(
       code: true,
       name: true,
       spec: true,
-      barcode: true,
+      // 대표 바코드 (스캔·검색용, 0083 — 기본단위 것을 먼저)
+      barcodes: {
+        where: { isPrimary: 'Y' },
+        select: { barcode: true, unit: { select: { code: true } } },
+      },
       useLot: true,
       useExpiry: true,
       labelUnit: true,
       baseUnit: { select: { code: true, ...unitDecimalsSelect(scope.operatorId ?? 0n) } },
+      // 환산단위 (기본단위 행은 빼고, 0083)
       units: {
+        where: { level: { not: 'BASE' } },
         select: {
           convQty: true,
           unit: { select: { code: true, ...unitDecimalsSelect(scope.operatorId ?? 0n) } },
@@ -82,13 +87,16 @@ export async function getAsnItemOptions(
   resolveUnitDecimals(items)
   const defaults = shipperItemDefaults(shipper)
   return textIds(
-    items.map(({ units, useLot, useExpiry, labelUnit, ...item }) => {
+    items.map(({ units, useLot, useExpiry, labelUnit, barcodes, ...item }) => {
       const options = effectiveItemOptions(
         { useLot: useLot as 'Y' | 'N' | null, useExpiry: useExpiry as 'Y' | 'N' | null, labelUnit },
         defaults,
       )
       return {
         ...item,
+        barcode:
+          (barcodes.find((b) => b.unit.code === item.baseUnit.code) ?? barcodes[0])?.barcode ??
+          null,
         units: units.map((u) => ({
           code: u.unit.code,
           convQty: qty(u.convQty),

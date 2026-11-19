@@ -25,6 +25,9 @@ export const AUDITED_MODELS: ReadonlySet<string> = new Set([
   'Customer',
   // 납품처 (0082)
   'ShipTo',
+  'ItemUnit',
+  'ItemBarcode',
+  'PalletType',
   'Asn',
   'RegionCenterMap',
   // 화주 연동 API 키 (0081)
@@ -46,6 +49,7 @@ export const SOFT_DELETE_MODELS: ReadonlySet<string> = new Set([
   'Item',
   'Customer',
   'ShipTo',
+  'PalletType',
   'Asn',
 ])
 
@@ -71,6 +75,8 @@ export const TENANT_MODELS: ReadonlySet<string> = new Set([
   'Item',
   'Customer',
   'ShipTo',
+  'ItemBarcode',
+  'PalletType',
   'Stock',
   'StockTxn',
   'Asn',
@@ -110,7 +116,7 @@ function notDeleted<T extends { where?: unknown }>(model: string, args: T): T {
 
 // 시스템 줄(operator_id 비어 있음)을 모든 운영사가 함께 보는 표 (단위의 시스템 기본 단위, 0078)
 // 읽을 때는 "시스템 + 지금 운영사", 고치거나 지울 때는 지금 운영사의 줄만 → 시스템 줄은 운영사가 고칠 수 없다
-export const SHARED_SYSTEM_MODELS: ReadonlySet<string> = new Set(['Unit'])
+export const SHARED_SYSTEM_MODELS: ReadonlySet<string> = new Set(['Unit', 'PalletType'])
 
 // 운영사 거르기: 서버 액션 안이면 지금 운영사의 줄만 (조건에 다른 운영사를 적어도 지금 운영사로 덮어쓴다 → 새지 않는 쪽으로)
 // 서버 액션 밖(화면 조회 함수)은 데이터 범위 scopeFilter·isInScope가 운영사를 거른다

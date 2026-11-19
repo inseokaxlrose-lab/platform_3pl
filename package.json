@@ -11,6 +11,7 @@
     "format:check": "prettier --check .",
     "postinstall": "prisma generate",
     "db:check": "tsx scripts/db-check.ts",
+    "db:doc": "tsx scripts/db-doc.ts",
     "region:load": "tsx --conditions=react-server scripts/region-load.ts",
     "db:studio": "prisma studio",
     "test": "vitest run",

@@ -12,7 +12,6 @@ import {
 import { prisma } from '@/lib/prisma'
 import { scopeFilter, type DataScope } from '@/lib/scope/data-scope'
 import { DELETED_ONLY, withIsActive } from '@/lib/status'
-import { isYes } from '@/lib/yn'
 import { formatQty } from '@/lib/units/convert'
 import { effectiveItemOptions } from './item-schema'
 
@@ -40,7 +39,7 @@ export async function assertItemsInScope(ids: bigint[], scope: DataScope, delete
 export async function listItems(input: ListQuery, scope: DataScope) {
   const { filters } = input
   const query = toPrismaQuery(input, {
-    searchFields: ['code', 'systemCode', 'name', 'barcode', 'shipper.name', 'shipper.code'],
+    searchFields: ['code', 'systemCode', 'name', 'shipper.name', 'shipper.code'],
     sortable: {
       code: 'code',
       name: 'name',
@@ -51,15 +50,17 @@ export async function listItems(input: ListQuery, scope: DataScope) {
     },
     defaultOrderBy: { code: 'asc' },
   })
-  // 로트·유통기한 거르기는 "실제로 적용되는 값" 기준 (품목이 비어 있으면 화주사 기본값)
+  // 로트·기한 관리 여부는 품목의 명시값 (0083)
   const optionWhere = (key: 'useLot' | 'useExpiry', value: 'Y' | 'N' | undefined) =>
-    value === undefined
-      ? {}
-      : { OR: [{ [key]: value }, { [key]: null, shipper: { [key]: value } }] }
+    value === undefined ? {} : { [key]: value }
+  // 검색어는 바코드(어느 단위든)로도 찾는다
+  const keyword = input.search.trim()
   const createdAt = dateRangeFilter(filters, 'createdAt')
   const where = {
     AND: [
-      query.where,
+      keyword
+        ? { OR: [query.where, { barcodes: { some: { barcode: { contains: keyword } } } }] }
+        : query.where,
       scopeFilter(scope, ITEM_SCOPE),
       idFilter(filters, 'shipper') ? { shipperId: idFilter(filters, 'shipper') } : {},
       statusWhere(filters),
@@ -79,7 +80,12 @@ export async function listItems(input: ListQuery, scope: DataScope) {
         code: true,
         name: true,
         spec: true,
-        barcode: true,
+        // 대표 바코드 (기본단위의 것을 먼저)
+        barcodes: {
+          where: { isPrimary: 'Y' },
+          select: { barcode: true, unitId: true },
+        },
+        baseUnitId: true,
         useLot: true,
         useExpiry: true,
         labelUnit: true,
@@ -91,7 +97,9 @@ export async function listItems(input: ListQuery, scope: DataScope) {
           select: { code: true, name: true, ...shipperDefaultsSelect },
         },
         baseUnit: { select: { code: true } },
+        // 환산단위 (기본단위 행은 빼고)
         units: {
+          where: { level: { not: 'BASE' } },
           select: { convQty: true, unit: { select: { code: true } } },
           orderBy: { sortOrder: 'asc' },
         },
@@ -100,7 +108,7 @@ export async function listItems(input: ListQuery, scope: DataScope) {
     prisma.item.count({ where }),
   ])
   return {
-    rows: rows.map(withIsActive).map(({ shipper, baseUnit, units, ...row }) => {
+    rows: rows.map(withIsActive).map(({ shipper, baseUnit, units, barcodes, ...row }) => {
       const options = effectiveItemOptions(
         {
           useLot: row.useLot as 'Y' | 'N' | null,
@@ -115,7 +123,8 @@ export async function listItems(input: ListQuery, scope: DataScope) {
         code: row.code,
         name: row.name,
         spec: row.spec,
-        barcode: row.barcode,
+        barcode:
+          (barcodes.find((b) => b.unitId === row.baseUnitId) ?? barcodes[0])?.barcode ?? null,
         shipper: `${shipper.name} (${shipper.code})`,
         baseUnit: baseUnit.code,
         // 환산단위 요약: 'BOX 24 · PLT 1,440'

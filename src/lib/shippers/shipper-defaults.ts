@@ -9,24 +9,46 @@ import { isYes } from '@/lib/yn'
 export const shipperDefaultsSelect = {
   useLot: true,
   useExpiry: true,
+  useSerial: true,
+  allocRule: true,
+  minInboundShelfDays: true,
+  minOutboundShelfDays: true,
   labelUnit: true,
-  operator: { select: { useLot: true, useExpiry: true } },
+  operator: { select: { useLot: true, useExpiry: true, useSerial: true, allocRule: true } },
 } as const
 
 export type ShipperDefaultsRow = {
   useLot: string | null
   useExpiry: string | null
+  useSerial: string | null
+  allocRule: string | null
+  minInboundShelfDays: number | null
+  minOutboundShelfDays: number | null
   labelUnit: 'PLT' | 'BOX'
-  operator: { useLot: string; useExpiry: string }
+  operator: { useLot: string; useExpiry: string; useSerial: string; allocRule: string }
 }
 
-export type ShipperItemDefaults = { useLot: boolean; useExpiry: boolean; labelUnit: 'PLT' | 'BOX' }
+// 품목 기본값: 새 품목에 복사하는 관리 여부(기한·LOT·시리얼, 0083 — 복사 후에는 화주 설정과 무관) +
+// 품목이 비워 두면 따르는 값(할당 규칙·최소 잔여일·라벨 단위)
+export type ShipperItemDefaults = {
+  useLot: boolean
+  useExpiry: boolean
+  useSerial: boolean
+  allocRule: string
+  minInboundShelfDays: number | null
+  minOutboundShelfDays: number | null
+  labelUnit: 'PLT' | 'BOX'
+}
 
 // 조회한 화주사 → 품목 기본값 (true/false)
 export function shipperItemDefaults(shipper: ShipperDefaultsRow): ShipperItemDefaults {
   return {
     useLot: isYes(shipper.useLot ?? shipper.operator.useLot),
     useExpiry: isYes(shipper.useExpiry ?? shipper.operator.useExpiry),
+    useSerial: isYes(shipper.useSerial ?? shipper.operator.useSerial),
+    allocRule: shipper.allocRule ?? shipper.operator.allocRule,
+    minInboundShelfDays: shipper.minInboundShelfDays,
+    minOutboundShelfDays: shipper.minOutboundShelfDays,
     labelUnit: shipper.labelUnit,
   }
 }

@@ -8,6 +8,7 @@ import { createTestCenter, createTestShipper, systemUnit } from '@/test/factorie
 import { createTestOperator, resetDatabase, TEST_OPERATOR_ID } from '@/test/reset-database'
 import { adjustStock, moveStock, receiveStock } from './stock-change'
 import { withStockWrite } from './stock-write-guard'
+import { MILK_OPTIONS } from '@/test/item-input'
 
 // 재고 변경 공통 함수 (docs/decisions/0045)
 // 예: 이천센터(ICN) / 입고대기 창고 DEFAULT 로케이션 + 일반 창고 A-01·A-02 / 화주사 가나
@@ -79,7 +80,7 @@ beforeEach(async () => {
     a02: (await location(general.id, 'A-02')).id,
     gmhStaging: (await firstLocation(gmhInbound.id)).id,
     water: (await item('WATER', ea.id)).id,
-    milk: (await item('MILK', ea.id, { useLot: 'Y', useExpiry: 'Y' })).id,
+    milk: (await item('MILK', ea.id, MILK_OPTIONS)).id,
     rice: (await item('RICE', kg.id)).id,
   }
 })

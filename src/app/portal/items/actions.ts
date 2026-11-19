@@ -6,7 +6,7 @@ import { createAction } from '@/lib/actions/create-action'
 import { listQuerySchema } from '@/lib/grid/grid-query'
 import { idSchema } from '@/lib/id'
 import { assertItemsInScope, listItems } from '@/lib/items/item-list'
-import { itemSchema } from '@/lib/items/item-schema'
+import { itemCodeField, itemSchema } from '@/lib/items/item-schema'
 import {
   createItem,
   deleteItems,
@@ -47,14 +47,16 @@ export const listPortalItemsAction = createAction({
 
 export const createPortalItemAction = createAction({
   permission: 'portal.items.create',
-  input: portalItemSchema,
-  handler: async ({ input, scope }) => createItem({ ...input, shipperId: shipperOf(scope) }),
+  // 등록: 품목코드를 넣는다 (화주사는 로그인한 화주사)
+  input: z.object({ code: itemCodeField }).and(portalItemSchema),
+  handler: async ({ input, scope }) =>
+    createItem({ ...input, shipperId: shipperOf(scope) }, { source: 'PORTAL' }),
 })
 
 // 수정 (rowVersion: 화면이 불러온 버전, 동시 수정 막기)
 export const updatePortalItemAction = createAction({
   permission: 'portal.items.update',
-  input: portalItemSchema.extend({ id: idSchema, rowVersion: rowVersionField }),
+  input: portalItemSchema.and(z.object({ id: idSchema, rowVersion: rowVersionField })),
   handler: async ({ input: { id, rowVersion, ...data }, scope }) => {
     shipperOf(scope)
     await assertItemsInScope([id], scope)

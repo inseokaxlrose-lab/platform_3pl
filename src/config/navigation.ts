@@ -24,6 +24,7 @@ import {
   WarehouseIcon,
   type LucideIcon,
   KeyRoundIcon,
+  LayersIcon,
   ActivityIcon,
 } from 'lucide-react'
 import type { PermissionCode } from './permissions'
@@ -106,6 +107,14 @@ const adminNavigation: NavArea = {
           title: '단위',
           href: '/admin/master/units',
           icon: RulerIcon,
+          ready: true,
+          permission: 'master.units.read',
+        },
+        {
+          // 팔레트 종류 (0083): 품목 PLT 계산 기준 — 권한은 단위와 같다
+          title: '팔레트 종류',
+          href: '/admin/master/pallet-types',
+          icon: LayersIcon,
           ready: true,
           permission: 'master.units.read',
         },

@@ -23,7 +23,8 @@ export default async function PortalNewItemPage() {
     <ItemForm
       header={{
         title: '품목 등록',
-        description: '품목코드를 비우면 자동으로 부여되는 시스템 코드를 그대로 씁니다.',
+        description:
+          '품목코드는 화주가 쓰는 코드를 그대로 넣습니다 (등록 후 바꿀 수 없음). 기한·LOT 관리는 화주사 설정을 기본값으로 가져옵니다.',
         actions: <BackToListButton listPath="/portal/items" />,
       }}
       options={options}
