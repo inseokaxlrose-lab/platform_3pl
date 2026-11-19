@@ -114,6 +114,39 @@ const SHOTS: Shot[] = [
     ],
   },
   list('/admin/master/items'),
+  {
+    // 품목 등록 (0083): BOX 24 + 규격, 팔레트 T11 · 10 × 5단 → PLT 자동 계산이 보이게
+    // ① 단위·규격 표 ② 팔레트 적재 요약 ③ [저장]
+    src: '/help/admin/master/items/new.png',
+    url: '/admin/master/items/new',
+    account: 'admin',
+    prepare: async (page) => {
+      await page.locator('#item-shipperId').click()
+      await page.getByRole('option', { name: /GANA/ }).click()
+      await page.locator('#item-baseUnitId').click()
+      await page.getByRole('option', { name: /^EA/ }).click()
+      await page.getByRole('button', { name: 'BOX 추가' }).click()
+      const box = {
+        convQty: '24',
+        widthCm: '30',
+        depthCm: '20',
+        heightCm: '25',
+        grossWeightKg: '12',
+      }
+      for (const [key, value] of Object.entries(box)) {
+        await page.locator(`#units-BOX-${key}`).fill(value)
+      }
+      await page.locator('#item-palletTi').fill('10')
+      await page.locator('#item-palletHi').fill('5')
+      await expect(page.getByText('1 PLT = 50 BOX', { exact: false })).toBeVisible()
+    },
+    scrollTo: (page) => page.locator('#section-units'),
+    markers: [
+      { label: '1', target: (page) => page.getByRole('table', { name: '단위·규격' }) },
+      { label: '2', target: (page) => page.locator('#section-pallet') },
+      { label: '3', target: (page) => page.getByRole('button', { name: '저장' }) },
+    ],
+  },
   list('/admin/master/customers'),
   {
     // 거래처 등록: 화주사를 고르면 [납품처 추가]가 열린다 — ① 주소 ② 납품처 ③ 저장 (0082)
@@ -143,6 +176,8 @@ const SHOTS: Shot[] = [
     ],
   },
   list('/admin/master/units'),
+  // 팔레트 종류 (0083): 시스템 기본 T11·T12와 운영사 기본 표시
+  list('/admin/master/pallet-types'),
   {
     // 운영사 추가 단위 '근' (중량): 환산 섹션과 "1 근 = 0.6 KG" 미리보기가 보이게
     src: '/help/admin/master/units/new.png',
