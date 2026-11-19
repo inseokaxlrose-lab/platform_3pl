@@ -1,4 +1,5 @@
 import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest'
+import { MILK_OPTIONS } from '@/test/item-input'
 import { ALL_PERMISSION_CODES, type PermissionCode } from '@/config/permissions'
 import { getAsnForEdit } from '@/lib/inbound/asn-queries'
 import type { AsnCreateInput } from '@/lib/inbound/asn-schema'
@@ -91,7 +92,7 @@ beforeEach(async () => {
     gana: gana.id,
     dara: dara.id,
     water: water.id,
-    milk: (await item(gana.id, 'MILK', ea.id, { useLot: 'Y', useExpiry: 'Y' })).id,
+    milk: (await item(gana.id, 'MILK', ea.id, MILK_OPTIONS)).id,
     rice: (await item(gana.id, 'RICE', kg.id)).id,
     daraItem: (await item(dara.id, 'DARA1', ea.id)).id,
   }

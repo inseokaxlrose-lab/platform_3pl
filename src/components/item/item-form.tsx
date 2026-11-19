@@ -1,9 +1,10 @@
 'use client'
 
-import { PowerIcon } from 'lucide-react'
+import { InfoIcon, PowerIcon } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { ConfirmDialog, StatusBadge } from '@/components/common'
-import { NumberInput } from '@/components/inputs'
+import { formatDate } from '@/components/data-grid'
+import { NumberInput, YnToggle } from '@/components/inputs'
 import {
   EditableSubTable,
   Field,
@@ -24,53 +25,80 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { Textarea } from '@/components/ui/textarea'
+import { ALLOC_RULE, TEMP_ZONE } from '@/config/operator-codes'
 import { unwrap } from '@/lib/actions'
 import type { ActionResult } from '@/lib/actions/result'
-import type { ItemFormOptions, ItemUnitOption } from '@/lib/items/item-form-options'
+import { calcPallet } from '@/lib/items/item-calc'
 import {
-  effectiveItemOptions,
+  BARCODE_TYPE,
+  EXPIRY_INPUT,
+  EXPIRY_TYPE,
+  ITEM_STATUS_BADGE,
+  ITEM_TYPE,
+  LOT_SOURCE,
+} from '@/lib/items/item-codes'
+import type { ItemFormOptions } from '@/lib/items/item-form-options'
+import {
   INHERIT,
   itemCreateSchema,
-  MAX_ITEM_UNITS,
-  type ItemCreateData,
+  MAX_ITEM_BARCODES,
+  type ItemBarcodeInput,
   type ItemCreateInput,
   type ItemInput,
 } from '@/lib/items/item-schema'
+import { LABEL_UNITS } from '@/lib/shippers/shipper-schema'
+import { ItemPalletSection } from './item-pallet-section'
+import { EMPTY_UNIT_ROW, ItemUnitsSection } from './item-units-section'
 
-// 고르기에서 "선택 안 함"을 나타내는 값 (Radix Select는 빈 글자를 값으로 못 쓴다)
+// "선택 안 함"·"화주사 값 따름" (Select는 빈 글자를 값으로 못 쓴다)
 const NONE = '__none__'
 
-// 저장한 값(키 bigint, 빈 칸 null) → 입력값(글자)
-function toFormValues(data: ItemCreateData): ItemCreateInput {
-  return {
-    shipperId: String(data.shipperId),
-    code: data.code,
-    name: data.name,
-    spec: data.spec ?? '',
-    barcode: data.barcode ?? '',
-    baseUnitId: String(data.baseUnitId),
-    useLot: data.useLot,
-    useExpiry: data.useExpiry,
-    labelUnit: data.labelUnit,
-    expiryAlertDays: data.expiryAlertDays === null ? '' : String(data.expiryAlertDays),
-    remark: data.remark ?? '',
-    units: data.units.map((u) => ({ unitId: String(u.unitId), convQty: u.convQty })),
-  }
-}
-
-const EMPTY: ItemCreateInput = {
-  shipperId: '',
+const EMPTY: Omit<ItemCreateInput, 'shipperId'> = {
   code: '',
   name: '',
+  nameEn: '',
+  shortName: '',
   spec: '',
-  barcode: '',
+  itemType: 'GOODS',
+  category1: '',
+  category2: '',
+  category3: '',
+  brandName: '',
+  makerName: '',
+  originCountry: '',
+  hsCode: '',
+  itemValue: '',
+  currency: '',
   baseUnitId: '',
-  useLot: INHERIT,
-  useExpiry: INHERIT,
+  defaultInboundUnitId: '',
+  defaultOrderUnitId: '',
+  units: [EMPTY_UNIT_ROW('BASE')],
+  palletTypeCode: '',
+  palletTi: null,
+  palletHi: null,
+  palletBoxQty: null,
+  tempZone: 'AMBIENT',
+  storageTempMin: '',
+  storageTempMax: '',
+  hazmat: false,
+  fragile: false,
+  maxStackBox: null,
+  upright: false,
+  useExpiry: false,
+  expiryType: '',
+  expiryInput: '',
+  shelfLifeDays: null,
+  minInboundShelfDays: null,
+  minOutboundShelfDays: null,
+  expiryAlertDays: null,
+  useLot: false,
+  lotSource: '',
+  useSerial: false,
+  allocRule: INHERIT,
   labelUnit: INHERIT,
-  expiryAlertDays: '',
+  boxOnlyShip: false,
+  barcodes: [],
   remark: '',
-  units: [],
 }
 
 // 저장 결과 (등록·수정 모두 키와 새 버전을 돌려준다)
@@ -79,12 +107,18 @@ type SaveResult = { id: string; rowVersion: number }
 // 수정 화면에 넘기는 품목 (조회 함수 결과)
 export type ItemFormItem = {
   id: string
+  code: string
   systemCode: string
   rowVersion: number
+  status: string
   isActive: boolean
+  source: string
+  lastIfAt: Date | string | null
   shipperId: string
   // '가나식품 (GANA)'
   shipper: string
+  // 재고·미완료 ASN 때문에 기본단위·관리 여부를 바꿀 수 없으면 그 이유
+  structureLock: string | null
   input: ItemInput
 }
 
@@ -106,8 +140,8 @@ type ItemFormProps = {
   setActiveAction: (input: { ids: string[]; isActive: boolean }) => Promise<ActionResult<unknown>>
 }
 
-// 품목 등록·수정 (docs/decisions/0041, 입력 화면 틀 0031) — 운영사 화면과 화주 포털이 같이 쓴다
-// 관리 옵션(로트·유통기한·라벨 단위)은 "화주사 기본값 따름"이 기본이고, 지금 실제로 적용되는 값을 함께 보여준다
+// 품목 등록·수정 (docs/decisions/0041, 0083 — 입력 화면 틀 0031). 운영사 화면과 화주 포털이 같이 쓴다
+// 섹션: 기본 정보 / 단위·규격 / 팔레트 적재 / 보관 조건 / 소비기한·LOT / 출고 조건 / 바코드 / 연동 정보 / 상태
 export function ItemForm({
   header,
   options,
@@ -121,112 +155,180 @@ export function ItemForm({
   setActiveAction,
 }: ItemFormProps) {
   const router = useRouter()
+  // 새 품목: 화주사 설정을 기본값으로 복사 (기한·LOT·시리얼 — 이후 화주 설정이 바뀌어도 그대로, 0083)
+  const shipperDefaults = (shipperId: string) => {
+    const shipper = options.shippers.find((s) => s.id === shipperId)
+    return shipper
+      ? {
+          useExpiry: shipper.useExpiry,
+          expiryType: shipper.useExpiry ? 'CONSUME' : '',
+          expiryInput: shipper.useExpiry ? 'EXPIRY' : '',
+          useLot: shipper.useLot,
+          lotSource: shipper.useLot ? 'INPUT' : '',
+          useSerial: shipper.useSerial,
+        }
+      : {}
+  }
+  const initialShipper = fixedShipperId ?? ''
   const form = useMasterForm({
     initial: item
-      ? { ...item.input, shipperId: item.shipperId }
-      : { ...EMPTY, shipperId: fixedShipperId ?? '' },
+      ? { ...item.input, shipperId: item.shipperId, code: item.code }
+      : {
+          ...EMPTY,
+          shipperId: initialShipper,
+          palletTypeCode: options.defaultPalletType,
+          ...shipperDefaults(initialShipper),
+        },
     version: item?.rowVersion,
     schema: itemCreateSchema,
-    save: (value: ItemCreateInput, version) =>
-      item
-        ? updateAction({ ...value, id: item.id, rowVersion: version ?? item.rowVersion })
-        : createAction(value),
-    afterSave: toFormValues,
+    save: (value: ItemCreateInput, version) => {
+      if (!item) return createAction(value)
+      // 수정: 화주사·품목코드는 보내지 않는다 (바꿀 수 없다)
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      const { shipperId, code, ...rest } = value
+      return updateAction({ ...rest, id: item.id, rowVersion: version ?? item.rowVersion })
+    },
     createdHref: item ? undefined : (created) => `${basePath}/${(created as { id: string }).id}`,
   })
   const { value, set, errors } = form
   const disabled = readOnly || form.pending
+  const structureLock = item?.structureLock ?? null
   const id = (key: string) => `item-${key}`
-  const props = (key: string) => ({ id: id(key), disabled, 'aria-invalid': Boolean(errors[key]) })
-
-  const unitById = new Map(options.units.map((u) => [u.id, u]))
-  // 고를 수 있는 단위: 사용 중인 것 + 지금 저장된 값 (사용 중지돼도 그대로 둘 수 있다)
-  // role BASE: 기본단위(포장 아닌 단위) / PACK: 환산단위(포장 단위) — 0078
-  const choosable = (role: 'BASE' | 'PACK', current: string) =>
-    options.units.filter(
-      (u) =>
-        (role === 'PACK' ? u.type === 'PACK' : u.type !== 'PACK') &&
-        (u.isActive || u.id === current),
-    )
-  const baseUnit = unitById.get(value.baseUnitId)
   const shipper = options.shippers.find((s) => s.id === value.shipperId)
-  // 지금 실제로 적용되는 관리 옵션 (화주사를 고르기 전에는 모른다)
-  const effective = shipper ? effectiveItemOptions(value, shipper) : null
-  const labelUnitMissing =
-    effective !== null &&
-    !value.units.some((u) => unitById.get(u.unitId)?.code === effective.labelUnit)
+  const unitOf = (unitId: string) => options.units.find((u) => u.id === unitId)
+  const baseUnit = unitOf(value.baseUnitId)
+
+  // 팔레트 계산 미리보기 (서버와 같은 함수)
+  const box = value.units.find((u) => u.level === 'BOX')
+  const pallet = options.pallets.find((p) => p.code === value.palletTypeCode) ?? null
+  let palletResult: ReturnType<typeof calcPallet> = null
+  try {
+    palletResult =
+      box && /^\d+(\.\d+)?$/.test(box.convQty) && Number(box.convQty) > 0
+        ? calcPallet(box, pallet, {
+            ti: value.palletTi,
+            hi: value.palletHi,
+            boxQty: value.palletBoxQty,
+          })
+        : null
+  } catch {
+    palletResult = null
+  }
 
   const text = (
-    key: 'code' | 'name' | 'spec' | 'barcode',
+    key:
+      | 'name'
+      | 'nameEn'
+      | 'shortName'
+      | 'spec'
+      | 'category1'
+      | 'category2'
+      | 'category3'
+      | 'brandName'
+      | 'makerName'
+      | 'originCountry'
+      | 'hsCode'
+      | 'currency',
     label: string,
     span: FieldSpan,
-    extra: { required?: boolean; placeholder?: string; newRow?: boolean } = {},
+    extra: { required?: boolean; placeholder?: string; newRow?: boolean; hint?: string } = {},
   ) => (
     <Field
       label={label}
       span={span}
       required={extra.required}
       newRow={extra.newRow}
+      hint={extra.hint}
       error={errors[key]}
       htmlFor={id(key)}
     >
       <Input
-        {...props(key)}
-        value={value[key]}
+        id={id(key)}
+        value={value[key] ?? ''}
         placeholder={extra.placeholder}
         onChange={(e) => set({ [key]: e.target.value })}
+        disabled={disabled}
+        aria-invalid={Boolean(errors[key])}
       />
     </Field>
   )
-
-  // 고르기 (값 목록이 고정된 칸)
-  const select = (
-    key: string,
-    current: string,
-    choices: { value: string; label: string }[],
-    onChange: (next: string) => void,
-    locked = false,
+  const select = <T extends string>(
+    key: keyof ItemCreateInput,
+    label: string,
+    span: FieldSpan,
+    choices: readonly { value: T; label: string }[],
+    extra: { required?: boolean; none?: string; hint?: string; lock?: boolean } = {},
   ) => (
-    <Select
-      // 비어 있을 때: "화주사 기본값"처럼 빈 값 선택지가 있으면 그것, 없으면 안내 글자("선택")가 보이게
-      value={current !== '' ? current : choices.some((c) => c.value === '') ? NONE : ''}
-      onValueChange={(next) => onChange(next === NONE ? '' : next)}
-      disabled={disabled || locked}
+    <Field
+      label={label}
+      span={span}
+      required={extra.required}
+      hint={extra.hint}
+      error={errors[key]}
+      htmlFor={id(key)}
     >
-      <SelectTrigger id={id(key)} className="w-full" aria-invalid={Boolean(errors[key])}>
-        <SelectValue placeholder="선택" />
-      </SelectTrigger>
-      <SelectContent>
-        {choices.map((choice) => (
-          <SelectItem key={choice.value || NONE} value={choice.value || NONE}>
-            {choice.label}
-          </SelectItem>
-        ))}
-      </SelectContent>
-    </Select>
-  )
-
-  // 관리 옵션 고르기: 화주사 기본값(지금 값) / 사용 / 안 함
-  const yn = (key: 'useLot' | 'useExpiry', label: string) => (
-    <Field label={label} span={4} error={errors[key]} htmlFor={id(key)}>
-      {select(
-        key,
-        value[key],
-        [
-          {
-            value: INHERIT,
-            label: `화주사 기본값${shipper ? ` (${shipper[key] ? '사용' : '안 함'})` : ''}`,
-          },
-          { value: 'Y', label: '사용' },
-          { value: 'N', label: '안 함' },
-        ],
-        (next) => set({ [key]: next as ItemInput['useLot'] }),
-      )}
+      <Select
+        value={String(value[key] ?? '') || NONE}
+        onValueChange={(v) => set({ [key]: v === NONE ? '' : v } as Partial<ItemCreateInput>)}
+        disabled={disabled || extra.lock}
+      >
+        <SelectTrigger id={id(key)} className="w-full" aria-invalid={Boolean(errors[key])}>
+          <SelectValue placeholder="선택" />
+        </SelectTrigger>
+        <SelectContent>
+          {extra.none && <SelectItem value={NONE}>{extra.none}</SelectItem>}
+          {choices.map((c) => (
+            <SelectItem key={c.value} value={c.value}>
+              {c.label}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
     </Field>
   )
-
-  const unitLabel = (u: ItemUnitOption) =>
-    `${u.code} · ${u.name}${u.isActive ? '' : ' (사용 중지)'}`
+  const days = (
+    key:
+      | 'shelfLifeDays'
+      | 'minInboundShelfDays'
+      | 'minOutboundShelfDays'
+      | 'expiryAlertDays'
+      | 'maxStackBox',
+    label: string,
+    span: FieldSpan,
+    hint?: string,
+  ) => (
+    <Field label={label} span={span} hint={hint} error={errors[key]} htmlFor={id(key)}>
+      <NumberInput
+        id={id(key)}
+        value={value[key] ?? null}
+        onChange={(n) => set({ [key]: n })}
+        min={0}
+        max={36500}
+        disabled={disabled}
+      />
+    </Field>
+  )
+  const toggle = (
+    key: 'hazmat' | 'fragile' | 'upright' | 'useExpiry' | 'useLot' | 'useSerial' | 'boxOnlyShip',
+    label: string,
+    span: FieldSpan,
+    extra: { lock?: boolean; hint?: string; onLabel?: string; offLabel?: string } = {},
+  ) => (
+    <Field label={label} span={span} hint={extra.hint} htmlFor={id(key)}>
+      <YnToggle
+        id={id(key)}
+        value={value[key]}
+        onChange={(on) => set({ [key]: on })}
+        disabled={disabled || extra.lock}
+        onLabel={extra.onLabel ?? '예'}
+        offLabel={extra.offLabel ?? '아니오'}
+      />
+    </Field>
+  )
+  const itemUnitChoices = value.units
+    .map((u) => unitOf(u.unitId))
+    .filter((u): u is NonNullable<typeof u> => Boolean(u))
+    .map((u) => ({ value: u.id, label: u.code }))
 
   const sections: MasterFormSection[] = [
     {
@@ -241,25 +343,62 @@ export function ItemForm({
             error={errors.shipperId}
             htmlFor={id('shipperId')}
           >
-            {item ? (
-              // 화주사는 등록 후 바꿀 수 없다 (재고·이력이 화주사에 묶인다)
-              <Input id={id('shipperId')} value={item.shipper} disabled readOnly />
+            {item || fixedShipperId ? (
+              <Input
+                id={id('shipperId')}
+                value={
+                  item?.shipper ?? options.shippers.find((s) => s.id === fixedShipperId)?.name ?? ''
+                }
+                disabled
+                readOnly
+              />
             ) : (
-              select(
-                'shipperId',
-                value.shipperId,
-                options.shippers.map((s) => ({ value: s.id, label: `${s.name} (${s.code})` })),
-                (shipperId) => set({ shipperId }),
-                Boolean(fixedShipperId),
-              )
+              <Select
+                value={value.shipperId}
+                // 화주사를 바꾸면 그 화주사의 기한·LOT·시리얼 설정을 다시 기본값으로
+                onValueChange={(shipperId) => set({ shipperId, ...shipperDefaults(shipperId) })}
+                disabled={disabled}
+              >
+                <SelectTrigger
+                  id={id('shipperId')}
+                  className="w-full"
+                  aria-invalid={Boolean(errors.shipperId)}
+                >
+                  <SelectValue placeholder="선택" />
+                </SelectTrigger>
+                <SelectContent>
+                  {options.shippers.map((s) => (
+                    <SelectItem key={s.id} value={s.id}>
+                      {s.name} ({s.code})
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             )}
           </Field>
-          {text('code', '품목코드', 3, { placeholder: '비우면 시스템 코드', newRow: true })}
+          <Field
+            label="품목코드"
+            span={3}
+            required
+            newRow
+            error={errors.code}
+            htmlFor={id('code')}
+            hint={item ? '바꿀 수 없습니다' : '화주가 쓰는 코드 · 등록 후 바꿀 수 없습니다'}
+          >
+            <Input
+              id={id('code')}
+              value={value.code}
+              onChange={(e) => set({ code: e.target.value })}
+              disabled={disabled || Boolean(item)}
+              maxLength={50}
+              aria-invalid={Boolean(errors.code)}
+            />
+          </Field>
           <Field
             label="시스템 코드"
             span={3}
             htmlFor={id('system-code')}
-            hint="라벨·이력에 쓰는 바뀌지 않는 코드"
+            hint="출고·이력에 쓰는 바뀌지 않는 코드"
           >
             <Input
               id={id('system-code')}
@@ -268,15 +407,42 @@ export function ItemForm({
               readOnly
             />
           </Field>
+          {select('itemType', '품목 유형', 3, ITEM_TYPE.options, { required: true })}
           {text('name', '품목명', 8, { required: true, newRow: true })}
-          {text('spec', '규격', 4, { placeholder: '예: 500ml × 20' })}
-          {text('barcode', '바코드', 4, { placeholder: '선택' })}
+          {text('shortName', '약칭', 4, { hint: '피킹리스트·라벨 표시용' })}
+          {text('nameEn', '영문명', 8)}
+          {text('spec', '규격', 4, { placeholder: '예: 500g×24입' })}
+          {text('category1', '분류 1', 4, { newRow: true })}
+          {text('category2', '분류 2', 4)}
+          {text('category3', '분류 3', 4)}
+          {text('brandName', '브랜드', 4)}
+          {text('makerName', '제조사', 4)}
+          {text('originCountry', '원산지', 2, { placeholder: 'KR' })}
+          {text('hsCode', 'HS 코드', 2)}
+          <Field
+            label="품목 가액"
+            span={4}
+            newRow
+            error={errors.itemValue}
+            htmlFor={id('itemValue')}
+            hint="기본단위 1개 기준 (파손·분실 보상)"
+          >
+            <Input
+              id={id('itemValue')}
+              inputMode="decimal"
+              value={value.itemValue ?? ''}
+              onChange={(e) => set({ itemValue: e.target.value })}
+              disabled={disabled}
+            />
+          </Field>
+          {text('currency', '통화', 2, { placeholder: 'KRW' })}
           <Field label="비고" span={12} error={errors.remark} htmlFor={id('remark')}>
             <Textarea
-              {...props('remark')}
+              id={id('remark')}
               rows={2}
-              value={value.remark}
+              value={value.remark ?? ''}
               onChange={(e) => set({ remark: e.target.value })}
+              disabled={disabled}
             />
           </Field>
         </FormGrid>
@@ -284,11 +450,11 @@ export function ItemForm({
     },
     {
       id: 'units',
-      title: '단위',
+      title: '단위·규격',
       description:
-        '재고는 항상 기본단위로 저장합니다. 환산단위의 입수량은 기본단위 기준입니다 (예: BOX = 24 EA).',
+        '재고는 기본단위로 저장합니다. BOX·PLT는 기본단위 몇 개인지(환산수량)로 정합니다.',
       content: (
-        <div className="grid gap-4">
+        <div className="space-y-4">
           <FormGrid>
             <Field
               label="기본단위"
@@ -296,146 +462,340 @@ export function ItemForm({
               required
               error={errors.baseUnitId}
               htmlFor={id('baseUnitId')}
+              hint={
+                structureLock
+                  ? `${structureLock} 바꿀 수 없습니다`
+                  : '재고를 세는 단위 (포장 단위는 안 됨)'
+              }
             >
-              {select(
-                'baseUnitId',
-                value.baseUnitId,
-                choosable('BASE', value.baseUnitId).map((u) => ({
-                  value: u.id,
-                  label: unitLabel(u),
-                })),
-                (baseUnitId) => set({ baseUnitId }),
-              )}
+              <Select
+                value={value.baseUnitId}
+                onValueChange={(baseUnitId) =>
+                  set({
+                    baseUnitId,
+                    // 기본단위 행도 함께 바꾼다
+                    units: value.units.map((u) =>
+                      u.level === 'BASE' ? { ...u, unitId: baseUnitId } : u,
+                    ),
+                  })
+                }
+                disabled={disabled || Boolean(structureLock)}
+              >
+                <SelectTrigger
+                  id={id('baseUnitId')}
+                  className="w-full"
+                  aria-invalid={Boolean(errors.baseUnitId)}
+                >
+                  <SelectValue placeholder="선택" />
+                </SelectTrigger>
+                <SelectContent>
+                  {options.units
+                    .filter((u) => u.type !== 'PACK' && (u.isActive || u.id === value.baseUnitId))
+                    .map((u) => (
+                      <SelectItem key={u.id} value={u.id}>
+                        {u.code} {u.name}
+                      </SelectItem>
+                    ))}
+                </SelectContent>
+              </Select>
             </Field>
+            {select('defaultInboundUnitId', '기본 입고단위', 4, itemUnitChoices, {
+              none: '자동 (BOX, 없으면 기본단위)',
+            })}
+            {select('defaultOrderUnitId', '기본 주문단위', 4, itemUnitChoices, {
+              none: '자동 (기본단위)',
+            })}
           </FormGrid>
-          <EditableSubTable
-            name="units"
+          <ItemUnitsSection
             rows={value.units}
             onChange={(units) => set({ units })}
-            columns={[
-              {
-                key: 'unitId',
-                label: '환산단위',
-                required: true,
-                width: '12rem',
-                render: (cell) =>
-                  select(
-                    cell.id,
-                    cell.value,
-                    choosable('PACK', cell.value).map((u) => ({
-                      value: u.id,
-                      label: unitLabel(u),
-                    })),
-                    cell.onChange,
-                  ),
-              },
-              {
-                key: 'convQty',
-                label: `입수량${baseUnit ? ` (${baseUnit.code})` : ''}`,
-                required: true,
-                render: (cell) => (
-                  <NumberInput
-                    id={cell.id}
-                    disabled={cell.disabled}
-                    aria-invalid={cell.invalid}
-                    // 소수 자리는 기본단위를 따른다 (EA면 정수, KG면 3자리)
-                    decimals={baseUnit?.decimals ?? 0}
-                    min={0}
-                    unit={baseUnit?.code}
-                    value={cell.value === '' ? null : Number(cell.value)}
-                    onChange={(next) => cell.onChange(next === null ? '' : String(next))}
-                  />
-                ),
-              },
-            ]}
-            createRow={() => ({ unitId: '', convQty: '' })}
-            maxRows={MAX_ITEM_UNITS}
+            units={options.units}
+            baseUnitCode={baseUnit?.code ?? ''}
+            pltCalculated={palletResult}
             errors={errors}
-            addLabel="환산단위 추가"
-            countUnit="개"
-            emptyText="환산단위가 없습니다. 묶음으로 입고·출고하면 BOX·PLT 등을 넣어 주세요."
             disabled={disabled}
           />
-          {labelUnitMissing && (
-            <p className="text-sm text-warning" role="note">
-              라벨 단위 {effective!.labelUnit}의 입수량이 없습니다. 저장은 되지만, 라벨을 발행하려면{' '}
-              {effective!.labelUnit} 환산단위를 넣어야 합니다.
-            </p>
-          )}
         </div>
       ),
     },
     {
-      id: 'options',
-      title: '관리 옵션',
-      description:
-        '"화주사 기본값"을 고르면 화주사의 설정을 따르고, 화주사 설정을 바꾸면 함께 바뀝니다.',
+      id: 'pallet',
+      title: '팔레트 적재',
+      description: 'BOX를 팔레트에 어떻게 쌓는지로 PLT를 계산합니다.',
       content: (
-        <div className="grid gap-3">
-          <FormGrid>
-            {yn('useLot', '로트번호')}
-            {yn('useExpiry', '유통기한')}
-            <Field label="라벨 단위" span={4} error={errors.labelUnit} htmlFor={id('labelUnit')}>
-              {select(
-                'labelUnit',
-                value.labelUnit,
-                [
-                  {
-                    value: INHERIT,
-                    label: `화주사 기본값${shipper ? ` (${shipper.labelUnit})` : ''}`,
-                  },
-                  { value: 'PLT', label: 'PLT' },
-                  { value: 'BOX', label: 'BOX' },
-                ],
-                (labelUnit) => set({ labelUnit: labelUnit as ItemInput['labelUnit'] }),
+        <ItemPalletSection
+          value={{
+            palletTypeCode: value.palletTypeCode ?? '',
+            palletTi: value.palletTi,
+            palletHi: value.palletHi,
+            palletBoxQty: value.palletBoxQty,
+          }}
+          onChange={(patch) => set(patch)}
+          pallets={options.pallets}
+          result={palletResult}
+          boxReady={Boolean(box && Number(box.convQty) > 0)}
+          baseUnitCode={baseUnit?.code ?? ''}
+          errors={errors}
+          disabled={disabled}
+        />
+      ),
+    },
+    {
+      id: 'storage',
+      title: '보관 조건',
+      content: (
+        <FormGrid>
+          {select('tempZone', '보관 온도대', 3, TEMP_ZONE.options, {
+            required: true,
+            hint: '같은 온도대 창고에만 적치',
+          })}
+          <Field
+            label="보관 최저온도(℃)"
+            span={3}
+            error={errors.storageTempMin}
+            htmlFor={id('storageTempMin')}
+          >
+            <Input
+              id={id('storageTempMin')}
+              inputMode="decimal"
+              value={value.storageTempMin ?? ''}
+              onChange={(e) => set({ storageTempMin: e.target.value })}
+              disabled={disabled}
+            />
+          </Field>
+          <Field
+            label="보관 최고온도(℃)"
+            span={3}
+            error={errors.storageTempMax}
+            htmlFor={id('storageTempMax')}
+          >
+            <Input
+              id={id('storageTempMax')}
+              inputMode="decimal"
+              value={value.storageTempMax ?? ''}
+              onChange={(e) => set({ storageTempMax: e.target.value })}
+              disabled={disabled}
+            />
+          </Field>
+          {days('maxStackBox', '최대 적층 박스 단수', 3, '팔레트 단수(HI)보다 작으면 경고')}
+          {toggle('hazmat', '위험물', 3, { hint: '위험물 창고에만 적치' })}
+          {toggle('fragile', '파손 주의', 3, { hint: '피킹·적재 지시에 표시' })}
+          {toggle('upright', '세워서 보관', 3)}
+        </FormGrid>
+      ),
+    },
+    {
+      id: 'expiry',
+      title: '소비기한·LOT',
+      description: item
+        ? structureLock
+          ? `${structureLock} 관리 여부를 바꿀 수 없습니다 (재고 구조가 바뀝니다).`
+          : '관리 여부를 바꾸면 이후 입고부터 적용됩니다.'
+        : `화주사 기본 설정에서 가져온 값입니다${shipper ? ` (${shipper.name})` : ''}. 저장한 뒤에는 화주 설정이 바뀌어도 이 품목은 그대로입니다.`,
+      content: (
+        <FormGrid>
+          {toggle('useExpiry', '기한 관리', 3, {
+            lock: Boolean(structureLock),
+            onLabel: '관리',
+            offLabel: '안 함',
+          })}
+          {value.useExpiry && (
+            <>
+              {select('expiryType', '기한 종류', 3, EXPIRY_TYPE.options, { required: true })}
+              {select('expiryInput', '기한 입력 방식', 3, EXPIRY_INPUT.options, { required: true })}
+              {days(
+                'shelfLifeDays',
+                '총 기한 일수',
+                3,
+                value.expiryInput === 'MFG' || value.expiryInput === 'BOTH'
+                  ? `제조일 + ${value.shelfLifeDays ?? 'n'}일 = 기한`
+                  : '제조일로부터 기한까지',
               )}
-            </Field>
-            {/* 임박 기준 일수: 유통기한을 실제로 쓸 때만 */}
-            {effective?.useExpiry && (
-              <Field
-                label="유통기한 임박 기준"
-                span={4}
-                error={errors.expiryAlertDays}
-                htmlFor={id('expiryAlertDays')}
-                hint="유통기한까지 이 일수 이하로 남으면 '임박'으로 표시합니다"
-              >
-                <NumberInput
-                  {...props('expiryAlertDays')}
-                  min={1}
-                  max={3650}
-                  unit="일"
-                  value={value.expiryAlertDays === '' ? null : Number(value.expiryAlertDays)}
-                  onChange={(next) => set({ expiryAlertDays: next === null ? '' : String(next) })}
+              {days(
+                'minInboundShelfDays',
+                '입고 최소 잔여일',
+                3,
+                `비우면 화주사 값${shipper?.minInboundShelfDays != null ? ` (${shipper.minInboundShelfDays}일)` : ''}`,
+              )}
+              {days(
+                'minOutboundShelfDays',
+                '출고 최소 잔여일',
+                3,
+                `비우면 화주사 값${shipper?.minOutboundShelfDays != null ? ` (${shipper.minOutboundShelfDays}일)` : ''}`,
+              )}
+              {days('expiryAlertDays', '임박 알림 기준일', 3, '잔여일이 이보다 짧으면 "임박"')}
+            </>
+          )}
+          {toggle('useLot', 'LOT 관리', 3, {
+            lock: Boolean(structureLock),
+            onLabel: '관리',
+            offLabel: '안 함',
+          })}
+          {value.useLot &&
+            select('lotSource', 'LOT 생성 방식', 3, LOT_SOURCE.options, { required: true })}
+          {toggle('useSerial', '시리얼 관리', 3, {
+            lock: Boolean(structureLock),
+            hint: '값만 저장 (시리얼 기능은 2차)',
+            onLabel: '관리',
+            offLabel: '안 함',
+          })}
+          {select('allocRule', '재고할당 규칙', 3, ALLOC_RULE.options, {
+            none: `화주사 값 따름${shipper ? ` (${shipper.allocRule})` : ''}`,
+            hint:
+              value.useExpiry && value.allocRule !== 'FEFO'
+                ? '기한 관리 품목은 FEFO(기한 빠른 순)를 권장합니다'
+                : undefined,
+          })}
+          {select(
+            'labelUnit',
+            '라벨 단위',
+            3,
+            LABEL_UNITS.map((u) => ({ value: u, label: u })),
+            {
+              none: `화주사 값 따름${shipper ? ` (${shipper.labelUnit})` : ''}`,
+            },
+          )}
+        </FormGrid>
+      ),
+    },
+    {
+      id: 'shipping',
+      title: '출고 조건',
+      content: (
+        <FormGrid>
+          {toggle('boxOnlyShip', '박스 단위 출고만', 4, {
+            hint: '주문 수량이 BOX 환산수량의 배수가 아니면 경고·반려 (주문 작업에서)',
+          })}
+        </FormGrid>
+      ),
+    },
+    {
+      id: 'barcodes',
+      title: '바코드',
+      description:
+        'EAN-13·ITF-14 등은 체크디지트를 검사합니다. 같은 화주사의 다른 품목과 겹칠 수 없습니다. 단위별 대표 1개는 라벨에 씁니다.',
+      content: (
+        <EditableSubTable<ItemBarcodeInput>
+          name="barcodes"
+          rows={value.barcodes}
+          onChange={(barcodes) => set({ barcodes })}
+          columns={[
+            {
+              key: 'unitId',
+              label: '단위',
+              required: true,
+              width: '8rem',
+              render: (cell) => (
+                <Select value={cell.value} onValueChange={cell.onChange} disabled={cell.disabled}>
+                  <SelectTrigger id={cell.id} className="w-full" aria-invalid={cell.invalid}>
+                    <SelectValue placeholder="단위" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {itemUnitChoices.map((c) => (
+                      <SelectItem key={c.value} value={c.value}>
+                        {c.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              ),
+            },
+            { key: 'barcode', label: '바코드', required: true },
+            {
+              key: 'barcodeType',
+              label: '종류',
+              required: true,
+              width: '9rem',
+              render: (cell) => (
+                <Select value={cell.value} onValueChange={cell.onChange} disabled={cell.disabled}>
+                  <SelectTrigger id={cell.id} className="w-full" aria-invalid={cell.invalid}>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {BARCODE_TYPE.options.map((o) => (
+                      <SelectItem key={o.value} value={o.value}>
+                        {o.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              ),
+            },
+            {
+              key: 'isPrimary',
+              label: '대표',
+              width: '4rem',
+              render: (cell) => (
+                <input
+                  id={cell.id}
+                  type="checkbox"
+                  className="mt-2.5 size-4 accent-primary"
+                  checked={cell.row.isPrimary}
+                  disabled={cell.disabled}
+                  // 대표는 단위별 1개: 켜면 같은 단위의 다른 바코드는 끈다
+                  onChange={(e) =>
+                    set({
+                      barcodes: value.barcodes.map((b, i) =>
+                        i === cell.index
+                          ? { ...b, isPrimary: e.target.checked }
+                          : e.target.checked && b.unitId === cell.row.unitId
+                            ? { ...b, isPrimary: false }
+                            : b,
+                      ),
+                    })
+                  }
                 />
-              </Field>
-            )}
-          </FormGrid>
-          <p className="text-sm text-muted-foreground" aria-live="polite">
-            {effective
-              ? `지금 적용: 로트 ${effective.useLot ? '사용' : '안 함'} · 유통기한 ${effective.useExpiry ? '사용' : '안 함'} · 라벨 ${effective.labelUnit}`
-              : '화주사를 고르면 지금 적용되는 값이 보입니다.'}
-          </p>
-        </div>
+              ),
+            },
+          ]}
+          createRow={() => ({
+            unitId: value.baseUnitId,
+            barcode: '',
+            barcodeType: 'EAN13',
+            isPrimary: !value.barcodes.some((b) => b.unitId === value.baseUnitId),
+          })}
+          maxRows={MAX_ITEM_BARCODES}
+          errors={errors}
+          addLabel="바코드 추가"
+          emptyText="등록된 바코드가 없습니다."
+          disabled={disabled}
+        />
       ),
     },
   ]
 
-  // 수정 화면에서만: 상태 (바로 처리)
   if (item) {
+    sections.push({
+      id: 'interface',
+      title: '연동 정보',
+      description: '어디서 등록했는지와 마지막 연동 기록입니다.',
+      content: (
+        <FormGrid>
+          <Field label="등록 경로" span={4} htmlFor={id('source')}>
+            <Input id={id('source')} value={item.source} disabled readOnly />
+          </Field>
+          <Field label="마지막 연동" span={4} htmlFor={id('lastIfAt')}>
+            <Input
+              id={id('lastIfAt')}
+              value={item.lastIfAt ? (formatDate(new Date(item.lastIfAt), true) ?? '-') : '-'}
+              disabled
+              readOnly
+            />
+          </Field>
+        </FormGrid>
+      ),
+    })
+    const badge = ITEM_STATUS_BADGE[item.status] ?? { label: item.status, tone: 'neutral' as const }
     sections.push({
       id: 'status',
       title: '상태',
       standalone: true,
       description: item.isActive
-        ? '사용 중지하면 새 입고예정(ASN)에서 고를 수 없습니다. 기록은 남습니다.'
-        : '사용 중지된 품목입니다.',
+        ? '사용 중지하면 새 입고·출고에서 고를 수 없습니다. 기록은 남습니다.'
+        : '사용 중이 아닌 품목입니다.',
       content: (
         <div className="flex flex-wrap items-center gap-3">
-          {item.isActive ? (
-            <StatusBadge tone="success">사용</StatusBadge>
-          ) : (
-            <StatusBadge tone="danger">사용 중지</StatusBadge>
-          )}
+          <StatusBadge tone={badge.tone}>{badge.label}</StatusBadge>
           {canToggleActive && (
             <ConfirmDialog
               trigger={
@@ -445,11 +805,6 @@ export function ItemForm({
                 </Button>
               }
               title={item.isActive ? '이 품목을 사용 중지할까요?' : '이 품목을 다시 사용할까요?'}
-              description={
-                item.isActive
-                  ? '새 입고예정에서 고를 수 없게 됩니다. 이미 있는 재고·기록은 그대로입니다.'
-                  : '다시 고를 수 있게 됩니다.'
-              }
               confirmLabel={item.isActive ? '사용 중지' : '다시 사용'}
               destructive={item.isActive}
               onConfirm={async () => {
@@ -463,5 +818,22 @@ export function ItemForm({
     })
   }
 
-  return <MasterFormPage header={header} form={form} readOnly={readOnly} sections={sections} />
+  return (
+    <MasterFormPage
+      header={{
+        ...header,
+        meta:
+          header.meta ??
+          (!item ? (
+            <span className="flex items-center gap-1 text-xs text-muted-foreground">
+              <InfoIcon className="size-3.5" />
+              품목코드는 등록 후 바꿀 수 없습니다
+            </span>
+          ) : undefined),
+      }}
+      form={form}
+      readOnly={readOnly}
+      sections={sections}
+    />
+  )
 }

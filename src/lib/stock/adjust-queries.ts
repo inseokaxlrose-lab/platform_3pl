@@ -163,7 +163,7 @@ export async function getAdjustStockOptions(centerId: bigint, scope: DataScope) 
         select: {
           code: true,
           name: true,
-          barcode: true,
+          barcodes: { select: { barcode: true } },
           baseUnit: { select: { code: true, ...unitDecimalsSelect(scope.operatorId ?? 0n) } },
         },
       },
@@ -184,7 +184,9 @@ export async function getAdjustStockOptions(centerId: bigint, scope: DataScope) 
       ]
         .filter(Boolean)
         .join(' · '),
-      keywords: [s.item.name, s.item.barcode, s.lotNo].filter(Boolean).join(' '),
+      keywords: [s.item.name, ...s.item.barcodes.map((b) => b.barcode), s.lotNo]
+        .filter(Boolean)
+        .join(' '),
       qty: qty(s.qty)!,
       baseUnit: s.item.baseUnit.code,
       decimals: s.item.baseUnit.decimals,

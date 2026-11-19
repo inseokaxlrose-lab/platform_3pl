@@ -30,8 +30,9 @@ export default async function PortalItemPage({ params }: PageProps<'/portal/item
 
   return (
     <ItemForm
+      key={item.rowVersion}
       header={{
-        title: `${item.input.name} (${item.input.code})`,
+        title: `${item.input.name} (${item.code})`,
         actions: <BackToListButton listPath="/portal/items" />,
       }}
       options={options}

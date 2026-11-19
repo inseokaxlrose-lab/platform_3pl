@@ -1231,12 +1231,13 @@ model Item {
   currency      String?  @map("currency_cd") @db.Char(3)
 
   // ── ② 단위: 기본단위 = 재고를 세는 단위 (PACK 불가, 재고·거래가 생기면 수정 불가). 단위별 환산·규격은 tb_item_unit
-  baseUnitId           BigInt @map("base_unit_id")
-  baseUnit             Unit   @relation("ItemBaseUnit", fields: [baseUnitId], references: [id], onDelete: Restrict)
-  defaultInboundUnitId BigInt @map("default_inbound_unit_id")
-  defaultInboundUnit   Unit   @relation("ItemInboundUnit", fields: [defaultInboundUnitId], references: [id], onDelete: Restrict)
-  defaultOrderUnitId   BigInt @map("default_order_unit_id")
-  defaultOrderUnit     Unit   @relation("ItemOrderUnit", fields: [defaultOrderUnitId], references: [id], onDelete: Restrict)
+  baseUnitId           BigInt  @map("base_unit_id")
+  baseUnit             Unit    @relation("ItemBaseUnit", fields: [baseUnitId], references: [id], onDelete: Restrict)
+  // 기본 입고·주문단위: NULL = 자동 (입고 = BOX, 없으면 기본단위 / 주문 = 기본단위)
+  defaultInboundUnitId BigInt? @map("default_inbound_unit_id")
+  defaultInboundUnit   Unit?   @relation("ItemInboundUnit", fields: [defaultInboundUnitId], references: [id], onDelete: Restrict)
+  defaultOrderUnitId   BigInt? @map("default_order_unit_id")
+  defaultOrderUnit     Unit?   @relation("ItemOrderUnit", fields: [defaultOrderUnitId], references: [id], onDelete: Restrict)
 
   // ── ③ 팔레트 적재: 종류 + 단당 박스 수(TI) × 단수(HI) → PLT 행 자동 계산. TI·HI 없이 팔레트당 박스 수만 넣어도 된다
   palletTypeCode String? @map("pallet_type_cd") @db.VarChar(20)

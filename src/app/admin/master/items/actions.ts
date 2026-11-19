@@ -53,7 +53,7 @@ export const createItemAction = createAction({
 // 수정 (rowVersion: 화면이 불러온 버전, 동시 수정 막기)
 export const updateItemAction = createAction({
   permission: 'master.items.update',
-  input: itemSchema.extend({ id: idSchema, rowVersion: rowVersionField }),
+  input: itemSchema.and(z.object({ id: idSchema, rowVersion: rowVersionField })),
   handler: async ({ input: { id, rowVersion, ...data }, scope }) => {
     await assertItemsInScope([id], scope)
     return updateItem(id, rowVersion, data)

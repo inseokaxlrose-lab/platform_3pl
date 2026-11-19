@@ -32,8 +32,9 @@ export default async function ItemPage({ params }: PageProps<'/admin/master/item
 
   return (
     <ItemForm
+      key={item.rowVersion}
       header={{
-        title: `${item.input.name} (${item.input.code})`,
+        title: `${item.input.name} (${item.code})`,
         description: item.shipper,
         meta: `마지막 수정: ${await actorLabel(audit.updatedBy)} · ${formatDate(audit.updatedAt, true)}`,
         actions: <BackToListButton listPath="/admin/master/items" />,

@@ -7,6 +7,7 @@ import { prisma } from '@/lib/prisma'
 import type { DataScope } from '@/lib/scope/data-scope'
 import { getCurrentPermissions, getCurrentScope, getCurrentUser } from '@/lib/session'
 import { createTestShipper, versionOf, systemUnit } from '@/test/factories'
+import { itemInput, withLot } from '@/test/item-input'
 import { resetDatabase, TEST_OPERATOR_ID } from '@/test/reset-database'
 import {
   createPortalItemAction,
@@ -50,18 +51,10 @@ const shipperScope = (shipperId: bigint): DataScope => ({
   shipperId,
 })
 
+// 품목코드는 필수 (0083), 나머지는 공용 테스트 입력 + LOT 관리
 const input = (overrides: Record<string, unknown> = {}) => ({
-  code: '',
-  name: '김치 1kg',
-  spec: '',
-  barcode: '',
-  baseUnitId: String(ea),
-  useLot: 'Y' as const,
-  useExpiry: '' as const,
-  labelUnit: '' as const,
-  expiryAlertDays: '',
-  remark: '',
-  units: [],
+  code: 'KIMCHI',
+  ...itemInput(ea, { name: '김치 1kg', ...withLot }),
   ...overrides,
 })
 
@@ -84,7 +77,14 @@ describe('화주 포털 품목', () => {
     const saved = await prisma.item.findUniqueOrThrow({
       where: { id: BigInt(result.ok ? result.data.id : 0) },
     })
-    expect(saved).toMatchObject({ shipperId: gana, useLot: 'Y', createdBy: 'gana.user' })
+    expect(saved).toMatchObject({
+      shipperId: gana,
+      code: 'KIMCHI',
+      useLot: 'Y',
+      lotSource: 'INPUT',
+      source: 'PORTAL',
+      createdBy: 'gana.user',
+    })
   })
 
   it('자기 화주사 품목만 보이고, 다른 화주사 품목은 고치거나 지울 수 없다', async () => {

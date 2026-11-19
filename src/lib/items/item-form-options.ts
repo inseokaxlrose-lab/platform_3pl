@@ -6,10 +6,28 @@ export type ItemShipperOption = {
   id: string
   code: string
   name: string
-  // 품목 기본값 (품목에서 "화주사 기본값 따름"이면 이 값)
+  // 새 품목에 복사하는 관리 여부 (0083 — 복사 후에는 화주 설정과 무관)
   useLot: boolean
   useExpiry: boolean
+  useSerial: boolean
+  // 품목이 비워 두면 따르는 값 (화면 안내용)
+  allocRule: string
+  minInboundShelfDays: number | null
+  minOutboundShelfDays: number | null
   labelUnit: LabelUnitValue
+}
+
+// 팔레트 종류 선택지 (계산 미리보기에 규격이 필요)
+export type ItemPalletOption = {
+  code: string
+  name: string
+  widthCm: string
+  depthCm: string
+  heightCm: string
+  weightKg: string
+  maxLoadHeightCm: string | null
+  maxLoadWeightKg: string | null
+  isActive: boolean
 }
 
 export type ItemUnitOption = {
@@ -22,4 +40,10 @@ export type ItemUnitOption = {
   isActive: boolean
 }
 
-export type ItemFormOptions = { shippers: ItemShipperOption[]; units: ItemUnitOption[] }
+export type ItemFormOptions = {
+  shippers: ItemShipperOption[]
+  units: ItemUnitOption[]
+  pallets: ItemPalletOption[]
+  // 운영사 기본 팔레트 (새 품목의 팔레트 종류 기본값)
+  defaultPalletType: string
+}

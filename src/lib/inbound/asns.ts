@@ -14,7 +14,6 @@ import { assertRowVersion, withVersionGuard } from '@/lib/row-version'
 import { scopeFilter, type DataScope } from '@/lib/scope/data-scope'
 import { ACTIVE_ONLY, DELETED_ONLY, isActiveStatus } from '@/lib/status'
 import { checkQtyDecimals, parseQty, qtyText, toBaseQty } from '@/lib/units/convert'
-import { isYes } from '@/lib/yn'
 import type { AsnCreateData, AsnData } from './asn-schema'
 import { refreshPutawayStatus } from './putaways'
 
@@ -64,7 +63,9 @@ export const asnItemSelect = (operatorId: bigint) =>
     useExpiry: true,
     labelUnit: true,
     baseUnit: { select: { code: true, ...unitDecimalsSelect(operatorId) } },
+    // 환산단위 (기본단위 행은 빼고, 0083)
     units: {
+      where: { level: { not: 'BASE' } },
       select: {
         convQty: true,
         unit: { select: { code: true, ...unitDecimalsSelect(operatorId) } },
