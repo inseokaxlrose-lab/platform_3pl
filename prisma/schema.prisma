@@ -678,13 +678,14 @@ model Shipper {
   updatedBy            String    @default("system") @map("updated_by") @db.VarChar(50)
   rowVersion           Int       @default(1) @map("row_version")
 
-  users     User[]
-  centers   ShipperCenter[]
-  contacts  ShipperContact[]
-  items     Item[]
-  customers Customer[]
-  stocks    Stock[]
-  asns      Asn[]
+  users        User[]
+  centers      ShipperCenter[]
+  contacts     ShipperContact[]
+  items        Item[]
+  itemBarcodes ItemBarcode[]
+  customers    Customer[]
+  stocks       Stock[]
+  asns         Asn[]
 
   // 논리 삭제: 'Y'면 지운 것 (목록·조회에서 빠지고 되살릴 수 있다, 0038)
   delYn               String      @default("N") @map("del_yn") @db.Char(1)
@@ -861,20 +862,22 @@ model Operator {
   tempZones        OperatorTempZone[]
 
   // ── ④ 운영 기본값 [2차] (센터·화주가 상속)
-  currency       String    @default("KRW") @map("currency_cd") @db.Char(3)
-  timezone       String    @default("Asia/Seoul") @db.VarChar(50)
-  lang           String    @default("ko-KR") @map("lang_cd") @db.VarChar(5)
+  currency          String    @default("KRW") @map("currency_cd") @db.Char(3)
+  // 기본 팔레트 종류 (품목 팔레트 적재의 기본값, 0083)
+  defaultPalletType String    @default("T11") @map("default_pallet_type_cd") @db.VarChar(20)
+  timezone          String    @default("Asia/Seoul") @db.VarChar(50)
+  lang              String    @default("ko-KR") @map("lang_cd") @db.VarChar(5)
   // 표시 단위: 단위 기준정보의 중량·길이 단위 코드 (시스템 또는 이 운영사의 단위 — DB 트리거로 검사, 0078)
-  weightUnit     String    @default("KG") @map("weight_unit_cd") @db.VarChar(10)
-  lengthUnit     String    @default("CM") @map("length_unit_cd") @db.VarChar(10)
+  weightUnit        String    @default("KG") @map("weight_unit_cd") @db.VarChar(10)
+  lengthUnit        String    @default("CM") @map("length_unit_cd") @db.VarChar(10)
   // 재고할당 규칙 ALLOC_RULE
-  allocRule      String    @default("FIFO") @map("alloc_rule_cd") @db.VarChar(10)
-  useLot         String    @default("N") @map("lot_mgmt_yn") @db.Char(1)
-  useExpiry      String    @default("N") @map("expiry_mgmt_yn") @db.Char(1)
-  useSerial      String    @default("N") @map("serial_mgmt_yn") @db.Char(1)
-  shipCutoffTime DateTime? @map("ship_cutoff_time") @db.Time(0)
+  allocRule         String    @default("FIFO") @map("alloc_rule_cd") @db.VarChar(10)
+  useLot            String    @default("N") @map("lot_mgmt_yn") @db.Char(1)
+  useExpiry         String    @default("N") @map("expiry_mgmt_yn") @db.Char(1)
+  useSerial         String    @default("N") @map("serial_mgmt_yn") @db.Char(1)
+  shipCutoffTime    DateTime? @map("ship_cutoff_time") @db.Time(0)
   // 정산 마감일: 1~31일, 99 = 말일
-  closingDay     Int       @default(99) @map("closing_day") @db.SmallInt
+  closingDay        Int       @default(99) @map("closing_day") @db.SmallInt
 
   // ── ⑤ 계약·요금제 [2차] (플랫폼만)
   plan            String    @default("TRIAL") @map("plan_cd") @db.VarChar(20)
@@ -923,6 +926,8 @@ model Operator {
   units            Unit[]
   unitSettings     OperatorUnit[]
   items            Item[]
+  itemBarcodes     ItemBarcode[]
+  palletTypes      PalletType[]
   customers        Customer[]
   stocks           Stock[]
   stockTxns        StockTxn[]
@@ -1150,8 +1155,11 @@ model Unit {
   operatorSettings OperatorUnit[]
 
   // 이 단위를 쓰는 품목 (기본단위 / 환산단위) — 쓰이고 있으면 지울 수 없다
-  baseItems Item[]     @relation("ItemBaseUnit")
-  packItems ItemUnit[] @relation("ItemPackUnit")
+  baseItems    Item[]        @relation("ItemBaseUnit")
+  inboundItems Item[]        @relation("ItemInboundUnit")
+  orderItems   Item[]        @relation("ItemOrderUnit")
+  packItems    ItemUnit[]    @relation("ItemPackUnit")
+  barcodes     ItemBarcode[] @relation("ItemBarcodeUnit")
 
   // 논리 삭제: 'Y'면 지운 것 (목록·조회에서 빠지고 되살릴 수 있다, 0038)
   delYn String @default("N") @map("del_yn") @db.Char(1)
@@ -1190,36 +1198,95 @@ model OperatorUnit {
   @@map("tb_operator_unit")
 }
 
-// ── 품목 (docs/decisions/0041, 0003 결정 2·3·6): 화주사가 맡긴 상품의 관리 단위
-// 코드 3층 (0025): systemCode IT00000001(자동·불변) / code(품목코드, 같은 화주사 안에서 중복 금지, 비우면 시스템 코드) / 외부 코드(ExternalCode ITEM)
-// 로트·유통기한 사용·라벨 단위는 비어 있으면 "화주사 기본값 따름" (화주사 기본값을 바꾸면 함께 바뀐다, 사용자 결정)
+// ── 품목 (docs/decisions/0041, 0083): 화주사가 맡긴 상품의 관리 단위
+// 코드 3층 (0025): systemCode IT00000001(자동·불변) / code(품목코드: 화주 코드 그대로, 필수, 화주사 안에서 고유, 등록 후 변경 불가 — 0083) / 외부 코드(ExternalCode ITEM)
+// 기한·LOT·시리얼 관리 여부는 상속하지 않는 명시값: 신규 등록 때 화주 실제 값을 복사하고, 이후 화주 설정이 바뀌어도 그대로 (재고 구조를 정하므로, 0083)
 model Item {
-  id         BigInt   @id @default(autoincrement()) @map("item_id")
+  id            BigInt   @id @default(autoincrement()) @map("item_id")
   // 운영사 (멀티테넌트: 같은 운영사 사람만 보고 고친다, docs/decisions/0039)
-  operatorId BigInt   @map("operator_id")
-  operator   Operator @relation(fields: [operatorId], references: [id], onDelete: Restrict)
-  shipperId  BigInt   @map("shipper_id")
-  shipper    Shipper  @relation(fields: [shipperId], references: [id], onDelete: Restrict)
-  systemCode String   @unique @map("sys_cd")
-  code       String   @map("item_cd") @db.VarChar(30)
-  name       String   @map("item_nm") @db.VarChar(200)
-  // 규격 (예: 500ml × 20, 선택)
-  spec       String?  @map("spec_nm") @db.VarChar(100)
-  // 바코드 (선택, 같은 화주사 안에서 중복 금지 — 나중에 스캐너 검수용)
-  barcode    String?  @map("barcode_cd") @db.VarChar(50)
-  // 기본단위: 재고를 세는 단위 (단위 표의 기본단위만). 재고는 항상 이 단위로 저장한다
-  baseUnitId BigInt   @map("base_unit_id")
-  baseUnit   Unit     @relation("ItemBaseUnit", fields: [baseUnitId], references: [id], onDelete: Restrict)
+  operatorId    BigInt   @map("operator_id")
+  operator      Operator @relation(fields: [operatorId], references: [id], onDelete: Restrict)
+  shipperId     BigInt   @map("shipper_id")
+  shipper       Shipper  @relation(fields: [shipperId], references: [id], onDelete: Restrict)
+  systemCode    String   @unique @map("sys_cd")
+  // ── ① 기본 정보 (0083): 품목코드는 화주 코드 그대로, 화주 안에서 고유·수정 불가
+  code          String   @map("item_cd") @db.VarChar(50)
+  name          String   @map("item_nm") @db.VarChar(200)
+  nameEn        String?  @map("item_nm_en") @db.VarChar(200)
+  shortName     String?  @map("item_short_nm") @db.VarChar(50)
+  // 규격 (예: 500g×24입, 1.8L)
+  spec          String?  @map("spec_nm") @db.VarChar(100)
+  // 품목 유형 (상수 ITEM_TYPE — SET이면 세트 품목)
+  itemType      String   @default("GOODS") @map("item_type_cd") @db.VarChar(20)
+  category1     String?  @map("category1") @db.VarChar(50)
+  category2     String?  @map("category2") @db.VarChar(50)
+  category3     String?  @map("category3") @db.VarChar(50)
+  brandName     String?  @map("brand_nm") @db.VarChar(100)
+  makerName     String?  @map("maker_nm") @db.VarChar(100)
+  // 원산지 (ISO 3166 두 글자)
+  originCountry String?  @map("origin_country_cd") @db.Char(2)
+  hsCode        String?  @map("hs_cd") @db.VarChar(12)
+  // 품목 가액 (기본단위 1개 기준, 파손·분실 보상용)
+  itemValue     Decimal? @map("item_value_amt") @db.Decimal(15, 2)
+  currency      String?  @map("currency_cd") @db.Char(3)
 
-  // 관리 옵션: null = 화주사 기본값 따름, 'Y'/'N' = 이 품목만 따로
-  useLot          String?    @map("lot_mgmt_yn") @db.Char(1)
-  useExpiry       String?    @map("expiry_mgmt_yn") @db.Char(1)
-  labelUnit       LabelUnit? @map("label_unit_cd")
-  // 유통기한 임박 기준 일수 (유통기한을 쓸 때만, 유통기한까지 이 일수 이하로 남으면 "임박")
-  expiryAlertDays Int?       @map("expiry_alert_day_cnt")
+  // ── ② 단위: 기본단위 = 재고를 세는 단위 (PACK 불가, 재고·거래가 생기면 수정 불가). 단위별 환산·규격은 tb_item_unit
+  baseUnitId           BigInt @map("base_unit_id")
+  baseUnit             Unit   @relation("ItemBaseUnit", fields: [baseUnitId], references: [id], onDelete: Restrict)
+  defaultInboundUnitId BigInt @map("default_inbound_unit_id")
+  defaultInboundUnit   Unit   @relation("ItemInboundUnit", fields: [defaultInboundUnitId], references: [id], onDelete: Restrict)
+  defaultOrderUnitId   BigInt @map("default_order_unit_id")
+  defaultOrderUnit     Unit   @relation("ItemOrderUnit", fields: [defaultOrderUnitId], references: [id], onDelete: Restrict)
+
+  // ── ③ 팔레트 적재: 종류 + 단당 박스 수(TI) × 단수(HI) → PLT 행 자동 계산. TI·HI 없이 팔레트당 박스 수만 넣어도 된다
+  palletTypeCode String? @map("pallet_type_cd") @db.VarChar(20)
+  palletTi       Int?    @map("pallet_ti")
+  palletHi       Int?    @map("pallet_hi")
+  palletBoxQty   Int?    @map("pallet_box_qty")
+
+  // ── ④ 보관 조건
+  tempZone       String   @default("AMBIENT") @map("temp_zone_cd") @db.VarChar(20)
+  storageTempMin Decimal? @map("storage_temp_min") @db.Decimal(5, 1)
+  storageTempMax Decimal? @map("storage_temp_max") @db.Decimal(5, 1)
+  hazmatYn       String   @default("N") @map("hazmat_yn") @db.Char(1)
+  hazmatClass    String?  @map("hazmat_class_cd") @db.VarChar(20)
+  fragileYn      String   @default("N") @map("fragile_yn") @db.Char(1)
+  maxStackBox    Int?     @map("max_stack_box")
+  uprightYn      String   @default("N") @map("upright_yn") @db.Char(1)
+  abcClass       String?  @map("abc_class_cd") @db.VarChar(5)
+
+  // ── ⑤ 소비기한·LOT: 관리 여부 3개는 상속하지 않는 명시값 (신규 때 화주 실제 값을 복사, 이후 화주 설정 변경에 영향 없음)
+  useExpiry            String     @default("N") @map("expiry_mgmt_yn") @db.Char(1)
+  expiryType           String?    @map("expiry_type_cd") @db.VarChar(20)
+  expiryInput          String?    @map("expiry_input_cd") @db.VarChar(20)
+  shelfLifeDays        Int?       @map("shelf_life_days")
+  // NULL = 화주 값 (상속)
+  minInboundShelfDays  Int?       @map("min_inbound_shelf_days")
+  minOutboundShelfDays Int?       @map("min_outbound_shelf_days")
+  // 임박 알림 기준일 (잔여일이 이보다 짧으면 "임박")
+  expiryAlertDays      Int?       @map("expiry_alert_day_cnt")
+  useLot               String     @default("N") @map("lot_mgmt_yn") @db.Char(1)
+  lotSource            String?    @map("lot_source_cd") @db.VarChar(20)
+  useSerial            String     @default("N") @map("serial_mgmt_yn") @db.Char(1)
+  // NULL = 화주 값 (상속)
+  allocRule            String?    @map("alloc_rule_cd") @db.VarChar(10)
+  // 라벨 단위 (입고 라벨 출력, 0041)
+  labelUnit            LabelUnit? @map("label_unit_cd")
+
+  // ── ⑥ 출고 조건
+  boxOnlyShipYn String   @default("N") @map("box_only_ship_yn") @db.Char(1)
+  minOrderQty   Decimal? @map("min_order_qty") @db.Decimal(15, 3)
+  setYn         String   @default("N") @map("set_yn") @db.Char(1)
+
+  // ── ⑦ 연동 정보 (거래처와 같다)
+  source        String    @default("SCREEN") @map("source_cd") @db.VarChar(20)
+  lastIfAt      DateTime? @map("last_if_at")
+  lastRequestId String?   @map("last_request_id") @db.VarChar(40)
+  extAttr       Json?     @map("ext_attr")
 
   remark     String?  @db.VarChar(1000)
-  status     String   @default("ACTIVE") @map("status_cd") @db.VarChar(10)
+  // ACTIVE 사용 / INACTIVE 사용중지 / DISCONTINUED 단종 (신규 입고 불가, 재고 출고는 가능)
+  status     String   @default("ACTIVE") @map("status_cd") @db.VarChar(20)
   createdAt  DateTime @default(now()) @map("created_at")
   updatedAt  DateTime @updatedAt @map("updated_at")
   // 등록·수정한 사람 아이디(username, 자동: 현재 작업자 / 시드 seed / 기존 데이터 system), 동시 수정 막기용 버전 (docs/db-conventions.md 공통 칸)
@@ -1227,8 +1294,10 @@ model Item {
   updatedBy  String   @default("system") @map("updated_by") @db.VarChar(50)
   rowVersion Int      @default(1) @map("row_version")
 
-  // 환산단위 (BOX·CARTON·PLT… + 입수량)
+  // 단위별 환산·규격 (BASE·INNER·BOX·PLT), 바코드
   units       ItemUnit[]
+  unitHistory ItemUnitHist[]
+  barcodes    ItemBarcode[]
   stocks      Stock[]
   asnLines    AsnLine[]
   inspections InboundInspection[]
@@ -1236,30 +1305,130 @@ model Item {
   // 논리 삭제: 'Y'면 지운 것 (목록·조회에서 빠지고 되살릴 수 있다, 0038)
   delYn String @default("N") @map("del_yn") @db.Char(1)
 
-  // 품목코드·바코드는 같은 화주사의 삭제 안 된 것끼리만 겹치면 안 된다 (0038)
+  // 품목코드는 같은 화주사의 삭제 안 된 것끼리만 겹치면 안 된다 (0038)
   @@unique([shipperId, code], where: raw("del_yn = 'N'"), map: "tb_item_shipper_id_item_cd_key")
-  @@unique([shipperId, barcode], where: raw("del_yn = 'N' AND barcode_cd IS NOT NULL"), map: "tb_item_shipper_id_barcode_cd_key")
-  @@index([operatorId])
+  @@index([operatorId, shipperId, status])
+  @@index([shipperId, name])
+  @@index([shipperId, category1])
   @@index([baseUnitId])
+  @@index([defaultInboundUnitId])
+  @@index([defaultOrderUnitId])
   @@map("tb_item")
 }
 
-// 품목 환산단위: 기본단위를 묶은 단위와 입수량 (예: 생수 BOX = 24 EA, PLT = 1,440 EA)
-// 입수량은 기본단위 기준이고, 소수 자리는 기본단위의 소수 자리수까지 (KG면 2.5 가능). 품목의 이력으로 본다 (0038)
+// 품목 단위·환산·규격 (0083): 품목이 쓰는 단위마다 1행, 레벨(BASE·INNER·BOX·PLT)별 1행. 기본단위 행도 반드시 있다
+// 환산수량은 기본단위 기준 (예: 생수 BOX = 24 EA, PLT = 1,440 EA), 소수 자리는 기본단위의 소수 자리수까지 (KG면 2.5 가능)
+// 체적은 BOX 기준, PLT 행은 팔레트 적재 정보(종류·TI·HI)로 자동 계산
 model ItemUnit {
-  id        BigInt  @id @default(autoincrement()) @map("item_unit_id")
-  itemId    BigInt  @map("item_id")
-  item      Item    @relation(fields: [itemId], references: [id], onDelete: Cascade)
-  // 환산단위 (단위 표의 환산단위만)
-  unitId    BigInt  @map("unit_id")
-  unit      Unit    @relation("ItemPackUnit", fields: [unitId], references: [id], onDelete: Restrict)
-  // 입수량: 이 단위 1개에 든 기본단위 수
-  convQty   Decimal @map("conv_cnt") @db.Decimal(18, 3)
-  sortOrder Int     @default(0) @map("sort_seq")
+  id            BigInt   @id @default(autoincrement()) @map("item_unit_id")
+  itemId        BigInt   @map("item_id")
+  item          Item     @relation(fields: [itemId], references: [id], onDelete: Cascade)
+  // 단위 (기본단위 행은 품목의 기본단위, 나머지는 환산단위)
+  unitId        BigInt   @map("unit_id")
+  unit          Unit     @relation("ItemPackUnit", fields: [unitId], references: [id], onDelete: Restrict)
+  // 단위 레벨 (상수 UNIT_LEVEL): BASE 기본 · INNER 내포장 · BOX 박스 · PLT 팔레트 — 품목마다 레벨별 1행 (0083)
+  level         String   @default("BOX") @map("unit_level_cd") @db.VarChar(10)
+  // 기본단위 환산수량: 이 단위 1개 = 기본단위 n개 (BASE는 1)
+  convQty       Decimal  @map("conv_cnt") @db.Decimal(18, 3)
+  // 규격 (저장은 cm·kg 고정, 화면은 운영사 표시 단위로 — 0078). CBM은 가로·세로·높이로 자동 계산
+  widthCm       Decimal? @map("width_cm") @db.Decimal(8, 2)
+  depthCm       Decimal? @map("depth_cm") @db.Decimal(8, 2)
+  heightCm      Decimal? @map("height_cm") @db.Decimal(8, 2)
+  cbm           Decimal? @map("cbm") @db.Decimal(12, 6)
+  grossWeightKg Decimal? @map("gross_weight_kg") @db.Decimal(10, 3)
+  netWeightKg   Decimal? @map("net_weight_kg") @db.Decimal(10, 3)
+  // 자동 계산 행 (PLT: 팔레트 적재 정보로 다시 계산, 화면에서 고칠 수 없음)
+  autoCalcYn    String   @default("N") @map("auto_calc_yn") @db.Char(1)
+  sortOrder     Int      @default(0) @map("sort_seq")
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+  createdBy     String   @default("system") @map("created_by") @db.VarChar(50)
+  updatedBy     String   @default("system") @map("updated_by") @db.VarChar(50)
+  rowVersion    Int      @default(1) @map("row_version")
 
   @@unique([itemId, unitId])
+  @@unique([itemId, level])
   @@index([unitId])
   @@map("tb_item_unit")
+}
+
+// 품목 단위 환산수량 변경 이력 (0083): 미완료 ASN·주문이 없을 때만 바꿀 수 있고, 바꾸면 남긴다
+model ItemUnitHist {
+  id        BigInt   @id @default(autoincrement()) @map("item_unit_hist_id")
+  itemId    BigInt   @map("item_id")
+  item      Item     @relation(fields: [itemId], references: [id], onDelete: Cascade)
+  unitCode  String   @map("unit_cd") @db.VarChar(20)
+  level     String   @map("unit_level_cd") @db.VarChar(10)
+  // 바뀌기 전·후 환산수량 (추가는 before null, 삭제는 after null)
+  beforeQty Decimal? @map("before_conv_cnt") @db.Decimal(18, 3)
+  afterQty  Decimal? @map("after_conv_cnt") @db.Decimal(18, 3)
+  changedAt DateTime @default(now()) @map("changed_at")
+  changedBy String   @map("changed_by") @db.VarChar(50)
+
+  @@index([itemId, changedAt])
+  @@map("tb_item_unit_hist")
+}
+
+// 품목 바코드 (0083): 단위별 여러 개, 단위별 대표 1개. 같은 화주 안에서 바코드 하나는 품목·단위 하나만 가리킨다
+model ItemBarcode {
+  id          BigInt   @id @default(autoincrement()) @map("barcode_id")
+  operatorId  BigInt   @map("operator_id")
+  operator    Operator @relation(fields: [operatorId], references: [id], onDelete: Restrict)
+  shipperId   BigInt   @map("shipper_id")
+  shipper     Shipper  @relation(fields: [shipperId], references: [id], onDelete: Restrict)
+  itemId      BigInt   @map("item_id")
+  item        Item     @relation(fields: [itemId], references: [id], onDelete: Cascade)
+  // 이 바코드를 스캔하면 이 단위로 본다 (EA 바코드, BOX 바코드)
+  unitId      BigInt   @map("unit_id")
+  unit        Unit     @relation("ItemBarcodeUnit", fields: [unitId], references: [id], onDelete: Restrict)
+  barcode     String   @map("barcode") @db.VarChar(50)
+  // 상수 BARCODE_TYPE (EAN13·ITF14 등은 체크디지트 검사)
+  barcodeType String   @map("barcode_type_cd") @db.VarChar(20)
+  isPrimary   String   @default("N") @map("primary_yn") @db.Char(1)
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+  createdBy   String   @default("system") @map("created_by") @db.VarChar(50)
+  updatedBy   String   @default("system") @map("updated_by") @db.VarChar(50)
+  rowVersion  Int      @default(1) @map("row_version")
+
+  @@unique([shipperId, barcode])
+  @@unique([itemId, unitId], where: raw("primary_yn = 'Y'"), map: "tb_item_barcode_primary_key")
+  @@index([itemId])
+  @@index([operatorId])
+  @@index([unitId])
+  @@map("tb_item_barcode")
+}
+
+// 팔레트 종류 (0083): PLT 계산 기준. 시스템 기본(operator_id NULL) + 운영사 행 — 운영사 행이 같은 코드의 시스템 행을 덮어쓴다
+model PalletType {
+  id              BigInt    @id @default(autoincrement()) @map("pallet_type_id")
+  operatorId      BigInt?   @map("operator_id")
+  operator        Operator? @relation(fields: [operatorId], references: [id], onDelete: Restrict)
+  code            String    @map("pallet_type_cd") @db.VarChar(20)
+  name            String    @map("pallet_type_nm") @db.VarChar(50)
+  // 팔레트 자체 규격·중량
+  widthCm         Decimal   @map("width_cm") @db.Decimal(8, 2)
+  depthCm         Decimal   @map("depth_cm") @db.Decimal(8, 2)
+  heightCm        Decimal   @map("height_cm") @db.Decimal(8, 2)
+  weightKg        Decimal   @map("weight_kg") @db.Decimal(8, 2)
+  // 권장 최대 적재 높이 (팔레트 포함)·최대 적재 중량 — 넘으면 경고
+  maxLoadHeightCm Decimal?  @map("max_load_height_cm") @db.Decimal(8, 2)
+  maxLoadWeightKg Decimal?  @map("max_load_weight_kg") @db.Decimal(10, 2)
+  isSystem        String    @default("N") @map("system_yn") @db.Char(1)
+  status          String    @default("ACTIVE") @map("status_cd") @db.VarChar(10)
+  sortOrder       Int       @default(0) @map("sort_seq")
+  remark          String?   @db.VarChar(1000)
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
+  createdBy       String    @default("system") @map("created_by") @db.VarChar(50)
+  updatedBy       String    @default("system") @map("updated_by") @db.VarChar(50)
+  rowVersion      Int       @default(1) @map("row_version")
+  delYn           String    @default("N") @map("del_yn") @db.Char(1)
+
+  @@unique([operatorId, code], where: raw("del_yn = 'N'"), map: "tb_pallet_type_operator_id_cd_key")
+  @@unique([code], where: raw("operator_id IS NULL AND del_yn = 'N'"), map: "tb_pallet_type_system_cd_key")
+  @@index([operatorId])
+  @@map("tb_pallet_type")
 }
 
 // ── 거래처 (docs/decisions/0043): 화주사의 고객사 — 출고(MVP 이후) 때 물건을 받는 곳
