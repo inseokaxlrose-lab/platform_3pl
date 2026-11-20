@@ -64,8 +64,53 @@ async function main() {
       },
       update: {},
     })
+
+    // 휴무관리 (0096): e2e에는 공휴일 API 키가 없으므로 견본 국가 공휴일·개별 휴일을 넣는다 (도움말 사진용)
+    const day = (text: string) => new Date(`${text}T00:00:00.000Z`)
+    const national = [
+      ['2026-01-01', '1월1일'],
+      ['2026-02-16', '설날'],
+      ['2026-02-17', '설날'],
+      ['2026-02-18', '설날'],
+      ['2026-03-01', '삼일절'],
+      ['2026-03-02', '대체공휴일'],
+      ['2026-05-05', '어린이날'],
+      ['2026-12-25', '기독탄신일'],
+    ] as const
+    for (const [date, name] of national) {
+      await prisma.holiday.upsert({
+        where: { holidayOn_name: { holidayOn: day(date), name } },
+        create: { holidayOn: day(date), name },
+        update: {},
+      })
+    }
+    await prisma.holidayYear.upsert({
+      where: { year: 2026 },
+      create: { year: 2026, status: 'OK', holidayCount: national.length },
+      update: {},
+    })
+    const ownHolidays = [
+      { centerId: null, date: '2026-02-14', name: '설 연휴 전 특근', dayType: 'OPEN' },
+      { centerId: center.id, date: '2026-12-31', name: '연말 재고 실사', dayType: 'CLOSED' },
+    ]
+    for (const h of ownHolidays) {
+      const found = await prisma.operatorHoliday.findFirst({
+        where: { operatorId: operator.id, centerId: h.centerId, holidayOn: day(h.date) },
+      })
+      if (!found) {
+        await prisma.operatorHoliday.create({
+          data: {
+            operatorId: operator.id,
+            centerId: h.centerId,
+            holidayOn: day(h.date),
+            name: h.name,
+            dayType: h.dayType,
+          },
+        })
+      }
+    }
   })
-  console.log('e2e 준비 데이터 확인: 품목 E2E-WATER, 로케이션 E2EGEN/E2E-01')
+  console.log('e2e 준비 데이터 확인: 품목 E2E-WATER, 로케이션 E2EGEN/E2E-01, 견본 휴일')
 }
 
 main()

@@ -63,6 +63,17 @@ const list = (menu: string, account: Account = 'admin'): Shot => ({
 })
 
 const SHOTS: Shot[] = [
+  // ── 시스템 · 휴무관리 (0096): e2e 준비 데이터의 2026년 견본 공휴일·특근·센터 휴무
+  {
+    src: '/help/admin/system/holidays/list.png',
+    url: '/admin/system/holidays?year=2026',
+    account: 'admin',
+    markers: [
+      { label: '1', target: (page) => page.getByText('국가 공휴일', { exact: true }).first() },
+      { label: '2', target: (page) => page.getByRole('row', { name: /설 연휴 전 특근/ }) },
+      { label: '3', target: (page) => page.getByRole('button', { name: '공휴일 다시 가져오기' }) },
+    ],
+  },
   // ── 기준정보
   {
     src: '/help/admin/master/regions/assign.png',
