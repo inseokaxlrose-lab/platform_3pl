@@ -217,6 +217,29 @@ const SHOTS: Shot[] = [
   // ── 시스템
   list('/admin/system/users'),
   list('/admin/system/roles'),
+  // 체번 규칙: 목록(검색 조건 없음) + 입고예정 번호 수정 화면(미리보기)
+  {
+    src: '/help/admin/system/numbering/list.png',
+    url: '/admin/system/numbering',
+    account: 'admin',
+    markers: [
+      { label: '1', target: firstTable },
+      {
+        label: '2',
+        target: (page) => page.getByRole('link', { name: '입고예정(ASN)', exact: true }),
+      },
+    ],
+  },
+  {
+    src: '/help/admin/system/numbering/edit.png',
+    url: '/admin/system/numbering/ASN',
+    account: 'admin',
+    markers: [
+      { label: '1', target: firstSection },
+      { label: '2', target: (page) => page.locator('section[data-section-id="preview"]') },
+      { label: '3', target: pageActions },
+    ],
+  },
   {
     src: '/help/admin/system/codes/main.png',
     url: '/admin/system/codes',
