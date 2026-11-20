@@ -13,6 +13,7 @@ import {
 } from '@/components/ui/select'
 import { cbmOf, trimQty } from '@/lib/items/item-calc'
 import { UNIT_LEVEL, UNIT_LEVEL_ORDER, type UnitLevel } from '@/lib/items/item-codes'
+import { EMPTY_UNIT_ROW } from '@/lib/items/item-defaults'
 import type { ItemUnitOption } from '@/lib/items/item-form-options'
 import type { ItemUnitInput } from '@/lib/items/item-schema'
 
@@ -20,17 +21,6 @@ import type { ItemUnitInput } from '@/lib/items/item-schema'
 // - 환산수량은 "1 BOX = 24 EA"처럼 미리보기
 // - PLT는 팔레트 적재 정보가 있으면 계산값(읽기 전용), 없으면 직접 입력
 // - CBM은 가로·세로·높이로 자동 (cm)
-
-export const EMPTY_UNIT_ROW = (level: UnitLevel, unitId = ''): ItemUnitInput => ({
-  level,
-  unitId,
-  convQty: level === 'BASE' ? '1' : '',
-  widthCm: '',
-  depthCm: '',
-  heightCm: '',
-  grossWeightKg: '',
-  netWeightKg: '',
-})
 
 // 표 열 (레벨 · 단위 · 환산수량 · 가로·세로·높이·총중량 · CBM · 빼기)
 const GRID_COLS = 'md:grid-cols-[7rem_8rem_8rem_repeat(4,minmax(0,1fr))_6rem_2.25rem]'

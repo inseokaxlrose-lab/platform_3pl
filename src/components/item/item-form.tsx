@@ -39,7 +39,6 @@ import {
 } from '@/lib/items/item-codes'
 import type { ItemFormOptions } from '@/lib/items/item-form-options'
 import {
-  INHERIT,
   itemCreateSchema,
   MAX_ITEM_BARCODES,
   type ItemBarcodeInput,
@@ -47,59 +46,12 @@ import {
   type ItemInput,
 } from '@/lib/items/item-schema'
 import { LABEL_UNITS } from '@/lib/shippers/shipper-schema'
+import { EMPTY_ITEM_INPUT, shipperItemStart } from '@/lib/items/item-defaults'
 import { ItemPalletSection } from './item-pallet-section'
-import { EMPTY_UNIT_ROW, ItemUnitsSection } from './item-units-section'
+import { ItemUnitsSection } from './item-units-section'
 
 // "선택 안 함"·"화주사 값 따름" (Select는 빈 글자를 값으로 못 쓴다)
 const NONE = '__none__'
-
-const EMPTY: Omit<ItemCreateInput, 'shipperId'> = {
-  code: '',
-  name: '',
-  nameEn: '',
-  shortName: '',
-  spec: '',
-  itemType: 'GOODS',
-  category1: '',
-  category2: '',
-  category3: '',
-  brandName: '',
-  makerName: '',
-  originCountry: '',
-  hsCode: '',
-  itemValue: '',
-  currency: '',
-  baseUnitId: '',
-  defaultInboundUnitId: '',
-  defaultOrderUnitId: '',
-  units: [EMPTY_UNIT_ROW('BASE')],
-  palletTypeCode: '',
-  palletTi: null,
-  palletHi: null,
-  palletBoxQty: null,
-  tempZone: 'AMBIENT',
-  storageTempMin: '',
-  storageTempMax: '',
-  hazmat: false,
-  fragile: false,
-  maxStackBox: null,
-  upright: false,
-  useExpiry: false,
-  expiryType: '',
-  expiryInput: '',
-  shelfLifeDays: null,
-  minInboundShelfDays: null,
-  minOutboundShelfDays: null,
-  expiryAlertDays: null,
-  useLot: false,
-  lotSource: '',
-  useSerial: false,
-  allocRule: INHERIT,
-  labelUnit: INHERIT,
-  boxOnlyShip: false,
-  barcodes: [],
-  remark: '',
-}
 
 // 저장 결과 (등록·수정 모두 키와 새 버전을 돌려준다)
 type SaveResult = { id: string; rowVersion: number }
@@ -158,23 +110,14 @@ export function ItemForm({
   // 새 품목: 화주사 설정을 기본값으로 복사 (기한·LOT·시리얼 — 이후 화주 설정이 바뀌어도 그대로, 0083)
   const shipperDefaults = (shipperId: string) => {
     const shipper = options.shippers.find((s) => s.id === shipperId)
-    return shipper
-      ? {
-          useExpiry: shipper.useExpiry,
-          expiryType: shipper.useExpiry ? 'CONSUME' : '',
-          expiryInput: shipper.useExpiry ? 'EXPIRY' : '',
-          useLot: shipper.useLot,
-          lotSource: shipper.useLot ? 'INPUT' : '',
-          useSerial: shipper.useSerial,
-        }
-      : {}
+    return shipper ? shipperItemStart(shipper) : {}
   }
   const initialShipper = fixedShipperId ?? ''
   const form = useMasterForm({
     initial: item
       ? { ...item.input, shipperId: item.shipperId, code: item.code }
       : {
-          ...EMPTY,
+          ...EMPTY_ITEM_INPUT,
           shipperId: initialShipper,
           palletTypeCode: options.defaultPalletType,
           ...shipperDefaults(initialShipper),

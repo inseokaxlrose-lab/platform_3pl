@@ -15,13 +15,31 @@ export const ITEM_TYPE = codeSet({
   SUPPLY: '판촉물·소모품',
   ETC: '기타',
 })
+export type ItemTypeKey = (typeof ITEM_TYPE.values)[number]
 
 // 품목 상태: 단종 = 신규 입고 불가, 재고 출고는 가능 / 사용중지 = 신규 입고·출고요청 모두 불가
 export const ITEM_STATUS = codeSet({ ACTIVE: '사용', INACTIVE: '사용중지', DISCONTINUED: '단종' })
+export type ItemStatus = (typeof ITEM_STATUS.values)[number]
 export const ITEM_STATUS_BADGE: StatusFormat = {
   ACTIVE: { label: '사용', tone: 'success' },
   INACTIVE: { label: '사용중지', tone: 'neutral' },
   DISCONTINUED: { label: '단종', tone: 'warning' },
+}
+
+// 등록 경로 (누가 만들었나 — 목록 거르기·연동 정보 표시)
+export const ITEM_SOURCE = codeSet({
+  SCREEN: '운영사 화면',
+  PORTAL: '화주 포털',
+  API: 'API 연동',
+  UPLOAD: '엑셀 업로드',
+  ORDER_AUTO: '주문 자동',
+})
+export type ItemSourceKey = (typeof ITEM_SOURCE.values)[number]
+
+// 체적 상태 (BOX 규격 기준 — 목록 배지)
+export const VOLUME_STATUS_BADGE: StatusFormat = {
+  OK: { label: '등록', tone: 'success' },
+  MISSING: { label: '미등록', tone: 'warning' },
 }
 
 // 품목 단위 레벨 (품목마다 레벨별 1행, 정렬도 이 순서)
@@ -36,6 +54,7 @@ export const EXPIRY_TYPE = codeSet({
   USE: '사용기한',
   VALID: '유효기간',
 })
+export type ExpiryTypeKey = (typeof EXPIRY_TYPE.values)[number]
 
 // 기한 입력 방식: 기한일 / 제조일(+총 기한 일수로 계산) / 둘 다
 export const EXPIRY_INPUT = codeSet({

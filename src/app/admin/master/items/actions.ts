@@ -7,13 +7,18 @@ import { listQuerySchema } from '@/lib/grid/grid-query'
 import { idSchema } from '@/lib/id'
 import { assertItemsInScope, listItems, SHIPPER_SCOPE } from '@/lib/items/item-list'
 import { itemCreateSchema, itemSchema } from '@/lib/items/item-schema'
+import { applyPalletToItems } from '@/lib/items/item-bulk'
+import { ITEM_STATUS } from '@/lib/items/item-codes'
+import { commitItemUpload, previewItemUpload } from '@/lib/items/item-upload'
 import {
   createItem,
   deleteItems,
   restoreItems,
   setItemsActive,
+  setItemsStatus,
   updateItem,
 } from '@/lib/items/items'
+import { uploadRowsSchema } from '@/lib/excel/upload'
 import { prisma } from '@/lib/prisma'
 import { rowVersionField } from '@/lib/row-version'
 import { assertInScope } from '@/lib/scope/data-scope'
@@ -81,4 +86,51 @@ export const restoreItemsAction = createAction({
   input: z.object({ ids: idsSchema }),
   handler: async ({ input, scope }) =>
     restoreItems(await assertItemsInScope(input.ids, scope, true)),
+})
+
+// 상태 바꾸기 (여러 건): 사용·사용중지·단종 (0083 ②)
+export const setItemsStatusAction = createAction({
+  permission: 'master.items.update',
+  input: z.object({ ids: idsSchema, status: z.enum(ITEM_STATUS.values) }),
+  handler: async ({ input, scope }) =>
+    setItemsStatus(await assertItemsInScope(input.ids, scope), input.status),
+})
+
+// 팔레트 적재 일괄 입력 (0083 ②): 계산할 수 없는 품목은 건너뛰고 결과에 알린다
+export const applyPalletBulkAction = createAction({
+  permission: 'master.items.update',
+  input: z.object({
+    ids: idsSchema,
+    palletTypeCode: z.string().trim().max(20),
+    palletTi: z.number().int().min(1).max(999).nullable(),
+    palletHi: z.number().int().min(1).max(999).nullable(),
+    palletBoxQty: z.number().int().min(1).max(99999).nullable(),
+  }),
+  handler: async ({ input: { ids, ...pallet }, scope }) =>
+    applyPalletToItems(await assertItemsInScope(ids, scope), pallet),
+})
+
+// 엑셀 업로드 (0083 ②): 품목을 만들고 고치므로 등록·수정 권한 둘 다 필요
+const assertUploadPermission = (permissions: ReadonlySet<string>) => {
+  if (!permissions.has('master.items.update')) {
+    throw new ActionError('FORBIDDEN', '품목 수정 권한이 없습니다.')
+  }
+}
+
+export const validateItemUploadAction = createAction({
+  permission: 'master.items.create',
+  input: uploadRowsSchema,
+  handler: async ({ input, scope, permissions }) => {
+    assertUploadPermission(permissions)
+    return previewItemUpload(input, scope)
+  },
+})
+
+export const commitItemUploadAction = createAction({
+  permission: 'master.items.create',
+  input: uploadRowsSchema,
+  handler: async ({ input, scope, permissions }) => {
+    assertUploadPermission(permissions)
+    return commitItemUpload(input, scope)
+  },
 })
