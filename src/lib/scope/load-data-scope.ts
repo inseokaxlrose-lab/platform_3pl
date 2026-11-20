@@ -4,6 +4,8 @@ import { isActiveStatus } from '@/lib/status'
 import { computeScope, type DataScope } from './data-scope'
 import { isCenterInScopeStatus } from '@/lib/centers/center-status'
 import { isShipperInScopeStatus } from '@/lib/shippers/shipper-codes'
+import { toValue } from '@/lib/db-value'
+import { USER_TYPE_VALUES } from '@/config/db-codes'
 
 // 사용자의 데이터 범위를 DB에서 읽어 계산한다 (사용자가 없으면 NONE)
 export async function loadDataScope(userId: bigint): Promise<DataScope> {
@@ -22,7 +24,7 @@ export async function loadDataScope(userId: bigint): Promise<DataScope> {
   // 상태(status_cd) → 사용 여부로 바꿔 계산
   return computeScope({
     operatorId: user.operatorId,
-    userType: user.userType,
+    userType: toValue(USER_TYPE_VALUES, user.userType),
     isActive: isActiveStatus(user.status),
     // 소속 센터: 폐쇄만 범위에서 뺀다 (준비중·일시중지는 기준정보 정리를 위해 보인다, 0073)
     centers: user.centers.map(({ center }) => ({

@@ -18,6 +18,8 @@ import { createUserAccount } from '@/lib/users/create-user-account'
 import { createUserSchema, passwordSchema, updateUserSchema } from '@/lib/users/user-schema'
 import { resetUserPassword, setUserActive } from '@/lib/users/manage-user'
 import { idSchema } from '@/lib/id'
+import { toValue } from '@/lib/db-value'
+import { USER_TYPE_VALUES } from '@/config/db-codes'
 
 // 사용자 관리 서버 액션 (docs/decisions/0018-user-admin.md)
 // 시스템 메뉴는 운영사 관리자만 쓸 수 있다 (권한 계산에서 이미 막지만 서버에서 한 번 더 확인)
@@ -187,9 +189,10 @@ export const updateUserAction = createAction({
     // 플랫폼 관리자는 운영사가 없어 여기서 찾아지지 않는다 (타입을 좁히기 위한 확인)
     if (target.userType === 'PLATFORM')
       throw new ActionError('NOT_FOUND', '사용자를 찾을 수 없습니다.')
+    const userType = toValue(USER_TYPES, target.userType)
 
-    assertAffiliation(target.userType, input.centerIds, input.shipperId)
-    await assertGroupsMatch(input.permissionGroupIds, target.userType)
+    assertAffiliation(userType, input.centerIds, input.shipperId)
+    await assertGroupsMatch(input.permissionGroupIds, userType)
     const email = input.email?.toLowerCase() ?? internalEmail(target.username ?? String(input.id))
     await assertEmailFree(email, input.id)
 
@@ -293,7 +296,7 @@ export const updateUserOverridesAction = createAction({
 
     const grants = [...new Set(input.grants)]
     const denies = [...new Set(input.denies)]
-    const issue = overridesIssue(target.userType, grants, denies)
+    const issue = overridesIssue(toValue(USER_TYPE_VALUES, target.userType), grants, denies)
     if (issue) throw new ActionError('VALIDATION', issue)
 
     await prisma.$transaction([

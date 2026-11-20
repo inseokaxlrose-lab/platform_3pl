@@ -90,5 +90,7 @@ export const ASN_CHANNEL_LABELS = {
   PORTAL: '화주 포털',
   PROXY: '센터 대리',
   EXCEL: '엑셀 업로드',
+  // 화주 연동 API (입고예정 API — 정의서 system_code M6에서 값만 먼저 추가)
+  API: 'API 연동',
 } as const
 export const INBOUND_TYPE_LABELS = { SHIPPER: '화주사입고', TRANSFER: '수송입고' } as const

@@ -93,12 +93,11 @@ export const listCentersAction = createAction({
           status: true,
           regionName: true,
           phone: true,
-          managerName: true,
           storageAreaM2: true,
           sortOrder: true,
           createdAt: true,
           updatedAt: true,
-          // 대표 담당자 (없으면 예전 센터장 칸)
+          // 대표 담당자
           contacts: { where: { isPrimary: 'Y' }, select: { name: true }, take: 1 },
           tempZones: { select: { tempZoneCd: true }, orderBy: { tempZoneCd: 'asc' } },
           _count: { select: { shippers: true } },
@@ -122,7 +121,7 @@ export const listCentersAction = createAction({
       rows: rows.map(({ contacts, tempZones, _count, storageAreaM2, ...row }) => ({
         ...row,
         storageAreaM2: storageAreaM2?.toString() ?? null,
-        manager: contacts[0]?.name ?? row.managerName,
+        manager: contacts[0]?.name ?? null,
         tempZones: tempZones.map((z) => z.tempZoneCd),
         shipperCount: _count.shippers,
         locationCount: locationsOf(row.id),

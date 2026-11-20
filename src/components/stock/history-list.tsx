@@ -8,7 +8,7 @@ import { formatQty } from '@/lib/units/convert'
 export type HistoryRow = {
   id: string
   txnAt: Date
-  type: 'RECEIVE' | 'MOVE_OUT' | 'MOVE_IN' | 'ADJUST'
+  type: string
   typeLabel: string
   center: string
   location: string

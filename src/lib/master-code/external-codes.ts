@@ -1,5 +1,5 @@
 import 'server-only'
-import type { ExternalEntityType } from '@/generated/prisma/client'
+import type { ExternalEntityType } from '@/config/db-codes'
 import {
   EXTERNAL_SYSTEMS,
   EXTERNAL_SYSTEM_KEYS,

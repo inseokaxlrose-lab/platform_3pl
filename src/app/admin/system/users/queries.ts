@@ -6,6 +6,8 @@ import { operatorFilter, type DataScope } from '@/lib/scope/data-scope'
 import { isActiveStatus } from '@/lib/status'
 import { CENTER_SETUP_ONLY } from '@/lib/centers/center-status'
 import { SHIPPER_SETUP_ONLY } from '@/lib/shippers/shipper-codes'
+import { toValue } from '@/lib/db-value'
+import { USER_TYPES } from '@/lib/users/user-schema'
 
 // 등록·수정 화면의 선택지: 내 운영사의 사용 중인 센터·화주사, 권한그룹(영역 포함)
 export async function getUserFormOptions(scope: DataScope) {
@@ -62,7 +64,7 @@ export async function getUserForEdit(id: bigint, scope: DataScope) {
     name: user.name,
     // 내부용 주소는 화면에 보여주지 않는다
     email: user.email.endsWith('@users.local') ? '' : user.email,
-    userType: user.userType,
+    userType: toValue(USER_TYPES, user.userType),
     isActive: isActiveStatus(user.status),
     // 동시 수정 막기: 저장할 때 이 버전을 함께 보낸다
     rowVersion: user.rowVersion,

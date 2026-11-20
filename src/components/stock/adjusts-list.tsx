@@ -4,12 +4,13 @@ import type { DataGridColumn, StatusFormat } from '@/components/data-grid'
 import { MasterListPage, type SearchFieldDef, useListQuery } from '@/components/master-list'
 import type { ListFetcher } from '@/components/master-list/use-list-query'
 import { ADJUST_STATUS_LABELS, ADJUST_TYPE_LABELS } from '@/lib/stock/adjust-schema'
+import { labelOf } from '@/lib/db-value'
 
 export type AdjustRow = {
   id: string
   adjustNo: string
-  type: 'COUNT' | 'ADJUST'
-  status: 'DRAFT' | 'CONFIRMED' | 'CANCELED'
+  type: string
+  status: string
   center: string
   reason: string
   lineCount: number
@@ -35,7 +36,12 @@ const COLUMNS: DataGridColumn<AdjustRow>[] = [
     pinned: true,
     href: (row) => `/admin/stock/adjustments/${row.id}`,
   },
-  { id: 'type', header: '유형', accessor: (r) => ADJUST_TYPE_LABELS[r.type], sortable: true },
+  {
+    id: 'type',
+    header: '유형',
+    accessor: (r) => labelOf(ADJUST_TYPE_LABELS, r.type),
+    sortable: true,
+  },
   {
     id: 'status',
     header: '상태',

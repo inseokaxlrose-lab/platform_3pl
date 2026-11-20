@@ -1,5 +1,5 @@
 import 'server-only'
-import { Prisma, type AsnStatus } from '@/generated/prisma/client'
+import { Prisma } from '@/generated/prisma/client'
 import { ActionError } from '@/lib/actions/action-error'
 import { currentActor, requireOperatorId } from '@/lib/actor'
 import { deleteExternalCodes } from '@/lib/master-code/external-codes'
@@ -43,7 +43,7 @@ export type ItemSaveOptions = {
 
 // 미완료 ASN (예정·검수중·부분확정)
 const OPEN_ASN = {
-  asn: { status: { in: ['PLANNED', 'INSPECTING', 'PARTIAL'] as AsnStatus[] } },
+  asn: { status: { in: ['PLANNED', 'INSPECTING', 'PARTIAL'] } },
 } satisfies Prisma.AsnLineWhereInput
 
 // 품목코드(직접 입력): 자동 체번 모양 금지({접두어}S000001 — 나중 자동 발급과 겹침), 같은 화주사 안에서 중복 금지

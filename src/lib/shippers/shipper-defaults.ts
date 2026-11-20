@@ -1,4 +1,6 @@
+import { toValue } from '@/lib/db-value'
 import { isYes } from '@/lib/yn'
+import { LABEL_UNITS, type LabelUnitValue } from './shipper-schema'
 
 // 화주사의 품목 기본값 (0003 결정 2, 0080) — 화면 조회·서버 공용
 // 로트·유통기한 관리: 화주사가 비워 두면(NULL) 운영사 값을 따른다
@@ -24,7 +26,8 @@ export type ShipperDefaultsRow = {
   allocRule: string | null
   minInboundShelfDays: number | null
   minOutboundShelfDays: number | null
-  labelUnit: 'PLT' | 'BOX'
+  // DB 값 목록 칸 (CHECK) — 아래에서 정해진 값으로 좁힌다
+  labelUnit: string
   operator: { useLot: string; useExpiry: string; useSerial: string; allocRule: string }
 }
 
@@ -37,7 +40,7 @@ export type ShipperItemDefaults = {
   allocRule: string
   minInboundShelfDays: number | null
   minOutboundShelfDays: number | null
-  labelUnit: 'PLT' | 'BOX'
+  labelUnit: LabelUnitValue
 }
 
 // 조회한 화주사 → 품목 기본값 (true/false)
@@ -49,6 +52,6 @@ export function shipperItemDefaults(shipper: ShipperDefaultsRow): ShipperItemDef
     allocRule: shipper.allocRule ?? shipper.operator.allocRule,
     minInboundShelfDays: shipper.minInboundShelfDays,
     minOutboundShelfDays: shipper.minOutboundShelfDays,
-    labelUnit: shipper.labelUnit,
+    labelUnit: toValue(LABEL_UNITS, shipper.labelUnit),
   }
 }

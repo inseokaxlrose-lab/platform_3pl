@@ -9,6 +9,7 @@ import { checkQtyDecimals, parseQty, qtyText } from '@/lib/units/convert'
 import { ADJUST_TYPE_LABELS, type AdjustData } from './adjust-schema'
 import { adjustStock } from './stock-change'
 import { stockTransaction } from './stock-transaction'
+import { labelOf } from '@/lib/db-value'
 
 // 재고 실사·조정 (docs/decisions/0061)
 // 등록(작업자): 재고 줄마다 센 수량 또는 바꿀 수량 — 재고는 아직 그대로
@@ -135,7 +136,10 @@ export async function confirmAdjust(id: bigint) {
       let stockTxnId: bigint | null = null
       if (change !== 0n) {
         const reason =
-          `${ADJUST_TYPE_LABELS[adjust.type]} ${adjust.adjustNo}: ${adjust.reason}`.slice(0, 200)
+          `${labelOf(ADJUST_TYPE_LABELS, adjust.type)} ${adjust.adjustNo}: ${adjust.reason}`.slice(
+            0,
+            200,
+          )
         const result = await adjustStock(tx, {
           address: {
             locationId: line.stock.locationId,

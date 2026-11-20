@@ -12,13 +12,14 @@
 | 표 | `tb_` + snake_case | `tb_center`, `tb_operator_contact` |
 | 칸 | snake_case | `zip_cd`, `addr1` |
 | `_id` | 내부 키 (BIGINT, 자동 증가) | `center_id` |
-| `_cd` | 코드 (공통코드·enum·사용자 코드) | `center_cd`, `status_cd`, `temp_zone_cd` |
+| `_cd` | 코드 (공통코드·값 목록·우리 코드) | `center_cd`, `status_cd`, `temp_zone_cd` |
+| `_cust_cd` | 사용자 정의 코드 (화주·ERP 시스템의 코드, 0084) | `item_cust_cd` |
 | `_nm` | 명칭 | `center_nm`, `ceo_nm` |
 | `_no` | 번호 — **숫자만** 저장 | `biz_reg_no`, `tel_no` |
 | `_yn` | 예/아니오 — CHAR(1) `'Y'`/`'N'` (CHECK 제약) | `primary_yn`, `del_yn` |
 | `_dt` / `_at` | 날짜 / 일시 | `establish_dt`, `created_at` |
-| `_cnt` / `_amt` | 수량 / 금액 | `max_user_cnt`, `decimal_cnt` |
-| 시스템 코드 | `sys_cd` | `CT000001` |
+| `_qty` / `_cnt` / `_amt` | 수량(소수 가능) / 개수(정수) / 금액 | `conv_qty`, `pallet_box_cnt`, `max_user_cnt` |
+| `_days` | 일수 | `shelf_life_days`, `expiry_alert_days` |
 | 정렬 순서 | `sort_seq` | |
 
 - **코드 쪽 이름은 그대로**(camelCase): Prisma `@@map`/`@map`으로 DB 이름만 바꾼다. 예) 코드 `center.businessNumber` ↔ DB `tb_center.biz_reg_no`.
@@ -38,6 +39,11 @@
   - Better Auth 표(user·session·account·verification)는 `advanced.database.generateId: 'serial'`로 DB가 키를 만든다. Better Auth가 주는 사용자 키는 글자라 `getCurrentUser`에서 `BigInt`로 바꾼다.
   - 서버 안에서만 부르는 함수(`createUserAccount` 등)는 bigint를 그대로 받는다.
 - 길이: 정의서의 VARCHAR(n)·CHAR(n)를 DB에도 `@db.VarChar(n)`로 둔다 (입력 규칙 최대 길이와 같게).
+- **TEXT 금지** (0084 ④-2): 길이를 정한 VARCHAR로. 예외는 로그 본문(`req_body`·`resp_body`·`response_body`)과 인증 라이브러리 표(`tb_user`·`tb_account`·`tb_session`·`tb_verification`)의 인증 칸뿐이다.
+- **값 목록 칸은 VARCHAR(20) + CHECK** (0084 ④-2, ENUM 쓰지 않음): 값 목록은 상수(`src/config/*-codes.ts`·각 업무의 `*-codes.ts`) + DB `CHECK (칸 IN (…))` 두 곳에 두고, `src/config/db-value-sets.db.test.ts`가 둘이 같은지 확인한다(새 칸은 그 표에 등록). Prisma는 `string`으로 주므로 값에 따라 동작을 바꾸는 곳은 `toValue(상수, 값)`(`src/lib/db-value.ts`)로 좁히고, 표시 글자는 `labelOf`로. 글자 칸은 알파벳 순으로 정렬되므로 정해진 순서가 필요하면 프로그램에서 정렬한다.
+- 바깥에서 길이가 정해진 코드는 그 길이로: GLN 13, HS 12, 언어 5, 정제한 우편번호 `zip_cd` CHAR(5) + 숫자 5자리 검사(원본은 `raw_zip_cd` VARCHAR(10)).
+- 약어: `location`은 줄이지 않는다(`loc` 쓰지 않음 — PK가 `location_id`). 법정동코드는 `bjd_cd`, 시군구명은 `sigungu_nm`.
+- **FK**: 업무 문서·기준정보 표의 `_id` 참조 칸에는 FK를 건다. 이력·로그 표(`tb_stock_txn`, `*_hist`, API 요청 로그)에서 나가는 참조는 원본이 지워지거나 바뀌어도 기록이 남아야 하므로 **일부러 FK를 두지 않는다**.
 
 ## 공통 칸 (모든 기준정보, 2단계)
 
