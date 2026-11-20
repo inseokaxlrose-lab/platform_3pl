@@ -3,7 +3,7 @@
 > 이 문서는 `npm run db:doc`가 실제 DB 구조와 `prisma/schema.prisma`의 주석으로 만든다. **손으로 고치지 않는다** — 마이그레이션을 적용한 뒤 명령을 다시 돌린다.
 > 엑셀 판: `docs/db/DB_테이블정의서.xlsx` · 이름 규칙: `docs/db-conventions.md`
 
-테이블 67개 · 칼럼 1081개
+테이블 67개 · 칼럼 1086개
 
 ## 목차
 
@@ -1979,6 +1979,7 @@
 | 12 | `putaway_qty` | 적치 수량 |  | DECIMAL(18,3) | N | 0 |  |
 | 13 | `closed_qty` | 마감 수량 | 마감 때 남아 있던 잔량 (보고서용) | DECIMAL(18,3) | N | 0 |  |
 | 14 | `remark` | 비고 | 비고 | VARCHAR(200) | Y |  |  |
+| 15 | `mfg_dt` | mfg 일자 | 화주가 알려 준 제조일 (선택, 0089) | DATE | Y |  |  |
 
 **고유 인덱스**
 
@@ -2018,6 +2019,7 @@
 | 14 | `inspected_at` | 검수 일시 |  | TIMESTAMP(3) | N | CURRENT_TIMESTAMP |  |
 | 15 | `inspected_by` | 검수 자 |  | VARCHAR(50) | N | system |  |
 | 16 | `defect_reason_cd` | 불량 사유 코드 | 불량 사유 코드 (공통코드 DEFECT_REASON, 불량 수량이 있으면 필수 — 0087) | VARCHAR(20) | Y |  |  |
+| 17 | `mfg_dt` | mfg 일자 | 제조일 (품목 기한 입력 방식이 제조일·둘 다면 필수, 0089) | DATE | Y |  |  |
 
 **인덱스**
 
@@ -2109,6 +2111,7 @@
 | 9 | `confirmed_qty` | 확정 수량 | 확정 수량 (기본단위)과 그중 적치한 수량 | DECIMAL(18,3) | N |  |  |
 | 10 | `putaway_qty` | 적치 수량 |  | DECIMAL(18,3) | N | 0 |  |
 | 11 | `inspection_id` | 검수 ID | 어느 검수 결과를 확정했는지 (확정은 검수된 수량에서만) | BIGINT | N |  | FK → tb_inbound_inspection.inspection_id |
+| 12 | `mfg_dt` | mfg 일자 | 제조일 (검수 값, 0089) | DATE | Y |  |  |
 
 **인덱스**
 
@@ -2176,6 +2179,7 @@
 | 13 | `updated_at` | 수정 일시 | 수정 일시 (자동) | TIMESTAMP(3) | N |  |  |
 | 14 | `row_version` | 행버전 | 동시 처리 안전: 재고 변경 함수가 줄을 잠그고 바꾼다. 버전은 화면 확인용 | INTEGER | N | 1 |  |
 | 15 | `stock_status_cd` | 재고 상태 코드 | 재고상태 (재고 주소의 일부, 0088): NORMAL 정상 / HOLD 보류 / DAMAGED 불량 / QUARANTINE 격리 — 정상만 가용 | VARCHAR(20) | N | NORMAL | UK |
+| 16 | `mfg_dt` | mfg 일자 | 제조일: 이 재고 줄이 처음 생길 때의 값 — 재고 주소에는 넣지 않는다 (0089) | DATE | Y |  |  |
 
 **고유 인덱스**
 
@@ -2293,6 +2297,7 @@
 | 20 | `created_by` | 등록 자 | 처리한 사람 아이디 (재고 변경 함수가 지금 작업자로 채운다) | VARCHAR(50) | N | system |  |
 | 21 | `reason_cd` | 사유 코드 | 사유 (조정은 필수) 사유 코드 (조정은 ADJUST_REASON, 상태 변경은 HOLD_REASON — 공통코드, 0087) + 사유 메모 | VARCHAR(20) | Y |  |  |
 | 22 | `stock_status_cd` | 재고 상태 코드 | 그때의 재고상태 (0088) | VARCHAR(20) | N | NORMAL |  |
+| 23 | `mfg_dt` | mfg 일자 | 그때의 제조일 (0089) | DATE | Y |  |  |
 
 **인덱스**
 
