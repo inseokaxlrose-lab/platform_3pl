@@ -529,10 +529,16 @@ export async function createCustomerIn(
     },
   })
   await db.customerContact.createMany({ data: contactRows(customer.id, data.contacts) })
-  const rows = data.shipTos.length > 0 ? data.shipTos : [defaultShipToRow(customer)]
+  // 납품처를 보내지 않았으면 기본 납품처를 자동으로 — 매입처만인 거래처는 만들지 않는다 (0090)
+  const rows =
+    data.shipTos.length > 0
+      ? data.shipTos
+      : data.role === 'PURCHASE'
+        ? []
+        : [defaultShipToRow(customer)]
   // 납품처를 함께 보냈으면 그중 기본 표시, 기본 납품처를 자동으로 만들면 시스템 생성
   const shipTos = await syncShipTos(db, customer, rows, options)
-  if (data.shipTos.length === 0) {
+  if (data.shipTos.length === 0 && shipTos.length > 0) {
     await db.shipTo.updateMany({
       where: { customerId: customer.id, code: shipTos[0].code },
       data: { systemCreatedYn: 'Y' },
@@ -571,7 +577,8 @@ export async function updateCustomerIn(
   assertRowVersion(found, rowVersion, '거래처를 찾을 수 없습니다.')
   const current = found!
   await assertCustomerCustCode(db, current.shipperId, data.custCode, id)
-  if (data.shipTos.length === 0) {
+  // 매입처만인 거래처는 납품처가 없어도 된다 (0090)
+  if (data.shipTos.length === 0 && data.role !== 'PURCHASE') {
     throw new ActionError('VALIDATION', '사용 중인 납품처가 1곳 이상 있어야 합니다.')
   }
   await assertCodes(db, data, {
@@ -632,9 +639,14 @@ export async function setCustomersStatus(ids: bigint[], status: 'ACTIVE' | 'SUSP
 
 // 쓰인 적 있는 거래처 id (출고 기록이 있음)
 // TODO(출고 작업, MVP 이후): 출고·배송요청 표가 생기면 여기서 검사한다. 지금은 쓰일 곳이 없어 빈 목록
+// 쓰인 거래처: ASN 공급처로 쓰인 거래처 (지운 ASN 포함 — 기록이 가리키므로, 0090). 출고 주문은 출고 작업에서 더한다
 export async function findUsedCustomerIds(ids: bigint[]): Promise<bigint[]> {
-  void ids
-  return []
+  const rows = await prisma.asn.findMany({
+    where: { supplierId: { in: ids }, delYn: { in: ['Y', 'N'] } },
+    select: { supplierId: true },
+    distinct: ['supplierId'],
+  })
+  return rows.map((r) => r.supplierId!).filter(Boolean)
 }
 
 // 지우기: 쓰인 적 없는 거래처만, 논리 삭제 (되살릴 수 있다). 납품처도 함께 지우고, 외부 코드는 지운다

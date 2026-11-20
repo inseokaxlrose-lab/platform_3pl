@@ -39,6 +39,7 @@ import {
   DATA_SOURCE,
   ORDER_ADDR_MODE,
   CUSTOMER_TYPE_GROUP,
+  CUSTOMER_ROLE,
 } from '@/lib/customers/customer-codes'
 import type { CustomerForEdit, CustomerShipperOption } from '@/lib/customers/customer-queries'
 import {
@@ -58,6 +59,7 @@ const EMPTY: CustomerCreateInput = {
   name: '',
   shortName: '',
   customerType: '',
+  role: 'SALES',
   customerGroup: '',
   businessNumber: '',
   ceoName: '',
@@ -250,6 +252,35 @@ export function CustomerForm({
               allowEmpty
             />
           </Field>
+          <Field
+            label="거래처 역할"
+            span={4}
+            required
+            error={errors.role}
+            htmlFor={id('role')}
+            hint={
+              value.role === 'PURCHASE'
+                ? '입고 공급처 전용 — 납품처를 만들지 않습니다'
+                : '매입처·둘 다는 ASN 공급처로 고를 수 있습니다'
+            }
+          >
+            <Select
+              value={value.role ?? 'SALES'}
+              onValueChange={(role) => set({ role })}
+              disabled={disabled}
+            >
+              <SelectTrigger id={id('role')} className="w-full">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {CUSTOMER_ROLE.options.map((o) => (
+                  <SelectItem key={o.value} value={o.value}>
+                    {o.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </Field>
           {text('customerGroup', '거래처 그룹', 4, { placeholder: '예: 수도권 대리점' })}
           <Field
             label="주문 주소 사용"
@@ -309,7 +340,7 @@ export function CustomerForm({
           <Field
             label="주소"
             span={12}
-            required={value.shipTos.length === 0}
+            required={value.shipTos.length === 0 && value.role !== 'PURCHASE'}
             htmlFor={id('address-address')}
           >
             <AddressInput

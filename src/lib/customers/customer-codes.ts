@@ -6,6 +6,15 @@ import { codeSet } from '@/config/operator-codes'
 
 export const CUSTOMER_TYPE_GROUP = 'CUSTOMER_TYPE'
 
+// 거래처 역할 (0090): 매출처(납품받는 곳) / 매입처(공급처 — 입고 출발지, 납품처 없음) / 둘 다
+export const CUSTOMER_ROLE = codeSet({
+  SALES: '매출처',
+  PURCHASE: '매입처(공급처)',
+  BOTH: '매출·매입',
+})
+// ASN 공급처로 고를 수 있는 역할
+export const SUPPLIER_ROLES: readonly string[] = ['PURCHASE', 'BOTH']
+
 // 거래처 상태: 거래중지는 신규 출고요청만 막는다 (진행 중 주문은 처리, 출고 작업에서 적용)
 export const CUSTOMER_STATUS = codeSet({ ACTIVE: '거래중', SUSPENDED: '거래중지' })
 export const CUSTOMER_STATUS_BADGE: StatusFormat = {

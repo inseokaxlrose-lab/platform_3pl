@@ -5,7 +5,7 @@ import { keyWhere, type IfKeyType } from '@/lib/master-code/if-key'
 import type { Db } from '@/lib/prisma'
 import type { AddressSearcher } from '@/lib/regions/juso-client'
 import { NOT_DELETED } from '@/lib/status'
-import { CUSTOMER_STATUS, ORDER_ADDR_MODE, SHIP_TO_STATUS } from './customer-codes'
+import { CUSTOMER_STATUS, ORDER_ADDR_MODE, SHIP_TO_STATUS, CUSTOMER_ROLE } from './customer-codes'
 import { customerInputOf } from './customer-queries'
 import {
   customerCreateSchema,
@@ -61,6 +61,8 @@ export const apiCustomerSchema = z.object({
   bizRegNo: text(20),
   ceoNm: text(50),
   orderAddrMode: z.enum(ORDER_ADDR_MODE.values).optional(),
+  // 역할 (0090): SALES 매출처 / PURCHASE 매입처(공급처) / BOTH — 새 거래처는 비우면 SALES
+  customerRole: z.enum(CUSTOMER_ROLE.values).optional(),
   telNo: text(20),
   faxNo: text(20),
   email: text(100),
@@ -87,6 +89,7 @@ const CUSTOMER_FIELDS = {
   bizRegNo: 'businessNumber',
   ceoNm: 'ceoName',
   orderAddrMode: 'orderAddrMode',
+  customerRole: 'role',
   telNo: 'phone',
   faxNo: 'fax',
   email: 'email',
@@ -471,6 +474,7 @@ function customerSchemaDefaults(): CustomerInput {
     businessNumber: '',
     ceoName: '',
     orderAddrMode: 'SHIP_TO',
+    role: 'SALES',
     phone: '',
     fax: '',
     email: '',

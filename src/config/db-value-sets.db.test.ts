@@ -33,6 +33,7 @@ import {
   DATA_SOURCE,
   ORDER_ADDR_MODE,
   SHIP_TO_STATUS,
+  CUSTOMER_ROLE,
 } from '@/lib/customers/customer-codes'
 import {
   ASN_CHANNEL_LABELS,
@@ -162,6 +163,7 @@ const VALUE_SETS: Record<string, readonly string[]> = {
   'tb_customer.status_cd': CUSTOMER_STATUS.values,
   'tb_customer.source_cd': DATA_SOURCE.values,
   'tb_customer.order_addr_mode_cd': ORDER_ADDR_MODE.values,
+  'tb_customer.customer_role_cd': CUSTOMER_ROLE.values,
   'tb_ship_to.status_cd': SHIP_TO_STATUS.values,
   'tb_ship_to.source_cd': DATA_SOURCE.values,
   'tb_ship_to.center_assign_type_cd': CENTER_ASSIGN_TYPE.values,

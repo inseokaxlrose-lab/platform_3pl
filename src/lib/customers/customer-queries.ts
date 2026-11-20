@@ -94,6 +94,7 @@ export function customerInputOf(customer: CustomerInputSource): CustomerInput {
     businessNumber: text(customer.businessNumber),
     ceoName: text(customer.ceoName),
     orderAddrMode: customer.orderAddrMode,
+    role: customer.role,
     phone: text(customer.phone),
     fax: text(customer.fax),
     email: text(customer.email),
