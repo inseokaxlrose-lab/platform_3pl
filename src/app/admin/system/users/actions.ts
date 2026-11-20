@@ -15,7 +15,13 @@ import { assertRowVersion, withVersionGuard } from '@/lib/row-version'
 import type { CurrentUser } from '@/lib/session'
 import { affiliationIssues, internalEmail } from '@/lib/users/affiliation'
 import { createUserAccount } from '@/lib/users/create-user-account'
-import { createUserSchema, passwordSchema, updateUserSchema } from '@/lib/users/user-schema'
+import {
+  checkPasswordChoice,
+  createUserSchema,
+  passwordChoiceShape,
+  updateUserSchema,
+} from '@/lib/users/user-schema'
+import { generateTempPassword } from '@/lib/users/temp-password'
 import { resetUserPassword, setUserActive } from '@/lib/users/manage-user'
 import { idSchema } from '@/lib/id'
 import { toValue } from '@/lib/db-value'
@@ -159,10 +165,13 @@ export const createUserAction = createAction({
     }
     await assertEmailFree(input.email?.toLowerCase() ?? internalEmail(username))
 
+    // 처음 비밀번호: 자동이면 서버가 만든다. 어느 쪽이든 임시 비밀번호라 처음 로그인 때 바꾸게 한다 (0086)
+    const tempPassword = input.passwordMode === 'AUTO' ? generateTempPassword() : input.password
     const created = await createUserAccount({
       operatorId: requireOperatorId(),
       username: input.username,
-      password: input.password,
+      password: tempPassword,
+      passwordChangeRequired: true,
       name: input.name,
       userType: input.userType,
       email: input.email,
@@ -170,7 +179,11 @@ export const createUserAction = createAction({
       shipperId: input.shipperId,
       permissionGroupIds: input.permissionGroupIds,
     })
-    return { id: created.id }
+    // 자동으로 만든 비밀번호만 화면에 한 번 돌려준다 (직접 입력은 관리자가 이미 안다)
+    return {
+      id: created.id,
+      tempPassword: input.passwordMode === 'AUTO' ? tempPassword : null,
+    }
   },
 })
 
@@ -259,18 +272,17 @@ export const setUsersActiveAction = createAction({
 export const resetUserPasswordAction = createAction({
   permission: 'system.users.update',
   input: z
-    .object({ id: idSchema, password: passwordSchema, passwordConfirm: z.string() })
-    .refine((data) => data.password === data.passwordConfirm, {
-      path: ['passwordConfirm'],
-      message: '비밀번호가 서로 다릅니다.',
-    }),
+    .object({ id: idSchema, ...passwordChoiceShape })
+    .superRefine((data, ctx) => checkPasswordChoice(data, ctx)),
   handler: async ({ user, input }) => {
     requireOperator(user)
     if (!(await prisma.user.findUnique({ where: { id: input.id }, select: { id: true } }))) {
       throw new ActionError('NOT_FOUND', '사용자를 찾을 수 없습니다.')
     }
-    await resetUserPassword(input.id, input.password)
-    return { id: input.id }
+    // 자동이면 서버가 만든다. 어느 쪽이든 다음 로그인 때 바꾸게 한다 (0086)
+    const tempPassword = input.passwordMode === 'AUTO' ? generateTempPassword() : input.password
+    await resetUserPassword(input.id, tempPassword)
+    return { id: input.id, tempPassword: input.passwordMode === 'AUTO' ? tempPassword : null }
   },
 })
 

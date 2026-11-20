@@ -40,6 +40,8 @@ async function seedSuperAdmin(operatorId: bigint, groupId: bigint) {
   let user = await findUserByUsername(username)
   if (!user) {
     user = await createUserAccount({
+      // 개발용 시드 계정: .env 비밀번호를 그대로 쓰므로 변경 강제를 걸지 않는다 (0086)
+      passwordChangeRequired: false,
       operatorId,
       username,
       password,
@@ -80,6 +82,8 @@ async function seedPlatformAdmin() {
     return
   }
   await createUserAccount({
+    // 개발용 시드 계정: .env 비밀번호를 그대로 쓰므로 변경 강제를 걸지 않는다 (0086)
+    passwordChangeRequired: false,
     operatorId: null,
     username,
     password,
@@ -117,6 +121,8 @@ async function seedSampleAccounts(operatorId: bigint, groupIds: Map<string, bigi
       : null
 
     await createUserAccount({
+      // 개발용 시드 계정: .env 비밀번호를 그대로 쓰므로 변경 강제를 걸지 않는다 (0086)
+      passwordChangeRequired: false,
       operatorId,
       username: account.username,
       password,

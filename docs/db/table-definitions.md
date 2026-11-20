@@ -3,7 +3,7 @@
 > 이 문서는 `npm run db:doc`가 실제 DB 구조와 `prisma/schema.prisma`의 주석으로 만든다. **손으로 고치지 않는다** — 마이그레이션을 적용한 뒤 명령을 다시 돌린다.
 > 엑셀 판: `docs/db/DB_테이블정의서.xlsx` · 이름 규칙: `docs/db-conventions.md`
 
-테이블 67개 · 칼럼 1072개
+테이블 67개 · 칼럼 1073개
 
 ## 목차
 
@@ -187,6 +187,7 @@
 | 14 | `updated_by` | 수정 자 | 수정자 아이디 (자동) | VARCHAR(50) | N | system |  |
 | 15 | `status_cd` | 상태 코드 | false면 로그인·사용 불가 (퇴사자 등). 기록 보존을 위해 계정을 지우지 않고 막는다 | VARCHAR(20) | N | ACTIVE |  |
 | 16 | `operator_id` | 운영사 ID | 운영사 (멀티테넌트, 0039). 플랫폼 관리자만 비어 있고 나머지 유형은 반드시 있다 (DB 검사 조건 tb_user_operator_matches_type) | BIGINT | Y |  | FK → tb_operator.operator_id |
+| 17 | `password_change_req_yn` | 비밀번호 변경 요청 여부 | 'Y'면 임시 비밀번호 상태 — 비밀번호를 바꾸기 전에는 다른 화면·작업을 쓸 수 없다 (새 계정·관리자 재설정, 0086) | CHAR(1) | N | N |  |
 
 **고유 인덱스**
 
@@ -201,6 +202,7 @@
 **검사 조건**
 
 - `tb_user_operator_matches_type`: `CHECK (((user_type_cd) = 'PLATFORM') = (operator_id IS NULL))`
+- `tb_user_password_change_req_yn_check`: `CHECK (password_change_req_yn IN ('Y', 'N')`
 - `tb_user_shipper_matches_type`: `CHECK (((user_type_cd) = 'SHIPPER') = (shipper_id IS NOT NULL))`
 - `tb_user_status_cd_check`: `CHECK ((status_cd) IN (('ACTIVE'), ('INACTIVE'))`
 - `tb_user_user_type_cd_check`: `CHECK ((user_type_cd) IN ('OPERATOR', 'CENTER', 'SHIPPER', 'PLATFORM'))`

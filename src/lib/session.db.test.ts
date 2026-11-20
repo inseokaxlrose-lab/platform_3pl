@@ -123,4 +123,13 @@ describe('운영사 사용자', () => {
     expect(await getCurrentScope()).toEqual({ kind: 'NONE' })
     await expect(requireUser('admin')).rejects.toThrow('redirect:/login')
   })
+
+  it('임시 비밀번호 상태면 어느 영역에 들어가도 비밀번호 변경 화면으로 (0086)', async () => {
+    await prisma.user.update({ where: { username: 'boss' }, data: { passwordChangeReqYn: 'Y' } })
+    await loginAs('boss')
+    expect(await getCurrentUser()).toMatchObject({ passwordChangeRequired: true })
+    await expect(requireUser('admin')).rejects.toThrow('redirect:/account/password')
+    await prisma.user.update({ where: { username: 'boss' }, data: { passwordChangeReqYn: 'N' } })
+    expect(await requireUser('admin')).toMatchObject({ passwordChangeRequired: false })
+  })
 })

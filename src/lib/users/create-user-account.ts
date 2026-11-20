@@ -3,6 +3,7 @@ import { z } from 'zod'
 import { passwordSchema, usernameSchema } from './user-schema'
 import { auth } from '@/lib/auth'
 import { prisma, type Tx } from '@/lib/prisma'
+import { toYn } from '@/lib/yn'
 import { affiliationIssues, internalEmail } from './affiliation'
 
 // 아이디 규칙: 영문·숫자·점·밑줄·하이픈 3~30자 (Better Auth username 플러그인 설정과 같게)
@@ -25,6 +26,8 @@ const createUserAccountSchema = z
     shipperId: z.bigint().optional(),
     // 배정할 권한그룹 (영역이 사용자 유형과 맞는지는 호출하는 쪽에서 확인)
     permissionGroupIds: z.array(z.bigint()).default([]),
+    // true면 임시 비밀번호 — 처음 로그인 때 비밀번호를 바꿔야 한다 (0086). 시드 계정만 false
+    passwordChangeRequired: z.boolean().default(true),
   })
   .superRefine((data, ctx) => {
     // 플랫폼 관리자만 운영사가 없다 (DB 검사 조건 tb_user_operator_matches_type과 같은 규칙)
@@ -64,6 +67,7 @@ export async function createUserAccount(input: CreateUserAccountInput, tx?: Tx) 
         displayUsername: data.username,
         userType: data.userType,
         shipperId: data.shipperId,
+        passwordChangeReqYn: toYn(data.passwordChangeRequired),
         centers: { create: [...new Set(data.centerIds)].map((centerId) => ({ centerId })) },
         permissionGroups: {
           create: [...new Set(data.permissionGroupIds)].map((groupId) => ({ groupId })),

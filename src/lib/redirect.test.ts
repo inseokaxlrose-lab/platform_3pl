@@ -38,6 +38,12 @@ describe('safeNextPath (로그인 후 돌아갈 주소)', () => {
     expect(safeNextPath('/administrator', 'CENTER')).toBe('/admin')
   })
 
+  it('비밀번호 변경 화면은 모든 영역 공통이라 그대로 (0086)', () => {
+    expect(safeNextPath('/account/password', 'SHIPPER')).toBe('/account/password')
+    expect(safeNextPath('/account/password', 'PLATFORM')).toBe('/account/password')
+    expect(safeNextPath('/account/other', 'CENTER')).toBe('/admin')
+  })
+
   it('없거나 빈 값이면 홈', () => {
     expect(safeNextPath(null, 'CENTER')).toBe('/admin')
     expect(safeNextPath('', 'SHIPPER')).toBe('/portal')

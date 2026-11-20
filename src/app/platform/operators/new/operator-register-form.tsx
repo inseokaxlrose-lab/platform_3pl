@@ -1,5 +1,6 @@
 'use client'
 
+import { useState } from 'react'
 import { BizNoInput } from '@/components/inputs'
 import {
   Field,
@@ -10,6 +11,7 @@ import {
   type MasterFormSection,
 } from '@/components/master-form'
 import { Input } from '@/components/ui/input'
+import { TempPasswordDialog } from '@/components/users/temp-password-dialog'
 import {
   Select,
   SelectContent,
@@ -36,10 +38,18 @@ const EMPTY: OperatorRegisterInput = {
 // 운영사 등록 폼 (0039 3c, 0040): 운영사코드·회사명·유형·사업자등록번호·대표자
 // 나머지 칸은 기본값으로 들어가고, 등록 후 편집 화면에서 채운다. 관리자는 admin.{운영사코드 소문자}
 export function OperatorRegisterForm({ header }: { header: MasterFormHeader }) {
+  // 등록 직후 한 번만 보여 줄 관리자 임시 비밀번호 (0086)
+  const [issued, setIssued] = useState<{ username: string; password: string } | null>(null)
   const form = useMasterForm({
     initial: EMPTY,
     schema: operatorRegisterSchema,
-    save: (value: OperatorRegisterInput) => createOperatorAction(value),
+    save: async (value: OperatorRegisterInput) => {
+      const result = await createOperatorAction(value)
+      if (result.ok && result.data.tempPassword) {
+        setIssued({ username: result.data.adminUsername, password: result.data.tempPassword })
+      }
+      return result
+    },
     // 등록하면 [계속 등록]·[등록한 항목 보기](편집 화면에서 나머지 칸을 이어서 채운다)
     createdHref: (created) => `/platform/operators/${(created as { id: string }).id}`,
   })
@@ -124,7 +134,7 @@ export function OperatorRegisterForm({ header }: { header: MasterFormHeader }) {
       id: 'admin',
       title: '관리자 계정',
       description:
-        '이 운영사의 첫 관리자입니다. 아이디는 운영사코드로 정해지고, 처음 비밀번호는 모든 운영사가 같은 값(서버 설정)이니 처음 로그인한 뒤 바꾸도록 안내하세요.',
+        '이 운영사의 첫 관리자입니다. 아이디는 운영사코드로 정해지고, 등록하면 임시 비밀번호를 한 번 보여 줍니다. 관리자는 처음 로그인할 때 새 비밀번호로 바꿔야 합니다.',
       content: (
         <FormGrid>
           <Field label="관리자 아이디" span={4} htmlFor={id('adminUsername')}>
@@ -135,5 +145,14 @@ export function OperatorRegisterForm({ header }: { header: MasterFormHeader }) {
     },
   ]
 
-  return <MasterFormPage header={header} form={form} readOnly={false} sections={sections} />
+  return (
+    <>
+      <MasterFormPage header={header} form={form} readOnly={false} sections={sections} />
+      <TempPasswordDialog
+        username={issued?.username ?? ''}
+        password={issued?.password ?? null}
+        onClose={() => setIssued(null)}
+      />
+    </>
+  )
 }

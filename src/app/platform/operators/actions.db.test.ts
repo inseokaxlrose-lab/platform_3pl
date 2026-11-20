@@ -1,4 +1,4 @@
-import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { createDataGridState } from '@/components/data-grid/state'
 import type { PermissionCode } from '@/config/permissions'
 import { exitActingOperatorAction } from '@/lib/platform/acting-actions'
@@ -125,8 +125,6 @@ describe('운영사 전환', () => {
 })
 
 describe('운영사 등록 (3c)', () => {
-  // 관리자 처음 비밀번호(서버 설정) — 테스트 전용 값
-  const PASSWORD = 'first-password-1234'
   const register = (overrides: Record<string, string> = {}) =>
     createOperatorAction({
       name: '나라물류(주)',
@@ -137,14 +135,7 @@ describe('운영사 등록 (3c)', () => {
       ...overrides,
     })
 
-  beforeEach(() => {
-    vi.stubEnv('SEED_ADMIN_PASSWORD', PASSWORD)
-  })
-  afterEach(() => {
-    vi.unstubAllEnvs()
-  })
-
-  it('운영사 + 기본값 + 관리자 admin.○○(슈퍼 관리자)를 한 번에, 그 아이디로 로그인된다', async () => {
+  it('운영사 + 기본값 + 관리자 admin.○○(슈퍼 관리자)를 한 번에, 임시 비밀번호로 로그인된다 (0086)', async () => {
     const result = await register()
     expect(result).toMatchObject({
       ok: true,
@@ -161,13 +152,15 @@ describe('운영사 등록 (3c)', () => {
       where: { username: 'admin.nara' },
       include: { permissionGroups: { include: { group: true } } },
     })
-    expect(admin).toMatchObject({ operatorId: id, userType: 'OPERATOR' })
+    // 관리자 비밀번호는 운영사마다 새로 만든 임시 비밀번호 — 처음 로그인 때 바꿔야 한다
+    expect(admin).toMatchObject({ operatorId: id, userType: 'OPERATOR', passwordChangeReqYn: 'Y' })
+    const temp = result.ok ? result.data.tempPassword : null
+    expect(temp).toHaveLength(12)
     expect(admin.permissionGroups.map((g) => [g.group.name, g.group.operatorId])).toEqual([
       ['슈퍼 관리자', id],
     ])
     expect(
-      (await auth.api.signInUsername({ body: { username: 'admin.nara', password: PASSWORD } }))
-        ?.user,
+      (await auth.api.signInUsername({ body: { username: 'admin.nara', password: temp! } }))?.user,
     ).toBeDefined()
   })
 
@@ -208,16 +201,14 @@ describe('운영사 등록 (3c)', () => {
     })
   })
 
-  it('처음 비밀번호 설정이 없으면 거부, 플랫폼 관리자가 아니면 거부', async () => {
-    vi.stubEnv('SEED_ADMIN_PASSWORD', '')
-    expect(await register()).toMatchObject({
-      ok: false,
-      error: { code: 'VALIDATION', message: expect.stringContaining('SEED_ADMIN_PASSWORD') },
-    })
-    vi.stubEnv('SEED_ADMIN_PASSWORD', PASSWORD)
+  it('운영사마다 다른 임시 비밀번호, 플랫폼 관리자가 아니면 거부', async () => {
+    const first = await register()
+    const second = await register({ code: 'Dara', businessNumber: '220-81-62517' })
+    expect(first.ok && second.ok).toBe(true)
+    if (first.ok && second.ok) expect(first.data.tempPassword).not.toBe(second.data.tempPassword)
     signIn('OPERATOR', PLATFORM_CODES)
     expect(await register()).toMatchObject({ ok: false, error: { code: 'FORBIDDEN' } })
-    expect(await prisma.operator.count()).toBe(2)
+    expect(await prisma.operator.count()).toBe(4)
   })
 })
 

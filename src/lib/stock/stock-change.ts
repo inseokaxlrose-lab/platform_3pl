@@ -6,7 +6,6 @@ import { effectiveItemOptions } from '@/lib/items/item-schema'
 import type { Tx } from '@/lib/prisma'
 import { isActiveStatus } from '@/lib/status'
 import { checkQtyDecimals, formatQty, parseQty, qtyText } from '@/lib/units/convert'
-import { isYes } from '@/lib/yn'
 import { withStockWrite } from './stock-write-guard'
 
 // 재고 변경 공통 함수 (docs/decisions/0045, CLAUDE.md "재고는 직접 수정 금지")

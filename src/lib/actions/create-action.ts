@@ -26,6 +26,8 @@ type CreateActionOptions<TSchema extends z.ZodType, TData> = {
   // 'signed-in': 메뉴 권한 없이 로그인만 필요 — 본인 것만 다루는 개인 설정용 (예: 그리드 설정)
   //   이 경우 handler는 반드시 context.user.id의 데이터만 다뤄야 한다 (0015)
   permission: PermissionCode | 'signed-in'
+  // true면 임시 비밀번호 상태에서도 실행된다 — 비밀번호 변경·로그아웃처럼 그 상태를 벗어나는 액션만 (0086)
+  allowWhilePasswordChange?: boolean
   // 입력 규칙
   input: TSchema
   // 실제 처리: 로그인·권한·입력 검사를 모두 통과해야 실행된다
@@ -35,21 +37,27 @@ type CreateActionOptions<TSchema extends z.ZodType, TData> = {
 const MESSAGES = {
   UNAUTHENTICATED: '로그인이 필요합니다. 다시 로그인해 주세요.',
   FORBIDDEN: '이 작업을 할 권한이 없습니다.',
+  PASSWORD_CHANGE: '임시 비밀번호입니다. 비밀번호를 먼저 바꿔 주세요.',
   VALIDATION: '입력값을 확인해 주세요.',
   UNKNOWN: '처리 중 오류가 발생했습니다. 잠시 후 다시 시도해 주세요.',
 } as const
 
 // 서버 액션 공통 틀 — 데이터를 바꾸는 모든 서버 액션은 이것으로 만든다 (CLAUDE.md)
-// 검사 순서: ① 로그인 → ② 권한 → ③ 입력 → ④ 처리 → ⑤ 결과의 키(bigint)를 글자로
+// 검사 순서: ① 로그인(+ 임시 비밀번호 상태) → ② 권한 → ③ 입력 → ④ 처리 → ⑤ 결과의 키(bigint)를 글자로
 // 권한을 입력보다 먼저 검사한다: 권한 없는 사람에게 입력 규칙 힌트를 주지 않기 위해
 export function createAction<TSchema extends z.ZodType, TData>({
   permission,
+  allowWhilePasswordChange = false,
   input,
   handler,
 }: CreateActionOptions<TSchema, TData>) {
   return async (rawInput: z.input<TSchema>): Promise<ActionResult<WithTextIds<TData>>> => {
     const user = await getCurrentUser()
     if (!user) return failure('UNAUTHENTICATED', MESSAGES.UNAUTHENTICATED)
+    // 임시 비밀번호 상태: 화면은 변경 화면으로만 보내지만, 서버 액션을 직접 불러도 막는다 (0086)
+    if (user.passwordChangeRequired && !allowWhilePasswordChange) {
+      return failure('FORBIDDEN', MESSAGES.PASSWORD_CHANGE)
+    }
 
     const permissions = await getCurrentPermissions()
     if (permission !== 'signed-in' && !permissions.has(permission)) {

@@ -1,6 +1,7 @@
 'use client'
 
-import { ChevronDownIcon, LogOutIcon, UserIcon } from 'lucide-react'
+import { ChevronDownIcon, KeyRoundIcon, LogOutIcon, UserIcon } from 'lucide-react'
+import Link from 'next/link'
 import { useTransition } from 'react'
 import { Button } from '@/components/ui/button'
 import {
@@ -24,7 +25,7 @@ type UserMenuProps = {
   user: { name: string; username: string; userType: keyof typeof USER_TYPE_LABELS }
 }
 
-// 상단 바 사용자 메뉴: 이름 · 아이디 · 로그아웃
+// 상단 바 사용자 메뉴: 이름 · 아이디 · 비밀번호 변경 · 로그아웃
 export function UserMenu({ user }: UserMenuProps) {
   const [pending, startTransition] = useTransition()
 
@@ -45,6 +46,12 @@ export function UserMenu({ user }: UserMenuProps) {
           </p>
         </DropdownMenuLabel>
         <DropdownMenuSeparator />
+        <DropdownMenuItem asChild>
+          <Link href="/account/password">
+            <KeyRoundIcon />
+            비밀번호 변경
+          </Link>
+        </DropdownMenuItem>
         <DropdownMenuItem onSelect={() => startTransition(() => signOutAction())}>
           <LogOutIcon />
           {pending ? '로그아웃 중…' : '로그아웃'}
