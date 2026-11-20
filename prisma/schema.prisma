@@ -307,7 +307,7 @@ model Center {
 
 // 센터 담당자 (0073): 운영사 담당자와 같은 모양, 최대 10명, 대표 1명 (센터 저장 때 함께 저장)
 model CenterContact {
-  id           BigInt   @id @default(autoincrement()) @map("contact_id")
+  id           BigInt   @id @default(autoincrement()) @map("center_contact_id")
   centerId     BigInt   @map("center_id")
   sortOrder    Int      @map("sort_seq")
   // 담당 업무: 운영사 공통코드 CENTER_CONTACT_ROLE의 코드 (예: MANAGER)
@@ -316,13 +316,13 @@ model CenterContact {
   phone        String?  @map("tel_no") @db.VarChar(15)
   email        String?  @db.VarChar(100)
   isPrimary    String   @default("N") @map("primary_yn") @db.Char(1)
-  // [2차] 부서·직책·알림 수신
+  // 부서·직책·알림 수신
   deptName     String?  @map("dept_nm") @db.VarChar(50)
   positionName String?  @map("position_nm") @db.VarChar(50)
   notifyYn     String   @default("Y") @map("notify_yn") @db.Char(1)
-  // 감사 칸: 저장 함수가 채운다 (버전은 센터에서 검사)
+  // 감사 칸 (담당자 표 4개 같은 모양, 0084 ④-3): 등록·수정자는 prisma.ts가 채운다
   createdAt    DateTime @default(now()) @map("created_at")
-  updatedAt    DateTime @default(now()) @map("updated_at")
+  updatedAt    DateTime @default(now()) @updatedAt @map("updated_at")
   createdBy    String   @default("system") @map("created_by") @db.VarChar(50)
   updatedBy    String   @default("system") @map("updated_by") @db.VarChar(50)
   center       Center   @relation(fields: [centerId], references: [id], onDelete: Cascade)
@@ -714,16 +714,25 @@ model ShipperCenter {
 // 화주사 담당자 (운영사 담당자와 같은 모양, 화주사만 최대 10명 — 0080), 대표 1명, 담당 업무는 공통코드 CONTACT_ROLE
 // 연동 담당(if_contact_yn): 화주당 최대 1명, 이메일 필수 (API 키 발급·만료 알림 받는 사람)
 model ShipperContact {
-  id          BigInt  @id @default(autoincrement()) @map("contact_id")
-  shipperId   BigInt  @map("shipper_id")
-  sortOrder   Int     @map("sort_seq")
-  duty        String  @map("role_cd") @db.VarChar(20)
-  name        String  @map("contact_nm") @db.VarChar(50)
-  phone       String? @map("tel_no") @db.VarChar(15)
-  email       String? @db.VarChar(100)
-  isPrimary   String  @default("N") @map("primary_yn") @db.Char(1)
-  isIfContact String  @default("N") @map("if_contact_yn") @db.Char(1)
-  shipper     Shipper @relation(fields: [shipperId], references: [id], onDelete: Cascade)
+  id           BigInt   @id @default(autoincrement()) @map("shipper_contact_id")
+  shipperId    BigInt   @map("shipper_id")
+  sortOrder    Int      @map("sort_seq")
+  duty         String   @map("role_cd") @db.VarChar(20)
+  name         String   @map("contact_nm") @db.VarChar(50)
+  phone        String?  @map("tel_no") @db.VarChar(15)
+  email        String?  @db.VarChar(100)
+  isPrimary    String   @default("N") @map("primary_yn") @db.Char(1)
+  // 부서·직책·알림 수신
+  deptName     String?  @map("dept_nm") @db.VarChar(50)
+  positionName String?  @map("position_nm") @db.VarChar(50)
+  notifyYn     String   @default("Y") @map("notify_yn") @db.Char(1)
+  isIfContact  String   @default("N") @map("if_contact_yn") @db.Char(1)
+  // 감사 칸 (담당자 표 4개 같은 모양, 0084 ④-3): 등록·수정자는 prisma.ts가 채운다
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @default(now()) @updatedAt @map("updated_at")
+  createdBy    String   @default("system") @map("created_by") @db.VarChar(50)
+  updatedBy    String   @default("system") @map("updated_by") @db.VarChar(50)
+  shipper      Shipper  @relation(fields: [shipperId], references: [id], onDelete: Cascade)
 
   // 화주사당 대표 1명
   @@unique([shipperId], where: raw("primary_yn = 'Y'"), map: "tb_shipper_contact_primary_key")
@@ -746,8 +755,6 @@ model UserCenter {
   @@map("tb_user_center")
 }
 
-// 사용자별 목록 그리드 설정: 사용자 + 그리드 이름(DataGrid id) 하나에 한 줄 (docs/decisions/0021)
-// settings 모양은 src/components/data-grid/settings.ts의 gridSettingsSchema (읽을 때 검사, 깨지면 기본값)
 // 사용자 개인 설정 (docs/decisions/0056): 화면이 기억하는 고르기 값 (예: 라벨 인쇄 양식·코드 종류)
 // 키는 코드에 정한 것만 (src/lib/prefs/user-prefs.ts), 값은 키마다 입력 규칙으로 검사한다
 model UserPref {
@@ -761,6 +768,9 @@ model UserPref {
   @@map("tb_user_pref")
 }
 
+// 사용자별 목록 그리드 설정: 사용자 + 그리드 이름(DataGrid id) 하나에 한 줄 (docs/decisions/0021)
+// settings 모양은 src/components/data-grid/settings.ts의 gridSettingsSchema (읽을 때 검사, 깨지면 기본값)
+// (화면이 기억하는 그 밖의 고르기 값은 tb_user_pref — 두 표는 용도가 달라 따로 둔다, 0084 ④-3 M17)
 model UserGridSetting {
   userId    BigInt   @map("user_id")
   gridId    String   @map("grid_cd") @db.VarChar(50)
@@ -945,7 +955,7 @@ model Operator {
 
 // 운영사 담당자 [1차] (최대 5명, 화면에서 정한 순서대로). 감사 칸 없이 운영사 이력으로 본다 (0038, 사용자 결정)
 model OperatorContact {
-  id           BigInt   @id @default(autoincrement()) @map("contact_id")
+  id           BigInt   @id @default(autoincrement()) @map("operator_contact_id")
   operatorId   BigInt   @map("operator_id")
   sortOrder    Int      @map("sort_seq")
   // 담당 업무: 운영사 공통코드 CONTACT_ROLE의 코드 (예: INBOUND, 0030)
@@ -955,10 +965,15 @@ model OperatorContact {
   email        String?  @db.VarChar(100)
   // 대표 담당자 (담당자가 있으면 정확히 1명)
   isPrimary    String   @default("N") @map("primary_yn") @db.Char(1)
-  // [2차] 부서·직책·알림 수신
+  // 부서·직책·알림 수신
   deptName     String?  @map("dept_nm") @db.VarChar(50)
   positionName String?  @map("position_nm") @db.VarChar(50)
   notifyYn     String   @default("Y") @map("notify_yn") @db.Char(1)
+  // 감사 칸 (담당자 표 4개 같은 모양, 0084 ④-3): 등록·수정자는 prisma.ts가 채운다
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @default(now()) @updatedAt @map("updated_at")
+  createdBy    String   @default("system") @map("created_by") @db.VarChar(50)
+  updatedBy    String   @default("system") @map("updated_by") @db.VarChar(50)
   operator     Operator @relation(fields: [operatorId], references: [id], onDelete: Cascade)
 
   // 운영사당 대표 1명
@@ -1430,17 +1445,21 @@ model Customer {
   email          String?  @db.VarChar(100)
 
   // ── 주소: 원본(입력·연동 그대로)은 보존하고 정제 결과는 따로 (0082)
-  rawZipCode    String?   @map("raw_zip_cd") @db.VarChar(10)
-  rawAddress    String?   @map("raw_addr") @db.VarChar(500)
-  zipCode       String?   @map("zip_cd") @db.Char(5)
-  address       String?   @map("addr1") @db.VarChar(200)
-  addressDetail String?   @map("addr2") @db.VarChar(200)
-  addressJibun  String?   @map("addr_jibun") @db.VarChar(200)
+  rawZipCode        String?   @map("raw_zip_cd") @db.VarChar(10)
+  rawAddress        String?   @map("raw_addr") @db.VarChar(500)
+  zipCode           String?   @map("zip_cd") @db.Char(5)
+  address           String?   @map("addr1") @db.VarChar(200)
+  addressDetail     String?   @map("addr2") @db.VarChar(200)
+  addressJibun      String?   @map("addr_jibun") @db.VarChar(200)
   // 법정동코드 10자리 (정제 결과)
-  regionCode    String?   @map("bjd_cd") @db.Char(10)
+  regionCode        String?   @map("bjd_cd") @db.Char(10)
+  // 주소 정제 결과 (납품처와 같은 칸 묶음, 0084 ④-3)
+  sigunguName       String?   @map("sigungu_nm") @db.VarChar(50)
+  bdMgtSn           String?   @map("bd_mgt_sn") @db.VarChar(30)
+  addressNormMethod String?   @map("addr_norm_method_cd") @db.VarChar(20)
   // 주소 정제 등급 A~F (0076 ADDR_GRADE)
-  addressGrade  String?   @map("addr_grade") @db.Char(1)
-  addressNormAt DateTime? @map("addr_norm_at")
+  addressGrade      String?   @map("addr_grade") @db.Char(1)
+  addressNormAt     DateTime? @map("addr_norm_at")
 
   // ── 출고 조건 (거래처가 요구, 화주 설정보다 우선 — 적용은 출고 할당 작업에서)
   // 비어 있으면 화주 출고 최소 잔여일
@@ -1569,15 +1588,24 @@ model ShipTo {
 }
 
 model CustomerContact {
-  id         BigInt   @id @default(autoincrement()) @map("contact_id")
-  customerId BigInt   @map("customer_id")
-  sortOrder  Int      @map("sort_seq")
-  duty       String   @map("role_cd") @db.VarChar(20)
-  name       String   @map("contact_nm") @db.VarChar(50)
-  phone      String?  @map("tel_no") @db.VarChar(15)
-  email      String?  @db.VarChar(100)
-  isPrimary  String   @default("N") @map("primary_yn") @db.Char(1)
-  customer   Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  id           BigInt   @id @default(autoincrement()) @map("customer_contact_id")
+  customerId   BigInt   @map("customer_id")
+  sortOrder    Int      @map("sort_seq")
+  duty         String   @map("role_cd") @db.VarChar(20)
+  name         String   @map("contact_nm") @db.VarChar(50)
+  phone        String?  @map("tel_no") @db.VarChar(15)
+  email        String?  @db.VarChar(100)
+  isPrimary    String   @default("N") @map("primary_yn") @db.Char(1)
+  // 부서·직책·알림 수신
+  deptName     String?  @map("dept_nm") @db.VarChar(50)
+  positionName String?  @map("position_nm") @db.VarChar(50)
+  notifyYn     String   @default("Y") @map("notify_yn") @db.Char(1)
+  // 감사 칸 (담당자 표 4개 같은 모양, 0084 ④-3): 등록·수정자는 prisma.ts가 채운다
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @default(now()) @updatedAt @map("updated_at")
+  createdBy    String   @default("system") @map("created_by") @db.VarChar(50)
+  updatedBy    String   @default("system") @map("updated_by") @db.VarChar(50)
+  customer     Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
 
   // 거래처당 대표 1명
   @@unique([customerId], where: raw("primary_yn = 'Y'"), map: "tb_customer_contact_primary_key")

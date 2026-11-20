@@ -31,6 +31,10 @@ type OperatorValues = {
     phone: string | null
     email: string | null
     isPrimary: string | boolean
+    deptName: string | null
+    positionName: string | null
+    notifyYn?: string
+    notify?: boolean
   }[]
 }
 
@@ -65,6 +69,9 @@ export function toOperatorInput(row: OperatorValues): OperatorInput {
       phone: text(c.phone),
       email: text(c.email),
       isPrimary: typeof c.isPrimary === 'boolean' ? c.isPrimary : isYes(c.isPrimary),
+      deptName: text(c.deptName),
+      positionName: text(c.positionName),
+      notify: c.notify ?? isYes(c.notifyYn ?? 'Y'),
     })),
   }
 }

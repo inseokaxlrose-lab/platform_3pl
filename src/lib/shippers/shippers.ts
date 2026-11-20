@@ -2,7 +2,7 @@ import 'server-only'
 import { ActionError } from '@/lib/actions/action-error'
 import { requireOperatorId } from '@/lib/actor'
 import { assertCodeValues } from '@/lib/common-code/common-codes'
-import { CONTACT_ROLE_GROUP } from '@/lib/contacts/contact-schema'
+import { CONTACT_ROLE_GROUP, contactFields } from '@/lib/contacts/contact-schema'
 import { timeToDate } from '@/lib/format/time'
 import { isAutoPattern, issueCode } from '@/lib/numbering/numbering'
 import { assertRowVersion, withVersionGuard } from '@/lib/row-version'
@@ -215,9 +215,8 @@ function fieldsOf(data: ShipperData) {
 }
 
 const contactRows = (shipperId: bigint, contacts: ShipperData['contacts']) =>
-  contacts.map(({ isPrimary, isIfContact, ...contact }, index) => ({
-    ...contact,
-    isPrimary: toYn(isPrimary),
+  contacts.map(({ isIfContact, ...contact }, index) => ({
+    ...contactFields(contact),
     isIfContact: toYn(isIfContact),
     shipperId,
     sortOrder: index,

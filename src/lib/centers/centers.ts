@@ -121,7 +121,6 @@ async function saveContacts(db: Db, centerId: bigint, contacts: CenterData['cont
   // 대표는 센터당 1명(고유 색인) → 지우고·내리는 것을 먼저
   await db.centerContact.deleteMany({ where: { centerId, id: { notIn: keepIds } } })
   await db.centerContact.updateMany({ where: { centerId }, data: { isPrimary: 'N' } })
-  const actor = currentActor()
   const ids: bigint[] = []
   for (const [index, contact] of contacts.entries()) {
     const fields = {
@@ -131,15 +130,17 @@ async function saveContacts(db: Db, centerId: bigint, contacts: CenterData['cont
       phone: contact.phone,
       email: contact.email,
       isPrimary: toYn(contact.isPrimary),
-      updatedBy: actor,
-      updatedAt: new Date(),
+      deptName: contact.deptName,
+      positionName: contact.positionName,
+      notifyYn: toYn(contact.notify),
     }
     if (contact.id && existingIds.has(contact.id)) {
       await db.centerContact.update({ where: { id: contact.id }, data: fields })
       ids.push(contact.id)
     } else {
       const created = await db.centerContact.create({
-        data: { ...fields, centerId, createdBy: actor },
+        // 등록·수정자는 prisma.ts가 채운다 (0084 ④-3)
+        data: { ...fields, centerId },
         select: { id: true },
       })
       ids.push(created.id)

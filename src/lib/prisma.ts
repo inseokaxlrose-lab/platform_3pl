@@ -35,6 +35,14 @@ export const AUDITED_MODELS: ReadonlySet<string> = new Set([
   'ApiClient',
 ])
 
+// 등록·수정자만 있는 표 (버전 칸 없음): 담당자 표 4개 (0084 ④-3) — 버전은 부모(운영사·센터·화주사·거래처)에서 검사
+export const STAMPED_MODELS: ReadonlySet<string> = new Set([
+  'OperatorContact',
+  'CenterContact',
+  'ShipperContact',
+  'CustomerContact',
+])
+
 // 논리 삭제(del_yn)가 있는 표 (사용자는 계정을 지우지 않으므로 없음)
 export const SOFT_DELETE_MODELS: ReadonlySet<string> = new Set([
   'PermissionGroup',
@@ -168,7 +176,7 @@ function withOperator(model: string, data: Data): Data {
 // 등록: 등록·수정자를 지금 작업자로, 운영사를 지금 운영사로
 function forCreate(model: string, data: Data): Data {
   const withTenant = withOperator(model, data)
-  if (!AUDITED_MODELS.has(model)) return withTenant
+  if (!AUDITED_MODELS.has(model) && !STAMPED_MODELS.has(model)) return withTenant
   return { ...withTenant, createdBy: currentActor(), updatedBy: currentActor() }
 }
 
@@ -178,6 +186,14 @@ const forUpdate = (data: Data): Data => ({
   updatedBy: currentActor(),
   rowVersion: { increment: 1 },
 })
+// 버전 칸이 없는 표: 수정자만
+const forStampUpdate = (data: Data): Data => ({ ...data, updatedBy: currentActor() })
+const stampUpdate = (model: string, data: Data): Data =>
+  AUDITED_MODELS.has(model)
+    ? forUpdate(data)
+    : STAMPED_MODELS.has(model)
+      ? forStampUpdate(data)
+      : data
 
 function createPrismaClient() {
   const connectionString = process.env.DATABASE_URL
@@ -239,12 +255,12 @@ function createPrismaClient() {
         },
         update({ model, args, query }) {
           assertStockWrite(model, 'update')
-          if (AUDITED_MODELS.has(model)) args.data = forUpdate(args.data as Data) as never
+          args.data = stampUpdate(model, args.data as Data) as never
           return query(scopedWrite(model, args))
         },
         updateMany({ model, args, query }) {
           assertStockWrite(model, 'updateMany')
-          if (AUDITED_MODELS.has(model)) args.data = forUpdate(args.data as Data) as never
+          args.data = stampUpdate(model, args.data as Data) as never
           return query(scopedWrite(model, args))
         },
         // 아래 둘은 공통 칸·운영사 자동 채우기를 하지 않는다 (지금 쓰는 곳 없음). 재고 표만 막는다
@@ -259,7 +275,7 @@ function createPrismaClient() {
         upsert({ model, args, query }) {
           assertStockWrite(model, 'upsert')
           args.create = forCreate(model, args.create as Data) as never
-          if (AUDITED_MODELS.has(model)) args.update = forUpdate(args.update as Data) as never
+          args.update = stampUpdate(model, args.update as Data) as never
           // 지운 줄은 찾지 않는다 → 없으면 새로 만든다 (부분 고유 조건과도 맞다)
           return query(scopedWrite(model, args))
         },

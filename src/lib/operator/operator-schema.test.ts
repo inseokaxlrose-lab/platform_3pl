@@ -84,7 +84,17 @@ describe('운영사 정보 입력 규칙', () => {
       isPrimary: true,
     }
     expect(operatorSchema.parse(input({ contacts: [contact] })).contacts).toEqual([
-      { duty: 'INBOUND', name: '김담당', phone: '01012345678', email: null, isPrimary: true },
+      {
+        duty: 'INBOUND',
+        name: '김담당',
+        phone: '01012345678',
+        email: null,
+        isPrimary: true,
+        // 부서·직책·알림을 안 보내면 빈 칸·알림 받음 (0084 ④-3)
+        deptName: null,
+        positionName: null,
+        notify: true,
+      },
     ])
 
     expect(errorsOf(input({ contacts: [{ ...contact, duty: '', name: '', phone: '' }] }))).toEqual({
