@@ -33,8 +33,8 @@ import {
 
 type Row = {
   id: string
-  systemCode: string
   code: string
+  custCode: string | null
   name: string
   customerType: string | null
   customerGroup: string | null
@@ -130,7 +130,8 @@ const COLUMNS: DataGridColumn<Row>[] = [
     sortable: true,
     defaultHidden: true,
   },
-  { id: 'systemCode', header: '시스템 코드', accessor: 'systemCode', defaultHidden: true },
+  // 사용자 정의 코드 (화주 시스템의 코드, 0084)
+  { id: 'custCode', header: '사용자 정의 코드', accessor: 'custCode', sortable: true },
   { id: 'createdAt', header: '등록일', accessor: 'createdAt', format: 'date', sortable: true },
   {
     id: 'updatedAt',

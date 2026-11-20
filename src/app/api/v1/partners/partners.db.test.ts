@@ -151,7 +151,7 @@ describe('POST /partners', () => {
       partner({
         shipTos: [
           {
-            shipToCd: 'p10023-01',
+            shipToCd: 'p10023-back',
             shipToNm: '후문',
             default: true,
             ...GANGNAM,
@@ -172,7 +172,7 @@ describe('POST /partners', () => {
           result: 'CREATED',
           shipTos: [
             {
-              shipToCd: 'P10023-01',
+              shipToCd: 'P10023-BACK',
               result: 'CREATED',
               addrGrade: 'A',
               zipCd: '06236',
@@ -195,7 +195,7 @@ describe('POST /partners', () => {
     const again = await post(body)
     expect(again.body.items[0]).toMatchObject({
       result: 'UNCHANGED',
-      shipTos: [{ shipToCd: 'P10023-01', result: 'UNCHANGED' }],
+      shipTos: [{ shipToCd: 'P10023-BACK', result: 'UNCHANGED' }],
     })
     expect((await prisma.customer.findFirstOrThrow({ where: { code: 'P10023' } })).rowVersion).toBe(
       saved.rowVersion,
@@ -236,7 +236,10 @@ describe('POST /partners', () => {
       { partnerCd: '한글코드', partnerNm: '코드 오류', ...GANGNAM },
     ])
     expect(res.body.items).toMatchObject([
-      { result: 'CREATED', shipTos: [{ shipToCd: 'P10023', result: 'CREATED', centerCd: 'ICN' }] },
+      {
+        result: 'CREATED',
+        shipTos: [{ shipToCd: 'P10023-01', result: 'CREATED', centerCd: 'ICN' }],
+      },
       { result: 'FAIL', errors: [{ code: 'PARTNER_ADDRESS_REQUIRED' }] },
       { result: 'FAIL', errors: [{ code: 'PARTNER_CD_INVALID', field: 'partnerCd' }] },
     ])
@@ -351,7 +354,9 @@ describe('조회 · 납품처 API', () => {
     expect(detail.body.data).toMatchObject({
       partnerCd: 'A1',
       telNo: '025551234',
-      shipTos: [{ shipToCd: 'A1', default: true, centerCd: 'ICN', centerAssignStatus: 'ASSIGNED' }],
+      shipTos: [
+        { shipToCd: 'A1-01', default: true, centerCd: 'ICN', centerAssignStatus: 'ASSIGNED' },
+      ],
     })
     const missing = await call(getPartnerRoute, { path: '/partners/X', params: { partnerCd: 'X' } })
     expect(missing).toMatchObject({ status: 404, body: { error: { code: 'NOT_FOUND' } } })
@@ -379,7 +384,7 @@ describe('조회 · 납품처 API', () => {
       params: { partnerCd: 'P10023' },
     })
     expect(list.body.data.items.map((s: { shipToCd: string }) => s.shipToCd)).toEqual([
-      'P10023',
+      'P10023-01',
       'B1',
     ])
   })

@@ -120,7 +120,9 @@ export function ShipToSection({
                   onClick={() => setEditing(index)}
                 >
                   <p className="flex flex-wrap items-center gap-2">
-                    <span className="font-medium text-primary hover:underline">{row.code}</span>
+                    <span className="font-medium text-primary hover:underline">
+                      {row.code || '(저장하면 자동 코드)'}
+                    </span>
                     <span>{row.name}</span>
                     {row.isDefault && <StatusBadge tone="info">기본</StatusBadge>}
                     {saved?.systemCreated && row.addrSync && (

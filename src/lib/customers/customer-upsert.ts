@@ -367,6 +367,7 @@ export async function upsertPartner(
 // 새 거래처의 빈 입력값 (화면 등록 화면의 빈 양식과 같은 모양)
 function customerSchemaDefaults(): CustomerInput {
   return {
+    custCode: '',
     name: '',
     shortName: '',
     customerType: '',

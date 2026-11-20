@@ -298,6 +298,52 @@ describe('POST /items', () => {
   })
 })
 
+describe('조회 키 (0084)', () => {
+  it('CODE 화주: itemCd로 찾고, itemCustCd는 보통 칸으로 저장한다', async () => {
+    const res = await post([ramen({ itemCustCd: 'ERP-1' })])
+    expect(res.body.items[0]).toMatchObject({
+      docNo: 'A10001',
+      result: 'CREATED',
+      itemCd: 'A10001',
+      itemCustCd: 'ERP-1',
+    })
+    // itemCd가 없으면 건별 오류
+    const missing = await post([{ itemNm: '코드 없음', baseUom: 'EA' }])
+    expect(missing.body.items[0]).toMatchObject({
+      result: 'FAIL',
+      errors: [{ code: 'ITEM_CD_INVALID', field: 'itemCd' }],
+    })
+  })
+
+  it('CUST_CD 화주: itemCustCd로 찾고, 새 품목의 품목코드는 자동 체번, 상세 경로도 itemCustCd', async () => {
+    await prisma.shipper.update({ where: { id: shipperId }, data: { ifKeyType: 'CUST_CD' } })
+    const { codePrefix } = await prisma.shipper.findUniqueOrThrow({ where: { id: shipperId } })
+    const res = await post([{ itemCustCd: 'erp-1', itemNm: '화주 품목', baseUom: 'EA' }])
+    expect(res.body.items[0]).toMatchObject({
+      docNo: 'erp-1',
+      result: 'CREATED',
+      itemCd: `${codePrefix}S000001`,
+      itemCustCd: 'erp-1',
+    })
+    // 같은 키로 다시 보내면 그 품목을 고친다
+    const again = await post([{ itemCustCd: 'erp-1', itemNm: '이름 바꿈' }])
+    expect(again.body.items[0]).toMatchObject({ result: 'UPDATED', itemCd: `${codePrefix}S000001` })
+    expect(await prisma.item.count({ where: { shipperId } })).toBe(1)
+    // 품목코드는 바꿀 수 없다
+    const changed = await post([{ itemCustCd: 'erp-1', itemCd: 'OTHER' }])
+    expect(changed.body.items[0]).toMatchObject({
+      result: 'FAIL',
+      errors: [{ code: 'ITEM_CD_INVALID' }],
+    })
+    // itemCustCd가 없으면 건별 오류
+    const missing = await post([{ itemCd: 'A1', itemNm: '키 없음', baseUom: 'EA' }])
+    expect(missing.body.items[0]).toMatchObject({ errors: [{ field: 'itemCustCd' }] })
+
+    const detail = await call(getItemRoute, { path: '/items/erp-1', params: { itemCd: 'erp-1' } })
+    expect(detail.body.data).toMatchObject({ itemCustCd: 'erp-1', itemNm: '이름 바꿈' })
+  })
+})
+
 describe('GET /items', () => {
   it('목록은 cursor로 이어 받고, 상세는 단위·바코드·계산값 포함, 없는 품목은 404', async () => {
     await post([ramen({ itemCd: 'A1' }), { itemCd: 'A2', itemNm: '두 번째', baseUom: 'EA' }])

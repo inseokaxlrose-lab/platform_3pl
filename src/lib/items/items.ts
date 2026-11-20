@@ -3,7 +3,8 @@ import { Prisma, type AsnStatus } from '@/generated/prisma/client'
 import { ActionError } from '@/lib/actions/action-error'
 import { currentActor, requireOperatorId } from '@/lib/actor'
 import { deleteExternalCodes } from '@/lib/master-code/external-codes'
-import { nextSystemCode } from '@/lib/master-code/system-code'
+import { shipperPrefixOf } from '@/lib/customers/customers'
+import { isAutoPattern, issueCode } from '@/lib/numbering/numbering'
 import { getPalletSpec } from '@/lib/pallets/pallet-types'
 import { prisma, type Db } from '@/lib/prisma'
 import { assertRowVersion, withVersionGuard } from '@/lib/row-version'
@@ -28,7 +29,7 @@ import { UNIT_LEVEL_ORDER, type BarcodeType, type ItemStatus, type UnitLevel } f
 import type { ItemCreateData, ItemData } from './item-schema'
 
 // 품목 저장 (docs/decisions/0041, 0083). 권한·데이터 범위 검사는 서버 액션에서 한다
-// - 화주사·품목코드는 등록 후 바꿀 수 없다 (품목코드는 화주 코드 = API 업무 키)
+// - 화주사·품목코드는 등록 후 바꿀 수 없다 (품목코드는 비우면 자동 체번, API 키는 화주 연동 조회 키 — 0084)
 // - 단위는 레벨별 1행(BASE 필수). 체적은 BOX 기준, PLT는 팔레트 적재 정보(종류·TI·HI·박스 수)가 있으면 계산, 없으면 입력값
 // - 기본단위·기한/LOT/시리얼 관리 여부는 재고·미완료 ASN이 있으면 바꿀 수 없다 (재고 구조가 바뀐다)
 // - 환산수량을 바꾸면 이력을 남기고, 그 단위로 된 미완료 ASN이 있으면 막는다
@@ -45,10 +46,38 @@ const OPEN_ASN = {
   asn: { status: { in: ['PLANNED', 'INSPECTING', 'PARTIAL'] as AsnStatus[] } },
 } satisfies Prisma.AsnLineWhereInput
 
-// 품목코드: 같은 화주사 안에서 중복 금지 (지운 것은 다시 쓸 수 있다)
-async function assertItemCode(db: Db, shipperId: bigint, code: string) {
+// 품목코드(직접 입력): 자동 체번 모양 금지({접두어}S000001 — 나중 자동 발급과 겹침), 같은 화주사 안에서 중복 금지
+async function assertItemCode(db: Db, shipperId: bigint, code: string, prefix: string) {
+  if (await isAutoPattern(db, 'ITEM', { operatorId: requireOperatorId(), prefix }, code)) {
+    throw new ActionError(
+      'VALIDATION',
+      `'${code}'는 자동 체번 모양이라 품목코드로 쓸 수 없습니다. 비워 두면 자동으로 붙습니다.`,
+      'ITEM_CD_INVALID',
+    )
+  }
   const owner = await db.item.findFirst({ where: { shipperId, code }, select: { id: true } })
   if (owner) throw new ActionError('CONFLICT', `이 화주사에 이미 있는 품목코드입니다: ${code}`)
+}
+
+// 사용자 정의 코드: 같은 화주사 안에서 중복 금지 (값이 있을 때, 0084)
+async function assertItemCustCode(
+  db: Db,
+  shipperId: bigint,
+  custCode: string | null,
+  exceptId?: bigint,
+) {
+  if (!custCode) return
+  const owner = await db.item.findFirst({
+    where: { shipperId, custCode },
+    select: { id: true, code: true },
+  })
+  if (owner && owner.id !== exceptId) {
+    throw new ActionError(
+      'CONFLICT',
+      `이 화주사의 다른 품목(${owner.code})이 쓰는 사용자 정의 코드입니다: ${custCode}`,
+      'DUPLICATE',
+    )
+  }
 }
 
 type UnitInfo = { id: bigint; code: string; type: string; decimals: number }
@@ -261,6 +290,7 @@ function fieldsOf(data: ItemData, units: UnitRow[]) {
     )
   }
   return {
+    custCode: data.custCode,
     name: data.name,
     nameEn: data.nameEn,
     shortName: data.shortName,
@@ -371,7 +401,9 @@ export async function createItemIn(db: Db, data: ItemCreateData, options: ItemSa
       'STATUS_NOT_ALLOWED',
     )
   }
-  await assertItemCode(db, data.shipperId, data.code)
+  const prefix = await shipperPrefixOf(db, data.shipperId)
+  if (data.code) await assertItemCode(db, data.shipperId, data.code, prefix)
+  await assertItemCustCode(db, data.shipperId, data.custCode)
   const { byId } = await checkUnits(db, data, [])
   const { rows, warnings } = await buildUnits(db, data, byId)
   const barcodes = await buildBarcodes(db, data.shipperId, null, data)
@@ -380,17 +412,22 @@ export async function createItemIn(db: Db, data: ItemCreateData, options: ItemSa
       ...fieldsOf(data, rows),
       operatorId: requireOperatorId(),
       shipperId: data.shipperId,
-      systemCode: await nextSystemCode('ITEM', db),
-      code: data.code,
+      // 품목코드: 비우면 자동 체번 {화주 접두어}S000001
+      code:
+        data.code ||
+        (await issueCode(db, 'ITEM', {
+          operatorId: requireOperatorId(),
+          shipperId: data.shipperId,
+          prefix,
+        })),
       source: options.source ?? 'SCREEN',
       ...(options.requestId && { lastIfAt: new Date(), lastRequestId: options.requestId }),
     },
-    select: { id: true, systemCode: true, code: true, rowVersion: true, shipperId: true },
+    select: { id: true, code: true, rowVersion: true, shipperId: true },
   })
   await writeChildren(db, item, rows, barcodes)
   return {
     id: item.id,
-    systemCode: item.systemCode,
     code: item.code,
     rowVersion: item.rowVersion,
     warnings,
@@ -407,7 +444,7 @@ async function hasStockOrOpenDoc(db: Db, itemId: bigint) {
   return { stock: stock > 0, asn: asn > 0 }
 }
 
-// 수정 본체 (트랜잭션 안): 화주사·품목코드·시스템 코드는 바뀌지 않는다
+// 수정 본체 (트랜잭션 안): 화주사·품목코드는 바뀌지 않는다
 export async function updateItemIn(
   db: Db,
   id: bigint,
@@ -432,6 +469,7 @@ export async function updateItemIn(
   })
   assertRowVersion(found, rowVersion, '품목을 찾을 수 없습니다.')
   const current = found!
+  await assertItemCustCode(db, current.shipperId, data.custCode, id)
   // 재고 구조를 바꾸는 변경: 재고·미완료 ASN이 있으면 막는다 (ITEM_STOCK_EXISTS)
   const structural =
     current.baseUnitId !== data.baseUnitId ||

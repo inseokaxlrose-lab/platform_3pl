@@ -309,6 +309,37 @@ describe('품목 엑셀 업로드 (0083 ②)', () => {
     expect(await prisma.item.count()).toBe(0)
   })
 
+  it('조회 키 (0084): 품목코드를 비우면 자동 생성, CUST_CD 화주는 사용자정의코드로 찾는다', async () => {
+    const { codePrefix } = await prisma.shipper.findUniqueOrThrow({ where: { id: gana } })
+    // CODE 화주: 품목코드를 비운 줄은 매번 새 품목 (자동 체번)
+    expect(
+      await commitItemUploadAction(
+        upload({ name: '자동 1', baseUnit: 'EA' }, { name: '자동 2', baseUnit: 'EA' }),
+      ),
+    ).toMatchObject({ ok: true, data: { message: expect.stringContaining('신규 2') } })
+    expect((await prisma.item.findMany({ orderBy: { code: 'asc' } })).map((i) => i.code)).toEqual([
+      `${codePrefix}S000001`,
+      `${codePrefix}S000002`,
+    ])
+
+    // CUST_CD 화주: 사용자정의코드가 키 — 없으면 칸 오류, 있으면 그 품목을 고친다
+    await prisma.shipper.update({ where: { id: gana }, data: { ifKeyType: 'CUST_CD' } })
+    const noKey = await validateItemUploadAction(
+      upload({ code: 'X1', name: '키 없음', baseUnit: 'EA' }),
+    )
+    expect(noKey.ok && noKey.data.rows[0].errors).toEqual([
+      expect.stringContaining('사용자정의코드'),
+    ])
+    await commitItemUploadAction(upload({ custCode: 'ERP-1', name: '화주 품목', baseUnit: 'EA' }))
+    expect(
+      await commitItemUploadAction(upload({ custCode: 'ERP-1', name: '이름 바꿈' })),
+    ).toMatchObject({ ok: true, data: { message: expect.stringContaining('수정 1') } })
+    expect(await prisma.item.findFirstOrThrow({ where: { custCode: 'ERP-1' } })).toMatchObject({
+      code: `${codePrefix}S000003`,
+      name: '이름 바꿈',
+    })
+  })
+
   it('상태 칸: 단종으로 등록, 업로드는 등록·수정 권한 둘 다 필요', async () => {
     expect(await commitItemUploadAction(upload({ ...NEW_ROW, status: '단종' }))).toMatchObject({
       ok: true,

@@ -19,6 +19,7 @@ export const EMPTY_UNIT_ROW = (level: UnitLevel, unitId = ''): ItemUnitInput => 
 // 빈 품목 입력 (화주사·품목코드 제외)
 export const EMPTY_ITEM_INPUT: Omit<ItemCreateInput, 'shipperId'> = {
   code: '',
+  custCode: '',
   name: '',
   nameEn: '',
   shortName: '',

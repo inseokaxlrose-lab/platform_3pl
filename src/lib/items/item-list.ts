@@ -74,9 +74,10 @@ const itemStatusWhere = (value: string | undefined) =>
 export async function listItems(input: ListQuery, scope: DataScope) {
   const { filters } = input
   const query = toPrismaQuery(input, {
-    searchFields: ['code', 'systemCode', 'name', 'shipper.name', 'shipper.code'],
+    searchFields: ['code', 'custCode', 'name', 'shipper.name', 'shipper.code'],
     sortable: {
       code: 'code',
+      custCode: 'custCode',
       name: 'name',
       shipper: 'shipper.code',
       itemType: 'itemType',
@@ -127,8 +128,8 @@ export async function listItems(input: ListQuery, scope: DataScope) {
       where,
       select: {
         id: true,
-        systemCode: true,
         code: true,
+        custCode: true,
         name: true,
         spec: true,
         itemType: true,
@@ -199,8 +200,8 @@ export async function listItems(input: ListQuery, scope: DataScope) {
             : null
       return {
         id: row.id,
-        systemCode: row.systemCode,
         code: row.code,
+        custCode: row.custCode,
         name: row.name,
         spec: row.spec,
         itemType: ITEM_TYPE.labels[row.itemType as ItemTypeKey] ?? row.itemType,

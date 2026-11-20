@@ -101,6 +101,7 @@ const text = (value: string | null) => value ?? ''
 // 저장된 품목 → 화면·입력 규칙 모양 (수정 화면이 보여 주고, upsert가 보낸 칸만 덮어쓴다)
 export function itemInputOf(item: ItemWithInput): ItemInput {
   return {
+    custCode: text(item.custCode),
     name: item.name,
     nameEn: text(item.nameEn),
     shortName: text(item.shortName),
@@ -187,7 +188,6 @@ export async function getItemForEdit(id: bigint, scope: DataScope) {
   return textIds({
     id: item.id,
     code: item.code,
-    systemCode: item.systemCode,
     rowVersion: item.rowVersion,
     status: item.status,
     isActive: isActiveStatus(item.status),

@@ -7,6 +7,7 @@ import {
   type UploadPreview,
   type UploadRow,
 } from '@/lib/excel/upload'
+import type { IfKeyType } from '@/lib/master-code/if-key'
 import { prisma, type Db } from '@/lib/prisma'
 import { scopeFilter, sharedOperatorFilter, type DataScope } from '@/lib/scope/data-scope'
 import { SHIPPER_SETUP_ONLY } from '@/lib/shippers/shipper-codes'
@@ -33,6 +34,7 @@ const STATUS_OF: Record<string, ItemStatus> = {
 
 // 글자 칸 (값을 그대로 넣는다 — 형식은 입력 규칙이 검사)
 const TEXT_KEYS = [
+  'custCode',
   'name',
   'nameEn',
   'shortName',
@@ -95,6 +97,10 @@ function barcodeTypeOf(barcode: string): BarcodeType {
 type Prepared = {
   row: UploadRow
   shipperId: bigint
+  keyType: IfKeyType
+  // 찾는 키 값 (비면 새 품목)
+  key: string
+  // 새 품목의 품목코드 (비우면 자동 생성)
   code: string
   status?: ItemStatus
   patch: (current: ItemInput) => ItemInput
@@ -108,11 +114,17 @@ async function prepareRows(rows: UploadRow[], scope: DataScope) {
   const [shippers, units] = await Promise.all([
     prisma.shipper.findMany({
       where: { AND: [scopeFilter(scope, SHIPPER_SCOPE), SHIPPER_SETUP_ONLY] },
-      select: { id: true, code: true },
+      select: { id: true, code: true, ifKeyType: true },
     }),
     prisma.unit.findMany({ where: sharedOperatorFilter(scope), select: { id: true, code: true } }),
   ])
-  const shipperByCode = new Map(shippers.map((s) => [s.code.toUpperCase(), s.id]))
+  // 화주사코드 → { id, 품목을 찾는 키 종류 }
+  const shipperByCode = new Map(
+    shippers.map((s) => [
+      s.code.toUpperCase(),
+      { id: s.id, keyType: (s.ifKeyType === 'CUST_CD' ? 'CUST_CD' : 'CODE') as IfKeyType },
+    ]),
+  )
   const unitByCode = new Map(units.map((u) => [u.code.toUpperCase(), String(u.id)]))
 
   const prepared: Prepared[] = []
@@ -121,14 +133,30 @@ async function prepareRows(rows: UploadRow[], scope: DataScope) {
     const value = (key: string) => (row.values[key] ?? '').trim()
     const shipperCode = value('shipperCode').toUpperCase()
     const code = value('code').toUpperCase()
-    if (!shipperCode || !code) continue
+    const custCode = value('custCode')
+    if (!shipperCode) continue
     const before = issues.length
-    const shipperId = shipperByCode.get(shipperCode)
-    if (!shipperId)
+    const shipper = shipperByCode.get(shipperCode)
+    const shipperId = shipper?.id
+    if (!shipper)
       add(row, 'shipperCode', `없거나 품목을 등록할 수 없는 화주사입니다 (${shipperCode}).`)
-    const key = `${shipperCode}|${code}`
-    if (seen.has(key)) add(row, 'code', '같은 화주사·품목코드의 줄이 이미 있습니다.')
-    seen.add(key)
+    // 찾는 키: 화주사 연동 조회 키 (품목코드 또는 사용자 정의 코드, 0084)
+    const keyType: IfKeyType = shipper?.keyType ?? 'CODE'
+    const key = keyType === 'CUST_CD' ? custCode : code
+    const keyColumn = keyType === 'CUST_CD' ? 'custCode' : 'code'
+    if (shipper && keyType === 'CUST_CD' && !custCode) {
+      add(
+        row,
+        'custCode',
+        '이 화주사는 사용자정의코드로 품목을 찾습니다. 사용자정의코드를 넣어 주세요.',
+      )
+    }
+    // 키를 비운 줄(품목코드 자동 생성)은 매번 새 품목이라 겹침 검사에서 뺀다
+    if (key) {
+      const seenKey = `${shipperCode}|${key}`
+      if (seen.has(seenKey)) add(row, keyColumn, '같은 화주사·품목의 줄이 이미 있습니다.')
+      seen.add(seenKey)
+    }
 
     // 칸 해석 (넣은 칸만 patch에 들어간다)
     const set: Partial<Record<string, unknown>> = {}
@@ -241,7 +269,7 @@ async function prepareRows(rows: UploadRow[], scope: DataScope) {
       }
       return next
     }
-    prepared.push({ row, shipperId, code, status, patch })
+    prepared.push({ row, shipperId, keyType, key, code, status, patch })
   }
   return { issues, prepared }
 }
@@ -269,7 +297,14 @@ async function runRows(tx: Db, prepared: Prepared[], issues: UploadIssue[]) {
     try {
       const result = await upsertItem(
         tx,
-        { shipperId: p.shipperId, code: p.code, patch: p.patch, status: p.status },
+        {
+          shipperId: p.shipperId,
+          keyType: p.keyType,
+          key: p.key,
+          code: p.code || undefined,
+          patch: p.patch,
+          status: p.status,
+        },
         { source: 'UPLOAD' },
       )
       summary[

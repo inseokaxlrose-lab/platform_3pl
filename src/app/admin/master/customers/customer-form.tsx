@@ -53,6 +53,7 @@ import { ShipToSection } from './ship-to-section'
 const EMPTY: CustomerCreateInput = {
   shipperId: '',
   code: '',
+  custCode: '',
   name: '',
   shortName: '',
   customerType: '',
@@ -75,10 +76,10 @@ const EMPTY: CustomerCreateInput = {
   shipTos: [],
 }
 
-type TextKey = 'code' | 'name' | 'shortName' | 'customerGroup' | 'ceoName'
+type TextKey = 'code' | 'custCode' | 'name' | 'shortName' | 'customerGroup' | 'ceoName'
 
 // 거래처 등록·수정 (docs/decisions/0043, 0082 — 입력 화면 틀 0031)
-// - 거래처코드: 필수, 등록 후 바꿀 수 없다
+// - 거래처코드: 비우면 자동 체번({화주 접두어}C000001), 등록 후 바꿀 수 없다. 사용자 정의 코드는 화주 시스템 코드 (0084)
 // - 납품처: 표 + 드로어로 고치고, 아래 [저장] 한 번에 거래처와 함께 저장한다 (배송센터는 저장할 때 정한다)
 // - 저장한 뒤에는 화면을 새로 읽어 납품처 키·배송센터 지정 결과를 다시 보여 준다 (페이지가 key=rowVersion으로 다시 그린다)
 export function CustomerForm({
@@ -224,25 +225,12 @@ export function CustomerForm({
             )}
           </Field>
           {text('code', '거래처코드', 3, {
-            required: true,
             newRow: true,
-            placeholder: '예: C-1001',
-            hint: customer ? '바꿀 수 없습니다' : '화주가 쓰는 코드 · 등록 후 바꿀 수 없습니다',
+            placeholder: '비워 두면 자동 생성',
+            hint: customer ? '바꿀 수 없습니다' : '등록 후 바꿀 수 없습니다',
             locked: Boolean(customer),
           })}
-          <Field
-            label="시스템 코드"
-            span={3}
-            htmlFor={id('system-code')}
-            hint="출고·이력에 쓰는 바뀌지 않는 코드"
-          >
-            <Input
-              id={id('system-code')}
-              value={customer?.systemCode ?? '저장하면 자동으로 부여됩니다'}
-              disabled
-              readOnly
-            />
-          </Field>
+          {text('custCode', '사용자 정의 코드', 3, { hint: '화주 시스템의 거래처코드 (선택)' })}
           {text('name', '거래처명', 8, { required: true, newRow: true })}
           {text('shortName', '약칭', 4)}
           <Field

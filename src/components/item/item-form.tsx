@@ -60,7 +60,6 @@ type SaveResult = { id: string; rowVersion: number }
 export type ItemFormItem = {
   id: string
   code: string
-  systemCode: string
   rowVersion: number
   status: string
   isActive: boolean
@@ -322,11 +321,10 @@ export function ItemForm({
           <Field
             label="품목코드"
             span={3}
-            required
             newRow
             error={errors.code}
             htmlFor={id('code')}
-            hint={item ? '바꿀 수 없습니다' : '화주가 쓰는 코드 · 등록 후 바꿀 수 없습니다'}
+            hint={item ? '바꿀 수 없습니다' : '등록 후 바꿀 수 없습니다'}
           >
             <Input
               id={id('code')}
@@ -334,20 +332,24 @@ export function ItemForm({
               onChange={(e) => set({ code: e.target.value })}
               disabled={disabled || Boolean(item)}
               maxLength={50}
+              placeholder="비워 두면 자동 생성"
               aria-invalid={Boolean(errors.code)}
             />
           </Field>
           <Field
-            label="시스템 코드"
+            label="사용자 정의 코드"
             span={3}
-            htmlFor={id('system-code')}
-            hint="출고·이력에 쓰는 바뀌지 않는 코드"
+            error={errors.custCode}
+            htmlFor={id('custCode')}
+            hint="화주 시스템의 품목코드 (선택)"
           >
             <Input
-              id={id('system-code')}
-              value={item?.systemCode ?? '저장하면 자동으로 부여됩니다'}
-              disabled
-              readOnly
+              id={id('custCode')}
+              value={value.custCode}
+              onChange={(e) => set({ custCode: e.target.value })}
+              disabled={disabled}
+              maxLength={50}
+              aria-invalid={Boolean(errors.custCode)}
             />
           </Field>
           {select('itemType', '품목 유형', 3, ITEM_TYPE.options, { required: true })}
