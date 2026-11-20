@@ -193,6 +193,13 @@ export const PERMISSION_MENUS = {
     area: 'admin',
     actions: ['read', 'update'],
   },
+  // 휴무관리 (0096): 국가 공휴일 다시 가져오기는 update, 개별 휴일 등록·수정·삭제
+  'system.holidays': {
+    label: '휴무관리',
+    group: '시스템',
+    area: 'admin',
+    actions: ['read', 'create', 'update', 'delete'],
+  },
   'system.exports': {
     label: '자료 추출',
     group: '시스템',
