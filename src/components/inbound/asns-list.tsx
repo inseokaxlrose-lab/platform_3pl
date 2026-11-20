@@ -11,11 +11,12 @@ import {
   PUTAWAY_STATUS_FORMAT,
   PUTAWAY_STATUS_OPTIONS,
 } from './asn-status'
+import { labelOf } from '@/lib/db-value'
 
 export type AsnRow = {
   id: string
   asnNo: string
-  channel: keyof typeof ASN_CHANNEL_LABELS
+  channel: string
   expectedOn: string
   shipperRefNo: string | null
   status: string
@@ -97,7 +98,7 @@ const columnsOf = (basePath: string, withShipper: boolean): DataGridColumn<AsnRo
   {
     id: 'channel',
     header: '등록 경로',
-    accessor: (row) => ASN_CHANNEL_LABELS[row.channel],
+    accessor: (row) => labelOf(ASN_CHANNEL_LABELS, row.channel),
     defaultHidden: !withShipper,
   },
   {

@@ -9,6 +9,7 @@ import { getAdjustDetail } from '@/lib/stock/adjust-queries'
 import { ADJUST_TYPE_LABELS } from '@/lib/stock/adjust-schema'
 import { getCurrentScope, hasPermission } from '@/lib/session'
 import { cancelAdjustAction, confirmAdjustAction } from '../actions'
+import { labelOf } from '@/lib/db-value'
 
 export const metadata: Metadata = { title: '실사·조정' }
 
@@ -27,7 +28,7 @@ export default async function AdjustmentPage({
   if (!adjust) notFound()
   return (
     <AppPage
-      title={`${ADJUST_TYPE_LABELS[adjust.type]} · ${adjust.adjustNo}`}
+      title={`${labelOf(ADJUST_TYPE_LABELS, adjust.type)} · ${adjust.adjustNo}`}
       description={adjust.center}
       meta={<AdjustStatusBadge status={adjust.status} />}
       actions={<BackToListButton listPath="/admin/stock/adjustments" />}

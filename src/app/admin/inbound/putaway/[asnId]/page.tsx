@@ -10,6 +10,7 @@ import { PUTAWAY_STATUS_LABELS } from '@/lib/inbound/asn-schema'
 import { getPutawayWork } from '@/lib/inbound/putaway-queries'
 import { getCurrentScope, hasPermission } from '@/lib/session'
 import { registerPutawayAction } from '../actions'
+import { labelOf } from '@/lib/db-value'
 
 export const metadata: Metadata = { title: '적치' }
 
@@ -31,7 +32,7 @@ export default async function PutawayWorkPage({
       description={`${work.shipper} · ${work.center}`}
       meta={
         <StatusBadge tone={work.putawayStatus === 'DONE' ? 'success' : 'info'}>
-          {PUTAWAY_STATUS_LABELS[work.putawayStatus]}
+          {labelOf(PUTAWAY_STATUS_LABELS, work.putawayStatus)}
         </StatusBadge>
       }
       actions={<BackToListButton listPath="/admin/inbound/putaway" />}

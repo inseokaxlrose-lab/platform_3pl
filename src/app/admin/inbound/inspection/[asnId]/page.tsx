@@ -13,6 +13,7 @@ import { ASN_STATUS_LABELS } from '@/lib/inbound/asn-schema'
 import { getInspectionWork } from '@/lib/inbound/inspection-queries'
 import { getCurrentScope, hasPermission } from '@/lib/session'
 import { addInspectionAction, deleteInspectionAction } from '../actions'
+import { labelOf } from '@/lib/db-value'
 
 export const metadata: Metadata = { title: '입고 검수' }
 
@@ -35,7 +36,7 @@ export default async function InspectionWorkPage({
       description={`${work.shipper} · ${work.center} · 예정일 ${work.expectedOn}`}
       meta={
         <StatusBadge tone={work.status === 'CLOSED' ? 'danger' : 'info'}>
-          {ASN_STATUS_LABELS[work.status]}
+          {labelOf(ASN_STATUS_LABELS, work.status)}
         </StatusBadge>
       }
       actions={

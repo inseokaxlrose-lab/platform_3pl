@@ -29,12 +29,12 @@ export const groupCodeField = z
     '그룹 코드는 영문 대문자로 시작하는 대문자·숫자·밑줄 2~30자입니다.',
   )
 
-// 코드: 대문자·숫자·밑줄·하이픈 1~30자 (예: INBOUND, 01)
+// 코드: 대문자·숫자·밑줄·하이픈 1~20자 (예: INBOUND, 01) — 업무 표의 코드 칸이 VARCHAR(20)이라 (0084 ④-2)
 export const itemCodeField = z
   .string()
   .trim()
   .toUpperCase()
-  .regex(/^[A-Z0-9_-]{1,30}$/, '코드는 영문 대문자·숫자·밑줄·하이픈 1~30자입니다.')
+  .regex(/^[A-Z0-9_-]{1,20}$/, '코드는 영문 대문자·숫자·밑줄·하이픈 1~20자입니다.')
 
 export const codeGroupCreateSchema = z.object({ code: groupCodeField, ...common })
 // rowVersion: 팝업을 열 때의 버전 (동시 수정 막기)

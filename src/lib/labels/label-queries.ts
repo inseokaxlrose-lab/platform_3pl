@@ -5,6 +5,8 @@ import { ASN_SCOPE, itemLotOptions, asnItemSelect } from '@/lib/inbound/asns'
 import { prisma } from '@/lib/prisma'
 import { isInScope, type DataScope } from '@/lib/scope/data-scope'
 import { parseQty, qtyText } from '@/lib/units/convert'
+import { toValue } from '@/lib/db-value'
+import { LABEL_UNITS } from '@/lib/shippers/shipper-schema'
 
 // 라벨 인쇄 화면 조회 (docs/decisions/0056) — 서버 액션 밖이라 데이터 범위를 직접 건다
 
@@ -93,7 +95,7 @@ export async function labelViews(inspectionIds: bigint[]) {
       payload: l.payload,
       seq: l.seq,
       total: l.total,
-      labelUnit: l.labelUnit,
+      labelUnit: toValue(LABEL_UNITS, l.labelUnit),
       qty: qty(l.qty),
       baseUnit: l.inspection.item.baseUnit.code,
       itemCode: l.inspection.item.code,

@@ -20,14 +20,6 @@ datasource db {
 // Better Auth 필드 이름·구조는 바꾸지 않는다.
 // ─────────────────────────────────────────────
 
-// 사용자 유형: 데이터 범위(볼 수 있는 데이터)를 정하는 기준
-enum UserType {
-  OPERATOR // 운영사 관리자 → 자기 운영사 전체
-  CENTER // 센터 운영자·작업자 → 소속 센터
-  SHIPPER // 화주사 사용자 → 자기 화주사
-  PLATFORM // 플랫폼 관리자 → 운영사에 속하지 않음, /platform (운영사를 골라 그 운영사로 작업할 수 있다, 0039)
-}
-
 model User {
   id              BigInt    @id @default(autoincrement()) @map("user_id")
   // 운영사 (멀티테넌트, 0039). 플랫폼 관리자만 비어 있고 나머지 유형은 반드시 있다 (DB 검사 조건 tb_user_operator_matches_type)
@@ -47,9 +39,9 @@ model User {
   // 로그인 아이디 (username 플러그인)
   username        String?
   displayUsername String?   @map("display_username")
-  userType        UserType  @map("user_type_cd")
+  userType        String    @map("user_type_cd") @db.VarChar(20)
   // false면 로그인·사용 불가 (퇴사자 등). 기록 보존을 위해 계정을 지우지 않고 막는다
-  status          String    @default("ACTIVE") @map("status_cd") @db.VarChar(10)
+  status          String    @default("ACTIVE") @map("status_cd") @db.VarChar(20)
   // 화주사 사용자의 소속 화주사 (화주사 사용자만, DB 검사 조건으로 강제: tb_user_shipper_matches_type)
   shipperId       BigInt?   @map("shipper_id")
   shipper         Shipper?  @relation(fields: [shipperId], references: [id], onDelete: Restrict)
@@ -130,22 +122,16 @@ model Verification {
 // 권한 코드(예: inbound.asn.create)는 코드 한 곳에서 목록으로 관리하고, DB에는 코드 글자만 저장한다
 // ─────────────────────────────────────────────
 
-// 화면 영역: ADMIN = 운영사 화면(/admin), PORTAL = 화주 포털(/portal)
-enum AppArea {
-  ADMIN
-  PORTAL
-}
-
 // 권한그룹: 권한 코드 묶음 (예: "센터 운영자", "화주 담당자")
 model PermissionGroup {
   id          BigInt   @id @default(autoincrement()) @map("perm_group_id")
   // 운영사 (멀티테넌트: 같은 운영사 사람만 보고 고친다, docs/decisions/0039)
   operatorId  BigInt   @map("operator_id")
   operator    Operator @relation(fields: [operatorId], references: [id], onDelete: Restrict)
-  name        String   @map("perm_group_nm")
+  name        String   @map("perm_group_nm") @db.VarChar(50)
   // 이 그룹이 다루는 영역: 그 영역의 권한만 담고, 맞는 유형의 사용자에게만 배정한다 (등록 후 변경 불가)
-  area        AppArea  @default(ADMIN) @map("app_area_cd")
-  description String?
+  area        String   @default("ADMIN") @map("app_area_cd") @db.VarChar(20)
+  description String?  @db.VarChar(200)
   createdAt   DateTime @default(now()) @map("created_at")
   updatedAt   DateTime @updatedAt @map("updated_at")
   // 등록·수정한 사람 아이디(username, 자동: 현재 작업자 / 시드 seed / 기존 데이터 system), 동시 수정 막기용 버전 (docs/db-conventions.md 공통 칸)
@@ -167,7 +153,7 @@ model PermissionGroup {
 // 권한그룹에 들어 있는 권한 코드 (그룹을 지우면 함께 지워진다)
 model PermissionGroupPermission {
   groupId        BigInt          @map("perm_group_id")
-  permissionCode String          @map("perm_cd")
+  permissionCode String          @map("perm_cd") @db.VarChar(100)
   group          PermissionGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
 
   @@id([groupId, permissionCode])
@@ -188,18 +174,13 @@ model UserPermissionGroup {
   @@map("tb_user_perm_group")
 }
 
-enum PermissionEffect {
-  GRANT // 그룹에 없어도 이 사용자에게 추가
-  DENY // 그룹에 있어도 이 사용자에게서 제외
-}
-
 // 사용자별 권한 예외: 같은 사용자·같은 코드에는 하나만 (추가와 제외가 동시에 있을 수 없다)
 model UserPermissionOverride {
-  userId         BigInt           @map("user_id")
-  permissionCode String           @map("perm_cd")
-  effect         PermissionEffect @map("effect_cd")
-  createdAt      DateTime         @default(now()) @map("created_at")
-  user           User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId         BigInt   @map("user_id")
+  permissionCode String   @map("perm_cd") @db.VarChar(100)
+  effect         String   @map("effect_cd") @db.VarChar(20)
+  createdAt      DateTime @default(now()) @map("created_at")
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@id([userId, permissionCode])
   @@map("tb_user_perm_override")
@@ -251,9 +232,6 @@ model Center {
   fax                  String?   @map("fax_no") @db.VarChar(15)
   email                String?   @db.VarChar(100)
   directions           String?   @db.VarChar(1000)
-  // 예전 센터장 칸 (사용자 결정으로 유지, 담당자 표와 별개)
-  managerName          String?   @map("manager_nm")
-  managerPhone         String?   @map("manager_tel_no")
   // ③ 시설 정보 (1차: 연면적·보관면적·도크 / 2차: 나머지)
   floorAreaM2          Decimal?  @map("floor_area_m2") @db.Decimal(12, 2)
   storageAreaM2        Decimal?  @map("storage_area_m2") @db.Decimal(12, 2)
@@ -288,7 +266,7 @@ model Center {
   defaultOutboundLoc   Location? @relation("CenterDefaultOutbound", fields: [defaultOutboundLocId], references: [id], onDelete: Restrict)
   defaultReturnLoc     Location? @relation("CenterDefaultReturn", fields: [defaultReturnLocId], references: [id], onDelete: Restrict)
   timezone             String?   @db.VarChar(50)
-  allocRule            String?   @map("alloc_rule_cd") @db.VarChar(10)
+  allocRule            String?   @map("alloc_rule_cd") @db.VarChar(20)
   useLot               String?   @map("lot_mgmt_yn") @db.Char(1)
   useExpiry            String?   @map("expiry_mgmt_yn") @db.Char(1)
   useSerial            String?   @map("serial_mgmt_yn") @db.Char(1)
@@ -321,6 +299,8 @@ model Center {
   regionBatches RegionChangeBatch[] @relation("RegionBatchTarget")
 
   // 코드는 삭제 안 된 것끼리만 겹치면 안 된다 (지운 것은 다시 쓸 수 있다, 0038)
+  stockAdjusts StockAdjust[]
+
   @@unique([operatorId, code], where: raw("del_yn = 'N'"), map: "tb_center_operator_id_center_cd_key")
   @@map("tb_center")
 }
@@ -572,6 +552,9 @@ model Location {
   // 논리 삭제: 'Y'면 지운 것 (목록·조회에서 빠지고 되살릴 수 있다, 0038)
   delYn String @default("N") @map("del_yn") @db.Char(1)
 
+  putawaysFrom Putaway[] @relation("PutawayFrom")
+  putawaysTo   Putaway[] @relation("PutawayTo")
+
   @@unique([warehouseId, code], where: raw("del_yn = 'N'"), map: "tb_location_warehouse_id_location_cd_key")
   // 센터 안 코드 앞부분·범위 검색
   @@index([centerId, code])
@@ -580,13 +563,6 @@ model Location {
   @@index([zoneId])
   @@index([operatorId])
   @@map("tb_location")
-}
-
-// 화주사: 운영사에 물건 보관·배송을 맡기는 회사
-// 라벨 단위: 입고 라벨을 붙이는 단위 (0003 결정 7)
-enum LabelUnit {
-  PLT
-  BOX
 }
 
 // 화주사 (docs/decisions/0035, 0080 — 정의서 docs/specs/shipper.md, 표 이름은 tb_shipper 유지)
@@ -613,10 +589,10 @@ model Shipper {
   // 사업자등록번호·전화번호는 하이픈 없이 숫자만 (0029). 화면에서는 필수, 기존 화주는 비어 있을 수 있다 (0080)
   businessNumber       String?   @map("biz_reg_no") @db.Char(10)
   // 사업자 구분·과세유형: 상수 BIZ_ENTITY·TAX_TYPE (운영사와 같은 값)
-  bizEntity            String    @default("CORP") @map("biz_entity_cd") @db.VarChar(10)
+  bizEntity            String    @default("CORP") @map("biz_entity_cd") @db.VarChar(20)
   corpRegNo            String?   @map("corp_reg_no") @db.Char(13)
   subBizNo             String?   @map("sub_biz_no") @db.Char(4)
-  taxType              String    @default("GENERAL") @map("tax_type_cd") @db.VarChar(10)
+  taxType              String    @default("GENERAL") @map("tax_type_cd") @db.VarChar(20)
   ceoName              String?   @map("ceo_nm") @db.VarChar(50)
   businessType         String?   @map("biz_condition") @db.VarChar(100)
   businessItem         String?   @map("biz_item") @db.VarChar(100)
@@ -639,7 +615,7 @@ model Shipper {
   contractEndOn        DateTime? @map("contract_end_dt") @db.Date
   autoRenewYn          String    @default("Y") @map("auto_renew_yn") @db.Char(1)
   // 정산 주기: 공통코드 SETTLE_CYCLE
-  settleCycle          String    @default("MONTHLY") @map("settle_cycle_cd") @db.VarChar(10)
+  settleCycle          String    @default("MONTHLY") @map("settle_cycle_cd") @db.VarChar(20)
   // 정산 마감일 1~31, 99 = 말일. 비어 있으면 운영사 값
   closingDay           Int?      @map("closing_day") @db.SmallInt
   // 결제 조건: 마감 후 n일
@@ -650,7 +626,7 @@ model Shipper {
   useLot               String?   @map("lot_mgmt_yn") @db.Char(1)
   useExpiry            String?   @map("expiry_mgmt_yn") @db.Char(1)
   useSerial            String?   @map("serial_mgmt_yn") @db.Char(1)
-  allocRule            String?   @map("alloc_rule_cd") @db.VarChar(10)
+  allocRule            String?   @map("alloc_rule_cd") @db.VarChar(20)
   shipCutoffTime       DateTime? @map("ship_cutoff_time") @db.Time(0)
   // 유통기한 잔여일 기준 (비어 있으면 검사 안 함, 상속 아님)
   minInboundShelfDays  Int?      @map("min_inbound_shelf_days")
@@ -658,7 +634,7 @@ model Shipper {
   partialShipYn        String    @default("Y") @map("partial_ship_yn") @db.Char(1)
   // 재고 부족 시 처리: 상수 SHORTAGE_POLICY (HOLD·PARTIAL·CANCEL_SHORT)
   shortagePolicy       String    @default("HOLD") @map("shortage_policy_cd") @db.VarChar(20)
-  labelUnit            LabelUnit @default(PLT) @map("label_unit_cd")
+  labelUnit            String    @default("PLT") @map("label_unit_cd") @db.VarChar(20)
   // ── ⑤ 거래처·주문 정책 (포털·API 공통, 상수)
   // 납품처 배송센터 미지정: AUTO_HOLD·AUTO_REJECT·REQUIRED
   shipToCenterPolicy   String    @default("AUTO_HOLD") @map("ship_to_center_policy_cd") @db.VarChar(20)
@@ -717,7 +693,7 @@ model ShipperCenter {
   endOn          DateTime? @map("end_dt") @db.Date
   status         String    @default("ACTIVE") @map("status_cd") @db.VarChar(20)
   // 센터별 재정의 (2차 화면)
-  allocRule      String?   @map("alloc_rule_cd") @db.VarChar(10)
+  allocRule      String?   @map("alloc_rule_cd") @db.VarChar(20)
   useLot         String?   @map("lot_mgmt_yn") @db.Char(1)
   useExpiry      String?   @map("expiry_mgmt_yn") @db.Char(1)
   useSerial      String?   @map("serial_mgmt_yn") @db.Char(1)
@@ -749,6 +725,8 @@ model ShipperContact {
   isIfContact String  @default("N") @map("if_contact_yn") @db.Char(1)
   shipper     Shipper @relation(fields: [shipperId], references: [id], onDelete: Cascade)
 
+  // 화주사당 대표 1명
+  @@unique([shipperId], where: raw("primary_yn = 'Y'"), map: "tb_shipper_contact_primary_key")
   @@unique([shipperId], where: raw("if_contact_yn = 'Y'"), map: "tb_shipper_contact_if_contact_key")
   @@index([shipperId, sortOrder])
   @@map("tb_shipper_contact")
@@ -785,7 +763,7 @@ model UserPref {
 
 model UserGridSetting {
   userId    BigInt   @map("user_id")
-  gridId    String   @map("grid_cd")
+  gridId    String   @map("grid_cd") @db.VarChar(50)
   settings  Json
   updatedAt DateTime @updatedAt @map("updated_at")
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -799,7 +777,7 @@ model UserGridSetting {
 // 권한이 사라지거나 목록에서 없어진 메뉴는 화면에서만 숨기고 기록은 남긴다 (권한이 돌아오면 다시 보임)
 model UserFavoriteMenu {
   userId    BigInt   @map("user_id")
-  href      String   @map("menu_href")
+  href      String   @map("menu_href") @db.VarChar(200)
   createdAt DateTime @default(now()) @map("created_at")
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
@@ -829,11 +807,11 @@ model Operator {
   // 사업자등록번호·법인등록번호·전화번호는 하이픈 없이 숫자만 (0029)
   businessNumber String    @map("biz_reg_no") @db.Char(10)
   // 사업자 구분 BIZ_ENTITY (CORP 법인 / INDIVIDUAL 개인), 법인등록번호는 법인일 때만
-  bizEntity      String    @default("CORP") @map("biz_entity_cd") @db.VarChar(10)
+  bizEntity      String    @default("CORP") @map("biz_entity_cd") @db.VarChar(20)
   corpRegNo      String?   @map("corp_reg_no") @db.Char(13)
   subBizNo       String?   @map("sub_biz_no") @db.Char(4)
   // 과세유형 TAX_TYPE
-  taxType        String    @default("GENERAL") @map("tax_type_cd") @db.VarChar(10)
+  taxType        String    @default("GENERAL") @map("tax_type_cd") @db.VarChar(20)
   ceoName        String?   @map("ceo_nm") @db.VarChar(50)
   // 업태 / 종목 (거래명세서·세금계산서용)
   businessType   String?   @map("biz_condition") @db.VarChar(100)
@@ -879,7 +857,7 @@ model Operator {
   weightUnit        Unit      @relation("OperatorWeightUnit", fields: [weightUnitId], references: [id], onDelete: Restrict)
   lengthUnit        Unit      @relation("OperatorLengthUnit", fields: [lengthUnitId], references: [id], onDelete: Restrict)
   // 재고할당 규칙 ALLOC_RULE
-  allocRule         String    @default("FIFO") @map("alloc_rule_cd") @db.VarChar(10)
+  allocRule         String    @default("FIFO") @map("alloc_rule_cd") @db.VarChar(20)
   useLot            String    @default("N") @map("lot_mgmt_yn") @db.Char(1)
   useExpiry         String    @default("N") @map("expiry_mgmt_yn") @db.Char(1)
   useSerial         String    @default("N") @map("serial_mgmt_yn") @db.Char(1)
@@ -892,7 +870,7 @@ model Operator {
   contractStartOn DateTime  @default(dbgenerated("CURRENT_DATE")) @map("contract_start_dt") @db.Date
   // 비어 있으면 무기한
   contractEndOn   DateTime? @map("contract_end_dt") @db.Date
-  billingBasis    String?   @map("billing_basis_cd") @db.VarChar(10)
+  billingBasis    String?   @map("billing_basis_cd") @db.VarChar(20)
   // 비어 있으면 무제한
   maxUserCount    Int?      @map("max_user_cnt")
   maxCenterCount  Int?      @map("max_center_cnt")
@@ -983,6 +961,8 @@ model OperatorContact {
   notifyYn     String   @default("Y") @map("notify_yn") @db.Char(1)
   operator     Operator @relation(fields: [operatorId], references: [id], onDelete: Cascade)
 
+  // 운영사당 대표 1명
+  @@unique([operatorId], where: raw("primary_yn = 'Y'"), map: "tb_operator_contact_primary_key")
   @@index([operatorId, sortOrder])
   @@map("tb_operator_contact")
 }
@@ -1012,33 +992,23 @@ model OperatorTempZone {
 // - 같은 운영사·같은 연동 상대·같은 종류 안에서 외부 코드 중복 금지
 // - 한 대상은 연동 상대마다 외부 코드 1개
 model ExternalCode {
-  id         BigInt             @id @default(autoincrement()) @map("ext_code_id")
+  id         BigInt   @id @default(autoincrement()) @map("ext_code_id")
   // 운영사 (멀티테넌트: 같은 운영사 사람만 보고 고친다, docs/decisions/0039)
-  operatorId BigInt             @map("operator_id")
-  operator   Operator           @relation(fields: [operatorId], references: [id], onDelete: Restrict)
+  operatorId BigInt   @map("operator_id")
+  operator   Operator @relation(fields: [operatorId], references: [id], onDelete: Restrict)
   // 연동 상대 키 (src/config/external-systems.ts)
-  system     String             @map("ext_system_cd")
-  entityType ExternalEntityType @map("entity_type_cd")
-  entityId   BigInt             @map("entity_id")
-  code       String             @map("ext_cd")
-  createdAt  DateTime           @default(now()) @map("created_at")
-  updatedAt  DateTime           @updatedAt @map("updated_at")
+  system     String   @map("ext_system_cd") @db.VarChar(20)
+  entityType String   @map("entity_type_cd") @db.VarChar(20)
+  entityId   BigInt   @map("entity_id")
+  code       String   @map("ext_cd") @db.VarChar(50)
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
 
   @@unique([operatorId, system, entityType, code])
   // 운영사마다 따로: 시스템 단위(공유 행)도 운영사마다 다른 외부 코드로 매핑한다 (0078)
   @@unique([operatorId, system, entityType, entityId])
   @@index([entityType, entityId])
   @@map("tb_ext_code")
-}
-
-enum ExternalEntityType {
-  CENTER
-  WAREHOUSE
-  LOCATION
-  SHIPPER
-  ITEM
-  CUSTOMER
-  UNIT
 }
 
 // ── 공통코드 (docs/decisions/0030): 코드 그룹(서랍) → 코드(서랍 속 물건) 2단계
@@ -1051,11 +1021,11 @@ model CodeGroup {
   operatorId  BigInt     @map("operator_id")
   operator    Operator   @relation(fields: [operatorId], references: [id], onDelete: Restrict)
   // 그룹 코드: 영문 대문자·숫자·밑줄 (예: CONTACT_DUTY), 등록 후 변경 불가
-  code        String     @map("group_cd")
-  name        String     @map("group_nm")
-  description String?
+  code        String     @map("group_cd") @db.VarChar(30)
+  name        String     @map("group_nm") @db.VarChar(50)
+  description String?    @db.VarChar(200)
   sortOrder   Int        @default(0) @map("sort_seq")
-  status      String     @default("ACTIVE") @map("status_cd") @db.VarChar(10)
+  status      String     @default("ACTIVE") @map("status_cd") @db.VarChar(20)
   // 시스템 그룹: 프로그램이 직접 쓰는 그룹 (시드가 만들고, 삭제할 수 없다)
   isSystem    String     @default("N") @map("system_yn") @db.Char(1)
   items       CodeItem[]
@@ -1081,12 +1051,12 @@ model CodeItem {
   operator    Operator  @relation(fields: [operatorId], references: [id], onDelete: Restrict)
   groupId     BigInt    @map("code_group_id")
   // 코드: 그룹 안에서 중복 금지, 등록 후 변경 불가 (업무 표에 이 글자가 저장되므로)
-  code        String    @map("code_cd")
-  name        String    @map("code_nm")
-  description String?
+  code        String    @map("code_cd") @db.VarChar(20)
+  name        String    @map("code_nm") @db.VarChar(50)
+  description String?   @db.VarChar(200)
   sortOrder   Int       @default(0) @map("sort_seq")
   // 사용 중지: 새로 고를 때만 숨기고, 이미 저장된 값은 이름으로 계속 보여준다
-  status      String    @default("ACTIVE") @map("status_cd") @db.VarChar(10)
+  status      String    @default("ACTIVE") @map("status_cd") @db.VarChar(20)
   group       CodeGroup @relation(fields: [groupId], references: [id], onDelete: Restrict)
   createdAt   DateTime  @default(now()) @map("created_at")
   updatedAt   DateTime  @updatedAt @map("updated_at")
@@ -1105,22 +1075,6 @@ model CodeItem {
   @@map("tb_code_item")
 }
 
-// ── 단위 (docs/decisions/0034·0078): 수량·포장·물리(중량·부피·길이·면적) 단위
-// 시스템 기본 단위는 operator_id 없이 한 벌(마이그레이션으로만 추가·수정), 운영사는 필요한 단위만 더한다
-// 시스템 코드 없이 표준 코드(EA·KG·BOX…)를 그대로 쓴다 (0025). 외부 코드는 ExternalCode(UNIT)
-// 포장단위 간 환산(1 BOX = 24 EA)은 품목마다 다르므로 여기 두지 않는다 (tb_item_unit)
-enum UnitType {
-  // 수량: EA(기준)·SET·PAIR — EA 외의 수량 단위 환산은 품목에서
-  QTY
-  // 포장: BOX·PLT 등 — 환산계수를 절대 두지 않는다 (품목별 입수량)
-  PACK
-  // 물리 단위: 유형별 기준단위(KG·L·M·M2) × 환산계수
-  WEIGHT
-  VOLUME
-  LENGTH
-  AREA
-}
-
 model Unit {
   id          BigInt    @id @default(autoincrement()) @map("unit_id")
   // 운영사: 비어 있으면 시스템 기본 단위 (모든 운영사가 함께 보고, 운영사는 고칠 수 없다)
@@ -1128,17 +1082,17 @@ model Unit {
   operatorId  BigInt?   @map("operator_id")
   operator    Operator? @relation(fields: [operatorId], references: [id], onDelete: Restrict)
   // 등록 후 바꿀 수 없다 (ASN·검수에 이 글자가 저장된다)
-  code        String    @map("unit_cd")
-  name        String    @map("unit_nm")
+  code        String    @map("unit_cd") @db.VarChar(10)
+  name        String    @map("unit_nm") @db.VarChar(50)
   nameEn      String?   @map("unit_nm_en") @db.VarChar(50)
   // 등록 후 바꿀 수 없다
-  type        UnitType  @map("unit_type_cd")
+  type        String    @map("unit_type_cd") @db.VarChar(20)
   // 소수 자리수: 수량 입력·저장·표시 자리수 (EA 0, KG 3). 0~6
   decimals    Int       @default(0) @map("decimal_cnt")
   // 송장·명세서 표기 (비우면 이름)
   printName   String?   @map("print_nm") @db.VarChar(20)
   sortOrder   Int       @default(0) @map("sort_seq")
-  status      String    @default("ACTIVE") @map("status_cd") @db.VarChar(10)
+  status      String    @default("ACTIVE") @map("status_cd") @db.VarChar(20)
   // 시스템 기본 단위 (operator_id가 비어 있는 줄만 Y — DB 검사 조건)
   isSystem    String    @default("N") @map("system_yn") @db.Char(1)
   // 유형 기준단위 (시스템 단위 중 유형마다 하나: EA·KG·L·M·M2)
@@ -1163,8 +1117,8 @@ model Unit {
   // 운영사별 사용 여부 (시스템 기본 단위만, 0079)
   operatorSettings OperatorUnit[]
   // 운영사 표시 단위로 쓰는 곳
-  weightOperators  Operator[]    @relation("OperatorWeightUnit")
-  lengthOperators  Operator[]    @relation("OperatorLengthUnit")
+  weightOperators  Operator[]     @relation("OperatorWeightUnit")
+  lengthOperators  Operator[]     @relation("OperatorLengthUnit")
 
   // 이 단위를 쓰는 품목 (기본단위 / 환산단위) — 쓰이고 있으면 지울 수 없다
   baseItems    Item[]        @relation("ItemBaseUnit")
@@ -1196,7 +1150,7 @@ model OperatorUnit {
   operator   Operator @relation(fields: [operatorId], references: [id], onDelete: Restrict)
   unitId     BigInt   @map("unit_id")
   unit       Unit     @relation(fields: [unitId], references: [id], onDelete: Restrict)
-  status     String   @default("ACTIVE") @map("status_cd") @db.VarChar(10)
+  status     String   @default("ACTIVE") @map("status_cd") @db.VarChar(20)
   // 이 운영사의 소수 자리수 (비우면 시스템 단위 값, 0~6)
   decimals   Int?     @map("decimal_cnt")
   createdAt  DateTime @default(now()) @map("created_at")
@@ -1270,22 +1224,22 @@ model Item {
   abcClass       String?  @map("abc_class_cd") @db.VarChar(5)
 
   // ── ⑤ 소비기한·LOT: 관리 여부 3개는 상속하지 않는 명시값 (신규 때 화주 실제 값을 복사, 이후 화주 설정 변경에 영향 없음)
-  useExpiry            String     @default("N") @map("expiry_mgmt_yn") @db.Char(1)
-  expiryType           String?    @map("expiry_type_cd") @db.VarChar(20)
-  expiryInput          String?    @map("expiry_input_cd") @db.VarChar(20)
-  shelfLifeDays        Int?       @map("shelf_life_days")
+  useExpiry            String  @default("N") @map("expiry_mgmt_yn") @db.Char(1)
+  expiryType           String? @map("expiry_type_cd") @db.VarChar(20)
+  expiryInput          String? @map("expiry_input_cd") @db.VarChar(20)
+  shelfLifeDays        Int?    @map("shelf_life_days")
   // NULL = 화주 값 (상속)
-  minInboundShelfDays  Int?       @map("min_inbound_shelf_days")
-  minOutboundShelfDays Int?       @map("min_outbound_shelf_days")
+  minInboundShelfDays  Int?    @map("min_inbound_shelf_days")
+  minOutboundShelfDays Int?    @map("min_outbound_shelf_days")
   // 임박 알림 기준일 (잔여일이 이보다 짧으면 "임박")
-  expiryAlertDays      Int?       @map("expiry_alert_days")
-  useLot               String     @default("N") @map("lot_mgmt_yn") @db.Char(1)
-  lotSource            String?    @map("lot_source_cd") @db.VarChar(20)
-  useSerial            String     @default("N") @map("serial_mgmt_yn") @db.Char(1)
+  expiryAlertDays      Int?    @map("expiry_alert_days")
+  useLot               String  @default("N") @map("lot_mgmt_yn") @db.Char(1)
+  lotSource            String? @map("lot_source_cd") @db.VarChar(20)
+  useSerial            String  @default("N") @map("serial_mgmt_yn") @db.Char(1)
   // NULL = 화주 값 (상속)
-  allocRule            String?    @map("alloc_rule_cd") @db.VarChar(10)
+  allocRule            String? @map("alloc_rule_cd") @db.VarChar(20)
   // 라벨 단위 (입고 라벨 출력, 0041)
-  labelUnit            LabelUnit? @map("label_unit_cd")
+  labelUnit            String? @map("label_unit_cd") @db.VarChar(20)
 
   // ── ⑥ 출고 조건
   boxOnlyShipYn String   @default("N") @map("box_only_ship_yn") @db.Char(1)
@@ -1320,6 +1274,8 @@ model Item {
   delYn String @default("N") @map("del_yn") @db.Char(1)
 
   // 품목코드는 같은 화주사의 삭제 안 된 것끼리만 겹치면 안 된다 (0038)
+  putaways Putaway[]
+
   @@unique([shipperId, code], where: raw("del_yn = 'N'"), map: "tb_item_shipper_id_item_cd_key")
   @@unique([shipperId, custCode], where: raw("item_cust_cd IS NOT NULL AND del_yn = 'N'"), map: "tb_item_shipper_id_cust_cd_key")
   @@index([operatorId, shipperId, status])
@@ -1342,7 +1298,7 @@ model ItemUnit {
   unitId        BigInt   @map("unit_id")
   unit          Unit     @relation("ItemPackUnit", fields: [unitId], references: [id], onDelete: Restrict)
   // 단위 레벨 (상수 UNIT_LEVEL): BASE 기본 · INNER 내포장 · BOX 박스 · PLT 팔레트 — 품목마다 레벨별 1행 (0083)
-  level         String   @default("BOX") @map("unit_level_cd") @db.VarChar(10)
+  level         String   @default("BOX") @map("unit_level_cd") @db.VarChar(20)
   // 기본단위 환산수량: 이 단위 1개 = 기본단위 n개 (BASE는 1)
   convQty       Decimal  @map("conv_qty") @db.Decimal(18, 3)
   // 규격 (저장은 cm·kg 고정, 화면은 운영사 표시 단위로 — 0078). CBM은 가로·세로·높이로 자동 계산
@@ -1373,7 +1329,7 @@ model ItemUnitHist {
   itemId    BigInt   @map("item_id")
   item      Item     @relation(fields: [itemId], references: [id], onDelete: Cascade)
   unitCode  String   @map("unit_cd") @db.VarChar(20)
-  level     String   @map("unit_level_cd") @db.VarChar(10)
+  level     String   @map("unit_level_cd") @db.VarChar(20)
   // 바뀌기 전·후 환산수량 (추가는 before null, 삭제는 after null)
   beforeQty Decimal? @map("before_conv_cnt") @db.Decimal(18, 3)
   afterQty  Decimal? @map("after_conv_cnt") @db.Decimal(18, 3)
@@ -1430,7 +1386,7 @@ model PalletType {
   maxLoadHeightCm Decimal?  @map("max_load_height_cm") @db.Decimal(8, 2)
   maxLoadWeightKg Decimal?  @map("max_load_weight_kg") @db.Decimal(10, 2)
   isSystem        String    @default("N") @map("system_yn") @db.Char(1)
-  status          String    @default("ACTIVE") @map("status_cd") @db.VarChar(10)
+  status          String    @default("ACTIVE") @map("status_cd") @db.VarChar(20)
   sortOrder       Int       @default(0) @map("sort_seq")
   remark          String?   @db.VarChar(1000)
   createdAt       DateTime  @default(now()) @map("created_at")
@@ -1476,7 +1432,7 @@ model Customer {
   // ── 주소: 원본(입력·연동 그대로)은 보존하고 정제 결과는 따로 (0082)
   rawZipCode    String?   @map("raw_zip_cd") @db.VarChar(10)
   rawAddress    String?   @map("raw_addr") @db.VarChar(500)
-  zipCode       String?   @map("zip_cd") @db.VarChar(10)
+  zipCode       String?   @map("zip_cd") @db.Char(5)
   address       String?   @map("addr1") @db.VarChar(200)
   addressDetail String?   @map("addr2") @db.VarChar(200)
   addressJibun  String?   @map("addr_jibun") @db.VarChar(200)
@@ -1552,7 +1508,7 @@ model ShipTo {
   // ── 주소·수령 정보: 원본 보존 + 정제 결과 (정제 실패면 원본을 addr1에 두고 등급 F)
   rawZipCode        String?   @map("raw_zip_cd") @db.VarChar(10)
   rawAddress        String    @map("raw_addr") @db.VarChar(500)
-  zipCode           String?   @map("zip_cd") @db.VarChar(10)
+  zipCode           String?   @map("zip_cd") @db.Char(5)
   address           String    @map("addr1") @db.VarChar(200)
   addressDetail     String?   @map("addr2") @db.VarChar(200)
   addressJibun      String?   @map("addr_jibun") @db.VarChar(200)
@@ -1573,7 +1529,7 @@ model ShipTo {
   // ── 배송센터 (상수 CENTER_ASSIGN_TYPE·STATUS·CONFIRM_REASON)
   deliveryCenterId    BigInt?   @map("delivery_center_id")
   deliveryCenter      Center?   @relation("ShipToDeliveryCenter", fields: [deliveryCenterId], references: [id], onDelete: Restrict)
-  centerAssignType    String?   @map("center_assign_type_cd") @db.VarChar(10)
+  centerAssignType    String?   @map("center_assign_type_cd") @db.VarChar(20)
   // 센터가 없으면 반드시 NEED_CONFIRM (DB 검사)
   centerAssignStatus  String    @default("NEED_CONFIRM") @map("center_assign_status_cd") @db.VarChar(20)
   centerConfirmReason String?   @map("center_confirm_reason_cd") @db.VarChar(30)
@@ -1623,6 +1579,8 @@ model CustomerContact {
   isPrimary  String   @default("N") @map("primary_yn") @db.Char(1)
   customer   Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
 
+  // 거래처당 대표 1명
+  @@unique([customerId], where: raw("primary_yn = 'Y'"), map: "tb_customer_contact_primary_key")
   @@index([customerId, sortOrder])
   @@map("tb_customer_contact")
 }
@@ -1673,47 +1631,39 @@ model Stock {
   @@map("tb_stock")
 }
 
-// 재고 이력 유형 (프로그램이 값에 따라 동작이 다르므로 enum, 0030)
-enum StockTxnType {
-  // 입고 확정: 입고대기 창고에 재고가 생긴다
-  RECEIVE
-  // 이동(적치 포함): 출발 로케이션에서 나감 / 도착 로케이션에 들어옴 (두 줄, 같은 묶음 번호)
-  MOVE_OUT
-  MOVE_IN
-  // 재고 조정: 사유 필수
-  ADJUST
-}
-
 // 재고 이력 (docs/decisions/0044): 수량이 바뀐 한 번 = 한 줄. 지우거나 고치지 않는 기록 (DB가 막는다)
 // 주소 칸은 그때 모습 그대로 함께 둔다 (재고 줄과 같지만, 이력만 봐도 알 수 있게)
 model StockTxn {
-  id          BigInt       @id @default(autoincrement()) @map("stock_txn_id")
-  operatorId  BigInt       @map("operator_id")
-  operator    Operator     @relation(fields: [operatorId], references: [id], onDelete: Restrict)
-  stockId     BigInt       @map("stock_id")
-  stock       Stock        @relation(fields: [stockId], references: [id], onDelete: Restrict)
-  centerId    BigInt       @map("center_id")
-  warehouseId BigInt       @map("warehouse_id")
-  locationId  BigInt       @map("location_id")
-  shipperId   BigInt       @map("shipper_id")
-  itemId      BigInt       @map("item_id")
-  lotNo       String?      @map("lot_no") @db.VarChar(50)
-  expiryOn    DateTime?    @map("expiry_dt") @db.Date
-  type        StockTxnType @map("txn_type_cd")
+  id          BigInt    @id @default(autoincrement()) @map("stock_txn_id")
+  operatorId  BigInt    @map("operator_id")
+  operator    Operator  @relation(fields: [operatorId], references: [id], onDelete: Restrict)
+  stockId     BigInt    @map("stock_id")
+  stock       Stock     @relation(fields: [stockId], references: [id], onDelete: Restrict)
+  centerId    BigInt    @map("center_id")
+  warehouseId BigInt    @map("warehouse_id")
+  locationId  BigInt    @map("location_id")
+  shipperId   BigInt    @map("shipper_id")
+  itemId      BigInt    @map("item_id")
+  lotNo       String?   @map("lot_no") @db.VarChar(50)
+  expiryOn    DateTime? @map("expiry_dt") @db.Date
+  type        String    @map("txn_type_cd") @db.VarChar(20)
   // 변동 수량 (+ 늘어남 / − 줄어듦, 기본단위, 0 아님)과 변동 후 수량
-  qtyChange   Decimal      @map("chg_qty") @db.Decimal(18, 3)
-  qtyAfter    Decimal      @map("after_qty") @db.Decimal(18, 3)
+  qtyChange   Decimal   @map("chg_qty") @db.Decimal(18, 3)
+  qtyAfter    Decimal   @map("after_qty") @db.Decimal(18, 3)
   // 묶음 번호: 이동처럼 여러 줄이 한 번의 작업일 때 같은 값 (첫 줄의 이력 키)
-  groupId     BigInt?      @map("txn_group_id")
+  groupId     BigInt?   @map("txn_group_id")
   // 원본 문서: 종류(예: RECEIPT 입고확정, ADJUSTMENT 조정) + 키 + 화면에 보일 번호
-  refType     String?      @map("ref_type_cd") @db.VarChar(20)
-  refId       BigInt?      @map("ref_id")
-  refNo       String?      @map("ref_no") @db.VarChar(50)
+  refType     String?   @map("ref_type_cd") @db.VarChar(20)
+  refId       BigInt?   @map("ref_id")
+  refNo       String?   @map("ref_no") @db.VarChar(50)
   // 사유 (조정은 필수)
-  reason      String?      @db.VarChar(200)
-  txnAt       DateTime     @default(now()) @map("txn_at")
+  reason      String?   @db.VarChar(200)
+  txnAt       DateTime  @default(now()) @map("txn_at")
   // 처리한 사람 아이디 (재고 변경 함수가 지금 작업자로 채운다)
-  createdBy   String       @default("system") @map("created_by") @db.VarChar(50)
+  createdBy   String    @default("system") @map("created_by") @db.VarChar(50)
+
+  receiptLines InboundReceiptLine[]
+  adjustLines  StockAdjustLine[]
 
   @@index([stockId, txnAt])
   @@index([operatorId, txnAt])
@@ -1728,35 +1678,6 @@ model StockTxn {
 // ASN(입고예정) 하나에 검수·입고 확정이 여러 번 나눠 일어날 수 있다 (0003 결정 5)
 // ASN (헤더 + 라인) └ 입고확정 1차 (문서 + 라인) → 입고대기 창고에 재고 생성 └ 적치 …
 
-// 입고 유형: 화주사가 보낸 물건 / 다른 센터에서 이동해 온 물건 (MVP 이후)
-enum InboundType {
-  SHIPPER
-  TRANSFER
-}
-
-// 등록 경로: 화주 포털 / 센터 대리 등록 / 엑셀 업로드
-enum AsnChannel {
-  PORTAL
-  PROXY
-  EXCEL
-}
-
-// 입고 상태: 예정 → 검수중 → 부분확정 → 확정완료, 또는 → 마감
-enum AsnStatus {
-  PLANNED
-  INSPECTING
-  PARTIAL
-  COMPLETED
-  CLOSED
-}
-
-// 적치 상태: 적치대기 → 부분적치 → 적치완료
-enum PutawayStatus {
-  WAITING
-  PARTIAL
-  DONE
-}
-
 // ASN 헤더
 model Asn {
   id         BigInt   @id @default(autoincrement()) @map("asn_id")
@@ -1769,20 +1690,20 @@ model Asn {
   // ASN 번호 (자동: AS + 등록일 YYMMDD + '-' + 일련번호, 운영사 전체에서 하나)
   asnNo      String   @map("asn_no") @db.VarChar(20)
 
-  type         InboundType @default(SHIPPER) @map("inbound_type_cd")
-  channel      AsnChannel  @map("reg_channel_cd")
+  type         String   @default("SHIPPER") @map("inbound_type_cd") @db.VarChar(20)
+  channel      String   @map("reg_channel_cd") @db.VarChar(20)
   // 입고 예정일
-  expectedOn   DateTime    @map("expected_dt") @db.Date
+  expectedOn   DateTime @map("expected_dt") @db.Date
   // 화주사 쪽 문서 번호 (발주번호 등, 선택)
-  shipperRefNo String?     @map("shipper_ref_no") @db.VarChar(50)
-  remark       String?     @db.VarChar(1000)
+  shipperRefNo String?  @map("shipper_ref_no") @db.VarChar(50)
+  remark       String?  @db.VarChar(1000)
 
-  status        AsnStatus     @default(PLANNED) @map("asn_status_cd")
-  putawayStatus PutawayStatus @default(WAITING) @map("putaway_status_cd")
+  status        String    @default("PLANNED") @map("asn_status_cd") @db.VarChar(20)
+  putawayStatus String    @default("WAITING") @map("putaway_status_cd") @db.VarChar(20)
   // 잔량 마감 (사유 필수, 마감자·일시)
-  closeReason   String?       @map("close_reason") @db.VarChar(200)
-  closedAt      DateTime?     @map("closed_at")
-  closedBy      String?       @map("closed_by") @db.VarChar(50)
+  closeReason   String?   @map("close_reason") @db.VarChar(200)
+  closedAt      DateTime? @map("closed_at")
+  closedBy      String?   @map("closed_by") @db.VarChar(50)
 
   createdAt  DateTime @default(now()) @map("created_at")
   updatedAt  DateTime @updatedAt @map("updated_at")
@@ -1798,6 +1719,8 @@ model Asn {
   delYn String @default("N") @map("del_yn") @db.Char(1)
 
   // 번호는 운영사 안에서 하나 (체번이 운영사별, 0084)
+  putaways Putaway[]
+
   @@unique([operatorId, asnNo])
   @@index([operatorId])
   @@index([centerId, status])
@@ -1880,6 +1803,7 @@ model InboundReceiptLine {
   stockId      BigInt            @map("stock_id")
   stock        Stock             @relation(fields: [stockId], references: [id], onDelete: Restrict)
   stockTxnId   BigInt            @map("stock_txn_id")
+  stockTxn     StockTxn          @relation(fields: [stockTxnId], references: [id], onDelete: Restrict)
   lotNo        String?           @map("lot_no") @db.VarChar(50)
   expiryOn     DateTime?         @map("expiry_dt") @db.Date
 
@@ -1949,7 +1873,7 @@ model InboundLabel {
   seq           Int               @map("label_seq")
   total         Int               @map("label_cnt")
   // 라벨 단위(PLT·BOX)와 이 장의 수량 (기본단위)
-  labelUnit     LabelUnit         @map("label_unit_cd")
+  labelUnit     String            @map("label_unit_cd") @db.VarChar(20)
   qty           Decimal           @map("label_qty") @db.Decimal(18, 3)
   // 2D 코드에 담은 글자와 그 형식 버전 (항목이 늘어도 스캐너가 구분하게, 0003)
   formatVersion Int               @map("format_ver")
@@ -1977,9 +1901,13 @@ model Putaway {
   receiptLineId  BigInt             @map("receipt_line_id")
   receiptLine    InboundReceiptLine @relation(fields: [receiptLineId], references: [id], onDelete: Restrict)
   asnId          BigInt             @map("asn_id")
+  asn            Asn                @relation(fields: [asnId], references: [id], onDelete: Restrict)
   itemId         BigInt             @map("item_id")
+  item           Item               @relation(fields: [itemId], references: [id], onDelete: Restrict)
   fromLocationId BigInt             @map("from_location_id")
+  fromLocation   Location           @relation("PutawayFrom", fields: [fromLocationId], references: [id], onDelete: Restrict)
   toLocationId   BigInt             @map("to_location_id")
+  toLocation     Location           @relation("PutawayTo", fields: [toLocationId], references: [id], onDelete: Restrict)
   lotNo          String?            @map("lot_no") @db.VarChar(50)
   expiryOn       DateTime?          @map("expiry_dt") @db.Date
   qty            Decimal            @map("putaway_qty") @db.Decimal(18, 3)
@@ -1997,30 +1925,19 @@ model Putaway {
 // ─── 재고 실사·조정 (M6, docs/decisions/0061) ─────────────────
 // 작업자가 등록하고(등록) 관리자가 확정하면(확정) 재고가 바뀐다 (권한 stock.adjustments.create / confirm)
 
-// 실사: 센 수량을 적고 확정 때 (센 수량 − 그때 재고)만큼 바꾼다 / 조정: 늘리거나 줄일 수량(±)을 적는다
-enum StockAdjustType {
-  COUNT
-  ADJUST
-}
-
-enum StockAdjustStatus {
-  DRAFT
-  CONFIRMED
-  CANCELED
-}
-
 model StockAdjust {
-  id         BigInt            @id @default(autoincrement()) @map("adjust_id")
-  operatorId BigInt            @map("operator_id")
-  operator   Operator          @relation(fields: [operatorId], references: [id], onDelete: Restrict)
+  id         BigInt   @id @default(autoincrement()) @map("adjust_id")
+  operatorId BigInt   @map("operator_id")
+  operator   Operator @relation(fields: [operatorId], references: [id], onDelete: Restrict)
   // 번호 (자동: AJ + YYMMDD + '-' + 일련번호)
-  adjustNo   String            @map("adjust_no") @db.VarChar(20)
-  type       StockAdjustType   @map("adjust_type_cd")
-  centerId   BigInt            @map("center_id")
-  status     StockAdjustStatus @default(DRAFT) @map("adjust_status_cd")
+  adjustNo   String   @map("adjust_no") @db.VarChar(20)
+  type       String   @map("adjust_type_cd") @db.VarChar(20)
+  centerId   BigInt   @map("center_id")
+  center     Center   @relation(fields: [centerId], references: [id], onDelete: Restrict)
+  status     String   @default("DRAFT") @map("adjust_status_cd") @db.VarChar(20)
   // 사유 (필수)
-  reason     String            @db.VarChar(200)
-  remark     String?           @db.VarChar(500)
+  reason     String   @db.VarChar(200)
+  remark     String?  @db.VarChar(500)
 
   createdAt   DateTime  @default(now()) @map("created_at")
   createdBy   String    @default("system") @map("created_by") @db.VarChar(50)
@@ -2050,12 +1967,13 @@ model StockAdjustLine {
   stock      Stock       @relation(fields: [stockId], references: [id], onDelete: Restrict)
 
   // 등록 때 재고 (참고) / 실사: 센 수량 / 조정: 바꿀 수량(±)
-  systemQty  Decimal  @map("system_qty") @db.Decimal(18, 3)
-  countedQty Decimal? @map("counted_qty") @db.Decimal(18, 3)
-  changeQty  Decimal? @map("chg_qty") @db.Decimal(18, 3)
+  systemQty  Decimal   @map("system_qty") @db.Decimal(18, 3)
+  countedQty Decimal?  @map("counted_qty") @db.Decimal(18, 3)
+  changeQty  Decimal?  @map("chg_qty") @db.Decimal(18, 3)
   // 확정 때 실제로 바꾼 수량과 재고 이력 (0이면 바꾸지 않음 → 이력 없음)
-  appliedQty Decimal? @map("applied_qty") @db.Decimal(18, 3)
-  stockTxnId BigInt?  @map("stock_txn_id")
+  appliedQty Decimal?  @map("applied_qty") @db.Decimal(18, 3)
+  stockTxnId BigInt?   @map("stock_txn_id")
+  stockTxn   StockTxn? @relation(fields: [stockTxnId], references: [id], onDelete: Restrict)
 
   @@unique([adjustId, lineNo])
   @@unique([adjustId, stockId])
@@ -2073,9 +1991,9 @@ model RegionLoadHist {
   loadVer        String    @map("load_ver") @db.VarChar(20)
   sourceName     String    @map("source_nm") @db.VarChar(500)
   // FULL 전체분 / DELTA 변동분
-  loadType       String    @map("load_type_cd") @db.VarChar(10)
+  loadType       String    @map("load_type_cd") @db.VarChar(20)
   // RUNNING / DONE / FAILED
-  status         String    @default("RUNNING") @map("status_cd") @db.VarChar(10)
+  status         String    @default("RUNNING") @map("status_cd") @db.VarChar(20)
   bjdCount       Int       @default(0) @map("bjd_cnt")
   zipCount       Int       @default(0) @map("zip_cnt")
   newCount       Int       @default(0) @map("new_cnt")
@@ -2248,7 +2166,7 @@ model ApiClient {
   shipper         Shipper   @relation(fields: [shipperId], references: [id], onDelete: Restrict)
   name            String    @map("key_nm") @db.VarChar(50)
   // 환경: TEST(검증만, 저장 안 함 — dry-run) / LIVE
-  env             String    @map("env_cd") @db.VarChar(10)
+  env             String    @map("env_cd") @db.VarChar(20)
   keyPrefix       String    @unique @map("key_prefix") @db.VarChar(20)
   keyHash         String    @map("key_hash") @db.Char(64)
   // 상태: ACTIVE / REVOKED(폐기) / EXPIRED(만료 — 만료일 지난 키를 처음 쓸 때 바뀜)
@@ -2272,6 +2190,9 @@ model ApiClient {
   scopes ApiClientScope[]
   ips    ApiClientIp[]
   events ApiClientEvent[]
+
+  idempotency ApiIdempotency[]
+  rateBuckets ApiRateBucket[]
 
   @@index([shipperId, env, status])
   @@map("tb_api_client")
@@ -2323,7 +2244,7 @@ model ApiRequestLog {
   operatorId     BigInt?  @map("operator_id")
   shipperId      BigInt?  @map("shipper_id")
   apiClientId    BigInt?  @map("api_client_id")
-  env            String?  @map("env_cd") @db.VarChar(10)
+  env            String?  @map("env_cd") @db.VarChar(20)
   // API 구분 (예: ME, CUSTOMER_UPSERT, ORDER_CREATE)
   apiCode        String   @map("api_cd") @db.VarChar(50)
   httpMethod     String   @map("http_method") @db.VarChar(10)
@@ -2377,6 +2298,8 @@ model ApiIdempotency {
   responseBody   String   @map("response_body")
   createdAt      DateTime @default(now()) @map("created_at")
 
+  apiClient ApiClient @relation(fields: [apiClientId], references: [id], onDelete: Cascade)
+
   @@id([apiClientId, idempotencyKey])
   @@index([createdAt])
   @@map("tb_api_idempotency")
@@ -2387,6 +2310,8 @@ model ApiRateBucket {
   apiClientId BigInt   @map("api_client_id")
   windowStart DateTime @map("window_start_at")
   count       Int      @default(0) @map("req_cnt")
+
+  apiClient ApiClient @relation(fields: [apiClientId], references: [id], onDelete: Cascade)
 
   @@id([apiClientId, windowStart])
   @@map("tb_api_rate_bucket")
@@ -2411,11 +2336,11 @@ model NumberingRule {
   // 일련번호 앞 구분자 (전표·납품처 '-')
   separator    String?   @map("separator") @db.VarChar(1)
   // 날짜: NONE / YYMMDD (운영사 타임존 기준 등록일)
-  dateFormat   String    @default("NONE") @map("date_fmt_cd") @db.VarChar(10)
+  dateFormat   String    @default("NONE") @map("date_fmt_cd") @db.VarChar(20)
   // 일련번호 자리수 (2~8)
   seqLength    Int       @map("seq_len") @db.SmallInt
   // 일련번호 초기화 주기: NONE / DAY / MONTH / YEAR
-  resetCycle   String    @default("NONE") @map("reset_cycle_cd") @db.VarChar(10)
+  resetCycle   String    @default("NONE") @map("reset_cycle_cd") @db.VarChar(20)
   createdAt    DateTime  @default(now()) @map("created_at")
   updatedAt    DateTime  @updatedAt @map("updated_at")
   createdBy    String    @default("system") @map("created_by") @db.VarChar(50)

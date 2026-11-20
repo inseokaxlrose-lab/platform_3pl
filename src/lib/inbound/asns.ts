@@ -8,7 +8,9 @@ import { resolveUnitDecimals, unitDecimalsSelect } from '@/lib/units/unit-status
 import { ActionError } from '@/lib/actions/action-error'
 import { currentActor, requireOperatorId } from '@/lib/actor'
 import { nextDocumentNumber } from '@/lib/documents/doc-no'
+import { toValueOrNull } from '@/lib/db-value'
 import { effectiveItemOptions } from '@/lib/items/item-schema'
+import { LABEL_UNITS } from '@/lib/shippers/shipper-schema'
 import { prisma, type Db } from '@/lib/prisma'
 import { assertRowVersion, withVersionGuard } from '@/lib/row-version'
 import { scopeFilter, type DataScope } from '@/lib/scope/data-scope'
@@ -80,7 +82,8 @@ export type AsnLineItem = {
   status: string
   useLot: string | null
   useExpiry: string | null
-  labelUnit: 'PLT' | 'BOX' | null
+  // DB 값 목록 칸 — itemLotOptions에서 정해진 값으로 좁힌다
+  labelUnit: string | null
   baseUnit: { code: string; decimals: number }
   units: { convQty: { toString(): string }; unit: { code: string; decimals: number } }[]
   shipper: ShipperDefaultsRow
@@ -119,7 +122,7 @@ export function itemLotOptions(item: AsnLineItem) {
     {
       useLot: item.useLot as 'Y' | 'N' | null,
       useExpiry: item.useExpiry as 'Y' | 'N' | null,
-      labelUnit: item.labelUnit,
+      labelUnit: toValueOrNull(LABEL_UNITS, item.labelUnit),
     },
     shipperItemDefaults(item.shipper),
   )

@@ -40,6 +40,7 @@ import {
 } from '@/lib/inbound/asn-schema'
 import { formatQty, toBaseQty } from '@/lib/units/convert'
 import { AsnProgressGrid } from './asn-progress-grid'
+import { labelOf } from '@/lib/db-value'
 
 type SaveResult = { id: string; asnNo: string; rowVersion: number }
 
@@ -454,10 +455,10 @@ export function AsnForm({
       content: (
         <div className="flex flex-wrap items-center gap-3 text-sm">
           <StatusBadge tone={asn.status === 'CLOSED' ? 'danger' : 'success'}>
-            {ASN_STATUS_LABELS[asn.status]}
+            {labelOf(ASN_STATUS_LABELS, asn.status)}
           </StatusBadge>
           <span className="text-muted-foreground">
-            {asn.asnNo} · {ASN_CHANNEL_LABELS[asn.channel]} · {asn.center}
+            {asn.asnNo} · {labelOf(ASN_CHANNEL_LABELS, asn.channel)} · {asn.center}
           </span>
           {asn.status === 'CLOSED' && asn.closeReason && (
             <span className="w-full text-muted-foreground">

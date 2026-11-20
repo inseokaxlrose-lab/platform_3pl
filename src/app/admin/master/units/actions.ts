@@ -66,14 +66,14 @@ export const listUnitsAction = createAction({
         deletedWhere(filters),
       ],
     }
-    const [rows, rowCount] = await prisma.$transaction([
+    // 정렬을 고르지 않으면 단위 유형(UNIT_TYPES 순서: 수량 → 포장 → 중량 …) → 정렬 순서 → 코드
+    // 유형은 글자 칸이라 DB 정렬은 알파벳 순 → 이때만 전부 읽어 프로그램에서 정렬하고 쪽을 자른다 (단위는 운영사당 수십 개)
+    const typeOrder = input.sorting.length === 0
+    const [found, rowCount] = await prisma.$transaction([
       prisma.unit.findMany({
         ...query,
-        // 정렬을 고르지 않으면 단위 유형 → 정렬 순서 → 코드
-        orderBy:
-          input.sorting.length > 0
-            ? query.orderBy
-            : [{ type: 'asc' }, { sortOrder: 'asc' }, { code: 'asc' }],
+        ...(typeOrder && { skip: undefined, take: undefined }),
+        orderBy: typeOrder ? [{ sortOrder: 'asc' }, { code: 'asc' }] : query.orderBy,
         where,
         select: {
           id: true,
@@ -94,6 +94,12 @@ export const listUnitsAction = createAction({
       }),
       prisma.unit.count({ where }),
     ])
+    const rank = (type: string) => (UNIT_TYPES as readonly string[]).indexOf(type)
+    const rows = typeOrder
+      ? [...found]
+          .sort((a, b) => rank(a.type) - rank(b.type))
+          .slice(query.skip, query.skip + query.take)
+      : found
     // 소수 자리수: 시스템 단위는 이 운영사의 값 (0079)
     resolveUnitDecimals(rows)
     const shaped = rows.map(

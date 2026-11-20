@@ -9,6 +9,8 @@ import { isCenterSetupStatus } from '@/lib/centers/center-status'
 import { isYes } from '@/lib/yn'
 import { isInScope, operatorFilter, type DataScope } from '@/lib/scope/data-scope'
 import type { ShipperInput } from '@/lib/shippers/shipper-schema'
+import { toValue } from '@/lib/db-value'
+import { LABEL_UNITS } from '@/lib/shippers/shipper-schema'
 
 // 날짜 칸 → 'YYYY-MM-DD' (없으면 빈 글자)
 const dayText = (date: Date | null) => (date ? date.toISOString().slice(0, 10) : '')
@@ -77,7 +79,7 @@ export async function getShipperForEdit(id: bigint, scope: DataScope) {
     minOutboundShelfDays: shipper.minOutboundShelfDays,
     partialShip: isYes(shipper.partialShipYn),
     shortagePolicy: shipper.shortagePolicy,
-    labelUnit: shipper.labelUnit,
+    labelUnit: toValue(LABEL_UNITS, shipper.labelUnit),
     shipToCenterPolicy: shipper.shipToCenterPolicy,
     autoCreateShipTo: isYes(shipper.autoCreateShipToYn),
     autoCreateItem: isYes(shipper.autoCreateItemYn),

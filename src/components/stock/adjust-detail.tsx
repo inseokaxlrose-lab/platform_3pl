@@ -10,6 +10,7 @@ import type { ActionResult } from '@/lib/actions/result'
 import type { AdjustDetail } from '@/lib/stock/adjust-queries'
 import { ADJUST_STATUS_LABELS, ADJUST_TYPE_LABELS } from '@/lib/stock/adjust-schema'
 import { formatQty } from '@/lib/units/convert'
+import { labelOf } from '@/lib/db-value'
 
 type Line = AdjustDetail['lines'][number]
 
@@ -98,7 +99,7 @@ export function AdjustDetailPanel({
       <dl className="grid grid-cols-1 gap-x-8 gap-y-2 text-sm sm:grid-cols-2">
         <div className="flex gap-3">
           <dt className="w-20 text-muted-foreground">유형</dt>
-          <dd>{ADJUST_TYPE_LABELS[adjust.type]}</dd>
+          <dd>{labelOf(ADJUST_TYPE_LABELS, adjust.type)}</dd>
         </div>
         <div className="flex gap-3">
           <dt className="w-20 text-muted-foreground">센터</dt>
@@ -194,7 +195,7 @@ export function AdjustStatusBadge({ status }: { status: AdjustDetail['status'] }
     <StatusBadge
       tone={status === 'CONFIRMED' ? 'success' : status === 'CANCELED' ? 'neutral' : 'info'}
     >
-      {ADJUST_STATUS_LABELS[status]}
+      {labelOf(ADJUST_STATUS_LABELS, status)}
     </StatusBadge>
   )
 }

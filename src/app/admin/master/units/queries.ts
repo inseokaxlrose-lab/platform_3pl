@@ -6,6 +6,8 @@ import { decimalText } from '@/lib/units/unit-format'
 import { isUnitActive, resolveUnitDecimals, unitStatusSelect } from '@/lib/units/unit-status'
 import type { UnitTypeValue } from '@/lib/units/unit-labels'
 import { isYes } from '@/lib/yn'
+import { toValue } from '@/lib/db-value'
+import { UNIT_TYPES } from '@/lib/units/unit-labels'
 
 // 단위 편집 화면 조회 (docs/decisions/0078) — 시스템 기본 단위 + 이 운영사의 단위
 
@@ -67,7 +69,7 @@ export async function getUnitForEdit(id: bigint, scope: DataScope) {
     }[],
     // 화면 입력값 (글자·숫자 그대로)
     input: {
-      type: unit.type,
+      type: toValue(UNIT_TYPES, unit.type),
       name: unit.name,
       nameEn: unit.nameEn ?? '',
       printName: unit.printName ?? '',

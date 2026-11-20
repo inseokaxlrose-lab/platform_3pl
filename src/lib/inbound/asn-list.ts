@@ -12,7 +12,7 @@ import { ASN_SCOPE } from './asns'
 
 const ASN_STATUSES = ['PLANNED', 'INSPECTING', 'PARTIAL', 'COMPLETED', 'CLOSED'] as const
 const PUTAWAY_STATUSES = ['WAITING', 'PARTIAL', 'DONE'] as const
-const CHANNELS = ['PORTAL', 'PROXY', 'EXCEL'] as const
+const CHANNELS = ['PORTAL', 'PROXY', 'EXCEL', 'API'] as const
 
 // 여러 값 조건 중 정해진 값만 (엉뚱한 값이 enum 조건에 들어가 오류 나지 않게)
 function enumFilter<T extends string>(

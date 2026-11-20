@@ -10,6 +10,7 @@ import { ASN_STATUS_LABELS } from '@/lib/inbound/asn-schema'
 import { getConfirmWork } from '@/lib/inbound/receipt-queries'
 import { getCurrentScope, hasPermission } from '@/lib/session'
 import { confirmReceiptAction } from '../actions'
+import { labelOf } from '@/lib/db-value'
 
 export const metadata: Metadata = { title: '입고 확정' }
 
@@ -31,7 +32,7 @@ export default async function ConfirmWorkPage({
       description={`${work.shipper} · ${work.center}`}
       meta={
         <StatusBadge tone={work.status === 'CLOSED' ? 'danger' : 'info'}>
-          {ASN_STATUS_LABELS[work.status]}
+          {labelOf(ASN_STATUS_LABELS, work.status)}
         </StatusBadge>
       }
       actions={<BackToListButton listPath="/admin/inbound/confirm" />}

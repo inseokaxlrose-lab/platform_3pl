@@ -14,6 +14,7 @@ import { assertAllFound, assertNoCodeConflict } from '@/lib/soft-delete'
 import { DELETED_ONLY, NOT_DELETED } from '@/lib/status'
 import { assertRowVersion, withVersionGuard } from '@/lib/row-version'
 import { idSchema } from '@/lib/id'
+import { toValue } from '@/lib/db-value'
 
 // 권한그룹 관리 서버 액션 (docs/decisions/0017-permission-group-admin.md)
 // 권한그룹은 운영사 전체 설정이라 데이터 범위(센터·화주사)를 적용하지 않는다
@@ -101,7 +102,10 @@ export const updatePermissionGroupAction = createAction({
     })
     assertRowVersion(group, input.rowVersion, '권한그룹을 찾을 수 없습니다.')
 
-    const { codes } = normalizeGroupCodes(input.permissionCodes, toPermissionArea(group!.area))
+    const { codes } = normalizeGroupCodes(
+      input.permissionCodes,
+      toPermissionArea(toValue(ROLE_AREAS, group!.area)),
+    )
     try {
       return await prisma.$transaction(async (tx) => {
         const saved = await withVersionGuard(() =>

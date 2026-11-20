@@ -2,6 +2,8 @@ import 'server-only'
 import { ALL_PERMISSION_CODES, isPermissionCode } from '@/config/permissions'
 import { prisma } from '@/lib/prisma'
 import { operatorFilter, type DataScope } from '@/lib/scope/data-scope'
+import { toValue } from '@/lib/db-value'
+import { ROLE_AREAS } from '@/lib/permissions/role-schema'
 
 // 수정 화면용: 권한그룹 한 건 (화면에서 hasPermission으로 확인한 뒤 호출, 내 운영사 것만)
 export async function getPermissionGroup(id: bigint, scope: DataScope) {
@@ -29,7 +31,7 @@ export async function getPermissionGroup(id: bigint, scope: DataScope) {
     // 화면으로 보낼 값이라 키는 글자로
     id: String(group.id),
     name: group.name,
-    area: group.area,
+    area: toValue(ROLE_AREAS, group.area),
     description: group.description ?? '',
     // 동시 수정 막기: 저장할 때 이 버전을 함께 보낸다
     rowVersion: group.rowVersion,

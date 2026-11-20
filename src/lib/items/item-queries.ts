@@ -18,6 +18,8 @@ import { isYes } from '@/lib/yn'
 import { listPalletTypes } from '@/lib/pallets/pallet-types'
 import { ITEM_SCOPE, SHIPPER_SCOPE } from './item-list'
 import { SHIPPER_SETUP_ONLY } from '@/lib/shippers/shipper-codes'
+import { toValue } from '@/lib/db-value'
+import { UNIT_TYPES } from '@/lib/units/unit-labels'
 
 // 품목 화면 조회 함수 (docs/decisions/0041) — 운영사 화면·화주 포털 공용. 서버 액션 밖이라 데이터 범위를 직접 건다
 
@@ -77,8 +79,9 @@ export async function getItemFormOptions(scope: DataScope): Promise<ItemFormOpti
       isActive: p.status === 'ACTIVE',
     })),
     defaultPalletType: operator?.defaultPalletType ?? 'T11',
-    units: units.map(({ status, operatorId, operatorSettings, ...u }) => ({
+    units: units.map(({ status, operatorId, operatorSettings, type, ...u }) => ({
       ...u,
+      type: toValue(UNIT_TYPES, type),
       isActive: isUnitActive({ status, operatorId, operatorSettings }),
     })),
   })
@@ -154,7 +157,7 @@ export function itemInputOf(item: ItemWithInput): ItemInput {
     lotSource: text(item.lotSource),
     useSerial: isYes(item.useSerial),
     allocRule: (item.allocRule ?? '') as ItemInput['allocRule'],
-    labelUnit: item.labelUnit ?? '',
+    labelUnit: (item.labelUnit ?? '') as ItemInput['labelUnit'],
     boxOnlyShip: isYes(item.boxOnlyShipYn),
     barcodes: item.barcodes.map((b) => ({
       unitId: String(b.unitId),
