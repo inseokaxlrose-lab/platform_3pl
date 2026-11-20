@@ -20,6 +20,7 @@ import { idSchema } from '@/lib/id'
 import { prisma } from '@/lib/prisma'
 import { rowVersionField } from '@/lib/row-version'
 import { assertInScope } from '@/lib/scope/data-scope'
+import { resolveShipToRoutes } from '@/lib/routes/route-resolve'
 
 // 거래처 서버 액션 (docs/decisions/0043)
 // 품목과 같은 범위: 범위 안이면 센터 직원도 대신 등록·수정할 수 있다
@@ -130,5 +131,31 @@ export const commitCustomerUploadAction = createAction({
   handler: async ({ input, scope, permissions }) => {
     assertUploadPermission(permissions)
     return commitCustomerUpload(input, scope)
+  },
+})
+
+// 납품처 코스 고르기 (0095): 그 배송센터의 사용 중인 코스 + 우편번호 배정으로 정해지는 코스(자동)
+export const listShipToRoutesAction = createAction({
+  permission: 'master.customers.read',
+  input: z.object({
+    centerId: idSchema,
+    zipCode: z.string().trim().max(10).default(''),
+  }),
+  handler: async ({ input }) => {
+    const [routes, [auto]] = await Promise.all([
+      prisma.route.findMany({
+        where: { centerId: input.centerId, status: 'ACTIVE' },
+        orderBy: [{ sortOrder: 'asc' }, { code: 'asc' }],
+        select: { id: true, code: true, name: true },
+      }),
+      resolveShipToRoutes(prisma, [
+        {
+          routeId: null,
+          deliveryCenterId: input.centerId,
+          zipCode: /^\d{5}$/.test(input.zipCode) ? input.zipCode : null,
+        },
+      ]),
+    ])
+    return { routes, auto: auto ? { code: auto.code, name: auto.name } : null }
   },
 })

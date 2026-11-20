@@ -3,7 +3,14 @@
 import { Trash2Icon, TriangleAlertIcon } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { StatusBadge } from '@/components/common'
-import { AddressInput, PhoneInput, YnToggle } from '@/components/inputs'
+import {
+  AddressInput,
+  CodeSelect,
+  PhoneInput,
+  TimeInput,
+  WeekdaySelect,
+  YnToggle,
+} from '@/components/inputs'
 import { Field, FormGrid } from '@/components/master-form'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -25,7 +32,7 @@ import {
 import { Textarea } from '@/components/ui/textarea'
 import { SHIP_TO_STATUS } from '@/lib/customers/customer-codes'
 import { shipToSchema, type ShipToInput } from '@/lib/customers/customer-schema'
-import { previewShipToCenterAction } from './actions'
+import { listShipToRoutesAction, previewShipToCenterAction } from './actions'
 
 // "권역 자동" (Select는 빈 값을 쓸 수 없어 따로 둔다)
 const AUTO = '__auto__'
@@ -48,6 +55,7 @@ export function ShipToSheet({
   onApply,
   onRemove,
   onClose,
+  assigned,
 }: {
   open: boolean
   row: ShipToInput
@@ -64,6 +72,8 @@ export function ShipToSheet({
   onApply: (row: ShipToInput) => void
   onRemove: () => void
   onClose: () => void
+  // 저장된 배송센터·정제 우편번호 (코스 고르기, 0095)
+  assigned?: { centerId: string | null; zipCode: string | null }
 }) {
   const [draft, setDraft] = useState<ShipToInput>(row)
   const [errors, setErrors] = useState<Record<string, string>>({})
@@ -99,6 +109,29 @@ export function ShipToSheet({
       alive = false
     }
   }, [shipperId, zip, region])
+
+  // 코스 고르기 (0095): 직접 고른 배송센터 → 저장된 배송센터 → 지역 기본 센터의 코스
+  const manualCenter = draft.centerMode === 'MANUAL' ? draft.deliveryCenterId : ''
+  const routeCenter = manualCenter || assigned?.centerId || regionDefault?.centerId || ''
+  const routeZip = /^\d{5}$/.test(zip.replace(/\D/g, ''))
+    ? zip.replace(/\D/g, '')
+    : (assigned?.zipCode ?? '')
+  const [routeChoice, setRouteChoice] = useState<{
+    centerId: string
+    routes: { id: string; code: string; name: string }[]
+    auto: { code: string; name: string } | null
+  } | null>(null)
+  useEffect(() => {
+    if (!routeCenter) return
+    let alive = true
+    void listShipToRoutesAction({ centerId: routeCenter, zipCode: routeZip }).then((result) => {
+      if (alive && result.ok) setRouteChoice({ centerId: routeCenter, ...result.data })
+    })
+    return () => {
+      alive = false
+    }
+  }, [routeCenter, routeZip])
+  const routes = routeChoice?.centerId === routeCenter ? routeChoice : null
 
   function apply() {
     const parsed = shipToSchema.safeParse(draft)
@@ -317,6 +350,111 @@ export function ShipToSheet({
                 {regionDefault!.centerName}입니다. 다르게 지정하면 ‘권역 불일치’로 표시됩니다.
               </p>
             )}
+            {/* 납품 조건 (0095) */}
+            <p className="col-span-12 mt-2 text-sm font-semibold">납품 조건</p>
+            <Field
+              label="배송 코스"
+              span={12}
+              error={errors.routeId}
+              htmlFor={id('routeId')}
+              hint={
+                routeCenter
+                  ? routes?.auto
+                    ? `자동이면 우편번호 배정으로 ${routes.auto.name}(${routes.auto.code})`
+                    : '자동이면 우편번호 배정을 따릅니다 (지금은 배정된 코스 없음)'
+                  : '배송센터가 정해진 뒤 코스를 고를 수 있습니다'
+              }
+            >
+              <Select
+                value={draft.routeId || AUTO}
+                onValueChange={(v) => set({ routeId: v === AUTO ? '' : v })}
+                disabled={disabled || !routeCenter}
+              >
+                <SelectTrigger id={id('routeId')} className="w-full">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value={AUTO}>자동 (우편번호 배정)</SelectItem>
+                  {(routes?.routes ?? []).map((route) => (
+                    <SelectItem key={route.id} value={route.id}>
+                      {route.name} ({route.code})
+                    </SelectItem>
+                  ))}
+                  {/* 지금 지정한 코스가 목록에 없으면 (사용 중지 등) 그대로 보이게 */}
+                  {draft.routeId && !routes?.routes.some((r) => r.id === draft.routeId) && (
+                    <SelectItem value={draft.routeId}>지정한 코스 (다른 센터·사용 중지)</SelectItem>
+                  )}
+                </SelectContent>
+              </Select>
+            </Field>
+            <Field
+              label="납품 시간"
+              span={6}
+              error={errors.deliveryTimeTo ?? errors.deliveryTimeFrom}
+              htmlFor={id('deliveryTimeFrom')}
+              hint="비우면 제한 없음"
+            >
+              <div className="flex items-center gap-2">
+                <TimeInput
+                  id={id('deliveryTimeFrom')}
+                  value={draft.deliveryTimeFrom ?? ''}
+                  onChange={(deliveryTimeFrom) => set({ deliveryTimeFrom })}
+                  disabled={disabled}
+                />
+                <span className="text-muted-foreground">~</span>
+                <TimeInput
+                  id={id('deliveryTimeTo')}
+                  aria-label="납품 시간 끝"
+                  value={draft.deliveryTimeTo ?? ''}
+                  onChange={(deliveryTimeTo) => set({ deliveryTimeTo })}
+                  disabled={disabled}
+                />
+              </div>
+            </Field>
+            <Field label="사전 연락" span={6} htmlFor={id('preCall')}>
+              <YnToggle
+                id={id('preCall')}
+                value={draft.preCall ?? false}
+                onChange={(preCall) => set({ preCall })}
+                onLabel="도착 전 연락"
+                offLabel="안 함"
+                disabled={disabled}
+              />
+            </Field>
+            <Field
+              label="납품 요일"
+              span={12}
+              error={errors.deliveryDays}
+              htmlFor={id('deliveryDays')}
+              hint="고르지 않으면 제한 없음"
+            >
+              <WeekdaySelect
+                id={id('deliveryDays')}
+                value={draft.deliveryDays || 'NNNNNNN'}
+                onChange={(deliveryDays) => set({ deliveryDays })}
+                disabled={disabled}
+              />
+            </Field>
+            <Field label="차량 제한" span={6} htmlFor={id('vehicleLimit')}>
+              <CodeSelect
+                group="VEHICLE_LIMIT"
+                id={id('vehicleLimit')}
+                value={draft.vehicleLimit ?? ''}
+                onChange={(vehicleLimit) => set({ vehicleLimit })}
+                disabled={disabled}
+                allowEmpty
+              />
+            </Field>
+            <Field label="하차 방법" span={6} htmlFor={id('unloadMethod')}>
+              <CodeSelect
+                group="UNLOAD_METHOD"
+                id={id('unloadMethod')}
+                value={draft.unloadMethod ?? ''}
+                onChange={(unloadMethod) => set({ unloadMethod })}
+                disabled={disabled}
+                allowEmpty
+              />
+            </Field>
             <Field label="비고" span={12} htmlFor={id('remark')}>
               <Textarea
                 id={id('remark')}

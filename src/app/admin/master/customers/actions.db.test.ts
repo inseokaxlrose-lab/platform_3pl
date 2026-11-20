@@ -486,6 +486,110 @@ describe('납품처 · 배송센터 (0082)', () => {
   })
 })
 
+describe('납품 조건 · 배송 코스 (0095)', () => {
+  const route = (centerId: bigint, code: string) =>
+    prisma.route.create({
+      data: { operatorId: TEST_OPERATOR_ID, centerId, code, name: `${code} 코스` },
+    })
+  const savedShipTo = () => prisma.shipTo.findFirstOrThrow({ where: { code: 'S1' } })
+
+  beforeEach(async () => {
+    await createTestCodeGroup('VEHICLE_LIMIT', [{ code: 'UNDER_5T' }])
+    await createTestCodeGroup('UNLOAD_METHOD', [{ code: 'FORKLIFT' }])
+  })
+
+  const conditions = {
+    centerMode: 'MANUAL' as const,
+    deliveryTimeFrom: '09:00',
+    deliveryTimeTo: '18:00',
+    deliveryDays: 'YYYYYNN',
+    vehicleLimit: 'UNDER_5T',
+    unloadMethod: 'FORKLIFT',
+    preCall: true,
+  }
+
+  it('납품 시간·요일·차량 제한·하차 방법·사전 연락·직접 지정 코스를 저장한다', async () => {
+    const r1 = await route(icn, 'R01')
+    await create({
+      shipTos: [shipTo({ ...conditions, deliveryCenterId: String(icn), routeId: String(r1.id) })],
+    })
+    const saved = await savedShipTo()
+    expect(saved).toMatchObject({
+      routeId: r1.id,
+      deliveryDays: 'YYYYYNN',
+      vehicleLimit: 'UNDER_5T',
+      unloadMethod: 'FORKLIFT',
+      preCallYn: 'Y',
+    })
+    expect(saved.deliveryTimeFrom?.toISOString().slice(11, 16)).toBe('09:00')
+  })
+
+  it('배송센터가 아닌 센터의 코스, 끝이 시작보다 빠른 시간, 없는 공통코드는 거부', async () => {
+    const other = await route(gmh, 'G01')
+    expect(
+      await createCustomerAction(
+        input({
+          shipTos: [
+            shipTo({ ...conditions, deliveryCenterId: String(icn), routeId: String(other.id) }),
+          ],
+        }),
+      ),
+    ).toMatchObject({ ok: false, error: { message: expect.stringContaining('배송센터의 코스') } })
+    expect(
+      await createCustomerAction(
+        input({
+          shipTos: [
+            shipTo({ ...conditions, deliveryCenterId: String(icn), deliveryTimeTo: '08:00' }),
+          ],
+        }),
+      ),
+    ).toMatchObject({ ok: false })
+    expect(
+      await createCustomerAction(
+        input({
+          shipTos: [shipTo({ ...conditions, deliveryCenterId: String(icn), unloadMethod: 'NOPE' })],
+        }),
+      ),
+    ).toMatchObject({ ok: false })
+  })
+
+  it('납품 조건 칸을 보내지 않으면 (연동·엑셀) 저장된 값을 그대로 둔다', async () => {
+    const created = await create({
+      shipTos: [shipTo({ ...conditions, deliveryCenterId: String(icn) })],
+    })
+    const edit = await getCustomerForEdit(BigInt(created.id), ALL)
+    const rows = edit!.input.shipTos.map(
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      ({
+        routeId,
+        deliveryTimeFrom,
+        deliveryTimeTo,
+        deliveryDays,
+        vehicleLimit,
+        unloadMethod,
+        preCall,
+        ...rest
+      }) => ({
+        ...rest,
+        deliveryMemo: '정문 경비실',
+      }),
+    )
+    expect(
+      await updateCustomerAction({
+        ...edit!.input,
+        shipTos: rows,
+        id: created.id,
+        rowVersion: edit!.rowVersion,
+      }),
+    ).toMatchObject({ ok: true })
+    expect(await savedShipTo()).toMatchObject({
+      deliveryMemo: '정문 경비실',
+      vehicleLimit: 'UNDER_5T',
+      preCallYn: 'Y',
+    })
+  })
+})
+
 describe('데이터 범위 · 삭제', () => {
   it('센터 직원: 소속 센터를 이용하는 화주사의 거래처만', async () => {
     await create({ code: 'GANA-C' })

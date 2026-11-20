@@ -196,6 +196,10 @@ export function ShipToSection({
           customerAddress={customerAddress}
           removeBlocked={editing !== null && editing >= 0 ? removeBlocked(editing) : null}
           existingCodes={rows.filter((_, i) => i !== editing).map((r) => r.code.toUpperCase())}
+          assigned={(() => {
+            const found = infoOf(editingRow)
+            return found ? { centerId: found.deliveryCenterId, zipCode: found.zipCode } : undefined
+          })()}
           disabled={disabled}
           onApply={(next) => {
             const list =
