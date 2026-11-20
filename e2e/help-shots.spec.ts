@@ -216,6 +216,22 @@ const SHOTS: Shot[] = [
   list('/admin/stock/adjustments'),
   // ── 시스템
   list('/admin/system/users'),
+  // 사용자 수정의 계정 관리·로그인 이력 (0093): ① 상태·마지막 로그인 ② 비밀번호 초기화 ③ 로그인 이력
+  {
+    src: '/help/admin/system/users/account.png',
+    url: '/admin/system/users',
+    account: 'admin',
+    prepare: async (page) => {
+      await page.getByRole('link', { name: E2E_ACCOUNTS.admin, exact: true }).click()
+      await expect(page.locator('#section-login-history')).toBeVisible()
+    },
+    scrollTo: (page) => page.locator('#section-account'),
+    markers: [
+      { label: '1', target: (page) => page.getByText(/^마지막 로그인/) },
+      { label: '2', target: (page) => page.getByRole('button', { name: '비밀번호 초기화' }) },
+      { label: '3', target: (page) => page.locator('#section-login-history') },
+    ],
+  },
   list('/admin/system/roles'),
   // 운영 설정 (0092): ① 재고 ② API 연동 ③ 화면 버튼
   {

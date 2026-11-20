@@ -3,7 +3,7 @@
 > 이 문서는 `npm run db:doc`가 실제 DB 구조와 `prisma/schema.prisma`의 주석으로 만든다. **손으로 고치지 않는다** — 마이그레이션을 적용한 뒤 명령을 다시 돌린다.
 > 엑셀 판: `docs/db/DB_테이블정의서.xlsx` · 이름 규칙: `docs/db-conventions.md`
 
-테이블 70개 · 칼럼 1111개
+테이블 71개 · 칼럼 1129개
 
 ## 목차
 
@@ -77,6 +77,7 @@
 | 공통·설정 | [`tb_ext_code`](#tb_ext_code) | ExternalCode | 외부 코드 매핑 (docs/decisions/0025): 우리 기준정보 ↔ SAP·ERP 등 외부 시스템 코드 한 줄 = 연동 상대 + 대상 종류 + 대상 id + 외부 코드 - 같은 운영사·같은 연동 상대·같은 종류 안에서 외부 코드 중복 금지 - 한 대상은 연동 상대마다 외부 코드 1개 |
 | 기타 | [`tb_file`](#tb_file) | File | 첨부파일 (docs/decisions/0091): 파일 정보. 바이트는 저장소(src/lib/files/storage.ts)에 storage_key로 있다 지우지 않는 기록이 아니라 실제로 지운다 (대상에서 떼면 파일도 지운다) — 공통 칸(버전·논리 삭제) 없음 |
 | 기타 | [`tb_file_link`](#tb_file_link) | FileLink | 첨부파일 대상 연결 (0091): 여러 장 붙는 곳 — ITEM 품목(IMAGE 이미지) · INSPECTION 검수(PHOTO 사진). 파일 하나는 한 곳에만 |
+| 기타 | [`tb_login_hist`](#tb_login_hist) | LoginHist | 로그인 이력 (docs/decisions/0093): 시도마다 한 줄 — SUCCESS 성공 / FAIL 실패 / LOCKED 잠김 / DISABLED 사용 중지·운영사 정지 없는 아이디로 시도하면 user_id 없이 아이디 글자만. 운영사는 그 사용자의 운영사 (플랫폼 관리자·없는 아이디는 비움) |
 | 기타 | [`tb_numbering_rule`](#tb_numbering_rule) | NumberingRule | 체번 규칙 (docs/decisions/0084): 대상별 코드·문서번호 모양 operator_id NULL = 시스템 기본 규칙, 값이 있으면 그 운영사의 재정의 (같은 대상이면 운영사 행이 이긴다) 번호 = 접두어(고정 문자 / 화주 code_prefix / 상위 코드) + 구분 문자 + 날짜 + 구분자 + 일련번호 |
 | 기타 | [`tb_numbering_seq`](#tb_numbering_seq) | NumberingSeq | 체번 현재값 (docs/decisions/0084): 운영사 × 대상 × 범위 × 주기마다 마지막 번호 발급은 한 문장으로 원자적 증가 (INSERT … ON CONFLICT DO UPDATE … RETURNING) — MAX()+1 금지 이력이 아니라 카운터라 FK를 두지 않는다 (scope_id는 범위에 따라 운영사 0·화주사·거래처 키) |
 
@@ -191,6 +192,14 @@
 | 15 | `status_cd` | 상태 코드 | false면 로그인·사용 불가 (퇴사자 등). 기록 보존을 위해 계정을 지우지 않고 막는다 | VARCHAR(20) | N | ACTIVE |  |
 | 16 | `operator_id` | 운영사 ID | 운영사 (멀티테넌트, 0039). 플랫폼 관리자만 비어 있고 나머지 유형은 반드시 있다 (DB 검사 조건 tb_user_operator_matches_type) | BIGINT | Y |  | FK → tb_operator.operator_id |
 | 17 | `password_change_req_yn` | 비밀번호 변경 요청 여부 | 'Y'면 임시 비밀번호 상태 — 비밀번호를 바꾸기 전에는 다른 화면·작업을 쓸 수 없다 (새 계정·관리자 재설정, 0086) | CHAR(1) | N | N |  |
+| 18 | `tel_no` | 전화 번호 | 연락처·부서·직책·사번 (0093) | VARCHAR(20) | Y |  |  |
+| 19 | `dept_nm` | 부서 명 |  | VARCHAR(50) | Y |  |  |
+| 20 | `position_nm` | 직위 명 |  | VARCHAR(50) | Y |  |  |
+| 21 | `emp_no` | emp 번호 |  | VARCHAR(30) | Y |  |  |
+| 22 | `login_fail_cnt` | login 실패 수 | 로그인 실패 잠금 (5회 연속 → 30분, 0093): 성공하면 0, 관리자가 풀 수 있다 | INTEGER | N | 0 |  |
+| 23 | `locked_until` | locked until |  | TIMESTAMP(3) | Y |  |  |
+| 24 | `last_login_at` | 마지막 login 일시 |  | TIMESTAMP(3) | Y |  |  |
+| 25 | `last_login_ip` | 마지막 login IP |  | VARCHAR(45) | Y |  |  |
 
 **고유 인덱스**
 
@@ -204,6 +213,7 @@
 
 **검사 조건**
 
+- `tb_user_login_fail_cnt_check`: `CHECK (login_fail_cnt >= 0)`
 - `tb_user_operator_matches_type`: `CHECK (((user_type_cd) = 'PLATFORM') = (operator_id IS NULL))`
 - `tb_user_password_change_req_yn_check`: `CHECK (password_change_req_yn IN ('Y', 'N')`
 - `tb_user_shipper_matches_type`: `CHECK (((user_type_cd) = 'SHIPPER') = (shipper_id IS NOT NULL))`
@@ -580,6 +590,7 @@
 | 62 | `work_days` | 운영 요일 | 월~일 Y/N 7글자 | CHAR(7) | N | YYYYYNN |  |
 | 63 | `work_end_time` | 작업 종료 시각 |  | TIME WITHOUT TIME ZONE | Y |  |  |
 | 64 | `work_start_time` | 작업 시작 시각 | ⑤ 운영 설정 — 상속 칸(출고 마감·타임존·할당 규칙·로트·유통기한·시리얼)은 NULL = 운영사 값 | TIME WITHOUT TIME ZONE | Y |  |  |
+| 65 | `center_cust_cd` | 센터 사용자정의코드 | 사용자 정의 코드 (ERP 플랜트 등, 0093) — 운영사 안에서 겹치지 않게, 수정 가능 | VARCHAR(50) | Y |  |  |
 
 **고유 인덱스**
 
@@ -779,6 +790,7 @@
 | 35 | `location_cd_separator` | 로케이션 코드 구분자 |  | CHAR(1) | Y |  |  |
 | 36 | `remark` | 비고 | ⑤ 확장 | VARCHAR(1000) | Y |  |  |
 | 37 | `ext_attr` | 확장속성 | 확장 속성 (JSON) | JSONB | Y |  |  |
+| 38 | `warehouse_cust_cd` | 창고 사용자정의코드 | 사용자 정의 코드 (ERP 저장위치 등, 0093) — 센터 안에서 겹치지 않게, 수정 가능 | VARCHAR(50) | Y |  |  |
 
 **고유 인덱스**
 
@@ -2497,6 +2509,31 @@
 
 - `tb_file_link_entity_type_cd_check`: `CHECK ((entity_type_cd) IN ('ITEM', 'INSPECTION'))`
 - `tb_file_link_purpose_cd_check`: `CHECK ((purpose_cd) IN ('IMAGE', 'PHOTO'))`
+
+## tb_login_hist
+
+- 영역: 기타 · 모델: `LoginHist`
+- 로그인 이력 (docs/decisions/0093): 시도마다 한 줄 — SUCCESS 성공 / FAIL 실패 / LOCKED 잠김 / DISABLED 사용 중지·운영사 정지 없는 아이디로 시도하면 user_id 없이 아이디 글자만. 운영사는 그 사용자의 운영사 (플랫폼 관리자·없는 아이디는 비움)
+
+| No | 칼럼 | 한글명 | 설명 | 타입 | NULL | 기본값 | 키 |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| 1 | `login_hist_id` | login 이력 ID |  | BIGINT | N | 자동 증가 | PK |
+| 2 | `user_id` | 사용자 ID |  | BIGINT | Y |  | FK → tb_user.user_id |
+| 3 | `operator_id` | 운영사 ID | 운영사 (멀티테넌트 키 — 다른 운영사 데이터는 보이지 않는다, 0039) | BIGINT | Y |  |  |
+| 4 | `username` | 아이디 |  | VARCHAR(50) | N |  |  |
+| 5 | `result_cd` | 결과 코드 |  | VARCHAR(20) | N |  |  |
+| 6 | `ip_address` | IP 주소 |  | VARCHAR(45) | Y |  |  |
+| 7 | `user_agent` | 사용자 에이전트 |  | VARCHAR(300) | Y |  |  |
+| 8 | `created_at` | 등록 일시 | 등록 일시 (자동) | TIMESTAMP(3) | N | CURRENT_TIMESTAMP |  |
+
+**인덱스**
+
+- `tb_login_hist_created_at_idx`: `CREATE INDEX tb_login_hist_created_at_idx ON tb_login_hist (created_at)`
+- `tb_login_hist_user_id_created_at_idx`: `CREATE INDEX tb_login_hist_user_id_created_at_idx ON tb_login_hist (user_id, created_at)`
+
+**검사 조건**
+
+- `tb_login_hist_result_cd_check`: `CHECK ((result_cd) IN ('SUCCESS', 'FAIL', 'LOCKED', 'DISABLED'))`
 
 ## tb_numbering_rule
 
