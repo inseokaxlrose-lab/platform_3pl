@@ -538,7 +538,7 @@ model Location {
   mixItemYn           String      @default("Y") @map("mix_item_yn") @db.Char(1)
   mixLotYn            String      @default("Y") @map("mix_lot_yn") @db.Char(1)
   // 3PL은 화주 간 재고 섞임 방지가 기본
-  mixClientYn         String      @default("N") @map("mix_client_yn") @db.Char(1)
+  mixShipperYn        String      @default("N") @map("mix_shipper_yn") @db.Char(1)
   putawaySeq          Int?        @map("putaway_seq")
   pickSeq             Int?        @map("pick_seq")
   // ⑤ 잠금·관리 [2차] — 잠금(일시적으로 작업 금지)은 사용 중지(장기간 안 씀)와 다르다
@@ -596,14 +596,14 @@ model Shipper {
   // 운영사 (멀티테넌트: 같은 운영사 사람만 보고 고친다, docs/decisions/0039)
   operatorId           BigInt    @map("operator_id")
   operator             Operator  @relation(fields: [operatorId], references: [id], onDelete: Restrict)
-  code                 String    @map("shipper_cd")
+  code                 String    @map("shipper_cd") @db.VarChar(20)
   // 거래처·품목 자동 체번 접두어 2글자 (I·O·0·1 제외), 운영사 안에서 고유. 하위 코드가 발행되면 바꿀 수 없다 (0084)
   codePrefix           String    @map("code_prefix") @db.Char(2)
   // 사용자 정의 코드 (운영사 ERP 코드 등), 운영사 안에서 고유 (값이 있을 때)
   custCode             String?   @map("shipper_cust_cd") @db.VarChar(50)
   // 연동(API·엑셀)에서 거래처·납품처·품목을 찾는 키: CODE(우리 코드) / CUST_CD(사용자 정의 코드)
   ifKeyType            String    @default("CODE") @map("if_key_type_cd") @db.VarChar(20)
-  name                 String    @map("shipper_nm")
+  name                 String    @map("shipper_nm") @db.VarChar(100)
   // ── ① 기본 정보
   nameEn               String?   @map("shipper_nm_en") @db.VarChar(100)
   shortName            String?   @map("shipper_short_nm") @db.VarChar(30)
@@ -611,27 +611,27 @@ model Shipper {
   shipperType          String?   @map("shipper_type_cd") @db.VarChar(20)
   industry             String?   @map("industry_cd") @db.VarChar(20)
   // 사업자등록번호·전화번호는 하이픈 없이 숫자만 (0029). 화면에서는 필수, 기존 화주는 비어 있을 수 있다 (0080)
-  businessNumber       String?   @map("biz_reg_no")
+  businessNumber       String?   @map("biz_reg_no") @db.Char(10)
   // 사업자 구분·과세유형: 상수 BIZ_ENTITY·TAX_TYPE (운영사와 같은 값)
   bizEntity            String    @default("CORP") @map("biz_entity_cd") @db.VarChar(10)
   corpRegNo            String?   @map("corp_reg_no") @db.Char(13)
   subBizNo             String?   @map("sub_biz_no") @db.Char(4)
   taxType              String    @default("GENERAL") @map("tax_type_cd") @db.VarChar(10)
-  ceoName              String?   @map("ceo_nm")
-  businessType         String?   @map("biz_condition")
-  businessItem         String?   @map("biz_item")
+  ceoName              String?   @map("ceo_nm") @db.VarChar(50)
+  businessType         String?   @map("biz_condition") @db.VarChar(100)
+  businessItem         String?   @map("biz_item") @db.VarChar(100)
   sortOrder            Int       @default(0) @map("sort_seq")
   remark               String?   @db.VarChar(1000)
   extAttr              Json?     @map("ext_attr")
   // ── ② 연락처·주소
-  phone                String?   @map("tel_no")
-  fax                  String?   @map("fax_no")
-  email                String?
+  phone                String?   @map("tel_no") @db.VarChar(15)
+  fax                  String?   @map("fax_no") @db.VarChar(15)
+  email                String?   @db.VarChar(100)
   homepageUrl          String?   @map("homepage_url") @db.VarChar(200)
   countryCode          String    @default("KR") @map("country_cd") @db.Char(2)
-  zipCode              String?   @map("zip_cd")
-  address              String?   @map("addr1")
-  addressDetail        String?   @map("addr2")
+  zipCode              String?   @map("zip_cd") @db.VarChar(10)
+  address              String?   @map("addr1") @db.VarChar(200)
+  addressDetail        String?   @map("addr2") @db.VarChar(200)
   addressJibun         String?   @map("addr_jibun") @db.VarChar(200)
   // ── ③ 계약·정산
   contractStartOn      DateTime  @default(dbgenerated("CURRENT_DATE")) @map("contract_start_dt") @db.Date
@@ -664,8 +664,8 @@ model Shipper {
   shipToCenterPolicy   String    @default("AUTO_HOLD") @map("ship_to_center_policy_cd") @db.VarChar(20)
   autoCreateShipToYn   String    @default("Y") @map("auto_create_ship_to_yn") @db.Char(1)
   autoCreateItemYn     String    @default("N") @map("auto_create_item_yn") @db.Char(1)
-  // 주문번호 중복 기준: CLIENT(화주 전체 기간)·CLIENT_DAY(일자별)
-  orderNoScope         String    @default("CLIENT") @map("order_no_unique_scope_cd") @db.VarChar(20)
+  // 주문번호 중복 기준: SHIPPER(화주 전체 기간)·SHIPPER_DAY(일자별)
+  orderNoScope         String    @default("SHIPPER") @map("order_no_unique_scope_cd") @db.VarChar(20)
   // ── ⑥ 연동 (API 키 관리는 다음 작업 — 정의서 PART 2)
   // 연동 방식: PORTAL·API·FILE·EDI
   ifMethod             String    @default("PORTAL") @map("if_method_cd") @db.VarChar(20)
@@ -741,10 +741,10 @@ model ShipperContact {
   id          BigInt  @id @default(autoincrement()) @map("contact_id")
   shipperId   BigInt  @map("shipper_id")
   sortOrder   Int     @map("sort_seq")
-  duty        String  @map("role_cd")
-  name        String  @map("contact_nm")
-  phone       String? @map("tel_no")
-  email       String?
+  duty        String  @map("role_cd") @db.VarChar(20)
+  name        String  @map("contact_nm") @db.VarChar(50)
+  phone       String? @map("tel_no") @db.VarChar(15)
+  email       String? @db.VarChar(100)
   isPrimary   String  @default("N") @map("primary_yn") @db.Char(1)
   isIfContact String  @default("N") @map("if_contact_yn") @db.Char(1)
   shipper     Shipper @relation(fields: [shipperId], references: [id], onDelete: Cascade)
@@ -872,9 +872,12 @@ model Operator {
   defaultPalletType String    @default("T11") @map("default_pallet_type_cd") @db.VarChar(20)
   timezone          String    @default("Asia/Seoul") @db.VarChar(50)
   lang              String    @default("ko-KR") @map("lang_cd") @db.VarChar(5)
-  // 표시 단위: 단위 기준정보의 중량·길이 단위 코드 (시스템 또는 이 운영사의 단위 — DB 트리거로 검사, 0078)
-  weightUnit        String    @default("KG") @map("weight_unit_cd") @db.VarChar(10)
-  lengthUnit        String    @default("CM") @map("length_unit_cd") @db.VarChar(10)
+  // 표시 단위: 단위 기준정보의 중량·길이 단위 (시스템 또는 이 운영사의 단위 — 유형은 DB 트리거로 검사, 0078·0084)
+  // 기본값은 시스템 KG·CM 단위 (DB 함수 system_unit_id)
+  weightUnitId      BigInt    @default(dbgenerated("system_unit_id('KG'::character varying)")) @map("weight_unit_id")
+  lengthUnitId      BigInt    @default(dbgenerated("system_unit_id('CM'::character varying)")) @map("length_unit_id")
+  weightUnit        Unit      @relation("OperatorWeightUnit", fields: [weightUnitId], references: [id], onDelete: Restrict)
+  lengthUnit        Unit      @relation("OperatorLengthUnit", fields: [lengthUnitId], references: [id], onDelete: Restrict)
   // 재고할당 규칙 ALLOC_RULE
   allocRule         String    @default("FIFO") @map("alloc_rule_cd") @db.VarChar(10)
   useLot            String    @default("N") @map("lot_mgmt_yn") @db.Char(1)
@@ -893,7 +896,7 @@ model Operator {
   // 비어 있으면 무제한
   maxUserCount    Int?      @map("max_user_cnt")
   maxCenterCount  Int?      @map("max_center_cnt")
-  maxClientCount  Int?      @map("max_client_cnt")
+  maxShipperCount Int?      @map("max_shipper_cnt")
   billingEmail    String?   @map("billing_email") @db.VarChar(100)
   taxInvoiceEmail String?   @map("tax_invoice_email") @db.VarChar(100)
   // 유입 경로 (플랫폼 관리자만 표시, 값 목록은 아직 정하지 않음)
@@ -1159,6 +1162,9 @@ model Unit {
 
   // 운영사별 사용 여부 (시스템 기본 단위만, 0079)
   operatorSettings OperatorUnit[]
+  // 운영사 표시 단위로 쓰는 곳
+  weightOperators  Operator[]    @relation("OperatorWeightUnit")
+  lengthOperators  Operator[]    @relation("OperatorLengthUnit")
 
   // 이 단위를 쓰는 품목 (기본단위 / 환산단위) — 쓰이고 있으면 지울 수 없다
   baseItems    Item[]        @relation("ItemBaseUnit")
@@ -1455,7 +1461,7 @@ model Customer {
   custCode       String?  @map("customer_cust_cd") @db.VarChar(50)
   name           String   @map("customer_nm") @db.VarChar(200)
   shortName      String?  @map("customer_short_nm") @db.VarChar(30)
-  // 거래처 유형: 공통코드 PARTNER_TYPE (분류·표시), 거래처 그룹: 화주가 쓰는 그룹 (자유 입력)
+  // 거래처 유형: 공통코드 CUSTOMER_TYPE (분류·표시), 거래처 그룹: 화주가 쓰는 그룹 (자유 입력)
   customerType   String?  @map("customer_type_cd") @db.VarChar(20)
   customerGroup  String?  @map("customer_group_cd") @db.VarChar(30)
   // 사업자등록번호·전화번호는 하이픈 없이 숫자만 (0029)
@@ -2271,7 +2277,7 @@ model ApiClient {
   @@map("tb_api_client")
 }
 
-// 키 권한 (상수 API_SCOPE: PARTNER_READ … STOCK_READ)
+// 키 권한 (상수 API_SCOPE: CUSTOMER_READ … STOCK_READ)
 model ApiClientScope {
   apiClientId BigInt    @map("api_client_id")
   scope       String    @map("scope_cd") @db.VarChar(30)
@@ -2318,7 +2324,7 @@ model ApiRequestLog {
   shipperId      BigInt?  @map("shipper_id")
   apiClientId    BigInt?  @map("api_client_id")
   env            String?  @map("env_cd") @db.VarChar(10)
-  // API 구분 (예: ME, PARTNER_UPSERT, ORDER_CREATE)
+  // API 구분 (예: ME, CUSTOMER_UPSERT, ORDER_CREATE)
   apiCode        String   @map("api_cd") @db.VarChar(50)
   httpMethod     String   @map("http_method") @db.VarChar(10)
   path           String   @db.VarChar(300)

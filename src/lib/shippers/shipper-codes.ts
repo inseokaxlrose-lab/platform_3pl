@@ -49,8 +49,8 @@ export const SHIP_TO_CENTER_POLICY = codeSet({
 
 // 주문번호 중복 기준 (주문 작업에서 사용)
 export const ORDER_NO_SCOPE = codeSet({
-  CLIENT: '화주 전체 기간 유일',
-  CLIENT_DAY: '일자별 유일',
+  SHIPPER: '화주 전체 기간 유일',
+  SHIPPER_DAY: '일자별 유일',
 })
 
 // 연동 방식 (파일·EDI는 2차)

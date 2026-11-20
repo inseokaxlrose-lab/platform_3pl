@@ -121,7 +121,7 @@ const input = (overrides: Partial<ShipperInput> = {}): ShipperInput => ({
   shipToCenterPolicy: 'AUTO_HOLD',
   autoCreateShipTo: true,
   autoCreateItem: false,
-  orderNoScope: 'CLIENT',
+  orderNoScope: 'SHIPPER',
   ifMethod: 'PORTAL',
   apiEnabled: false,
   centers: [center(icnId)],
@@ -284,7 +284,7 @@ describe('화주사 등록·수정 (0080)', () => {
       ok: true,
       data: { notice: expect.stringContaining('GANA') },
     })
-    await prisma.operator.update({ where: { id: TEST_OPERATOR_ID }, data: { maxClientCount: 2 } })
+    await prisma.operator.update({ where: { id: TEST_OPERATOR_ID }, data: { maxShipperCount: 2 } })
     expect(await createShipperAction(input({ code: 'GANA3' }))).toMatchObject({
       ok: false,
       error: { code: 'CONFLICT', message: expect.stringContaining('최대 2곳') },

@@ -260,7 +260,7 @@ export function BulkLocationForm({
       </InheritableField>
     </Field>
   )
-  const mix = (key: 'mixItem' | 'mixLot' | 'mixClient', label: string) => (
+  const mix = (key: 'mixItem' | 'mixLot' | 'mixShipper', label: string) => (
     <Field span={4} label={label} htmlFor={`bulk-${key}`}>
       <YnToggle
         id={`bulk-${key}`}
@@ -429,7 +429,7 @@ export function BulkLocationForm({
           {inherit('allocatable', '출고 할당 가능')}
           {mix('mixItem', '다품목 혼적')}
           {mix('mixLot', '다로트 혼적')}
-          {mix('mixClient', '다화주 혼적')}
+          {mix('mixShipper', '다화주 혼적')}
         </FormGrid>
       </FormSection>
 

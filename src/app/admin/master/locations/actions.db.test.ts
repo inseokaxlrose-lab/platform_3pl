@@ -81,7 +81,7 @@ const input = (overrides: Partial<LocationCreateInput> = {}): LocationCreateInpu
   allocatable: null,
   mixItem: true,
   mixLot: true,
-  mixClient: false,
+  mixShipper: false,
   putawaySeq: null,
   pickSeq: null,
   ...overrides,
@@ -100,7 +100,7 @@ const bulk = (overrides: Partial<LocationBulkInput['pattern']> = {}): LocationBu
     cell: null,
     ...overrides,
   },
-  attributes: { ...DEFAULT_BULK_ATTRIBUTES, locType: 'FLOOR', mixClient: true },
+  attributes: { ...DEFAULT_BULK_ATTRIBUTES, locType: 'FLOOR', mixShipper: true },
 })
 
 const codesOf = async (warehouseId: bigint) =>
@@ -169,7 +169,7 @@ describe('한 칸 추가 · 수정', () => {
       locType: 'RACK',
       inboundYn: null,
       allocatableYn: 'N',
-      mixClientYn: 'N',
+      mixShipperYn: 'N',
       systemYn: 'N',
     })
     expect(saved.maxCbm?.toString()).toBe('1.8')
@@ -263,12 +263,12 @@ describe('한 칸 추가 · 수정', () => {
       rowVersion: await versionOf('location', system.id),
       ...rest,
       locType: 'RACK',
-      mixClient: true,
+      mixShipper: true,
       description: '입고 확정 재고',
     })
     expect(await prisma.location.findUniqueOrThrow({ where: { id: system.id } })).toMatchObject({
       locType: 'STAGING',
-      mixClientYn: 'N',
+      mixShipperYn: 'N',
       description: '입고 확정 재고',
     })
   })
@@ -299,7 +299,7 @@ describe('일괄 생성', () => {
       rowNo: '02',
       levelNo: '03',
       locType: 'FLOOR',
-      mixClientYn: 'Y',
+      mixShipperYn: 'Y',
     })
     // 같은 범위를 다시 실행해도 안전
     expect(await bulkCreateLocationsAction(bulk())).toMatchObject({

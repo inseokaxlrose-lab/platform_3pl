@@ -61,11 +61,11 @@ export const UNIT_USAGE_CHECKS: UsageCheck[] = [
   {
     label: '운영사 중량·길이 단위',
     count: async (db, operatorId, units) => {
-      const [row] = await db.$queryRaw<{ weight: string; length: string }[]>(Prisma.sql`
-        SELECT weight_unit_cd AS weight, length_unit_cd AS length FROM tb_operator WHERE operator_id = ${operatorId}`)
+      const [row] = await db.$queryRaw<{ weight: bigint; length: bigint }[]>(Prisma.sql`
+        SELECT weight_unit_id AS weight, length_unit_id AS length FROM tb_operator WHERE operator_id = ${operatorId}`)
       return new Map(
         units
-          .filter((u) => row && (u.code === row.weight || u.code === row.length))
+          .filter((u) => row && (u.id === row.weight || u.id === row.length))
           .map((u) => [u.id, 1]),
       )
     },

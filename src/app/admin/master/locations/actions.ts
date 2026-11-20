@@ -97,7 +97,7 @@ export const listLocationsAction = createAction({
         levelNo: 'levelNo',
         bayNo: 'bayNo',
         locType: 'locType',
-        mixClient: 'mixClientYn',
+        mixShipper: 'mixShipperYn',
         maxWeightKg: 'maxWeightKg',
         maxPalletCnt: 'maxPalletCnt',
         isActive: 'status',
@@ -109,7 +109,7 @@ export const listLocationsAction = createAction({
     const codePrefix = filters.code?.trim().toUpperCase()
     const codeRange = codeRangeFilter(filters.codeRange)
     const locTypes = codesFilter(filters, 'locType')
-    const mixClient = ynFilter(filters, 'mixClient')
+    const mixShipper = ynFilter(filters, 'mixShipper')
     const createdAt = dateRangeFilter(filters, 'createdAt')
     const hasStock = { stocks: { some: { qty: { gt: 0 } } } }
     const where = {
@@ -125,7 +125,7 @@ export const listLocationsAction = createAction({
         locTypes ? { locType: locTypes } : {},
         filters.row?.trim() ? { rowNo: filters.row.trim().toUpperCase() } : {},
         filters.level?.trim() ? { levelNo: filters.level.trim().toUpperCase() } : {},
-        mixClient ? { mixClientYn: mixClient } : {},
+        mixShipper ? { mixShipperYn: mixShipper } : {},
         filters.stock === 'HAS' ? hasStock : filters.stock === 'EMPTY' ? { NOT: hasStock } : {},
         statusWhere(filters),
         // '삭제됨'을 고르면 지운 것만 (아니면 prisma.ts가 지운 것을 뺀다)
@@ -172,7 +172,7 @@ export const listLocationsAction = createAction({
           allocatableYn: true,
           mixItemYn: true,
           mixLotYn: true,
-          mixClientYn: true,
+          mixShipperYn: true,
           putawaySeq: true,
           pickSeq: true,
           status: true,
@@ -217,7 +217,7 @@ export const listLocationsAction = createAction({
           locType: row.locType,
           // 실제 적용값 (비어 있으면 창고 값)
           allocatable: ops.allocatable.value,
-          mixClient: isYes(row.mixClientYn),
+          mixShipper: isYes(row.mixShipperYn),
           maxWeightKg: row.maxWeightKg?.toString() ?? null,
           maxPalletCnt: row.maxPalletCnt,
           hasStock: _count.stocks > 0,
@@ -242,7 +242,7 @@ export const listLocationsAction = createAction({
             allocatable: row.allocatableYn === null ? null : isYes(row.allocatableYn),
             mixItem: isYes(row.mixItemYn),
             mixLot: isYes(row.mixLotYn),
-            mixClient: isYes(row.mixClientYn),
+            mixShipper: isYes(row.mixShipperYn),
             putawaySeq: row.putawaySeq,
             pickSeq: row.pickSeq,
           },

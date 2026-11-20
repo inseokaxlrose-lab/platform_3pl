@@ -77,14 +77,14 @@ export async function hasIssuedChildCodes(db: Db, shipperId: bigint) {
 async function assertShipperLimit(db: Db) {
   const operator = await db.operator.findUniqueOrThrow({
     where: { id: requireOperatorId() },
-    select: { maxClientCount: true },
+    select: { maxShipperCount: true },
   })
-  if (operator.maxClientCount === null) return
+  if (operator.maxShipperCount === null) return
   const count = await db.shipper.count({ where: { operatorId: requireOperatorId() } })
-  if (count >= operator.maxClientCount) {
+  if (count >= operator.maxShipperCount) {
     throw new ActionError(
       'CONFLICT',
-      `화주사는 최대 ${operator.maxClientCount}곳까지 등록할 수 있습니다. (요금제 한도) 플랫폼 관리자에게 문의하세요.`,
+      `화주사는 최대 ${operator.maxShipperCount}곳까지 등록할 수 있습니다. (요금제 한도) 플랫폼 관리자에게 문의하세요.`,
     )
   }
 }

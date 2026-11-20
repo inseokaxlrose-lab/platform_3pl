@@ -67,7 +67,7 @@ const EMPTY = (warehouseId = '', centerId = ''): FormValue => ({
   allocatable: null,
   mixItem: true,
   mixLot: true,
-  mixClient: false,
+  mixShipper: false,
   putawaySeq: null,
   pickSeq: null,
   cbmEdited: false,
@@ -268,7 +268,7 @@ export function LocationDialog({
       </Field>
     )
   }
-  const mix = (key: 'mixItem' | 'mixLot' | 'mixClient', label: string, hint: string) => (
+  const mix = (key: 'mixItem' | 'mixLot' | 'mixShipper', label: string, hint: string) => (
     <Field label={label} span={4} htmlFor={id(key)} hint={hint}>
       <YnToggle
         id={id(key)}
@@ -443,7 +443,7 @@ export function LocationDialog({
             {inherit('allocatable', '출고 할당 가능')}
             {mix('mixItem', '다품목 혼적', '아니오면 한 칸에 한 품목')}
             {mix('mixLot', '다로트 혼적', '아니오면 한 칸에 한 로트')}
-            {mix('mixClient', '다화주 혼적', '3PL은 보통 아니오')}
+            {mix('mixShipper', '다화주 혼적', '3PL은 보통 아니오')}
             {seq('putawaySeq', '적치 순서', '적치 추천 동선')}
             {seq('pickSeq', '피킹 순서', '비우면 코드순')}
           </FormGrid>

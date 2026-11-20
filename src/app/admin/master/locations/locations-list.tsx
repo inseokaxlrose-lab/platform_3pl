@@ -41,7 +41,7 @@ type Row = EditingLocation & {
   bayNo: string | null
   locType: string
   allocatable: boolean
-  mixClient: boolean
+  mixShipper: boolean
   maxWeightKg: string | null
   maxPalletCnt: number | null
   hasStock: boolean
@@ -93,7 +93,7 @@ const columnsFor = (units: DisplayUnits): DataGridColumn<Row>[] => [
   },
   // 실제 적용값 (로케이션이 비우면 창고 값)
   { id: 'allocatable', header: '출고 할당 가능', accessor: 'allocatable', format: 'yn' },
-  { id: 'mixClient', header: '다화주 혼적', accessor: 'mixClient', sortable: true, format: 'yn' },
+  { id: 'mixShipper', header: '다화주 혼적', accessor: 'mixShipper', sortable: true, format: 'yn' },
   {
     id: 'maxWeightKg',
     header: `최대 중량(${units.weight.label})`,
@@ -229,7 +229,7 @@ export function LocationsList({
     },
     { key: 'row', label: '열', type: 'text', span: 2, detail: true },
     { key: 'level', label: '단', type: 'text', span: 2, detail: true },
-    { key: 'mixClient', label: '다화주 혼적', type: 'yn', detail: true },
+    { key: 'mixShipper', label: '다화주 혼적', type: 'yn', detail: true },
     {
       key: 'stock',
       label: '재고',
