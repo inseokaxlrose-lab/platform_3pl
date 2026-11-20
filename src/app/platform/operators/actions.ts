@@ -20,7 +20,6 @@ import { NOT_DELETED } from '@/lib/status'
 import { registerOperator } from '@/lib/operator/register-operator'
 import { setActingOperatorCookie } from '@/lib/platform/acting-operator-cookie'
 import { prisma } from '@/lib/prisma'
-import { passwordSchema } from '@/lib/users/user-schema'
 import { z } from 'zod'
 
 // 플랫폼 · 운영사 (docs/decisions/0039)
@@ -133,20 +132,13 @@ export const switchOperatorAction = createAction({
 })
 
 // 운영사 등록: 운영사 + 기본값 + 관리자 계정(admin.○○)을 한 번에 (0039 3c)
-// 관리자의 처음 비밀번호는 서버 설정(.env SEED_ADMIN_PASSWORD) — 화면으로 보내지 않는다
+// 관리자의 처음 비밀번호는 운영사마다 자동으로 만든 임시 비밀번호 — 결과로 한 번만 화면에 보여 준다 (0086)
 export const createOperatorAction = createAction({
   permission: 'platform.operators.create',
   input: operatorRegisterSchema,
   handler: async ({ user, input }) => {
     requirePlatform(user)
-    const password = passwordSchema.safeParse(process.env.SEED_ADMIN_PASSWORD ?? '')
-    if (!password.success) {
-      throw new ActionError(
-        'VALIDATION',
-        '관리자 처음 비밀번호가 서버에 설정되지 않았습니다. (.env의 SEED_ADMIN_PASSWORD)',
-      )
-    }
-    return registerOperator(input, password.data)
+    return registerOperator(input)
   },
 })
 

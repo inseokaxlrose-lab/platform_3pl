@@ -46,6 +46,8 @@ model User {
   // 화주사 사용자의 소속 화주사 (화주사 사용자만, DB 검사 조건으로 강제: tb_user_shipper_matches_type)
   shipperId       BigInt?   @map("shipper_id")
   shipper         Shipper?  @relation(fields: [shipperId], references: [id], onDelete: Restrict)
+  // 'Y'면 임시 비밀번호 상태 — 비밀번호를 바꾸기 전에는 다른 화면·작업을 쓸 수 없다 (새 계정·관리자 재설정, 0086)
+  passwordChangeReqYn String @default("N") @map("password_change_req_yn") @db.Char(1)
 
   sessions            Session[]
   accounts            Account[]

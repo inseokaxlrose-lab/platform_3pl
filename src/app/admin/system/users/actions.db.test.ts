@@ -53,6 +53,7 @@ const newUser = (overrides: Record<string, unknown> = {}) => ({
   name: '김작업',
   userType: 'CENTER' as const,
   email: '',
+  passwordMode: 'MANUAL' as const,
   password: PASSWORD,
   passwordConfirm: PASSWORD,
   centerIds: [String(centerId)],
@@ -117,6 +118,59 @@ describe('사용자 등록', () => {
         fieldErrors: { passwordConfirm: ['비밀번호가 서로 다릅니다.'] },
       },
     })
+  })
+
+  it('처음 비밀번호 자동 생성: 결과로 한 번 돌려주고 그 비밀번호로 로그인, 변경 필요 표시 (0086)', async () => {
+    const result = await createUserAction(
+      newUser({ passwordMode: 'AUTO', password: '', passwordConfirm: '' }),
+    )
+    expect(result.ok).toBe(true)
+    const temp = result.ok ? result.data.tempPassword : null
+    expect(temp).toMatch(/^(?=.*[A-Za-z])(?=.*[2-9])[A-HJ-NP-Za-km-z2-9]{12}$/)
+    expect(
+      await auth.api.signInUsername({ body: { username: 'kim.worker', password: temp! } }),
+    ).toBeTruthy()
+    const row = await prisma.user.findUnique({
+      where: { username: 'kim.worker' },
+      select: { passwordChangeReqYn: true },
+    })
+    expect(row?.passwordChangeReqYn).toBe('Y')
+  })
+
+  it('직접 입력한 비밀번호도 변경 필요, 결과로 돌려주지 않는다 (0086)', async () => {
+    expect(await createUserAction(newUser())).toMatchObject({
+      ok: true,
+      data: { tempPassword: null },
+    })
+    const row = await prisma.user.findUnique({
+      where: { username: 'kim.worker' },
+      select: { passwordChangeReqYn: true },
+    })
+    expect(row?.passwordChangeReqYn).toBe('Y')
+  })
+
+  it('비밀번호 규칙: 영문·숫자 모두, 아이디와 같으면 거부 (0086)', async () => {
+    const cases = [
+      {
+        username: 'kim.worker',
+        password: 'onlyletters',
+        message: '비밀번호에 숫자를 넣어 주세요.',
+      },
+      { username: 'kim.worker', password: '12345678', message: '비밀번호에 영문을 넣어 주세요.' },
+      {
+        username: 'kim.worker1',
+        password: 'KIM.WORKER1',
+        message: '아이디와 같은 비밀번호는 쓸 수 없습니다.',
+      },
+    ]
+    for (const { username, password, message } of cases) {
+      expect(
+        await createUserAction(newUser({ username, password, passwordConfirm: password })),
+      ).toMatchObject({
+        ok: false,
+        error: { code: 'VALIDATION', fieldErrors: { password: [message] } },
+      })
+    }
   })
 
   it('아이디가 겹치면 (대소문자만 달라도) "이미 사용 중인 아이디입니다."', async () => {
@@ -221,8 +275,13 @@ describe('사용 중지 · 비밀번호 초기화', () => {
     await auth.api.signInUsername({ body: { username: 'kim.worker', password: PASSWORD } })
 
     expect(
-      await resetUserPasswordAction({ id, password: NEW_PASSWORD, passwordConfirm: NEW_PASSWORD }),
-    ).toMatchObject({ ok: true })
+      await resetUserPasswordAction({
+        id,
+        passwordMode: 'MANUAL',
+        password: NEW_PASSWORD,
+        passwordConfirm: NEW_PASSWORD,
+      }),
+    ).toMatchObject({ ok: true, data: { tempPassword: null } })
 
     expect(await prisma.session.count({ where: { userId: BigInt(id) } })).toBe(0)
     await expect(
@@ -231,6 +290,24 @@ describe('사용 중지 · 비밀번호 초기화', () => {
     expect(
       await auth.api.signInUsername({ body: { username: 'kim.worker', password: NEW_PASSWORD } }),
     ).toBeTruthy()
+  })
+
+  it('자동 생성으로 초기화하면 임시 비밀번호를 돌려주고 다시 변경 필요가 된다 (0086)', async () => {
+    const created = await createUserAction(newUser())
+    const id = created.ok ? created.data.id : ''
+    await prisma.user.update({ where: { id: BigInt(id) }, data: { passwordChangeReqYn: 'N' } })
+
+    const result = await resetUserPasswordAction({ id, passwordMode: 'AUTO' })
+    const temp = result.ok ? result.data.tempPassword : null
+    expect(temp).toHaveLength(12)
+    expect(
+      await auth.api.signInUsername({ body: { username: 'kim.worker', password: temp! } }),
+    ).toBeTruthy()
+    const row = await prisma.user.findUnique({
+      where: { id: BigInt(id) },
+      select: { passwordChangeReqYn: true },
+    })
+    expect(row?.passwordChangeReqYn).toBe('Y')
   })
 })
 
