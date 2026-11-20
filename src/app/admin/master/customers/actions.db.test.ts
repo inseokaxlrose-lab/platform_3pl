@@ -202,7 +202,18 @@ describe('거래처 등록 · 수정', () => {
     await assignZip('13529', icn)
     const created = await create({
       code: 'hanbit-1',
-      contacts: [{ duty: 'OUTBOUND', name: '박담당', phone: '', email: 'a@b.co', isPrimary: true }],
+      contacts: [
+        {
+          duty: 'OUTBOUND',
+          name: '박담당',
+          phone: '',
+          email: 'a@b.co',
+          isPrimary: true,
+          deptName: '물류팀',
+          positionName: '',
+          notify: false,
+        },
+      ],
     })
     const saved = await prisma.customer.findUniqueOrThrow({
       where: { id: BigInt(created.id) },
@@ -222,6 +233,14 @@ describe('거래처 등록 · 수정', () => {
     expect(saved.contacts.map((c) => [c.duty, c.name, c.isPrimary])).toEqual([
       ['OUTBOUND', '박담당', 'Y'],
     ])
+    // 부서·직책·알림 수신·등록자 (담당자 표 공통 모양, 0084 ④-3) — 빈 직책은 null
+    expect(saved.contacts[0]).toMatchObject({
+      deptName: '물류팀',
+      positionName: null,
+      notifyYn: 'N',
+      createdBy: 'boss',
+      updatedBy: 'boss',
+    })
     // 기본 납품처: 코드는 거래처코드-01 자동 체번(0084), 이름 그대로, 주소 동기화, 권역 자동으로 이천센터
     expect(saved.shipTos).toHaveLength(1)
     expect(saved.shipTos[0]).toMatchObject({

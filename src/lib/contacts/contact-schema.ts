@@ -1,9 +1,10 @@
 import { z } from 'zod'
-import { isYes } from '@/lib/yn'
+import { isYes, toYn } from '@/lib/yn'
 import {
   exactlyOne,
   optionalEmail,
   optionalPhone,
+  optionalText,
   requireOneOf,
 } from '@/lib/validation/common-fields'
 
@@ -26,6 +27,10 @@ export const contactSchema = z
     phone: optionalPhone,
     email: optionalEmail,
     isPrimary: z.boolean(),
+    // 부서·직책·알림 수신 (담당자 표 4개 공통 모양, 0084 ④-3) — 안 보내면 빈 값·알림 받음
+    deptName: optionalText(50).default(null),
+    positionName: optionalText(50).default(null),
+    notify: z.boolean().default(true),
   })
   .superRefine(requireOneOf(['phone', 'email'], '연락처와 이메일 중 하나는 입력해 주세요.'))
 
@@ -43,10 +48,17 @@ export const EMPTY_CONTACT: ContactInput = {
   phone: '',
   email: '',
   isPrimary: false,
+  deptName: '',
+  positionName: '',
+  // 알림 수신 기본은 받음 (DB 기본 'Y')
+  notify: true,
 }
 
-// 저장한 담당자 줄 (DB: 빈 칸 null, 대표 여부 'Y'/'N')
-type ContactRow = Omit<ContactData, 'isPrimary'> & { isPrimary: string }
+// 저장한 담당자 줄 (DB: 빈 칸 null, 대표·알림 여부 'Y'/'N')
+type ContactRow = Omit<ContactData, 'isPrimary' | 'notify'> & {
+  isPrimary: string
+  notifyYn: string
+}
 
 // 저장한 담당자 → 입력값 (빈 칸은 빈 글자, 대표 여부는 true/false)
 export const toContactInput = ({
@@ -55,10 +67,23 @@ export const toContactInput = ({
   phone,
   email,
   isPrimary,
+  deptName,
+  positionName,
+  notifyYn,
 }: ContactRow): ContactInput => ({
   duty,
   name,
   phone: phone ?? '',
   email: email ?? '',
   isPrimary: isYes(isPrimary),
+  deptName: deptName ?? '',
+  positionName: positionName ?? '',
+  notify: isYes(notifyYn),
+})
+
+// 입력값 → DB 칸 (대표·알림 여부는 'Y'/'N')
+export const contactFields = ({ isPrimary, notify, ...contact }: ContactData) => ({
+  ...contact,
+  isPrimary: toYn(isPrimary),
+  notifyYn: toYn(notify),
 })

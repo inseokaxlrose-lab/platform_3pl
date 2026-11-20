@@ -26,7 +26,9 @@ export type SubTableColumn<TRow> = {
   // 넓은 화면의 칸 너비 (CSS grid 너비, 예: '9rem', '1fr', 'minmax(8rem,1fr)'). 기본 '1fr'
   width?: string
   // 입력 부품 종류 (기본 'text'). 그 밖의 입력은 render로 직접 그린다
-  input?: 'text' | 'phone' | 'email' | { codeGroup: string }
+  // checkbox: 값이 true/false인 칸 (예: 알림 수신). 옆 글자는 checkLabel
+  input?: 'text' | 'phone' | 'email' | 'checkbox' | { codeGroup: string }
+  checkLabel?: string
   render?: (cell: SubTableCell<TRow>) => React.ReactNode
 }
 
@@ -98,6 +100,21 @@ export function EditableSubTable<TRow extends Record<string, unknown>>({
       disabled,
     }
     if (column.render) return column.render(cell)
+    if (column.input === 'checkbox') {
+      return (
+        <label htmlFor={cell.id} className="flex h-9 items-center gap-1.5 text-xs">
+          <input
+            type="checkbox"
+            id={cell.id}
+            className="size-4 accent-primary"
+            checked={row[column.key] === true}
+            disabled={disabled}
+            onChange={(e) => update(index, { [column.key]: e.target.checked } as Partial<TRow>)}
+          />
+          {column.checkLabel}
+        </label>
+      )
+    }
     const common = {
       id: cell.id,
       value: cell.value,

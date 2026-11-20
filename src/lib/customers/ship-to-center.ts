@@ -86,6 +86,12 @@ const REASON_MESSAGE: Record<CenterConfirmReason, string> = {
 
 const INACTIVE_CENTER = ['SUSPENDED', 'CLOSED']
 
+// 원본 우편번호가 숫자 5자리면 그대로, 아니면(옛 6자리 등) null
+const fiveDigitZip = (raw: string | null | undefined) => {
+  const digits = raw?.replace(/\D/g, '') ?? ''
+  return /^\d{5}$/.test(digits) ? digits : null
+}
+
 export async function assignShipToCenter(
   db: Db,
   input: AssignShipToInput,
@@ -106,8 +112,8 @@ export async function assignShipToCenter(
   const base = {
     rawZipCode: input.rawZipCode,
     rawAddress: input.rawAddress,
-    // 정제 실패(F)면 원본을 그대로 주소에 둔다
-    zipCode: norm.zipCode ?? (input.rawZipCode?.replace(/\D/g, '').slice(0, 10) || null),
+    // 정제 실패(F)면 원본을 그대로 주소에 둔다. 우편번호 칸은 5자리 숫자만(CHAR(5) 검사, 0084 ④-2) — 아니면 비우고 원본은 raw_zip_cd에
+    zipCode: norm.zipCode ?? fiveDigitZip(input.rawZipCode),
     address: (norm.roadAddress ?? input.rawAddress).slice(0, 200),
     addressDetail: input.addressDetail ?? norm.detailAddress ?? null,
     addressJibun: norm.jibunAddress?.slice(0, 200) ?? null,

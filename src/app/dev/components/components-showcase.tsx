@@ -28,6 +28,7 @@ import {
   WeekdaySelect,
 } from '@/components/inputs'
 import {
+  contactExtraColumns,
   EditableSubTable,
   Field,
   FormGrid,
@@ -312,6 +313,10 @@ const demoSchema = z.object({
           phone: optionalPhone,
           email: optionalEmail,
           isPrimary: z.boolean(),
+          // 체크 칸 예시 (input: 'checkbox')
+          deptName: z.string(),
+          positionName: z.string(),
+          notify: z.boolean(),
         })
         .superRefine(requireOneOf(['phone', 'email'], '연락처와 이메일 중 하나는 입력해 주세요.')),
     )
@@ -402,8 +407,18 @@ function FormSample() {
                 { key: 'name', label: '담당자명', required: true, width: '8rem' },
                 { key: 'phone', label: '연락처', width: '10rem', input: 'phone' },
                 { key: 'email', label: '이메일', input: 'email' },
+                ...contactExtraColumns(),
               ]}
-              createRow={() => ({ duty: '', name: '', phone: '', email: '', isPrimary: false })}
+              createRow={() => ({
+                duty: '',
+                name: '',
+                phone: '',
+                email: '',
+                isPrimary: false,
+                deptName: '',
+                positionName: '',
+                notify: true,
+              })}
               maxRows={5}
               primary={{ key: 'isPrimary', label: '대표' }}
               errors={errors}

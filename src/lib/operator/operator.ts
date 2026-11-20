@@ -3,8 +3,8 @@ import { ActionError } from '@/lib/actions/action-error'
 import { assertCodeValues } from '@/lib/common-code/common-codes'
 import { prisma } from '@/lib/prisma'
 import { assertRowVersion, withVersionGuard } from '@/lib/row-version'
-import { toYn } from '@/lib/yn'
 import { CONTACT_ROLE_GROUP, type OperatorSelfData } from './operator-schema'
+import { contactFields } from '@/lib/contacts/contact-schema'
 
 // 운영사 정보 (docs/specs/operator.md, decisions 0024·0039·0040)
 // 운영사는 플랫폼이 등록한다 (register-operator.ts). 여기서는 읽기·고치기·상태 변경
@@ -56,8 +56,7 @@ export async function saveOperator(
     await tx.operatorContact.deleteMany({ where: { operatorId } })
     await tx.operatorContact.createMany({
       data: contacts.map((contact, index) => ({
-        ...contact,
-        isPrimary: toYn(contact.isPrimary),
+        ...contactFields(contact),
         operatorId,
         sortOrder: index,
       })),

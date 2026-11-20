@@ -3,7 +3,7 @@
 > 이 문서는 `npm run db:doc`가 실제 DB 구조와 `prisma/schema.prisma`의 주석으로 만든다. **손으로 고치지 않는다** — 마이그레이션을 적용한 뒤 명령을 다시 돌린다.
 > 엑셀 판: `docs/db/DB_테이블정의서.xlsx` · 이름 규칙: `docs/db-conventions.md`
 
-테이블 67개 · 칼럼 1051개
+테이블 67개 · 칼럼 1072개
 
 ## 목차
 
@@ -16,10 +16,10 @@
 | 인증·권한 | [`tb_user`](#tb_user) | User |  |
 | 인증·권한 | [`tb_user_center`](#tb_user_center) | UserCenter | 센터 직원 ↔ 소속 센터 (한 직원이 여러 센터를 맡을 수 있다) 직원이 소속된 센터는 지울 수 없다 (Restrict) |
 | 인증·권한 | [`tb_user_favorite_menu`](#tb_user_favorite_menu) | UserFavoriteMenu | 사용자별 사이드바 즐겨찾기 메뉴 (docs/decisions/0022) 메뉴는 주소(href)로 구분한다 (메뉴 목록: src/config/navigation.ts). 추가한 순서(createdAt)대로 보여준다 권한이 사라지거나 목록에서 없어진 메뉴는 화면에서만 숨기고 기록은 남긴다 (권한이 돌아오면 다시 보임) |
-| 인증·권한 | [`tb_user_grid_setting`](#tb_user_grid_setting) | UserGridSetting |  |
+| 인증·권한 | [`tb_user_grid_setting`](#tb_user_grid_setting) | UserGridSetting | 사용자별 목록 그리드 설정: 사용자 + 그리드 이름(DataGrid id) 하나에 한 줄 (docs/decisions/0021) settings 모양은 src/components/data-grid/settings.ts의 gridSettingsSchema (읽을 때 검사, 깨지면 기본값) (화면이 기억하는 그 밖의 고르기 값은 tb_user_pref — 두 표는 용도가 달라 따로 둔다, 0084 ④-3 M17) |
 | 인증·권한 | [`tb_user_perm_group`](#tb_user_perm_group) | UserPermissionGroup | 사용자 ↔ 권한그룹 (한 사용자가 여러 그룹에 속할 수 있다) 사용자가 남아 있는 그룹은 지울 수 없다 (Restrict): 실수로 여러 사람의 권한이 사라지는 것을 막는다 |
 | 인증·권한 | [`tb_user_perm_override`](#tb_user_perm_override) | UserPermissionOverride | 사용자별 권한 예외: 같은 사용자·같은 코드에는 하나만 (추가와 제외가 동시에 있을 수 없다) |
-| 인증·권한 | [`tb_user_pref`](#tb_user_pref) | UserPref | 사용자별 목록 그리드 설정: 사용자 + 그리드 이름(DataGrid id) 하나에 한 줄 (docs/decisions/0021) settings 모양은 src/components/data-grid/settings.ts의 gridSettingsSchema (읽을 때 검사, 깨지면 기본값) 사용자 개인 설정 (docs/decisions/0056): 화면이 기억하는 고르기 값 (예: 라벨 인쇄 양식·코드 종류) 키는 코드에 정한 것만 (src/lib/prefs/user-prefs.ts), 값은 키마다 입력 규칙으로 검사한다 |
+| 인증·권한 | [`tb_user_pref`](#tb_user_pref) | UserPref | 사용자 개인 설정 (docs/decisions/0056): 화면이 기억하는 고르기 값 (예: 라벨 인쇄 양식·코드 종류) 키는 코드에 정한 것만 (src/lib/prefs/user-prefs.ts), 값은 키마다 입력 규칙으로 검사한다 |
 | 인증·권한 | [`tb_verification`](#tb_verification) | Verification |  |
 | 운영사·조직 | [`tb_operator`](#tb_operator) | Operator | 운영사 (docs/specs/operator.md, docs/decisions/0024·0039·0040): 플랫폼을 쓰는 3PL 회사 운영사마다 센터·화주사·공통코드·사용자를 따로 가진다. [1차] = DB·화면, [2차] = DB만(기본값) — 화면은 이후 플랫폼이 정하는 코드(유형·상태·사업자 구분·과세·요금제 등)는 상수 src/config/operator-codes.ts + DB 검사 조건 |
 | 운영사·조직 | [`tb_operator_contact`](#tb_operator_contact) | OperatorContact | 운영사 담당자 [1차] (최대 5명, 화면에서 정한 순서대로). 감사 칸 없이 운영사 이력으로 본다 (0038, 사용자 결정) |
@@ -232,6 +232,7 @@
 ## tb_user_grid_setting
 
 - 영역: 인증·권한 · 모델: `UserGridSetting`
+- 사용자별 목록 그리드 설정: 사용자 + 그리드 이름(DataGrid id) 하나에 한 줄 (docs/decisions/0021) settings 모양은 src/components/data-grid/settings.ts의 gridSettingsSchema (읽을 때 검사, 깨지면 기본값) (화면이 기억하는 그 밖의 고르기 값은 tb_user_pref — 두 표는 용도가 달라 따로 둔다, 0084 ④-3 M17)
 
 | No | 칼럼 | 한글명 | 설명 | 타입 | NULL | 기본값 | 키 |
 | --- | --- | --- | --- | --- | --- | --- | --- |
@@ -274,7 +275,7 @@
 ## tb_user_pref
 
 - 영역: 인증·권한 · 모델: `UserPref`
-- 사용자별 목록 그리드 설정: 사용자 + 그리드 이름(DataGrid id) 하나에 한 줄 (docs/decisions/0021) settings 모양은 src/components/data-grid/settings.ts의 gridSettingsSchema (읽을 때 검사, 깨지면 기본값) 사용자 개인 설정 (docs/decisions/0056): 화면이 기억하는 고르기 값 (예: 라벨 인쇄 양식·코드 종류) 키는 코드에 정한 것만 (src/lib/prefs/user-prefs.ts), 값은 키마다 입력 규칙으로 검사한다
+- 사용자 개인 설정 (docs/decisions/0056): 화면이 기억하는 고르기 값 (예: 라벨 인쇄 양식·코드 종류) 키는 코드에 정한 것만 (src/lib/prefs/user-prefs.ts), 값은 키마다 입력 규칙으로 검사한다
 
 | No | 칼럼 | 한글명 | 설명 | 타입 | NULL | 기본값 | 키 |
 | --- | --- | --- | --- | --- | --- | --- | --- |
@@ -403,7 +404,7 @@
 
 | No | 칼럼 | 한글명 | 설명 | 타입 | NULL | 기본값 | 키 |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| 1 | `contact_id` | 담당자 ID |  | BIGINT | N | 자동 증가 | PK |
+| 1 | `operator_contact_id` | 운영사 담당자 ID |  | BIGINT | N | 자동 증가 | PK |
 | 2 | `operator_id` | 운영사 ID | 운영사 (멀티테넌트 키 — 다른 운영사 데이터는 보이지 않는다, 0039) | BIGINT | N |  | UK FK → tb_operator.operator_id |
 | 3 | `sort_seq` | 정렬순서 | 정렬 순서 | INTEGER | N |  |  |
 | 4 | `role_cd` | 역할 코드 | 담당 업무: 운영사 공통코드 CONTACT_ROLE의 코드 (예: INBOUND, 0030) | VARCHAR(20) | N |  |  |
@@ -411,9 +412,13 @@
 | 6 | `tel_no` | 전화 번호 |  | VARCHAR(15) | Y |  |  |
 | 7 | `email` | 이메일 |  | VARCHAR(100) | Y |  |  |
 | 8 | `primary_yn` | 대표 여부 | 대표 담당자 (담당자가 있으면 정확히 1명) | CHAR(1) | N | N |  |
-| 9 | `dept_nm` | 부서 명 | [2차] 부서·직책·알림 수신 | VARCHAR(50) | Y |  |  |
+| 9 | `dept_nm` | 부서 명 | 부서·직책·알림 수신 | VARCHAR(50) | Y |  |  |
 | 10 | `notify_yn` | 알림 여부 |  | CHAR(1) | N | Y |  |
 | 11 | `position_nm` | 직위 명 |  | VARCHAR(50) | Y |  |  |
+| 12 | `created_at` | 등록 일시 | 감사 칸 (담당자 표 4개 같은 모양, 0084 ④-3): 등록·수정자는 prisma.ts가 채운다 | TIMESTAMP(3) | N | CURRENT_TIMESTAMP |  |
+| 13 | `updated_at` | 수정 일시 | 수정 일시 (자동) | TIMESTAMP(3) | N | CURRENT_TIMESTAMP |  |
+| 14 | `created_by` | 등록 자 | 등록자 아이디 (자동: 작업자 / seed / system) | VARCHAR(50) | N | system |  |
+| 15 | `updated_by` | 수정 자 | 수정자 아이디 (자동) | VARCHAR(50) | N | system |  |
 
 **고유 인덱스**
 
@@ -585,7 +590,7 @@
 
 | No | 칼럼 | 한글명 | 설명 | 타입 | NULL | 기본값 | 키 |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| 1 | `contact_id` | 담당자 ID |  | BIGINT | N | 자동 증가 | PK |
+| 1 | `center_contact_id` | 센터 담당자 ID |  | BIGINT | N | 자동 증가 | PK |
 | 2 | `center_id` | 센터 ID |  | BIGINT | N |  | UK FK → tb_center.center_id |
 | 3 | `sort_seq` | 정렬순서 | 정렬 순서 | INTEGER | N |  |  |
 | 4 | `role_cd` | 역할 코드 | 담당 업무: 운영사 공통코드 CENTER_CONTACT_ROLE의 코드 (예: MANAGER) | VARCHAR(20) | N |  |  |
@@ -593,10 +598,10 @@
 | 6 | `tel_no` | 전화 번호 |  | VARCHAR(15) | Y |  |  |
 | 7 | `email` | 이메일 |  | VARCHAR(100) | Y |  |  |
 | 8 | `primary_yn` | 대표 여부 |  | CHAR(1) | N | N |  |
-| 9 | `dept_nm` | 부서 명 | [2차] 부서·직책·알림 수신 | VARCHAR(50) | Y |  |  |
+| 9 | `dept_nm` | 부서 명 | 부서·직책·알림 수신 | VARCHAR(50) | Y |  |  |
 | 10 | `position_nm` | 직위 명 |  | VARCHAR(50) | Y |  |  |
 | 11 | `notify_yn` | 알림 여부 |  | CHAR(1) | N | Y |  |
-| 12 | `created_at` | 등록 일시 | 감사 칸: 저장 함수가 채운다 (버전은 센터에서 검사) | TIMESTAMP(3) | N | CURRENT_TIMESTAMP |  |
+| 12 | `created_at` | 등록 일시 | 감사 칸 (담당자 표 4개 같은 모양, 0084 ④-3): 등록·수정자는 prisma.ts가 채운다 | TIMESTAMP(3) | N | CURRENT_TIMESTAMP |  |
 | 13 | `updated_at` | 수정 일시 | 수정 일시 (자동) | TIMESTAMP(3) | N | CURRENT_TIMESTAMP |  |
 | 14 | `created_by` | 등록 자 | 등록자 아이디 (자동: 작업자 / seed / system) | VARCHAR(50) | N | system |  |
 | 15 | `updated_by` | 수정 자 | 수정자 아이디 (자동) | VARCHAR(50) | N | system |  |
@@ -1277,7 +1282,7 @@
 
 | No | 칼럼 | 한글명 | 설명 | 타입 | NULL | 기본값 | 키 |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| 1 | `contact_id` | 담당자 ID |  | BIGINT | N | 자동 증가 | PK |
+| 1 | `shipper_contact_id` | 화주사 담당자 ID |  | BIGINT | N | 자동 증가 | PK |
 | 2 | `shipper_id` | 화주사 ID |  | BIGINT | N |  | UK FK → tb_shipper.shipper_id |
 | 3 | `sort_seq` | 정렬순서 | 정렬 순서 | INTEGER | N |  |  |
 | 4 | `role_cd` | 역할 코드 |  | VARCHAR(20) | N |  |  |
@@ -1286,6 +1291,13 @@
 | 7 | `email` | 이메일 |  | VARCHAR(100) | Y |  |  |
 | 8 | `primary_yn` | 대표 여부 |  | CHAR(1) | N | N |  |
 | 9 | `if_contact_yn` | 연동 담당자 여부 |  | CHAR(1) | N | N |  |
+| 10 | `dept_nm` | 부서 명 | 부서·직책·알림 수신 | VARCHAR(50) | Y |  |  |
+| 11 | `position_nm` | 직위 명 |  | VARCHAR(50) | Y |  |  |
+| 12 | `notify_yn` | 알림 여부 |  | CHAR(1) | N | Y |  |
+| 13 | `created_at` | 등록 일시 | 감사 칸 (담당자 표 4개 같은 모양, 0084 ④-3): 등록·수정자는 prisma.ts가 채운다 | TIMESTAMP(3) | N | CURRENT_TIMESTAMP |  |
+| 14 | `updated_at` | 수정 일시 | 수정 일시 (자동) | TIMESTAMP(3) | N | CURRENT_TIMESTAMP |  |
+| 15 | `created_by` | 등록 자 | 등록자 아이디 (자동: 작업자 / seed / system) | VARCHAR(50) | N | system |  |
+| 16 | `updated_by` | 수정 자 | 수정자 아이디 (자동) | VARCHAR(50) | N | system |  |
 
 **고유 인덱스**
 
@@ -1300,6 +1312,7 @@
 
 - `tb_shipper_contact_if_contact_yn_check`: `CHECK (if_contact_yn IN ('Y', 'N')`
 - `tb_shipper_contact_if_email_check`: `CHECK ((if_contact_yn = 'N') OR (email IS NOT NULL))`
+- `tb_shipper_contact_notify_yn_check`: `CHECK (notify_yn IN ('Y', 'N')`
 - `tb_shipper_contact_primary_yn_check`: `CHECK (primary_yn IN ('Y', 'N')`
 - `tb_shipper_contact_tel_no_check`: `CHECK ((tel_no IS NULL) OR ((tel_no) ~ '^[0-9]{8,15}$'))`
 
@@ -1533,6 +1546,9 @@
 | 36 | `raw_zip_cd` | 원본 우편번호 | 주소: 원본(입력·연동 그대로)은 보존하고 정제 결과는 따로 (0082) | VARCHAR(10) | Y |  |  |
 | 37 | `source_cd` | 출처 코드 | 연동 정보 (읽기 전용): 등록 경로 DATA_SOURCE, 최근 연동 | VARCHAR(20) | N | SCREEN |  |
 | 38 | `customer_cust_cd` | 거래처 사용자정의코드 | 사용자 정의 코드 (화주 시스템의 거래처코드), 화주 안에서 고유 (값이 있을 때) | VARCHAR(50) | Y |  | UK |
+| 39 | `sigungu_nm` | 시군구 명 | 주소 정제 결과 (납품처와 같은 칸 묶음, 0084 ④-3) | VARCHAR(50) | Y |  |  |
+| 40 | `bd_mgt_sn` | 건물관리번호 |  | VARCHAR(30) | Y |  |  |
+| 41 | `addr_norm_method_cd` | 주소 정제 방식 코드 |  | VARCHAR(20) | Y |  |  |
 
 **고유 인덱스**
 
@@ -1564,7 +1580,7 @@
 
 | No | 칼럼 | 한글명 | 설명 | 타입 | NULL | 기본값 | 키 |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| 1 | `contact_id` | 담당자 ID |  | BIGINT | N | 자동 증가 | PK |
+| 1 | `customer_contact_id` | 거래처 담당자 ID |  | BIGINT | N | 자동 증가 | PK |
 | 2 | `customer_id` | 거래처 ID |  | BIGINT | N |  | UK FK → tb_customer.customer_id |
 | 3 | `sort_seq` | 정렬순서 | 정렬 순서 | INTEGER | N |  |  |
 | 4 | `role_cd` | 역할 코드 |  | VARCHAR(20) | N |  |  |
@@ -1572,6 +1588,13 @@
 | 6 | `tel_no` | 전화 번호 |  | VARCHAR(15) | Y |  |  |
 | 7 | `email` | 이메일 |  | VARCHAR(100) | Y |  |  |
 | 8 | `primary_yn` | 대표 여부 |  | CHAR(1) | N | N |  |
+| 9 | `dept_nm` | 부서 명 | 부서·직책·알림 수신 | VARCHAR(50) | Y |  |  |
+| 10 | `position_nm` | 직위 명 |  | VARCHAR(50) | Y |  |  |
+| 11 | `notify_yn` | 알림 여부 |  | CHAR(1) | N | Y |  |
+| 12 | `created_at` | 등록 일시 | 감사 칸 (담당자 표 4개 같은 모양, 0084 ④-3): 등록·수정자는 prisma.ts가 채운다 | TIMESTAMP(3) | N | CURRENT_TIMESTAMP |  |
+| 13 | `updated_at` | 수정 일시 | 수정 일시 (자동) | TIMESTAMP(3) | N | CURRENT_TIMESTAMP |  |
+| 14 | `created_by` | 등록 자 | 등록자 아이디 (자동: 작업자 / seed / system) | VARCHAR(50) | N | system |  |
+| 15 | `updated_by` | 수정 자 | 수정자 아이디 (자동) | VARCHAR(50) | N | system |  |
 
 **고유 인덱스**
 
@@ -1583,6 +1606,7 @@
 
 **검사 조건**
 
+- `tb_customer_contact_notify_yn_check`: `CHECK (notify_yn IN ('Y', 'N')`
 - `tb_customer_contact_primary_yn_check`: `CHECK (primary_yn IN ('Y', 'N')`
 
 ## tb_ship_to

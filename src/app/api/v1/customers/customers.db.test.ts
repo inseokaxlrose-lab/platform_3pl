@@ -490,3 +490,27 @@ describe('조회 키 (0084)', () => {
     })
   })
 })
+
+describe('우편번호 (0084 ④-2)', () => {
+  it('정제하지 못한 납품처의 옛 6자리 우편번호는 우편번호 칸을 비우고 원본만 남긴다', async () => {
+    const res = await post([
+      customer({
+        customerCd: 'OLDZIP',
+        shipTos: [
+          {
+            shipToCd: 'S1',
+            shipToNm: '옛 주소',
+            zipCd: '135-080',
+            addr1: '없는시 없는구 없는로 1',
+          },
+        ],
+      }),
+    ])
+    expect(res.body.items[0]).toMatchObject({
+      result: 'CREATED',
+      shipTos: [{ shipToCd: 'S1', result: 'CREATED', centerAssignStatus: 'NEED_CONFIRM' }],
+    })
+    const saved = await prisma.shipTo.findFirstOrThrow({ where: { code: 'S1' } })
+    expect(saved).toMatchObject({ zipCode: null, rawZipCode: '135-080', addressGrade: 'F' })
+  })
+})

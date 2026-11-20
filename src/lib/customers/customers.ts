@@ -2,7 +2,7 @@ import 'server-only'
 import { ActionError } from '@/lib/actions/action-error'
 import { currentActor, requireOperatorId } from '@/lib/actor'
 import { assertCodeValues } from '@/lib/common-code/common-codes'
-import { CONTACT_ROLE_GROUP } from '@/lib/contacts/contact-schema'
+import { CONTACT_ROLE_GROUP, contactFields } from '@/lib/contacts/contact-schema'
 import { deleteExternalCodes } from '@/lib/master-code/external-codes'
 import { isAutoPattern, issueCode, issueCodes } from '@/lib/numbering/numbering'
 import { prisma, type Db } from '@/lib/prisma'
@@ -98,7 +98,8 @@ async function assertCodes(
   )
 }
 
-// 거래처 주소 정제 (바뀌었을 때만): 원본은 그대로 두고 등급·지번·법정동을 채운다
+// 거래처 주소 정제 (바뀌었을 때만): 원본은 그대로 두고 등급·지번·법정동·시군구·건물관리번호·정제 방법을 채운다
+// (납품처와 같은 정제 결과 칸 묶음, 0084 ④-3)
 async function customerAddressFields(
   db: Db,
   data: CustomerData,
@@ -111,6 +112,9 @@ async function customerAddressFields(
       ...raw,
       addressGrade: null,
       addressNormAt: null,
+      addressNormMethod: null,
+      sigunguName: null,
+      bdMgtSn: null,
       addressJibun: data.addressJibun,
       regionCode: data.regionCode,
     }
@@ -122,10 +126,19 @@ async function customerAddressFields(
     { address: data.address, zipCode: data.zipCode },
     { searcher },
   )
+  const sigungu = norm.sigunguCode
+    ? await db.regionBjd.findFirst({
+        where: { sigunguCode: norm.sigunguCode },
+        select: { sigunguName: true },
+      })
+    : null
   return {
     ...raw,
     addressGrade: norm.grade,
     addressNormAt: new Date(),
+    addressNormMethod: norm.method,
+    sigunguName: sigungu?.sigunguName ?? null,
+    bdMgtSn: norm.bdMgtSn,
     addressJibun: norm.jibunAddress?.slice(0, 200) ?? data.addressJibun,
     regionCode: norm.bjdCode ?? data.regionCode,
   }
@@ -143,8 +156,7 @@ function fieldsOf(data: CustomerData) {
 
 const contactRows = (customerId: bigint, contacts: CustomerData['contacts']) =>
   contacts.map((contact, index) => ({
-    ...contact,
-    isPrimary: toYn(contact.isPrimary),
+    ...contactFields(contact),
     customerId,
     sortOrder: index,
   }))

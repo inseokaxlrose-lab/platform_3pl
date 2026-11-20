@@ -13,14 +13,15 @@ import {
   PhoneInput,
 } from '@/components/inputs'
 import {
+  contactExtraColumns,
   EditableSubTable,
   Field,
-  FormGrid,
-  MasterFormPage,
-  useMasterForm,
   type FieldSpan,
+  FormGrid,
   type MasterFormHeader,
+  MasterFormPage,
   type MasterFormSection,
+  useMasterForm,
 } from '@/components/master-form'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -464,6 +465,7 @@ export function CustomerForm({
           { key: 'name', label: '담당자명', required: true, width: '8rem' },
           { key: 'phone', label: '연락처', width: '10rem', input: 'phone' },
           { key: 'email', label: '이메일', input: 'email' },
+          ...contactExtraColumns(),
         ]}
         createRow={() => ({ ...EMPTY_CONTACT })}
         maxRows={MAX_CUSTOMER_CONTACTS}
