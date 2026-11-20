@@ -3,7 +3,7 @@
 > 이 문서는 `npm run db:doc`가 실제 DB 구조와 `prisma/schema.prisma`의 주석으로 만든다. **손으로 고치지 않는다** — 마이그레이션을 적용한 뒤 명령을 다시 돌린다.
 > 엑셀 판: `docs/db/DB_테이블정의서.xlsx` · 이름 규칙: `docs/db-conventions.md`
 
-테이블 69개 · 칼럼 1106개
+테이블 70개 · 칼럼 1111개
 
 ## 목차
 
@@ -24,6 +24,7 @@
 | 운영사·조직 | [`tb_operator`](#tb_operator) | Operator | 운영사 (docs/specs/operator.md, docs/decisions/0024·0039·0040): 플랫폼을 쓰는 3PL 회사 운영사마다 센터·화주사·공통코드·사용자를 따로 가진다. [1차] = DB·화면, [2차] = DB만(기본값) — 화면은 이후 플랫폼이 정하는 코드(유형·상태·사업자 구분·과세·요금제 등)는 상수 src/config/operator-codes.ts + DB 검사 조건 |
 | 운영사·조직 | [`tb_operator_contact`](#tb_operator_contact) | OperatorContact | 운영사 담당자 [1차] (최대 5명, 화면에서 정한 순서대로). 감사 칸 없이 운영사 이력으로 본다 (0038, 사용자 결정) |
 | 운영사·조직 | [`tb_operator_service`](#tb_operator_service) | OperatorService | 운영사 제공 서비스 [2차]: 운영사 공통코드 SERVICE_TYPE (운영사 이력으로 본다) |
+| 운영사·조직 | [`tb_operator_setting`](#tb_operator_setting) | OperatorSetting | 운영사 설정 (docs/decisions/0092): 키-값. 키 목록·기본값·검사 규칙은 src/config/operator-settings.ts 행이 없으면 기본값을 쓴다. 값은 JSON (숫자·글자·예/아니오·비움) |
 | 운영사·조직 | [`tb_operator_temp_zone`](#tb_operator_temp_zone) | OperatorTempZone | 운영사 취급 온도대 [2차]: TEMP_ZONE (AMBIENT·CHILLED·FROZEN·CONSTANT, 상수 + 검사 조건) |
 | 운영사·조직 | [`tb_operator_unit`](#tb_operator_unit) | OperatorUnit | 운영사별 단위 설정 (docs/decisions/0079): 시스템 기본 단위를 운영사마다 사용 여부·소수 자리수 바꾼 단위만 줄이 생긴다 (줄이 없으면 시스템 단위의 값). 운영사 추가 단위는 자기 칸을 쓴다 실제 값 = 이 줄의 값 ?? 단위의 값 (src/lib/units/unit-status.ts) |
 | 센터·창고·로케이션 | [`tb_center`](#tb_center) | Center | 센터: 운영사의 물류센터 (docs/decisions/0026) 코드 (0025·0084): id(내부) / code(사용자 코드, 같은 운영사 안에서 중복 금지, 필수) / 외부 코드(ExternalCode) |
@@ -449,6 +450,19 @@
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | 1 | `operator_id` | 운영사 ID | 운영사 (멀티테넌트 키 — 다른 운영사 데이터는 보이지 않는다, 0039) | BIGINT | N |  | PK FK → tb_operator.operator_id |
 | 2 | `service_cd` | 서비스 코드 |  | VARCHAR(20) | N |  | PK |
+
+## tb_operator_setting
+
+- 영역: 운영사·조직 · 모델: `OperatorSetting`
+- 운영사 설정 (docs/decisions/0092): 키-값. 키 목록·기본값·검사 규칙은 src/config/operator-settings.ts 행이 없으면 기본값을 쓴다. 값은 JSON (숫자·글자·예/아니오·비움)
+
+| No | 칼럼 | 한글명 | 설명 | 타입 | NULL | 기본값 | 키 |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| 1 | `operator_id` | 운영사 ID | 운영사 (멀티테넌트 키 — 다른 운영사 데이터는 보이지 않는다, 0039) | BIGINT | N |  | PK FK → tb_operator.operator_id |
+| 2 | `setting_key` | setting 키 |  | VARCHAR(50) | N |  | PK |
+| 3 | `setting_value` | setting 가액 |  | JSONB | N |  |  |
+| 4 | `updated_at` | 수정 일시 | 수정 일시 (자동) | TIMESTAMP(3) | N | CURRENT_TIMESTAMP |  |
+| 5 | `updated_by` | 수정 자 | 수정자 아이디 (자동) | VARCHAR(50) | N | system |  |
 
 ## tb_operator_temp_zone
 
