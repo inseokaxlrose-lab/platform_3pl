@@ -1,6 +1,7 @@
 import {
   BoxesIcon,
   HashIcon,
+  SlidersHorizontalIcon,
   BuildingIcon,
   ClipboardCheckIcon,
   ClipboardListIcon,
@@ -281,6 +282,14 @@ const adminNavigation: NavArea = {
           icon: HashIcon,
           ready: true,
           permission: 'system.numbering.read',
+        },
+        {
+          // 운영 설정 (0092): 운영사가 바꾸는 키-값 설정
+          title: '운영 설정',
+          href: '/admin/system/settings',
+          icon: SlidersHorizontalIcon,
+          ready: true,
+          permission: 'system.settings.read',
         },
         {
           title: '자료 추출',
