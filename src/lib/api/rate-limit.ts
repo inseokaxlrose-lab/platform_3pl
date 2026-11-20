@@ -19,9 +19,9 @@ export async function consumeRateLimit(
 ): Promise<RateLimitResult> {
   const windowStart = new Date(Math.floor(now.getTime() / 60_000) * 60_000)
   const rows = await prisma.$queryRaw<{ req_cnt: number }[]>`
-    INSERT INTO tb_api_rate_bucket (api_client_id, window_start, req_cnt)
+    INSERT INTO tb_api_rate_bucket (api_client_id, window_start_at, req_cnt)
     VALUES (${apiClientId}, ${windowStart}, 1)
-    ON CONFLICT (api_client_id, window_start)
+    ON CONFLICT (api_client_id, window_start_at)
     DO UPDATE SET req_cnt = tb_api_rate_bucket.req_cnt + 1
     RETURNING req_cnt`
   const count = Number(rows[0].req_cnt)
