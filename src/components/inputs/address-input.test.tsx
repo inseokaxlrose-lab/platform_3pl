@@ -54,7 +54,7 @@ describe('toAddress (검색 결과 → 저장할 주소)', () => {
       // 지번주소도 함께 (따로 저장하는 화면용, 0040)
       jibunAddress: '경기 성남시 분당구 백현동 532',
       regionCode: '4113510900',
-      // 지역명 '시·도 시·군·구' (센터 region_nm, 0073)
+      // 지역명 '시·도 시·군·구' (센터 sigungu_nm, 0073)
       regionName: '경기 성남시 분당구',
     })
     expect(toAddress({ ...RESULT, apartment: 'Y' }).address).toBe(

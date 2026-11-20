@@ -166,7 +166,7 @@ model PermissionGroup {
 
 // 권한그룹에 들어 있는 권한 코드 (그룹을 지우면 함께 지워진다)
 model PermissionGroupPermission {
-  groupId        BigInt          @map("group_id")
+  groupId        BigInt          @map("perm_group_id")
   permissionCode String          @map("perm_cd")
   group          PermissionGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
 
@@ -178,7 +178,7 @@ model PermissionGroupPermission {
 // 사용자가 남아 있는 그룹은 지울 수 없다 (Restrict): 실수로 여러 사람의 권한이 사라지는 것을 막는다
 model UserPermissionGroup {
   userId    BigInt          @map("user_id")
-  groupId   BigInt          @map("group_id")
+  groupId   BigInt          @map("perm_group_id")
   createdAt DateTime        @default(now()) @map("created_at")
   user      User            @relation(fields: [userId], references: [id], onDelete: Cascade)
   group     PermissionGroup @relation(fields: [groupId], references: [id], onDelete: Restrict)
@@ -244,7 +244,7 @@ model Center {
   address              String?   @map("addr1") @db.VarChar(200)
   addressDetail        String?   @map("addr2") @db.VarChar(200)
   addressJibun         String?   @map("addr_jibun") @db.VarChar(200)
-  regionName           String?   @map("region_nm") @db.VarChar(50)
+  regionName           String?   @map("sigungu_nm") @db.VarChar(50)
   latitude             Decimal?  @db.Decimal(10, 7)
   longitude            Decimal?  @db.Decimal(10, 7)
   phone                String?   @map("tel_no") @db.VarChar(15)
@@ -281,9 +281,9 @@ model Center {
   inboundCutoffTime    DateTime? @map("inbound_cutoff_time") @db.Time(0)
   shipCutoffTime       DateTime? @map("ship_cutoff_time") @db.Time(0)
   // 기본 로케이션 3개: 센터 생성·보정 때 입고대기·출고대기·반품대기 창고의 DEFAULT를 연결 (ensureCenterDefaults)
-  defaultInboundLocId  BigInt?   @map("default_inbound_loc_id")
-  defaultOutboundLocId BigInt?   @map("default_outbound_loc_id")
-  defaultReturnLocId   BigInt?   @map("default_return_loc_id")
+  defaultInboundLocId  BigInt?   @map("default_inbound_location_id")
+  defaultOutboundLocId BigInt?   @map("default_outbound_location_id")
+  defaultReturnLocId   BigInt?   @map("default_return_location_id")
   defaultInboundLoc    Location? @relation("CenterDefaultInbound", fields: [defaultInboundLocId], references: [id], onDelete: Restrict)
   defaultOutboundLoc   Location? @relation("CenterDefaultOutbound", fields: [defaultOutboundLocId], references: [id], onDelete: Restrict)
   defaultReturnLoc     Location? @relation("CenterDefaultReturn", fields: [defaultReturnLocId], references: [id], onDelete: Restrict)
@@ -414,7 +414,7 @@ model Warehouse {
   // 여러 창고에 재고가 있을 때 작은 값 먼저 (1~999)
   allocPriority      Int        @default(100) @map("alloc_priority")
   // 로케이션을 정하지 않고 적치할 때 쓰는 곳 (시스템 기본 창고는 DEFAULT 로케이션)
-  defaultLocId       BigInt?    @map("default_loc_id")
+  defaultLocId       BigInt?    @map("default_location_id")
   defaultLocation    Location?  @relation("WarehouseDefaultLocation", fields: [defaultLocId], references: [id], onDelete: Restrict)
   // ④ 관리·담당 [2차]
   managerUserId      BigInt?    @map("manager_user_id")
@@ -423,8 +423,8 @@ model Warehouse {
   dedicatedShipperId BigInt?    @map("dedicated_shipper_id")
   dedicatedShipper   Shipper?   @relation(fields: [dedicatedShipperId], references: [id], onDelete: Restrict)
   // 로케이션 일괄 생성 때 쓰는 접두어·구분자 (구분자가 없으면 '-')
-  locCodePrefix      String?    @map("loc_cd_prefix") @db.VarChar(10)
-  locCodeSeparator   String?    @map("loc_cd_separator") @db.Char(1)
+  locCodePrefix      String?    @map("location_cd_prefix") @db.VarChar(10)
+  locCodeSeparator   String?    @map("location_cd_separator") @db.Char(1)
   // ⑤ 확장
   remark             String?    @db.VarChar(1000)
   extAttr            Json?      @map("ext_attr")
@@ -512,7 +512,7 @@ model Location {
   // 목록 코드 옆 보조 문구 (예전 명칭 칸, 0071)
   description         String?     @db.VarChar(200)
   // 공통코드 LOC_TYPE
-  locType             String      @default("RACK") @map("loc_type_cd") @db.VarChar(20)
+  locType             String      @default("RACK") @map("location_type_cd") @db.VarChar(20)
   status              String      @default("ACTIVE") @map("status_cd") @db.VarChar(20)
   // 시스템 기본 로케이션 (시스템 기본 창고의 DEFAULT): 사용 중지·삭제 불가
   systemYn            String      @default("N") @map("system_yn") @db.Char(1)
@@ -1046,7 +1046,7 @@ enum ExternalEntityType {
 // 업무 표에는 코드 글자(CodeItem.code)를 그대로 저장한다 (예: 담당자 업무 'INBOUND')
 
 model CodeGroup {
-  id          BigInt     @id @default(autoincrement()) @map("group_id")
+  id          BigInt     @id @default(autoincrement()) @map("code_group_id")
   // 운영사 (멀티테넌트: 같은 운영사 사람만 보고 고친다, docs/decisions/0039)
   operatorId  BigInt     @map("operator_id")
   operator    Operator   @relation(fields: [operatorId], references: [id], onDelete: Restrict)
@@ -1079,10 +1079,10 @@ model CodeItem {
   // 운영사 (멀티테넌트: 같은 운영사 사람만 보고 고친다, docs/decisions/0039)
   operatorId  BigInt    @map("operator_id")
   operator    Operator  @relation(fields: [operatorId], references: [id], onDelete: Restrict)
-  groupId     BigInt    @map("group_id")
+  groupId     BigInt    @map("code_group_id")
   // 코드: 그룹 안에서 중복 금지, 등록 후 변경 불가 (업무 표에 이 글자가 저장되므로)
-  code        String    @map("code_item_cd")
-  name        String    @map("code_item_nm")
+  code        String    @map("code_cd")
+  name        String    @map("code_nm")
   description String?
   sortOrder   Int       @default(0) @map("sort_seq")
   // 사용 중지: 새로 고를 때만 숨기고, 이미 저장된 값은 이름으로 계속 보여준다
@@ -1099,7 +1099,7 @@ model CodeItem {
   // 논리 삭제: 'Y'면 지운 것 (목록·조회에서 빠지고 되살릴 수 있다, 0038)
   delYn String @default("N") @map("del_yn") @db.Char(1)
 
-  @@unique([groupId, code], where: raw("del_yn = 'N'"), map: "tb_code_item_group_id_code_item_cd_key")
+  @@unique([groupId, code], where: raw("del_yn = 'N'"), map: "tb_code_item_code_group_id_code_cd_key")
   @@index([groupId, sortOrder])
   @@index([operatorId])
   @@map("tb_code_item")
@@ -1256,7 +1256,7 @@ model Item {
   palletTypeCode String? @map("pallet_type_cd") @db.VarChar(20)
   palletTi       Int?    @map("pallet_ti")
   palletHi       Int?    @map("pallet_hi")
-  palletBoxQty   Int?    @map("pallet_box_qty")
+  palletBoxQty   Int?    @map("pallet_box_cnt")
 
   // ── ④ 보관 조건
   tempZone       String   @default("AMBIENT") @map("temp_zone_cd") @db.VarChar(20)
@@ -1265,7 +1265,7 @@ model Item {
   hazmatYn       String   @default("N") @map("hazmat_yn") @db.Char(1)
   hazmatClass    String?  @map("hazmat_class_cd") @db.VarChar(20)
   fragileYn      String   @default("N") @map("fragile_yn") @db.Char(1)
-  maxStackBox    Int?     @map("max_stack_box")
+  maxStackBox    Int?     @map("max_stack_box_cnt")
   uprightYn      String   @default("N") @map("upright_yn") @db.Char(1)
   abcClass       String?  @map("abc_class_cd") @db.VarChar(5)
 
@@ -1278,7 +1278,7 @@ model Item {
   minInboundShelfDays  Int?       @map("min_inbound_shelf_days")
   minOutboundShelfDays Int?       @map("min_outbound_shelf_days")
   // 임박 알림 기준일 (잔여일이 이보다 짧으면 "임박")
-  expiryAlertDays      Int?       @map("expiry_alert_day_cnt")
+  expiryAlertDays      Int?       @map("expiry_alert_days")
   useLot               String     @default("N") @map("lot_mgmt_yn") @db.Char(1)
   lotSource            String?    @map("lot_source_cd") @db.VarChar(20)
   useSerial            String     @default("N") @map("serial_mgmt_yn") @db.Char(1)
@@ -1344,7 +1344,7 @@ model ItemUnit {
   // 단위 레벨 (상수 UNIT_LEVEL): BASE 기본 · INNER 내포장 · BOX 박스 · PLT 팔레트 — 품목마다 레벨별 1행 (0083)
   level         String   @default("BOX") @map("unit_level_cd") @db.VarChar(10)
   // 기본단위 환산수량: 이 단위 1개 = 기본단위 n개 (BASE는 1)
-  convQty       Decimal  @map("conv_cnt") @db.Decimal(18, 3)
+  convQty       Decimal  @map("conv_qty") @db.Decimal(18, 3)
   // 규격 (저장은 cm·kg 고정, 화면은 운영사 표시 단위로 — 0078). CBM은 가로·세로·높이로 자동 계산
   widthCm       Decimal? @map("width_cm") @db.Decimal(8, 2)
   depthCm       Decimal? @map("depth_cm") @db.Decimal(8, 2)
@@ -1481,7 +1481,7 @@ model Customer {
   addressDetail String?   @map("addr2") @db.VarChar(200)
   addressJibun  String?   @map("addr_jibun") @db.VarChar(200)
   // 법정동코드 10자리 (정제 결과)
-  regionCode    String?   @map("region_cd") @db.Char(10)
+  regionCode    String?   @map("bjd_cd") @db.Char(10)
   // 주소 정제 등급 A~F (0076 ADDR_GRADE)
   addressGrade  String?   @map("addr_grade") @db.Char(1)
   addressNormAt DateTime? @map("addr_norm_at")
@@ -1884,7 +1884,7 @@ model InboundReceiptLine {
   expiryOn     DateTime?         @map("expiry_dt") @db.Date
 
   // 확정 수량 (기본단위)과 그중 적치한 수량
-  qty        Decimal @map("confirm_qty") @db.Decimal(18, 3)
+  qty        Decimal @map("confirmed_qty") @db.Decimal(18, 3)
   putawayQty Decimal @default(0) @map("putaway_qty") @db.Decimal(18, 3)
 
   putaways Putaway[]
@@ -2385,7 +2385,7 @@ model ApiIdempotency {
 // 호출 한도 카운터: 키별 1분 구간마다 한 줄 (고정 구간, 지난 구간은 지움)
 model ApiRateBucket {
   apiClientId BigInt   @map("api_client_id")
-  windowStart DateTime @map("window_start")
+  windowStart DateTime @map("window_start_at")
   count       Int      @default(0) @map("req_cnt")
 
   @@id([apiClientId, windowStart])
