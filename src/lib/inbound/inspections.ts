@@ -1,4 +1,5 @@
 import 'server-only'
+import { assertCodeValues } from '@/lib/common-code/common-codes'
 import { resolveUnitDecimals } from '@/lib/units/unit-status'
 import { ActionError } from '@/lib/actions/action-error'
 import { currentActor, requireOperatorId } from '@/lib/actor'
@@ -54,6 +55,13 @@ export async function addInspection(data: InspectionData) {
       throw new ActionError('VALIDATION', `유통기한을 관리하지 않는 품목입니다 (${item.code}).`)
     }
 
+    // 불량 사유: 불량이 있을 때만 남긴다 (공통코드 검사, 0087)
+    const defectReasonCd =
+      /[1-9]/.test(defect.baseQty) && data.defectReasonCd ? data.defectReasonCd : null
+    if (defectReasonCd) {
+      await assertCodeValues(tx, 'DEFECT_REASON', [defectReasonCd], { label: '불량 사유' })
+    }
+
     const created = await tx.inboundInspection.create({
       data: {
         operatorId,
@@ -64,6 +72,7 @@ export async function addInspection(data: InspectionData) {
         expiryOn: data.expiryOn ? new Date(`${data.expiryOn}T00:00:00.000Z`) : null,
         inspectedQty: good.baseQty,
         defectQty: defect.baseQty,
+        defectReasonCd,
         entryUnit: good.entryUnit,
         entryQty: good.entryUnit && parseQty(data.qty) > 0n ? data.qty : null,
         remark: data.remark,

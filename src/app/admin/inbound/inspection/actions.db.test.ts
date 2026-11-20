@@ -72,8 +72,19 @@ const inspect = (overrides: Partial<InspectionInput>) =>
 
 describe('검수 등록', () => {
   it('단위 환산(BOX 2 = 48 EA)·불량·검수자, 첫 검수에 ASN은 검수중', async () => {
-    expect(await inspect({ unit: 'BOX', qty: '2', defectQty: '1' })).toMatchObject({ ok: true })
+    // 불량이 있으면 불량 사유 필수 (0087)
+    expect(await inspect({ unit: 'BOX', qty: '2', defectQty: '1' })).toMatchObject({
+      ok: false,
+      error: { fieldErrors: { defectReasonCd: ['불량 사유를 골라 주세요.'] } },
+    })
+    expect(
+      await inspect({ unit: 'BOX', qty: '2', defectQty: '1', defectReasonCd: 'NO_SUCH' }),
+    ).toMatchObject({ ok: false, error: { message: expect.stringContaining('불량 사유') } })
+    expect(
+      await inspect({ unit: 'BOX', qty: '2', defectQty: '1', defectReasonCd: 'PRODUCT_DAMAGE' }),
+    ).toMatchObject({ ok: true })
     const saved = await prisma.inboundInspection.findFirstOrThrow()
+    expect(saved.defectReasonCd).toBe('PRODUCT_DAMAGE')
     expect([
       saved.inspectedQty.toString(),
       saved.defectQty.toString(),
@@ -91,6 +102,7 @@ describe('검수 등록', () => {
       remainingQty: '100',
     })
     expect(work?.inspections).toHaveLength(1)
+    expect(work?.inspections[0]).toMatchObject({ defectReasonCd: 'PRODUCT_DAMAGE' })
   })
 
   it('로트·유통기한: 관리 품목은 필수, 관리하지 않는 품목은 거부. 수량은 둘 중 하나 이상', async () => {
@@ -115,7 +127,9 @@ describe('검수 등록', () => {
       error: { message: expect.stringContaining('정수만') },
     })
     // 불량만 있는 검수도 된다
-    expect(await inspect({ qty: '0', defectQty: '3' })).toMatchObject({ ok: true })
+    expect(await inspect({ qty: '0', defectQty: '3', defectReasonCd: 'ETC' })).toMatchObject({
+      ok: true,
+    })
   })
 
   it('마감된 ASN은 검수할 수 없다, 범위 밖이면 찾을 수 없다', async () => {

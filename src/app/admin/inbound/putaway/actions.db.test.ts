@@ -149,6 +149,7 @@ describe('적치', () => {
       await closeAsnAction({
         id: asnId,
         rowVersion: await versionOf('asn', asnId),
+        reasonCd: 'SHIPPER_CANCEL',
         reason: '잔량 취소',
       }),
     )

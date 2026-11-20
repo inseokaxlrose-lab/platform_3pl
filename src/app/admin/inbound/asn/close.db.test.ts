@@ -58,8 +58,11 @@ async function createAsn() {
   return result.data
 }
 
-const close = async (id: string, reason = '화주사 요청으로 잔량 취소') =>
-  closeAsnAction({ id, rowVersion: await versionOf('asn', id), reason })
+const close = async (
+  id: string,
+  reasonCd = 'SHIPPER_CANCEL',
+  reason = '화주사 요청으로 잔량 취소',
+) => closeAsnAction({ id, rowVersion: await versionOf('asn', id), reasonCd, reason })
 
 describe('잔량 마감', () => {
   it('사유·마감자·일시를 남기고, 줄마다 잔량을 마감 수량으로 (초과한 줄은 0)', async () => {
@@ -97,9 +100,16 @@ describe('잔량 마감', () => {
     const asn = await createAsn()
     expect(await close(asn.id, '  ')).toMatchObject({
       ok: false,
-      error: { code: 'VALIDATION', message: expect.stringContaining('사유') },
+      error: { code: 'VALIDATION', fieldErrors: { reasonCd: [expect.stringContaining('사유')] } },
     })
-    expect(await closeAsnAction({ id: asn.id, rowVersion: 99, reason: '취소' })).toMatchObject({
+    // 공통코드에 없는 사유는 거부 (0087)
+    expect(await close(asn.id, 'NO_SUCH')).toMatchObject({
+      ok: false,
+      error: { code: 'VALIDATION', message: expect.stringContaining('마감 사유') },
+    })
+    expect(
+      await closeAsnAction({ id: asn.id, rowVersion: 99, reasonCd: 'ETC', reason: '취소' }),
+    ).toMatchObject({
       ok: false,
       error: { code: 'CONFLICT' },
     })

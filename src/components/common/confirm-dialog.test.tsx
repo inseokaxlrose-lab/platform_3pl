@@ -50,6 +50,16 @@ describe('ConfirmDialog', () => {
     await waitFor(() => expect(onConfirm).toHaveBeenCalledWith('화주사 요청으로 잔량 취소'))
   })
 
+  it('사유 코드를 쓰면 코드를 고르기 전에는 확인할 수 없고, 글자 칸은 선택 메모가 된다 (0087)', () => {
+    renderDialog({ reason: { label: '마감 사유', codeGroup: 'ASN_CLOSE_REASON' } })
+
+    expect(screen.getByRole('button', { name: '마감' })).toHaveProperty('disabled', true)
+    expect(screen.getByRole('combobox', { name: /마감 사유/ })).toBeTruthy()
+    // 메모만 적어도 확인할 수 없다 (사유 코드가 필수)
+    fireEvent.change(screen.getByLabelText('메모'), { target: { value: '자세한 내용' } })
+    expect(screen.getByRole('button', { name: '마감' })).toHaveProperty('disabled', true)
+  })
+
   it('처리에 실패하면 닫히지 않고 오류 메시지를 보여준다', async () => {
     renderDialog({
       onConfirm: () => Promise.reject(new Error('이미 마감된 ASN입니다.')),

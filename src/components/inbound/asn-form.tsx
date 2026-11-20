@@ -4,7 +4,9 @@ import { BanIcon, Trash2Icon } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { useEffect, useMemo, useState } from 'react'
 import { ConfirmDialog, StatusBadge } from '@/components/common'
+import { useCodeOptions } from '@/components/common-code'
 import { DateInput, QtyInput, SearchSelect } from '@/components/inputs'
+import { codeName } from '@/lib/common-code'
 import {
   EditableSubTable,
   Field,
@@ -104,11 +106,13 @@ export function AsnForm({
   closeAction?: (input: {
     id: string
     rowVersion: number
+    reasonCd: string
     reason: string
   }) => Promise<ActionResult<unknown>>
   canClose?: boolean
 }) {
   const router = useRouter()
+  const closeReasons = useCodeOptions('ASN_CLOSE_REASON')
   const editable = !asn || asn.status === 'PLANNED'
   const initialShipper = asn?.shipperId ?? fixedShipperId ?? ''
   const form = useMasterForm({
@@ -460,9 +464,13 @@ export function AsnForm({
           <span className="text-muted-foreground">
             {asn.asnNo} · {labelOf(ASN_CHANNEL_LABELS, asn.channel)} · {asn.center}
           </span>
-          {asn.status === 'CLOSED' && asn.closeReason && (
+          {asn.status === 'CLOSED' && (asn.closeReasonCd || asn.closeReason) && (
             <span className="w-full text-muted-foreground">
-              마감 사유: {asn.closeReason} ({asn.closedBy})
+              마감 사유:{' '}
+              {[codeName(closeReasons, asn.closeReasonCd), asn.closeReason]
+                .filter(Boolean)
+                .join(' — ')}{' '}
+              ({asn.closedBy})
             </span>
           )}
           {canClose && closeAction && ['PLANNED', 'INSPECTING', 'PARTIAL'].includes(asn.status) && (
@@ -477,12 +485,17 @@ export function AsnForm({
               description="더 도착하지 않을 잔량을 마감합니다. 마감하면 더 검수·확정할 수 없고, 이미 확정된 재고의 적치는 계속할 수 있습니다."
               confirmLabel="잔량 마감"
               destructive
-              reason={{ label: '마감 사유', placeholder: '예: 화주사 요청으로 잔량 취소' }}
-              onConfirm={async (reason) => {
+              reason={{
+                label: '마감 사유',
+                codeGroup: 'ASN_CLOSE_REASON',
+                placeholder: '필요하면 자세한 내용을 적어 주세요',
+              }}
+              onConfirm={async (reason, reasonCd) => {
                 unwrap(
                   await closeAction({
                     id: asn.id,
                     rowVersion: asn.rowVersion,
+                    reasonCd: reasonCd ?? '',
                     reason: reason ?? '',
                   }),
                 )
