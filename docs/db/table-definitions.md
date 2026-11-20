@@ -3,7 +3,7 @@
 > 이 문서는 `npm run db:doc`가 실제 DB 구조와 `prisma/schema.prisma`의 주석으로 만든다. **손으로 고치지 않는다** — 마이그레이션을 적용한 뒤 명령을 다시 돌린다.
 > 엑셀 판: `docs/db/DB_테이블정의서.xlsx` · 이름 규칙: `docs/db-conventions.md`
 
-테이블 67개 · 칼럼 1086개
+테이블 67개 · 칼럼 1088개
 
 ## 목차
 
@@ -1555,6 +1555,7 @@
 | 39 | `sigungu_nm` | 시군구 명 | 주소 정제 결과 (납품처와 같은 칸 묶음, 0084 ④-3) | VARCHAR(50) | Y |  |  |
 | 40 | `bd_mgt_sn` | 건물관리번호 |  | VARCHAR(30) | Y |  |  |
 | 41 | `addr_norm_method_cd` | 주소 정제 방식 코드 |  | VARCHAR(20) | Y |  |  |
+| 42 | `customer_role_cd` | 거래처 역할 코드 | 역할 (0090): SALES 매출처(납품받는 곳) / PURCHASE 매입처(공급처, 납품처 없음) / BOTH 둘 다 | VARCHAR(20) | N | SALES |  |
 
 **고유 인덱스**
 
@@ -1573,6 +1574,7 @@
 - `tb_customer_addr_grade_check`: `CHECK (addr_grade IN ('A', 'B', 'C', 'D', 'F')`
 - `tb_customer_bjd_cd_check`: `CHECK ((bjd_cd IS NULL) OR (bjd_cd ~ '^[0-9]{10}$'))`
 - `tb_customer_customer_cd_check`: `CHECK ((customer_cd) ~ '^[A-Z0-9_-]{1,30}$')`
+- `tb_customer_customer_role_cd_check`: `CHECK ((customer_role_cd) IN ('SALES', 'PURCHASE', 'BOTH'))`
 - `tb_customer_del_yn_check`: `CHECK (del_yn IN ('Y', 'N')`
 - `tb_customer_order_addr_mode_cd_check`: `CHECK ((order_addr_mode_cd) IN ('SHIP_TO', 'ORDER_ADDR'))`
 - `tb_customer_shelf_check`: `CHECK (((COALESCE(min_shelf_days, 0) >= 0) AND (COALESCE(min_shelf_days, 0) <= 9999)) AND ((COALESCE(min_shelf_ratio, 0) >= 0) AND (COALESCE(min_shelf_ratio, 0) <= 100)))`
@@ -1938,6 +1940,7 @@
 | 20 | `row_version` | 행버전 | 동시 수정 막기용 버전 (수정할 때마다 +1, 0038) | INTEGER | N | 1 |  |
 | 21 | `del_yn` | 삭제여부 | 논리 삭제: 예정(PLANNED) 상태에서만 지울 수 있다 | CHAR(1) | N | N |  |
 | 22 | `close_reason_cd` | 마감 사유 코드 | 잔량 마감 (사유 필수, 마감자·일시) 잔량 마감 사유 코드 (공통코드 ASN_CLOSE_REASON, 0087) + 사유 메모 | VARCHAR(20) | Y |  |  |
+| 23 | `supplier_id` | supplier ID | 공급처 (0090): 같은 화주사의 매입처·둘 다 거래처 (선택) | BIGINT | Y |  | FK → tb_customer.customer_id |
 
 **고유 인덱스**
 
@@ -1948,6 +1951,7 @@
 - `tb_asn_center_id_asn_status_cd_idx`: `CREATE INDEX tb_asn_center_id_asn_status_cd_idx ON tb_asn (center_id, asn_status_cd)`
 - `tb_asn_operator_id_idx`: `CREATE INDEX tb_asn_operator_id_idx ON tb_asn (operator_id)`
 - `tb_asn_shipper_id_expected_dt_idx`: `CREATE INDEX tb_asn_shipper_id_expected_dt_idx ON tb_asn (shipper_id, expected_dt)`
+- `tb_asn_supplier_id_idx`: `CREATE INDEX tb_asn_supplier_id_idx ON tb_asn (supplier_id)`
 
 **검사 조건**
 
