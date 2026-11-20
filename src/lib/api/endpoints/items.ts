@@ -19,7 +19,7 @@ import {
   type ApiHandlerContext,
   type ApiHandlerResult,
 } from '../api-route'
-import { listQuerySchema } from './partners'
+import { listQuerySchema } from './customers'
 
 // 품목 API (docs/decisions/0083 ③, 정의서 7장) — 필드 대응: docs/api-item-fields.md
 //   POST /items           품목 upsert (단위·팔레트·바코드 포함, 최대 500건)

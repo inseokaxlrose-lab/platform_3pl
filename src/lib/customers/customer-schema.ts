@@ -151,7 +151,7 @@ const customerShape = {
   shipTos: shipTosSchema,
 }
 
-// 납품처가 없으면 거래처 주소 필수 (PARTNER_ADDRESS_REQUIRED)
+// 납품처가 없으면 거래처 주소 필수 (CUSTOMER_ADDRESS_REQUIRED)
 const requireAddressWithoutShipTo = (
   value: { shipTos: unknown[]; address: string | null; zipCode: string | null },
   ctx: z.RefinementCtx,
@@ -161,7 +161,7 @@ const requireAddressWithoutShipTo = (
       code: 'custom',
       path: ['address'],
       message: '납품처가 없으면 거래처 주소가 필요합니다. (이 주소로 기본 납품처를 만듭니다)',
-      params: { apiCode: 'PARTNER_ADDRESS_REQUIRED' },
+      params: { apiCode: 'CUSTOMER_ADDRESS_REQUIRED' },
     })
   }
 }

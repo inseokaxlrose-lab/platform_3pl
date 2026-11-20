@@ -41,12 +41,12 @@ export type ApiHandlerContext = {
   body: unknown
   // TEST 키 = 검증만 하고 저장하지 않는다 (writeTransaction이 되돌린다)
   dryRun: boolean
-  // 주소의 경로 값 (예: /partners/{partnerCd} → { partnerCd })
+  // 주소의 경로 값 (예: /customers/{customerCd} → { customerCd })
   params: Record<string, string>
 }
 
 type ApiRouteOptions = {
-  // 로그·호출 이력의 API 구분 (예: ME, PARTNER_UPSERT)
+  // 로그·호출 이력의 API 구분 (예: ME, CUSTOMER_UPSERT)
   apiCode: string
   // 필요한 권한 (없으면 키만 맞으면 됨)
   scope?: ApiScope
@@ -186,7 +186,7 @@ export async function writeTransaction<T>(ctx: ApiHandlerContext, fn: (tx: Db) =
 }
 
 // 라우트 핸들러 만들기: export const GET = apiRoute({ apiCode: 'ME', handler: … })
-// 경로 값이 있는 라우트(/partners/[partnerCd])는 Next가 두 번째 인자로 params를 준다
+// 경로 값이 있는 라우트(/customers/[customerCd])는 Next가 두 번째 인자로 params를 준다
 type RouteContext = { params?: Promise<Record<string, string | string[]>> }
 
 export function apiRoute(options: ApiRouteOptions) {

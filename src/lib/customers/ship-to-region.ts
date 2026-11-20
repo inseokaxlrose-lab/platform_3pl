@@ -114,7 +114,7 @@ export async function reassignShipTos(
       result.skipped.push({
         code: row.code,
         customerCode: row.customer.code,
-        reason: assigned.fields.centerConfirmReason ?? 'NOT_CLIENT_CENTER',
+        reason: assigned.fields.centerConfirmReason ?? 'NOT_SHIPPER_CENTER',
       })
       continue
     }

@@ -37,7 +37,7 @@ import {
   CUSTOMER_STATUS,
   DATA_SOURCE,
   ORDER_ADDR_MODE,
-  PARTNER_TYPE_GROUP,
+  CUSTOMER_TYPE_GROUP,
 } from '@/lib/customers/customer-codes'
 import type { CustomerForEdit, CustomerShipperOption } from '@/lib/customers/customer-queries'
 import {
@@ -241,7 +241,7 @@ export function CustomerForm({
           >
             <CodeSelect
               id={id('customerType')}
-              group={PARTNER_TYPE_GROUP}
+              group={CUSTOMER_TYPE_GROUP}
               value={value.customerType ?? ''}
               onChange={(customerType) => set({ customerType })}
               disabled={disabled}

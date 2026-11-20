@@ -289,7 +289,7 @@ describe('납품처 목록 · 일괄 처리', () => {
       data: {
         total: 2,
         assigned: 1,
-        skipped: [{ customerCode: 'G1', reason: 'NOT_CLIENT_CENTER' }],
+        skipped: [{ customerCode: 'G1', reason: 'NOT_SHIPPER_CENTER' }],
       },
     })
     expect(await shipToOf(dara1.id)).toMatchObject({
