@@ -108,7 +108,6 @@ export async function getWarehouseForEdit(id: bigint, scope: DataScope) {
   // 화면으로 보낼 값이라 키는 글자로
   return textIds({
     id: warehouse.id,
-    systemCode: warehouse.systemCode,
     // 동시 수정 막기: 저장할 때 이 버전을 함께 보낸다
     rowVersion: warehouse.rowVersion,
     status: warehouse.status,

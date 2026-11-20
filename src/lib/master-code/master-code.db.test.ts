@@ -1,5 +1,4 @@
 import { afterAll, beforeEach, describe, expect, it } from 'vitest'
-import { formatSystemCode } from '@/config/master-codes'
 import { ActionError } from '@/lib/actions/action-error'
 import { runInContext } from '@/lib/actor'
 import { prisma } from '@/lib/prisma'
@@ -10,7 +9,6 @@ import {
   getExternalCodes,
   saveExternalCodes,
 } from './external-codes'
-import { nextSystemCode } from './system-code'
 
 // 외부 코드 저장은 서버 액션 안(운영사 출입증)에서만 불린다 → 테스트 운영사 출입증을 달고 부른다
 const save = (...args: Parameters<typeof saveExternalCodes>) =>
@@ -22,31 +20,6 @@ beforeEach(async () => {
 
 afterAll(async () => {
   await prisma.$disconnect()
-})
-
-describe('시스템 코드', () => {
-  it('종류별 접두어 + 0을 채운 번호, 부를 때마다 커진다', async () => {
-    const first = await nextSystemCode('CENTER')
-    const second = await nextSystemCode('CENTER')
-    expect(first).toMatch(/^CT\d{6}$/)
-    expect(Number(second.slice(2))).toBe(Number(first.slice(2)) + 1)
-    expect(await nextSystemCode('ITEM')).toMatch(/^IT\d{8}$/)
-  })
-
-  it('동시에 여러 건을 받아도 겹치지 않는다', async () => {
-    const codes = await Promise.all(Array.from({ length: 20 }, () => nextSystemCode('WAREHOUSE')))
-    expect(new Set(codes).size).toBe(20)
-  })
-
-  it('트랜잭션 안에서도 받을 수 있다', async () => {
-    const code = await prisma.$transaction((tx) => nextSystemCode('SHIPPER', tx))
-    expect(code).toMatch(/^SH\d{6}$/)
-  })
-
-  it('번호 모양 만들기', () => {
-    expect(formatSystemCode('CENTER', 1)).toBe('CT000001')
-    expect(formatSystemCode('CUSTOMER', BigInt(1234))).toBe('CU00001234')
-  })
 })
 
 describe('외부 코드 매핑', () => {

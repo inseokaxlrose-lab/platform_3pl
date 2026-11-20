@@ -88,7 +88,6 @@ describe('센터 등록', () => {
   it('준비중으로 시작, 대기 창고 3개·DEFAULT 로케이션을 만들고 기본 로케이션 3칸을 연결한다', async () => {
     const center = await create()
 
-    expect(center.systemCode).toMatch(/^CT\d{6}$/)
     expect(center.code).toBe('ICN')
     const saved = await prisma.center.findUniqueOrThrow({ where: { id: BigInt(center.id) } })
     expect(saved).toMatchObject({ status: 'PREPARING', workDays: 'YYYYYNN', bondedYn: 'N' })
@@ -137,16 +136,12 @@ describe('센터 등록', () => {
     ])
   })
 
-  it('센터코드: 필수, 소문자는 대문자로, 중복·시스템 코드 모양·영문 대문자·숫자 외는 거부', async () => {
+  it('센터코드: 필수, 소문자는 대문자로, 중복·영문 대문자·숫자 외는 거부', async () => {
     expect((await create({ code: 'gmh1' })).code).toBe('GMH1')
     await create({ code: 'ICN' })
     expect(await createCenterAction(input({ code: 'icn' }))).toMatchObject({
       ok: false,
       error: { code: 'CONFLICT', message: expect.stringContaining('ICN') },
-    })
-    expect(await createCenterAction(input({ code: 'CT000999' }))).toMatchObject({
-      ok: false,
-      error: { code: 'VALIDATION', message: expect.stringContaining('시스템 코드 모양') },
     })
     expect(await createCenterAction(input({ code: 'ICN-1', name: '' }))).toMatchObject({
       ok: false,

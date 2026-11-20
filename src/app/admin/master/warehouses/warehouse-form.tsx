@@ -312,14 +312,6 @@ export function WarehouseForm(props: WarehouseFormProps) {
               disabled={disabled}
             />
           </Field>
-          <Field label="시스템 코드" span={3} htmlFor={id('systemCode')}>
-            <Input
-              id={id('systemCode')}
-              value={editing?.systemCode ?? '저장하면 자동으로 부여됩니다'}
-              disabled
-              readOnly
-            />
-          </Field>
           {text('description', '설명', 12, {
             maxLength: 200,
             placeholder: '목록에서 코드 옆에 작게 보입니다',

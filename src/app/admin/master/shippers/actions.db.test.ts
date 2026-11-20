@@ -18,6 +18,7 @@ import {
   createTestCodeGroup,
   createTestShipper,
   createTestUser,
+  systemUnit,
   versionOf,
 } from '@/test/factories'
 import { createInboundFixture } from '@/test/inbound-fixtures'
@@ -67,8 +68,16 @@ const center = (centerId: bigint, extra: Partial<ShipperInput['centers'][number]
   ...extra,
 })
 
+// 부를 때마다 다른 코드 접두어 (같은 운영사 안 중복 금지 — AA, AB, …)
+const PREFIX_SECOND = 'ABCDEFGHJKLMNPQRSTUVWXYZ'
+let prefixSeq = 0
+const nextPrefix = () => 'A' + PREFIX_SECOND[prefixSeq++ % PREFIX_SECOND.length]
+
 const input = (overrides: Partial<ShipperInput> = {}): ShipperInput => ({
   code: '',
+  codePrefix: nextPrefix(),
+  custCode: '',
+  ifKeyType: 'CODE',
   name: '가나식품',
   nameEn: '',
   shortName: '',
@@ -152,10 +161,61 @@ afterAll(async () => {
   await prisma.$disconnect()
 })
 
+describe('화주사 코드 3층 (0084)', () => {
+  it('코드 접두어·사용자 정의 코드는 같은 운영사 안에서 중복 금지', async () => {
+    await create({ code: 'GANA', codePrefix: 'GN', custCode: 'ERP-1' })
+    expect(await createShipperAction(input({ code: 'DARA', codePrefix: 'GN' }))).toMatchObject({
+      ok: false,
+      error: { code: 'CONFLICT', message: expect.stringContaining('코드 접두어') },
+    })
+    expect(await createShipperAction(input({ code: 'DARA', custCode: 'ERP-1' }))).toMatchObject({
+      ok: false,
+      error: { code: 'CONFLICT', message: expect.stringContaining('사용자 정의 코드') },
+    })
+    // 헷갈리는 글자(I·O·0·1)는 접두어로 쓸 수 없다
+    expect(await createShipperAction(input({ code: 'DARA', codePrefix: 'IO' }))).toMatchObject({
+      ok: false,
+      error: { code: 'VALIDATION' },
+    })
+  })
+
+  it('화주사 코드는 바꿀 수 없고, 거래처·품목 코드가 발행되면 접두어도 잠긴다', async () => {
+    const shipper = await create({ code: 'GANA', codePrefix: 'GN' })
+    const update = async (overrides: Partial<ShipperInput>) =>
+      updateShipperAction({
+        id: shipper.id,
+        rowVersion: await versionOf('shipper', shipper.id),
+        ...input({ code: 'GANA', codePrefix: 'GN', ...overrides }),
+      })
+    expect(await update({ code: 'GANA2' })).toMatchObject({
+      ok: false,
+      error: { code: 'VALIDATION' },
+    })
+    // 아직 하위 코드가 없으면 접두어를 바꿀 수 있다
+    expect(await update({ codePrefix: 'GA' })).toMatchObject({ ok: true })
+    // 품목 하나가 생기면 (지워져도) 접두어를 바꿀 수 없다
+    await prisma.item.create({
+      data: {
+        operatorId: TEST_OPERATOR_ID,
+        shipperId: BigInt(shipper.id),
+        code: 'SKU-1',
+        name: '품목',
+        baseUnitId: (await systemUnit('EA')).id,
+      },
+    })
+    expect(await update({ codePrefix: 'GB' })).toMatchObject({
+      ok: false,
+      error: { message: expect.stringContaining('접두어') },
+    })
+  })
+})
+
 describe('화주사 등록·수정 (0080)', () => {
   it('새 화주는 준비중, 운영 설정은 운영사 값 따름(NULL), 하나뿐인 이용 센터는 자동 기본', async () => {
     const shipper = await create({ shipperType: 'ECOMMERCE' })
-    expect(shipper.systemCode).toMatch(/^SH\d{6}$/)
+    // 코드를 비우면 자동 체번 SH + 4자리 (0084)
+    expect(shipper.code).toBe('SH0001')
+    expect((await create()).code).toBe('SH0002')
     const saved = await prisma.shipper.findUniqueOrThrow({
       where: { id: BigInt(shipper.id) },
       include: { centers: true, contacts: true },
@@ -237,9 +297,9 @@ describe('화주사 등록·수정 (0080)', () => {
       ok: false,
       error: { code: 'CONFLICT' },
     })
-    expect(await createShipperAction(input({ code: 'SH000999' }))).toMatchObject({
+    expect(await createShipperAction(input({ code: 'SH0999' }))).toMatchObject({
       ok: false,
-      error: { message: expect.stringContaining('시스템 코드 모양') },
+      error: { message: expect.stringContaining('자동 체번 모양') },
     })
     await prisma.center.update({
       where: { id: gmhId },

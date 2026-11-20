@@ -25,7 +25,6 @@ export function WarehouseSummary({
                 {w.name} <span className="text-muted-foreground">({w.code})</span>
               </p>
               <p className="text-xs text-muted-foreground">
-                {w.systemCode} ·{' '}
                 {TEMP_ZONE.labels[w.tempZone as keyof typeof TEMP_ZONE.labels] ?? w.tempZone} ·
                 로케이션 {w.locationCount}개
               </p>

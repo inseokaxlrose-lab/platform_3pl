@@ -12,7 +12,6 @@ import { changeCentersStatusAction, listCentersAction } from './actions'
 
 type Row = {
   id: string
-  systemCode: string
   code: string
   name: string
   type: string
@@ -41,7 +40,7 @@ const SEARCH_FIELDS: SearchFieldDef[] = [
     label: '검색어',
     type: 'keyword',
     span: 4,
-    placeholder: '센터코드·시스템 코드·센터명·약칭',
+    placeholder: '센터코드·센터명·약칭',
   },
   { key: 'status', label: '운영 상태', type: 'multi', options: CENTER_STATUS.options },
   { key: 'type', label: '센터 유형', type: 'multi', options: CENTER_TYPE.options },
@@ -69,14 +68,6 @@ const COLUMNS: DataGridColumn<Row>[] = [
     href: (row) => `/admin/master/centers/${row.id}`,
   },
   { id: 'name', header: '센터명', accessor: 'name', sortable: true, hideable: false, pinned: true },
-  {
-    id: 'systemCode',
-    header: '시스템 코드',
-    accessor: 'systemCode',
-    sortable: true,
-    align: 'center',
-    defaultHidden: true,
-  },
   { id: 'type', header: '유형', accessor: 'type', sortable: true, format: { status: TYPE_FORMAT } },
   {
     id: 'status',

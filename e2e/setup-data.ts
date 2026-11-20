@@ -22,7 +22,6 @@ async function main() {
         data: {
           operatorId: operator.id,
           shipperId: shipper.id,
-          systemCode: 'IT-E2E-1',
           code: E2E_ITEM.code,
           name: E2E_ITEM.name,
           baseUnitId: ea.id,
@@ -50,7 +49,6 @@ async function main() {
         data: {
           operatorId: operator.id,
           centerId: center.id,
-          systemCode: 'WH-E2E-1',
           code: E2E_LOCATION.warehouse,
           name: 'E2E 보관창고',
           tempZone: 'AMBIENT',

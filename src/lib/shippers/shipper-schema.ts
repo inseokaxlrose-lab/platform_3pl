@@ -150,9 +150,28 @@ const optionalDays = (max: number) =>
 // 상속 칸: null = 위 단계 값을 따른다
 const inheritableYn = z.boolean().nullable()
 
+// 거래처·품목 자동 체번 접두어 (0084): 영문 대문자 + 영문 대문자/숫자, I·O·0·1 제외 (숫자 1·0과 헷갈림)
+export const CODE_PREFIX_PATTERN = /^[A-HJ-NP-Z][A-HJ-NP-Z2-9]$/
+export const codePrefixField = z
+  .string()
+  .trim()
+  .toUpperCase()
+  .regex(CODE_PREFIX_PATTERN, '코드 접두어는 2글자입니다 (영문 대문자 + 영문·숫자, I·O·0·1 제외).')
+
+// 연동(API·엑셀)에서 거래처·납품처·품목을 찾는 키 (0084)
+export const IF_KEY_TYPES = ['CODE', 'CUST_CD'] as const
+export const IF_KEY_TYPE_LABELS: Record<(typeof IF_KEY_TYPES)[number], string> = {
+  CODE: '우리 코드 (거래처·품목코드)',
+  CUST_CD: '사용자 정의 코드 (화주 시스템 코드)',
+}
+
 export const shipperShape = {
-  // 사용자 코드: 비우면 시스템 코드 (0025)
+  // 화주사 코드: 비우면 자동 체번 SH0001, 등록 후 바꿀 수 없음 (0084)
   code: userCodeField('화주사 코드'),
+  codePrefix: codePrefixField,
+  // 사용자 정의 코드 (운영사 ERP 코드 등)
+  custCode: optionalText(50),
+  ifKeyType: z.enum(IF_KEY_TYPES, '연동 조회 키를 골라 주세요.'),
   // ① 기본 정보
   name: requiredText('화주사명을 입력해 주세요.', 100),
   nameEn: optionalText(100),

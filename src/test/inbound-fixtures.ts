@@ -35,7 +35,6 @@ export async function createInboundFixture() {
       data: {
         operatorId: TEST_OPERATOR_ID,
         shipperId,
-        systemCode: `IT-T-${code}`,
         code,
         name: code,
         baseUnitId,
@@ -51,7 +50,6 @@ export async function createInboundFixture() {
       data: {
         operatorId: TEST_OPERATOR_ID,
         centerId,
-        systemCode: `WH-T-${code}`,
         code,
         name: code,
         tempZone: 'AMBIENT',

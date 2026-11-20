@@ -9,7 +9,7 @@ import { ActionError } from '@/lib/actions/action-error'
 import { requireOperatorId } from '@/lib/actor'
 import { prisma } from '@/lib/prisma'
 import { EMPTY_EXTERNAL_CODES, type ExternalCodes } from './external-codes-schema'
-import type { Db } from './system-code'
+import type { Db } from '@/lib/prisma'
 
 // 외부 코드 매핑 (docs/decisions/0025)
 

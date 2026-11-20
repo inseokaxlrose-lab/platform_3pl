@@ -302,16 +302,6 @@ export function CenterForm({
               max={9999}
             />
           </Field>
-          {center && (
-            <Field
-              label="시스템 코드"
-              span={4}
-              htmlFor={id('system-code')}
-              hint="라벨·이력에 쓰는 바뀌지 않는 코드"
-            >
-              <Input id={id('system-code')} value={center.systemCode} disabled readOnly />
-            </Field>
-          )}
           {longText('remark', '비고')}
         </FormGrid>
       ),

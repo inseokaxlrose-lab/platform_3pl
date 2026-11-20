@@ -9,7 +9,6 @@
 // 이미 있는 계정은 비밀번호·소속을 덮어쓰지 않는다 (화면에서 바꾼 값을 지키기 위해)
 import 'dotenv/config'
 import { ensureCenterDefaults } from '../src/lib/centers/center-defaults'
-import { nextSystemCode } from '../src/lib/master-code/system-code'
 import { prisma } from '../src/lib/prisma'
 import { acrossOperators, runAsActor, runInContext } from '../src/lib/actor'
 import { toYn } from '../src/lib/yn'
@@ -137,20 +136,39 @@ const SAMPLE_CENTERS = [
 ]
 // 견본 화주사 (0035): 로트·유통기한을 쓰는 식품 화주사 / 안 쓰는 전자 화주사 — M3 완료 기준 확인용
 const SAMPLE_SHIPPERS = [
-  { code: 'GANA', name: '가나식품', useLot: true, useExpiry: true, centerCodes: ['ICN'] },
-  { code: 'DARA', name: '다라전자', useLot: false, useExpiry: false, centerCodes: ['ICN', 'GMH'] },
+  // 코드 접두어(거래처·품목 자동 체번)·사용자 정의 코드(운영사 ERP 코드 예시) — 0084
+  // 다라전자는 연동 조회 키를 사용자 정의 코드(CUST_CD)로 두어 두 방식을 모두 시험한다
+  {
+    code: 'GANA',
+    name: '가나식품',
+    codePrefix: 'GN',
+    custCode: 'ERP-1001',
+    useLot: true,
+    useExpiry: true,
+    centerCodes: ['ICN'],
+  },
+  {
+    code: 'DARA',
+    name: '다라전자',
+    codePrefix: 'DR',
+    custCode: 'ERP-1002',
+    ifKeyType: 'CUST_CD',
+    useLot: false,
+    useExpiry: false,
+    centerCodes: ['ICN', 'GMH'],
+  },
 ]
 
 // 예시 조직: 이미 있으면 건드리지 않는다 (화면에서 바꾼 이름을 덮어쓰지 않기 위해)
 async function seedSampleOrganizations(operatorId: bigint) {
   for (const center of SAMPLE_CENTERS) {
-    // 없을 때만 만든다 (시스템 코드는 시퀀스로 발급)
+    // 없을 때만 만든다
     const found =
       (await prisma.center.findUnique({
         where: { operatorId_code: { operatorId, code: center.code } },
       })) ??
       (await prisma.center.create({
-        data: { ...center, operatorId, systemCode: await nextSystemCode('CENTER') },
+        data: { ...center, operatorId },
       }))
     // 입고대기 창고 + 기본 로케이션 (이미 있으면 그대로)
     await ensureCenterDefaults(prisma, found.id)
@@ -171,7 +189,6 @@ async function seedSampleOrganizations(operatorId: bigint) {
           operatorId,
           useLot: toYn(shipper.useLot),
           useExpiry: toYn(shipper.useExpiry),
-          systemCode: await nextSystemCode('SHIPPER'),
           // 견본은 바로 입고를 받을 수 있게 운영중으로 (새로 등록하는 화주사는 준비중, 0080)
           status: 'ACTIVE',
           // 첫 센터가 기본 센터
@@ -260,7 +277,6 @@ async function seedSecondOperator() {
           operatorId,
           code: 'ICN',
           name: '나라 인천센터',
-          systemCode: await nextSystemCode('CENTER'),
         },
       }))
     await ensureCenterDefaults(prisma, center.id)

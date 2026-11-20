@@ -52,7 +52,6 @@ const EDIT_INPUT = withoutCode(
 const CENTER = {
   id: 'c1',
   code: 'ICN',
-  systemCode: 'CT000001',
   rowVersion: 3,
   status: 'ACTIVE',
   statusReason: null,

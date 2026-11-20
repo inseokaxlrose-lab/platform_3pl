@@ -1,10 +1,8 @@
 import 'server-only'
-import { looksLikeSystemCode } from '@/config/master-codes'
 import { TEMP_ZONE, type TempZoneKey } from '@/config/operator-codes'
 import { ActionError } from '@/lib/actions/action-error'
 import { requireOperatorId } from '@/lib/actor'
 import { assertCodeValues } from '@/lib/common-code/common-codes'
-import { nextSystemCode } from '@/lib/master-code/system-code'
 import { assertRowVersion, withVersionGuard } from '@/lib/row-version'
 import { prisma, type Db } from '@/lib/prisma'
 import { assertAllFound, assertNoCodeConflict } from '@/lib/soft-delete'
@@ -35,14 +33,8 @@ async function loadCenter(db: Db, centerId: bigint): Promise<Center> {
   return { ...center, tempZones: center.tempZones.map((z) => z.tempZoneCd) }
 }
 
-// 창고코드: 시스템 코드 모양 금지, 같은 센터 안 중복 금지
+// 창고코드: 같은 센터 안 중복 금지 (필수 입력 — 시스템 코드는 0084에서 없앰)
 async function assertWarehouseCode(db: Db, centerId: bigint, code: string) {
-  if (looksLikeSystemCode('WAREHOUSE', code)) {
-    throw new ActionError(
-      'VALIDATION',
-      `'${code}'는 시스템 코드 모양이라 창고코드로 쓸 수 없습니다.`,
-    )
-  }
   const owner = await db.warehouse.findUnique({
     where: { centerId_code: { centerId, code } },
     select: { id: true },
@@ -157,29 +149,27 @@ async function allocatableNotice(db: Db, centerId: bigint) {
     : null
 }
 
-// 등록 (한 트랜잭션: 시스템 코드 → 창고). 사용자가 만드는 창고는 시스템 기본 창고가 아니다
+// 등록. 사용자가 만드는 창고는 시스템 기본 창고가 아니다
 export async function createWarehouse(centerId: bigint, code: string, data: WarehouseCreateData) {
   return prisma.$transaction(async (tx) => {
     const center = await loadCenter(tx, centerId)
     await assertWarehouseCode(tx, centerId, code)
     assertFitsCenter(center, data)
     await assertReferences(tx, data, centerId)
-    const systemCode = await nextSystemCode('WAREHOUSE', tx)
     const warehouse = await tx.warehouse.create({
       data: {
         operatorId: requireOperatorId(),
         centerId,
-        systemCode,
         code,
         ...warehouseFields(data),
       },
-      select: { id: true, systemCode: true, code: true, rowVersion: true },
+      select: { id: true, code: true, rowVersion: true },
     })
     return { ...warehouse, zoneIds: undefined, notice: await allocatableNotice(tx, centerId) }
   })
 }
 
-// 수정: 센터·코드·시스템 코드는 바뀌지 않는다
+// 수정: 센터·코드는 바뀌지 않는다
 // rowVersion: 화면이 불러온 버전 (그 사이 다른 사람이 저장했으면 충돌)
 export async function updateWarehouse(id: bigint, rowVersion: number, data: WarehouseData) {
   return prisma.$transaction(async (tx) => {
