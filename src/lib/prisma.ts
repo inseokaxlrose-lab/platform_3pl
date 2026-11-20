@@ -33,6 +33,9 @@ export const AUDITED_MODELS: ReadonlySet<string> = new Set([
   'RegionCenterMap',
   // 화주 연동 API 키 (0081)
   'ApiClient',
+  // 운송사·운송 계약 (0094)
+  'Carrier',
+  'CarrierContract',
 ])
 
 // 등록·수정자만 있는 표 (버전 칸 없음): 담당자 표 4개 (0084 ④-3) — 버전은 부모(운영사·센터·화주사·거래처)에서 검사
@@ -60,6 +63,9 @@ export const SOFT_DELETE_MODELS: ReadonlySet<string> = new Set([
   'ShipTo',
   'PalletType',
   'Asn',
+  // 운송사·운송 계약 (0094)
+  'Carrier',
+  'CarrierContract',
 ])
 
 // 운영사 데이터가 들어가는 표 (operator_id가 있는 표, docs/decisions/0039)
@@ -107,6 +113,9 @@ export const TENANT_MODELS: ReadonlySet<string> = new Set([
   'FileLink',
   // 운영사 설정 (0092)
   'OperatorSetting',
+  // 운송사·운송 계약 (0094)
+  'Carrier',
+  'CarrierContract',
 ])
 
 type Data = Record<string, unknown>

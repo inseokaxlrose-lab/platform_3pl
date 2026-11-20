@@ -8,6 +8,7 @@ export const EXTERNAL_TARGETS = [
   'ITEM',
   'CUSTOMER',
   'UNIT',
+  'CARRIER',
 ] as const
 
 export type ExternalTarget = (typeof EXTERNAL_TARGETS)[number]
@@ -19,6 +20,7 @@ export const EXTERNAL_TARGET_LABELS: Record<ExternalTarget, string> = {
   ITEM: '품목',
   CUSTOMER: '거래처',
   UNIT: '단위',
+  CARRIER: '운송사',
 }
 
 // 대상마다 "소속" 칸에 보여 줄 것 (없으면 칸을 숨긴다)

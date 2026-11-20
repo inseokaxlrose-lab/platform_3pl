@@ -28,6 +28,12 @@ import {
 import { API_ENV, API_KEY_STATUS, API_LOG_RESULT, API_SCOPE } from '@/lib/api/api-codes'
 import { CENTER_STATUS, CENTER_TYPE } from '@/lib/centers/center-status'
 import {
+  CARRIER_STATUS,
+  CARRIER_TYPE,
+  INVOICE_CHECK_RULE,
+  SENDER_ADDR_TYPE,
+} from '@/lib/carriers/carrier-codes'
+import {
   CENTER_ASSIGN_STATUS,
   CENTER_ASSIGN_TYPE,
   CENTER_CONFIRM_REASON,
@@ -201,6 +207,12 @@ const VALUE_SETS: Record<string, readonly string[]> = {
   'tb_api_client_scope.scope_cd': API_SCOPE.values,
   'tb_api_client_event.event_cd': API_KEY_EVENT_VALUES,
   'tb_login_hist.result_cd': LOGIN_RESULT_VALUES,
+  // 운송사·운송 계약·화주 발송인 (0094)
+  'tb_carrier.carrier_type_cd': CARRIER_TYPE.values,
+  'tb_carrier.invoice_check_cd': INVOICE_CHECK_RULE.values,
+  'tb_carrier.status_cd': CARRIER_STATUS.values,
+  'tb_carrier_contract.status_cd': CARRIER_STATUS.values,
+  'tb_shipper.sender_addr_type_cd': SENDER_ADDR_TYPE.values,
   'tb_api_request_log.result_cd': API_LOG_RESULT.values,
   'tb_api_request_item.result_cd': API_ITEM_RESULT_VALUES,
 }

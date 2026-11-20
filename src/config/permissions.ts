@@ -64,6 +64,14 @@ export const PERMISSION_MENUS = {
     actions: ['read', 'update', 'export'],
   },
   'master.units': { label: '단위', group: '기준정보', area: 'admin', actions: CRUD },
+  // 운송사·운송 계약 (0094): 택배사 등 + 센터(·화주)별 계약(고객코드·송장 대역)
+  'master.carriers': { label: '운송사', group: '기준정보', area: 'admin', actions: CRUD },
+  'master.carrier-contracts': {
+    label: '운송 계약',
+    group: '기준정보',
+    area: 'admin',
+    actions: [...CRUD, 'export'],
+  },
   'master.shippers': {
     label: '화주사',
     group: '기준정보',
