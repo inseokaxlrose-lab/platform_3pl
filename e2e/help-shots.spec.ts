@@ -178,6 +178,27 @@ const SHOTS: Shot[] = [
   list('/admin/master/units'),
   // 팔레트 종류 (0083): 시스템 기본 T11·T12와 운영사 기본 표시
   list('/admin/master/pallet-types'),
+  // 운송사·운송 계약 (0094): 계약은 등록 화면 — 센터·운송사를 골라 송장 대역 안내가 보이게
+  list('/admin/master/carriers'),
+  {
+    src: '/help/admin/master/carrier-contracts/new.png',
+    url: '/admin/master/carrier-contracts/new',
+    account: 'admin',
+    prepare: async (page) => {
+      await page.locator('#contract-carrierId').click()
+      await page.getByRole('option', { name: /CJ대한통운/ }).click()
+      await page.locator('#contract-custNo').fill('30012345')
+      await page.locator('#contract-pickupBranch').fill('인천 집하점')
+      await page.locator('#contract-invoiceStart').fill('60000000000')
+      await page.locator('#contract-invoiceEnd').fill('60000009999')
+      await expect(page.getByTestId('invoice-hint')).toBeVisible()
+    },
+    markers: [
+      { label: '1', target: (page) => page.locator('#section-basic') },
+      { label: '2', target: (page) => page.locator('#section-invoice') },
+      { label: '3', target: pageActions },
+    ],
+  },
   {
     // 운영사 추가 단위 '근' (중량): 환산 섹션과 "1 근 = 0.6 KG" 미리보기가 보이게
     src: '/help/admin/master/units/new.png',
