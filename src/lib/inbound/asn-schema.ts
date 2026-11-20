@@ -36,6 +36,8 @@ export const asnLineSchema = z.object({
   qty: positiveQtyField(),
   lotNo: optionalText(50),
   expiryOn: optionalDate,
+  // 화주가 알려 준 제조일 (선택, 0089) — 제조일 입력 품목은 이것으로 유통기한을 계산한다
+  mfgOn: optionalDate.default(''),
   remark: optionalText(200),
 })
 
@@ -70,6 +72,7 @@ export const EMPTY_ASN_LINE: AsnLineInput = {
   qty: '',
   lotNo: '',
   expiryOn: '',
+  mfgOn: '',
   remark: '',
 }
 

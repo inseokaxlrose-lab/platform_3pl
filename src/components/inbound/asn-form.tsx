@@ -7,6 +7,7 @@ import { ConfirmDialog, StatusBadge } from '@/components/common'
 import { useCodeOptions } from '@/components/common-code'
 import { DateInput, QtyInput, SearchSelect } from '@/components/inputs'
 import { codeName } from '@/lib/common-code'
+import { addDays } from '@/lib/items/expiry-dates'
 import {
   EditableSubTable,
   Field,
@@ -300,7 +301,7 @@ export function AsnForm({
       id: 'lines',
       title: '입고 품목',
       description:
-        '수량은 고른 단위로 넣습니다. 로트·유통기한은 관리하는 품목만 적을 수 있고, 실제 값은 검수에서 확인합니다.',
+        '수량은 고른 단위로 넣습니다. 로트·제조일·유통기한은 관리하는 품목만 적을 수 있고, 실제 값은 검수에서 확인합니다.',
       content: (
         <EditableSubTable<AsnLineInput>
           name="lines"
@@ -319,7 +320,7 @@ export function AsnForm({
               key: 'itemId',
               label: '품목',
               required: true,
-              width: 'minmax(14rem,2fr)',
+              width: 'minmax(12rem,2fr)',
               render: ({ row, index, id: cellId, invalid, disabled: cellDisabled }) => (
                 <SearchSelect
                   id={cellId}
@@ -339,7 +340,8 @@ export function AsnForm({
                             // 기본은 기본단위, 관리하지 않는 로트·유통기한은 비운다
                             unit: item?.baseUnit.code ?? '',
                             lotNo: item?.useLot ? line.lotNo : '',
-                            expiryOn: item?.useExpiry ? line.expiryOn : '',
+                            expiryOn: item?.useExpiry && !item.mfgInput ? line.expiryOn : '',
+                            mfgOn: item?.useExpiry ? line.mfgOn : '',
                           }
                         : line,
                     )
@@ -408,7 +410,7 @@ export function AsnForm({
             {
               key: 'lotNo',
               label: '로트번호',
-              width: '8rem',
+              width: '7rem',
               render: ({ row, id: cellId, invalid, disabled: cellDisabled, onChange }) => (
                 <Input
                   id={cellId}
@@ -420,18 +422,40 @@ export function AsnForm({
               ),
             },
             {
-              key: 'expiryOn',
-              label: '유통기한',
-              width: '9.5rem',
+              key: 'mfgOn',
+              label: '제조일',
+              width: '8.75rem',
               render: ({ row, id: cellId, invalid, disabled: cellDisabled, onChange }) => (
                 <DateInput
                   id={cellId}
-                  value={row.expiryOn}
+                  value={row.mfgOn ?? ''}
                   onChange={onChange}
                   aria-invalid={invalid}
                   disabled={cellDisabled || !itemById.get(row.itemId)?.useExpiry}
                 />
               ),
+            },
+            {
+              key: 'expiryOn',
+              label: '유통기한',
+              width: '8.75rem',
+              render: ({ row, id: cellId, invalid, disabled: cellDisabled, onChange }) => {
+                const item = itemById.get(row.itemId)
+                // 제조일 입력 품목은 제조일로 계산한 값을 보여 준다 (저장도 서버가 같은 계산, 0089)
+                const computed =
+                  item?.mfgInput && row.mfgOn && item.shelfLifeDays
+                    ? addDays(row.mfgOn, item.shelfLifeDays)
+                    : ''
+                return (
+                  <DateInput
+                    id={cellId}
+                    value={item?.mfgInput ? computed : row.expiryOn}
+                    onChange={onChange}
+                    aria-invalid={invalid}
+                    disabled={cellDisabled || !item?.useExpiry || item.mfgInput}
+                  />
+                )
+              },
             },
           ]}
         />

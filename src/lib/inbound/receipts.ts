@@ -63,6 +63,7 @@ export async function confirmReceipt(data: ReceiptData) {
         itemId: true,
         lotNo: true,
         expiryOn: true,
+        mfgOn: true,
         inspectedQty: true,
         confirmedQty: true,
         item: {
@@ -127,6 +128,8 @@ export async function confirmReceipt(data: ReceiptData) {
         },
         qty: text,
         ref: { refType: 'RECEIPT', refId: receipt.id, refNo: receipt.receiptNo },
+        // 제조일: 새 재고 줄에 남는다 (0089)
+        mfgOn: inspection.mfgOn?.toISOString().slice(0, 10) ?? null,
       })
       await tx.inboundReceiptLine.create({
         data: {
@@ -138,6 +141,7 @@ export async function confirmReceipt(data: ReceiptData) {
           stockTxnId: stock.txnId,
           lotNo: inspection.lotNo,
           expiryOn: inspection.expiryOn,
+          mfgOn: inspection.mfgOn,
           qty: text,
         },
       })

@@ -24,6 +24,8 @@ export type StockListRow = {
   spec: string | null
   lotNo: string | null
   expiryOn: string | null
+  // 제조일 (위치별 보기만, 0089)
+  mfgOn: string | null
   state: 'NONE' | 'OK' | 'SOON' | 'EXPIRED'
   daysLeft: number | null
   // 재고상태 (0088): NORMAL·HOLD·DAMAGED·QUARANTINE — 합계 보기도 상태별로 나뉜다
@@ -97,6 +99,15 @@ function columnsOf(
         cell: (row) => <ExpiryCell row={row} />,
       },
     )
+    if (byLocation) {
+      columns.push({
+        id: 'mfgOn',
+        header: '제조일',
+        accessor: 'mfgOn',
+        format: 'date',
+        defaultHidden: true,
+      })
+    }
   }
   columns.push(
     {

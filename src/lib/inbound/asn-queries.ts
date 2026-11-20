@@ -1,4 +1,5 @@
 import 'server-only'
+import { isMfgInput } from '@/lib/items/expiry-dates'
 import { shipperDefaultsSelect, shipperItemDefaults } from '@/lib/shippers/shipper-defaults'
 import { resolveUnitDecimals, unitDecimalsSelect } from '@/lib/units/unit-status'
 import { textIds } from '@/lib/id'
@@ -69,6 +70,8 @@ export async function getAsnItemOptions(
       },
       useLot: true,
       useExpiry: true,
+      expiryInput: true,
+      shelfLifeDays: true,
       labelUnit: true,
       baseUnit: { select: { code: true, ...unitDecimalsSelect(scope.operatorId ?? 0n) } },
       // 환산단위 (기본단위 행은 빼고, 0083)
@@ -87,7 +90,7 @@ export async function getAsnItemOptions(
   resolveUnitDecimals(items)
   const defaults = shipperItemDefaults(shipper)
   return textIds(
-    items.map(({ units, useLot, useExpiry, labelUnit, barcodes, ...item }) => {
+    items.map(({ units, useLot, useExpiry, labelUnit, barcodes, expiryInput, ...item }) => {
       const options = effectiveItemOptions(
         { useLot: useLot as 'Y' | 'N' | null, useExpiry: useExpiry as 'Y' | 'N' | null, labelUnit },
         defaults,
@@ -104,6 +107,11 @@ export async function getAsnItemOptions(
         })),
         useLot: options.useLot,
         useExpiry: options.useExpiry,
+        mfgInput: isMfgInput({
+          useExpiry: options.useExpiry,
+          expiryInput,
+          shelfLifeDays: item.shelfLifeDays,
+        }),
       }
     }),
   )
@@ -137,6 +145,7 @@ export async function getAsnForEdit(id: bigint, scope: DataScope) {
       qty: line.entryQty ? qty(line.entryQty) : qty(line.expectedQty),
       lotNo: line.lotNo ?? '',
       expiryOn: dateText(line.expiryOn),
+      mfgOn: dateText(line.mfgOn),
       remark: line.remark ?? '',
     })),
   }
