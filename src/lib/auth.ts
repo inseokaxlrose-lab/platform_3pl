@@ -14,6 +14,8 @@ export const ACCOUNT_DISABLED = 'ACCOUNT_DISABLED'
 export const OPERATOR_DISABLED = 'OPERATOR_DISABLED'
 // 화주사 사용자의 화주사가 해지됐을 때 (0080)
 export const SHIPPER_DISABLED = 'SHIPPER_DISABLED'
+// 로그인 실패가 쌓여 잠겼을 때 (0093)
+export const ACCOUNT_LOCKED = 'ACCOUNT_LOCKED'
 
 // 인증 설정 (Better Auth) — docs/decisions/0010-auth-and-permission-model.md
 // - 로그인: 아이디 + 비밀번호 (현장 작업자는 이메일이 없을 수 있음)
@@ -49,6 +51,7 @@ export const auth = betterAuth({
             where: { id: BigInt(session.userId) },
             select: {
               status: true,
+              lockedUntil: true,
               userType: true,
               operator: { select: { status: true } },
               shipper: { select: { status: true } },
@@ -56,6 +59,10 @@ export const auth = betterAuth({
           })
           if (!user || !isActiveStatus(user.status)) {
             throw new APIError('FORBIDDEN', { message: ACCOUNT_DISABLED })
+          }
+          // 잠긴 계정: 맞는 비밀번호여도 세션을 만들지 않는다 (인증 API를 직접 불러도, 0093)
+          if (user.lockedUntil && user.lockedUntil > new Date()) {
+            throw new APIError('FORBIDDEN', { message: ACCOUNT_LOCKED })
           }
           if (user.userType !== 'PLATFORM' && !isOperatorActive(user.operator?.status)) {
             throw new APIError('FORBIDDEN', { message: OPERATOR_DISABLED })

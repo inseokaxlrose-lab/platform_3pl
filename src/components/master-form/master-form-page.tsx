@@ -31,7 +31,8 @@ export type MasterFormSection = {
   content: React.ReactNode
   // true면 "따로 처리하는 섹션": 자기 버튼으로 바로 처리하는 내용(계정 사용 중지, 요약 표 등)
   // 폼 밖에 그려 저장·변경 감지에서 빠지고, 폼 섹션들 뒤에 온다 (목차에는 함께, 제목 옆 "바로 적용")
-  standalone?: boolean
+  // 'view'면 보기만 하는 섹션(이력 표 등): 폼 밖에 그리되 "바로 적용" 표시는 붙이지 않는다
+  standalone?: boolean | 'view'
 }
 
 // 헤더: 제목·설명·meta·보조 버튼 (저장·취소는 이 틀이 맨 오른쪽에 붙인다)
@@ -279,7 +280,7 @@ function renderSection(section: MasterFormSection, index: number) {
             <span aria-hidden className="h-5 w-1 shrink-0 rounded-full bg-primary" />
             {/* 섹션 이름은 제목 글자만 ("바로 적용" 표시는 빼고) */}
             <span id={`${sectionDomId(section.id)}-title`}>{section.title}</span>
-            {section.standalone && (
+            {section.standalone === true && (
               <span className="rounded-sm border px-1.5 py-0.5 text-xs leading-none font-normal text-muted-foreground">
                 바로 적용
               </span>

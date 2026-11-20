@@ -3,6 +3,7 @@ import { FILE_ENTITY, FILE_PURPOSE } from '@/lib/files/file-codes'
 import {
   API_ITEM_RESULT_VALUES,
   API_KEY_EVENT_VALUES,
+  LOGIN_RESULT_VALUES,
   BONDED_TYPE_VALUES,
   EXTERNAL_ENTITY_TYPE_VALUES,
   FAULT_PARTY_VALUES,
@@ -199,6 +200,7 @@ const VALUE_SETS: Record<string, readonly string[]> = {
   'tb_api_client.env_cd': API_ENV.values,
   'tb_api_client_scope.scope_cd': API_SCOPE.values,
   'tb_api_client_event.event_cd': API_KEY_EVENT_VALUES,
+  'tb_login_hist.result_cd': LOGIN_RESULT_VALUES,
   'tb_api_request_log.result_cd': API_LOG_RESULT.values,
   'tb_api_request_item.result_cd': API_ITEM_RESULT_VALUES,
 }

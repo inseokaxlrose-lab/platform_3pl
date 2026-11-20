@@ -23,6 +23,7 @@ import {
 } from '@/lib/users/user-schema'
 import { generateTempPassword } from '@/lib/users/temp-password'
 import { resetUserPassword, setUserActive } from '@/lib/users/manage-user'
+import { unlockUser } from '@/lib/users/login-guard'
 import { idSchema } from '@/lib/id'
 import { toValue } from '@/lib/db-value'
 import { USER_TYPE_VALUES } from '@/config/db-codes'
@@ -85,6 +86,7 @@ export const listUsersAction = createAction({
         userType: 'userType',
         isActive: 'status',
         createdAt: 'createdAt',
+        lastLoginAt: 'lastLoginAt',
       },
       defaultOrderBy: { username: 'asc' },
     })
@@ -121,6 +123,7 @@ export const listUsersAction = createAction({
           userType: true,
           status: true,
           createdAt: true,
+          lastLoginAt: true,
           shipper: { select: { name: true } },
           centers: { select: { center: { select: { name: true } } } },
           permissionGroups: { select: { group: { select: { name: true } } } },
@@ -139,6 +142,7 @@ export const listUsersAction = createAction({
         userType: row.userType as UserType,
         isActive: row.isActive,
         createdAt: row.createdAt,
+        lastLoginAt: row.lastLoginAt,
         affiliation:
           row.shipper?.name ?? (row.centers.map(({ center }) => center.name).join(', ') || null),
         groups: row.permissionGroups.map(({ group }) => group.name).join(', ') || null,
@@ -179,6 +183,16 @@ export const createUserAction = createAction({
       shipperId: input.shipperId,
       permissionGroupIds: input.permissionGroupIds,
     })
+    // 연락처·부서·직책·사번 (0093)
+    await prisma.user.update({
+      where: { id: created.id },
+      data: {
+        phone: input.phone,
+        deptName: input.deptName,
+        positionName: input.positionName,
+        empNo: input.empNo,
+      },
+    })
     // 자동으로 만든 비밀번호만 화면에 한 번 돌려준다 (직접 입력은 관리자가 이미 안다)
     return {
       id: created.id,
@@ -213,7 +227,15 @@ export const updateUserAction = createAction({
       const saved = await withVersionGuard(() =>
         tx.user.update({
           where: { id: input.id, rowVersion: input.rowVersion },
-          data: { name: input.name, email, shipperId: input.shipperId ?? null },
+          data: {
+            name: input.name,
+            email,
+            shipperId: input.shipperId ?? null,
+            phone: input.phone,
+            deptName: input.deptName,
+            positionName: input.positionName,
+            empNo: input.empNo,
+          },
           select: { id: true, rowVersion: true },
         }),
       )
@@ -266,6 +288,20 @@ export const setUsersActiveAction = createAction({
     }
     for (const id of ids) await setUserActive(id, input.isActive)
     return { count: ids.length }
+  },
+})
+
+// 로그인 잠금 풀기 (0093): 연속 실패 수를 0으로, 잠금 시간을 지운다
+export const unlockUserAction = createAction({
+  permission: 'system.users.update',
+  input: z.object({ id: idSchema }),
+  handler: async ({ user, input }) => {
+    requireOperator(user)
+    if (!(await prisma.user.findUnique({ where: { id: input.id }, select: { id: true } }))) {
+      throw new ActionError('NOT_FOUND', '사용자를 찾을 수 없습니다.')
+    }
+    await unlockUser(input.id)
+    return { id: input.id }
   },
 })
 

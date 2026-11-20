@@ -19,6 +19,10 @@ export const EXTERNAL_ENTITY_TYPE_VALUES = [
 ] as const
 export type ExternalEntityType = (typeof EXTERNAL_ENTITY_TYPE_VALUES)[number]
 
+// 로그인 이력 결과 (tb_login_hist.result_cd, 0093): 성공 / 비밀번호 틀림 / 잠겨서 막힘 / 사용 중지·운영사 중지로 막힘
+export const LOGIN_RESULT_VALUES = ['SUCCESS', 'FAIL', 'LOCKED', 'DISABLED'] as const
+export type LoginResult = (typeof LOGIN_RESULT_VALUES)[number]
+
 // API 키 이력 (tb_api_client_event.event_cd)
 export const API_KEY_EVENT_VALUES = ['ISSUED', 'UPDATED', 'REVOKED', 'EXPIRED'] as const
 

@@ -1,4 +1,5 @@
 import 'server-only'
+import { isLocked, recentLoginHistory } from '@/lib/users/login-guard'
 import { isPermissionCode } from '@/config/permissions'
 import { textIds } from '@/lib/id'
 import { prisma } from '@/lib/prisma'
@@ -51,12 +52,21 @@ export async function getUserForEdit(id: bigint, scope: DataScope) {
       status: true,
       shipperId: true,
       rowVersion: true,
+      phone: true,
+      deptName: true,
+      positionName: true,
+      empNo: true,
+      loginFailCount: true,
+      lockedUntil: true,
+      lastLoginAt: true,
+      lastLoginIp: true,
       centers: { select: { centerId: true } },
       permissionGroups: { select: { groupId: true } },
     },
   })
   // 플랫폼 관리자는 운영사가 없어 찾아지지 않는다 (타입을 좁히기 위한 확인)
   if (!user || user.userType === 'PLATFORM') return null
+  const loginHistory = await recentLoginHistory(user.id)
   // 화면으로 보낼 값이라 키는 글자로
   return textIds({
     id: user.id,
@@ -69,6 +79,19 @@ export async function getUserForEdit(id: bigint, scope: DataScope) {
     // 동시 수정 막기: 저장할 때 이 버전을 함께 보낸다
     rowVersion: user.rowVersion,
     shipperId: user.shipperId === null ? '' : String(user.shipperId),
+    phone: user.phone ?? '',
+    deptName: user.deptName ?? '',
+    positionName: user.positionName ?? '',
+    empNo: user.empNo ?? '',
+    // 계정 패널: 잠금·로그인 (0093)
+    security: {
+      locked: isLocked(user.lockedUntil),
+      lockedUntil: user.lockedUntil,
+      loginFailCount: user.loginFailCount,
+      lastLoginAt: user.lastLoginAt,
+      lastLoginIp: user.lastLoginIp,
+    },
+    loginHistory,
     centerIds: user.centers.map((c) => c.centerId),
     permissionGroupIds: user.permissionGroups.map((g) => g.groupId),
   })

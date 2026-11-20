@@ -1,9 +1,10 @@
 'use client'
 
-import { KeyRoundIcon, PowerIcon } from 'lucide-react'
+import { KeyRoundIcon, LockOpenIcon, PowerIcon } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { useState, useTransition } from 'react'
 import { ConfirmDialog, StatusBadge } from '@/components/common'
+import { formatDate } from '@/components/data-grid'
 import { Field, FormGrid } from '@/components/master-form'
 import { Can } from '@/components/permission'
 import { Button } from '@/components/ui/button'
@@ -12,15 +13,26 @@ import { PasswordModeField } from '@/components/users/password-mode-field'
 import { TempPasswordDialog } from '@/components/users/temp-password-dialog'
 import { unwrap } from '@/lib/actions'
 import { PASSWORD_RULE_TEXT, type PasswordMode } from '@/lib/users/user-schema'
-import { resetUserPasswordAction, setUserActiveAction } from './actions'
+import { resetUserPasswordAction, setUserActiveAction, unlockUserAction } from './actions'
+
+// 잠금·마지막 로그인 (0093)
+type AccountSecurity = {
+  locked: boolean
+  lockedUntil: Date | null
+  loginFailCount: number
+  lastLoginAt: Date | null
+  lastLoginIp: string | null
+}
 
 // 수정 화면의 계정 관리: 사용 중지/다시 사용, 비밀번호 초기화 (둘 다 기존 로그인을 끊는다)
+// 로그인을 연속으로 틀려 잠긴 계정은 [잠금 풀기]로 바로 풀 수 있다 (0093)
 // 초기화한 비밀번호는 임시 비밀번호 — 자동 생성(기본)이면 한 번 보여 주고, 사용자는 다음 로그인 때 바꿔야 한다 (0086)
 export function AccountPanel({
   user,
 }: {
-  user: { id: string; username: string; isActive: boolean }
+  user: { id: string; username: string; isActive: boolean; security: AccountSecurity }
 }) {
+  const { security } = user
   const router = useRouter()
   const [mode, setMode] = useState<PasswordMode>('AUTO')
   const [issued, setIssued] = useState<string | null>(null)
@@ -65,27 +77,60 @@ export function AccountPanel({
             ) : (
               <StatusBadge tone="danger">사용 중지</StatusBadge>
             )}
+            {security.locked && (
+              <StatusBadge tone="danger">
+                잠김 ({formatDate(security.lockedUntil, true)}까지)
+              </StatusBadge>
+            )}
+            <span className="text-muted-foreground">
+              마지막 로그인{' '}
+              {security.lastLoginAt
+                ? `${formatDate(security.lastLoginAt, true)}${security.lastLoginIp ? ` · ${security.lastLoginIp}` : ''}`
+                : '없음'}
+              {!security.locked && security.loginFailCount > 0 && (
+                <> · 연속 실패 {security.loginFailCount}회</>
+              )}
+            </span>
           </div>
-          <ConfirmDialog
-            trigger={
-              <Button type="button" variant={user.isActive ? 'destructive' : 'outline'}>
-                <PowerIcon />
-                {user.isActive ? '사용 중지' : '다시 사용'}
+          <div className="flex flex-wrap gap-2">
+            {security.locked && (
+              <Button
+                type="button"
+                variant="outline"
+                disabled={pending}
+                onClick={() =>
+                  startTransition(async () => {
+                    unwrap(await unlockUserAction({ id: user.id }))
+                    setMessage({ ok: true, text: '잠금을 풀었습니다. 바로 로그인할 수 있습니다.' })
+                    router.refresh()
+                  })
+                }
+              >
+                <LockOpenIcon />
+                잠금 풀기
               </Button>
-            }
-            title={user.isActive ? '이 계정을 사용 중지할까요?' : '이 계정을 다시 사용할까요?'}
-            description={
-              user.isActive
-                ? `'${user.username}'은(는) 즉시 로그아웃되고 로그인할 수 없게 됩니다. 기록은 남습니다.`
-                : `'${user.username}'이(가) 다시 로그인할 수 있게 됩니다.`
-            }
-            confirmLabel={user.isActive ? '사용 중지' : '다시 사용'}
-            destructive={user.isActive}
-            onConfirm={async () => {
-              unwrap(await setUserActiveAction({ id: user.id, isActive: !user.isActive }))
-              router.refresh()
-            }}
-          />
+            )}
+            <ConfirmDialog
+              trigger={
+                <Button type="button" variant={user.isActive ? 'destructive' : 'outline'}>
+                  <PowerIcon />
+                  {user.isActive ? '사용 중지' : '다시 사용'}
+                </Button>
+              }
+              title={user.isActive ? '이 계정을 사용 중지할까요?' : '이 계정을 다시 사용할까요?'}
+              description={
+                user.isActive
+                  ? `'${user.username}'은(는) 즉시 로그아웃되고 로그인할 수 없게 됩니다. 기록은 남습니다.`
+                  : `'${user.username}'이(가) 다시 로그인할 수 있게 됩니다.`
+              }
+              confirmLabel={user.isActive ? '사용 중지' : '다시 사용'}
+              destructive={user.isActive}
+              onConfirm={async () => {
+                unwrap(await setUserActiveAction({ id: user.id, isActive: !user.isActive }))
+                router.refresh()
+              }}
+            />
+          </div>
         </div>
 
         <form onSubmit={resetPassword} className="grid gap-4 border-t pt-4">
