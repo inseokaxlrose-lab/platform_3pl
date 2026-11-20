@@ -1,5 +1,6 @@
 import {
   BoxesIcon,
+  HashIcon,
   BuildingIcon,
   ClipboardCheckIcon,
   ClipboardListIcon,
@@ -272,6 +273,14 @@ const adminNavigation: NavArea = {
           icon: ListTreeIcon,
           ready: true,
           permission: 'system.codes.read',
+        },
+        {
+          // 체번 규칙 (0085): 코드·문서번호 모양
+          title: '체번 규칙',
+          href: '/admin/system/numbering',
+          icon: HashIcon,
+          ready: true,
+          permission: 'system.numbering.read',
         },
         {
           title: '자료 추출',

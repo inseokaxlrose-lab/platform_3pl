@@ -163,6 +163,13 @@ export const PERMISSION_MENUS = {
   },
   'system.roles': { label: '권한그룹', group: '시스템', area: 'admin', actions: CRUD },
   'system.codes': { label: '공통코드', group: '시스템', area: 'admin', actions: CRUD },
+  // 체번 규칙 (0085): 대상별 코드·문서번호 모양을 운영사 규칙으로 바꾸기·기본으로 되돌리기
+  'system.numbering': {
+    label: '체번 규칙',
+    group: '시스템',
+    area: 'admin',
+    actions: ['read', 'update'],
+  },
   'system.exports': {
     label: '자료 추출',
     group: '시스템',
