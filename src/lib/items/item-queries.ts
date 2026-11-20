@@ -1,5 +1,6 @@
 import 'server-only'
 import { shipperDefaultsSelect, shipperItemDefaults } from '@/lib/shippers/shipper-defaults'
+import type { Prisma } from '@/generated/prisma/client'
 import { textIds } from '@/lib/id'
 import type { ItemFormOptions } from '@/lib/items/item-form-options'
 import type { ItemInput } from '@/lib/items/item-schema'
@@ -84,21 +85,22 @@ export async function getItemFormOptions(scope: DataScope): Promise<ItemFormOpti
 }
 
 // 수정 화면용 품목 한 건 (범위 밖이면 null → "찾을 수 없음")
-export async function getItemForEdit(id: bigint, scope: DataScope) {
-  const item = await prisma.item.findUnique({
-    where: { id },
-    include: {
-      shipper: { select: { code: true, name: true, centers: { select: { centerId: true } } } },
-      units: { orderBy: { sortOrder: 'asc' }, include: { unit: { select: { code: true } } } },
-      barcodes: { orderBy: { id: 'asc' } },
-    },
-  })
-  if (!item || !isInScope(scope, item, ITEM_SCOPE)) return null
-  // Decimal → 글자 (끝의 0은 뺀다: 24.000 → '24')
-  const qty = (value: { toString(): string } | null) =>
-    value === null ? '' : qtyText(parseQty(value.toString()))
-  const text = (value: string | null) => value ?? ''
-  const input: ItemInput = {
+// 저장된 품목 → 입력값으로 바꿀 때 함께 읽는 관계 (수정 화면·upsert 공용)
+export const ITEM_INPUT_INCLUDE = {
+  units: { orderBy: { sortOrder: 'asc' }, include: { unit: { select: { code: true } } } },
+  barcodes: { orderBy: { id: 'asc' } },
+} as const satisfies Prisma.ItemInclude
+
+export type ItemWithInput = Prisma.ItemGetPayload<{ include: typeof ITEM_INPUT_INCLUDE }>
+
+// Decimal → 글자 (끝의 0은 뺀다: 24.000 → '24')
+const qty = (value: { toString(): string } | null) =>
+  value === null ? '' : qtyText(parseQty(value.toString()))
+const text = (value: string | null) => value ?? ''
+
+// 저장된 품목 → 화면·입력 규칙 모양 (수정 화면이 보여 주고, upsert가 보낸 칸만 덮어쓴다)
+export function itemInputOf(item: ItemWithInput): ItemInput {
+  return {
     name: item.name,
     nameEn: text(item.nameEn),
     shortName: text(item.shortName),
@@ -161,6 +163,18 @@ export async function getItemForEdit(id: bigint, scope: DataScope) {
     })),
     remark: text(item.remark),
   }
+}
+
+export async function getItemForEdit(id: bigint, scope: DataScope) {
+  const item = await prisma.item.findUnique({
+    where: { id },
+    include: {
+      shipper: { select: { code: true, name: true, centers: { select: { centerId: true } } } },
+      ...ITEM_INPUT_INCLUDE,
+    },
+  })
+  if (!item || !isInScope(scope, item, ITEM_SCOPE)) return null
+  const input = itemInputOf(item)
   // 재고·미완료 ASN이 있으면 기본단위·관리 여부를 바꿀 수 없다 (화면에서 잠그고 이유 표시)
   const [stock, openAsn] = await Promise.all([
     prisma.stock.count({
