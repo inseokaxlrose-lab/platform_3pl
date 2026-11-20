@@ -37,6 +37,7 @@ export function itemInput(
   overrides: Partial<ItemInput> = {},
 ): ItemInput {
   return {
+    custCode: '',
     name: '생수 500ml',
     nameEn: '',
     shortName: '',

@@ -7,7 +7,8 @@ import type { UploadTemplate } from '@/lib/excel/upload'
 export const itemUploadTemplate: UploadTemplate = {
   name: '품목업로드',
   guide: [
-    '한 줄이 품목 하나입니다. 화주사코드 + 품목코드로 찾아, 없으면 등록하고 있으면 넣은 칸만 고칩니다 (비운 칸은 그대로).',
+    '한 줄이 품목 하나입니다. 화주사의 연동 조회 키에 따라 품목코드(기본) 또는 사용자정의코드로 찾아, 없으면 등록하고 있으면 넣은 칸만 고칩니다 (비운 칸은 그대로).',
+    '품목코드로 찾는 화주사에서 품목코드를 비우면 새 품목으로 등록하고 코드를 자동으로 붙입니다.',
     '새 품목은 품목명·기본단위가 필수입니다. 기한·LOT 관리를 비우면 화주사 설정을 따릅니다. 기한관리 Y만 넣으면 소비기한·기한일 입력, LOT관리 Y만 넣으면 입고 시 입력으로 정합니다.',
     '단위는 단위 코드(EA·KG·BOX·PLT 등)로 넣습니다. BOX단위를 비우면 BOX, PLT는 시스템 PLT 단위를 씁니다.',
     '팔레트종류·TI·HI(또는 팔레트당박스수)를 넣으면 PLT를 계산합니다. 적재 정보가 없을 때만 PLT입수를 직접 넣습니다.',
@@ -20,9 +21,15 @@ export const itemUploadTemplate: UploadTemplate = {
     {
       key: 'code',
       header: '품목코드',
-      required: true,
       example: 'SKU-001',
-      note: '영문·숫자·점·하이픈·밑줄 50자, 등록 후 바꿀 수 없음',
+      note: '비우면 자동 생성. 영문·숫자·점·하이픈·밑줄 50자, 등록 후 바꿀 수 없음',
+      width: 14,
+    },
+    {
+      key: 'custCode',
+      header: '사용자정의코드',
+      example: 'ERP-A001',
+      note: '화주 시스템의 품목코드. 화주사 연동 조회 키가 "사용자 정의 코드"면 필수(이 값으로 찾음)',
       width: 14,
     },
     { key: 'name', header: '품목명', example: '생수 500ml', note: '새 품목은 필수', width: 20 },

@@ -52,6 +52,8 @@ import {
   SETTLE_CYCLE_GROUP,
   SHIPPER_INDUSTRY_GROUP,
   SHIPPER_TYPE_GROUP,
+  IF_KEY_TYPE_LABELS,
+  IF_KEY_TYPES,
   shipperSchema,
   type ShipperCenterInput,
   type ShipperInput,
@@ -64,6 +66,9 @@ const today = () => new Date().toLocaleDateString('sv-SE')
 
 const EMPTY: ShipperInput = {
   code: '',
+  codePrefix: '',
+  custCode: '',
+  ifKeyType: 'CODE',
   name: '',
   nameEn: '',
   shortName: '',
@@ -135,6 +140,8 @@ const LIST_HREF = '/admin/master/shippers'
 type TextKey =
   | 'name'
   | 'code'
+  | 'codePrefix'
+  | 'custCode'
   | 'nameEn'
   | 'shortName'
   | 'subBizNo'
@@ -146,7 +153,13 @@ type YnKey = 'autoRenew' | 'partialShip' | 'autoCreateShipTo' | 'autoCreateItem'
 type InheritYnKey = 'useLot' | 'useExpiry' | 'useSerial'
 type CountKey = 'paymentTermsDays' | 'minInboundShelfDays' | 'minOutboundShelfDays'
 type ConstKey =
-  'bizEntity' | 'taxType' | 'shortagePolicy' | 'shipToCenterPolicy' | 'orderNoScope' | 'ifMethod'
+  | 'bizEntity'
+  | 'taxType'
+  | 'shortagePolicy'
+  | 'shipToCenterPolicy'
+  | 'orderNoScope'
+  | 'ifMethod'
+  | 'ifKeyType'
 type CodeKey = 'shipperType' | 'industry' | 'settleCycle'
 type Option = { value: string; label: string }
 
@@ -190,7 +203,13 @@ export function ShipperForm({
     key: TextKey,
     label: string,
     span: FieldSpan,
-    options: { required?: boolean; placeholder?: string; hint?: string; newRow?: boolean } = {},
+    options: {
+      required?: boolean
+      placeholder?: string
+      hint?: string
+      newRow?: boolean
+      readOnly?: boolean
+    } = {},
   ) => (
     <Field
       label={label}
@@ -203,6 +222,8 @@ export function ShipperForm({
     >
       <Input
         {...props(key)}
+        disabled={disabled || options.readOnly}
+        readOnly={options.readOnly}
         value={value[key]}
         placeholder={options.placeholder}
         onChange={(e) => set({ [key]: e.target.value })}
@@ -342,17 +363,22 @@ export function ShipperForm({
       content: (
         <FormGrid>
           {text('name', '화주사명', 8, { required: true })}
-          {text('code', '화주사 코드', 4, { placeholder: '비우면 시스템 코드 사용' })}
+          {text('code', '화주사 코드', 4, {
+            placeholder: '비워 두면 자동 생성 (SH0001)',
+            hint: shipper ? '바꿀 수 없습니다' : undefined,
+            readOnly: Boolean(shipper),
+          })}
           {text('nameEn', '영문명', 6)}
           {text('shortName', '약칭', 2, { hint: '목록·고르기 표시용' })}
-          <Field label="시스템 코드" span={4} htmlFor={id('system-code')}>
-            <Input
-              id={id('system-code')}
-              value={shipper?.systemCode ?? '저장하면 자동으로 부여됩니다'}
-              disabled
-              readOnly
-            />
-          </Field>
+          {text('codePrefix', '코드 접두어', 4, {
+            required: true,
+            placeholder: '예: GN',
+            hint: shipper?.codePrefixLocked
+              ? '거래처·품목 코드가 발행되어 바꿀 수 없습니다'
+              : '거래처·품목 자동 코드 앞 2글자 (I·O·0·1 제외)',
+            readOnly: shipper?.codePrefixLocked,
+          })}
+          {text('custCode', '사용자 정의 코드', 4, { hint: '운영사 ERP 코드 등 (선택)' })}
           {code('shipperType', '화주 유형', SHIPPER_TYPE_GROUP)}
           {code('industry', '업종', SHIPPER_INDUSTRY_GROUP)}
           <Field label="정렬순서" span={4} error={errors.sortOrder} htmlFor={id('sortOrder')}>
@@ -798,6 +824,13 @@ export function ShipperForm({
       content: (
         <FormGrid>
           {select('ifMethod', '연동 방식', IF_METHOD.options, 4, '파일·EDI는 2차')}
+          {select(
+            'ifKeyType',
+            '연동 조회 키',
+            IF_KEY_TYPES.map((k) => ({ value: k, label: IF_KEY_TYPE_LABELS[k] })),
+            4,
+            'API·엑셀이 거래처·품목을 찾는 코드',
+          )}
           {yn('apiEnabled', 'API 사용', undefined, ['사용', '사용 안 함'])}
           <Field label="연동 담당자" span={4} htmlFor={id('if-contact')}>
             <Input

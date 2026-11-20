@@ -2,6 +2,7 @@ import 'server-only'
 import { toContactInput } from '@/lib/contacts/contact-schema'
 import { dateToTime } from '@/lib/format/time'
 import { textIds } from '@/lib/id'
+import { hasIssuedChildCodes } from '@/lib/shippers/shippers'
 import { prisma } from '@/lib/prisma'
 import { isActiveStatus } from '@/lib/status'
 import { isCenterSetupStatus } from '@/lib/centers/center-status'
@@ -34,6 +35,9 @@ export async function getShipperForEdit(id: bigint, scope: DataScope) {
   const text = (value: string | null) => value ?? ''
   const input: ShipperInput = {
     code: shipper.code,
+    codePrefix: shipper.codePrefix,
+    custCode: text(shipper.custCode),
+    ifKeyType: shipper.ifKeyType as ShipperInput['ifKeyType'],
     name: shipper.name,
     nameEn: text(shipper.nameEn),
     shortName: text(shipper.shortName),
@@ -95,11 +99,12 @@ export async function getShipperForEdit(id: bigint, scope: DataScope) {
   // 화면으로 보낼 값이라 키는 글자로
   return textIds({
     id: shipper.id,
-    systemCode: shipper.systemCode,
     // 동시 수정 막기: 저장할 때 이 버전을 함께 보낸다
     rowVersion: shipper.rowVersion,
     status: shipper.status,
     statusReason: shipper.statusReason,
+    // 거래처·품목 코드가 이미 발행되었으면 코드 접두어를 바꿀 수 없다 (0084)
+    codePrefixLocked: await hasIssuedChildCodes(prisma, shipper.id),
     updatedAt: shipper.updatedAt,
     updatedBy: shipper.updatedBy,
     input,

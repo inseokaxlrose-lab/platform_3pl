@@ -30,7 +30,6 @@ export async function getCenterForEdit(id: bigint, scope: DataScope) {
         where: NOT_DELETED,
         select: {
           id: true,
-          systemCode: true,
           code: true,
           name: true,
           type: true,
@@ -112,7 +111,6 @@ export async function getCenterForEdit(id: bigint, scope: DataScope) {
   return textIds({
     id: center.id,
     code: center.code,
-    systemCode: center.systemCode,
     // 동시 수정 막기: 저장할 때 이 버전을 함께 보낸다
     rowVersion: center.rowVersion,
     status: center.status,

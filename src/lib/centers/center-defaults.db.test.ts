@@ -39,7 +39,6 @@ describe('센터 기본 구성 (시스템 기본 창고 3개 + 기본 로케이�
       ['RETURN', 'RETURN', 'Y', 3, 'YNN', 'HOLD'],
     ])
     for (const w of warehouses) {
-      expect(w.systemCode).toMatch(/^WH\d{6}$/)
       // 시스템 기본 로케이션 DEFAULT (작업대기 유형, 0075)
       expect(w.locations.map((l) => [l.code, l.systemYn, l.locType, l.centerId])).toEqual([
         [DEFAULT_LOCATION_CODE, 'Y', 'STAGING', center.id],
@@ -116,7 +115,6 @@ describe('센터 기본 구성 (시스템 기본 창고 3개 + 기본 로케이�
         data: {
           operatorId: TEST_OPERATOR_ID,
           centerId: center.id,
-          systemCode: `T-${code}`,
           code,
           name: code,
           type,

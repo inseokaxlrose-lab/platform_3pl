@@ -34,7 +34,6 @@ beforeEach(async () => {
     data: {
       operatorId: TEST_OPERATOR_ID,
       centerId: icn.id,
-      systemCode: 'WH-T-GEN',
       code: 'GEN',
       name: '일반창고',
       tempZone: 'AMBIENT',
@@ -66,7 +65,6 @@ beforeEach(async () => {
       data: {
         operatorId: TEST_OPERATOR_ID,
         shipperId: shipper.id,
-        systemCode: `IT-T-${code}`,
         code,
         name: code,
         baseUnitId,

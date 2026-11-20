@@ -21,14 +21,14 @@ export const MAX_ITEM_BARCODES = 50
 // 라벨 단위·할당 규칙: '' = 화주사 값 따름 (상속, DB null)
 export const INHERIT = ''
 
-// 품목코드: 화주 코드 그대로 — 영문·숫자·점·하이픈·밑줄 1~50자 (소문자는 대문자로), 필수, 등록 후 변경 불가 (0083)
+// 품목코드: 영문·숫자·점·하이픈·밑줄 50자 이하 (소문자는 대문자로), 등록 후 변경 불가
+// 비우면 자동 체번 {화주 접두어}S000001 (0083 → 0084)
 export const itemCodeField = z
   .string()
   .trim()
   .toUpperCase()
-  .min(1, '품목코드를 입력해 주세요.')
   .max(50, '50자 이하로 입력해 주세요.')
-  .regex(/^[A-Z0-9._-]+$/, '품목코드는 영문·숫자·점·하이픈·밑줄입니다.')
+  .regex(/^[A-Z0-9._-]*$/, '품목코드는 영문·숫자·점·하이픈·밑줄입니다.')
 
 // 0보다 큰 소수 글자 (환산수량: 소수 자리는 서버가 기본단위 기준으로 확인)
 const positiveQty = (message: string) =>
@@ -84,6 +84,8 @@ export const itemBarcodeSchema = z.object({
 
 const itemShape = {
   // ① 기본 정보
+  // 사용자 정의 코드 (화주 시스템의 품목코드, 0084) — 수정할 수 있다
+  custCode: optionalText(50),
   name: requiredText('품목명을 입력해 주세요.', 200),
   nameEn: optionalText(200),
   shortName: optionalText(50),

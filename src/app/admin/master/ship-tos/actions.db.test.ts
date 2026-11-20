@@ -89,6 +89,7 @@ const BUNDANG = '4113510900'
 const input = (overrides: Partial<CustomerCreateInput> = {}): CustomerCreateInput => ({
   shipperId: String(gana),
   code: 'C1',
+  custCode: '',
   name: '한빛마트 분당점',
   shortName: '',
   customerType: '',

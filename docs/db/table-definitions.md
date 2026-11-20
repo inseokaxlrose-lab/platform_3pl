@@ -3,7 +3,7 @@
 > 이 문서는 `npm run db:doc`가 실제 DB 구조와 `prisma/schema.prisma`의 주석으로 만든다. **손으로 고치지 않는다** — 마이그레이션을 적용한 뒤 명령을 다시 돌린다.
 > 엑셀 판: `docs/db/DB_테이블정의서.xlsx` · 이름 규칙: `docs/db-conventions.md`
 
-테이블 67개 · 칼럼 1052개
+테이블 67개 · 칼럼 1053개
 
 ## 목차
 
@@ -26,7 +26,7 @@
 | 운영사·조직 | [`tb_operator_service`](#tb_operator_service) | OperatorService | 운영사 제공 서비스 [2차]: 운영사 공통코드 SERVICE_TYPE (운영사 이력으로 본다) |
 | 운영사·조직 | [`tb_operator_temp_zone`](#tb_operator_temp_zone) | OperatorTempZone | 운영사 취급 온도대 [2차]: TEMP_ZONE (AMBIENT·CHILLED·FROZEN·CONSTANT, 상수 + 검사 조건) |
 | 운영사·조직 | [`tb_operator_unit`](#tb_operator_unit) | OperatorUnit | 운영사별 단위 설정 (docs/decisions/0079): 시스템 기본 단위를 운영사마다 사용 여부·소수 자리수 바꾼 단위만 줄이 생긴다 (줄이 없으면 시스템 단위의 값). 운영사 추가 단위는 자기 칸을 쓴다 실제 값 = 이 줄의 값 ?? 단위의 값 (src/lib/units/unit-status.ts) |
-| 센터·창고·로케이션 | [`tb_center`](#tb_center) | Center | 센터: 운영사의 물류센터 센터: 운영사의 물류센터 (docs/decisions/0026) 코드 3층 (0025): systemCode(자동·불변) / code(사용자 코드, 같은 운영사 안에서 중복 금지) / 외부 코드(ExternalCode) |
+| 센터·창고·로케이션 | [`tb_center`](#tb_center) | Center | 센터: 운영사의 물류센터 센터: 운영사의 물류센터 (docs/decisions/0026) 코드 (0025·0084): id(내부) / code(사용자 코드, 같은 운영사 안에서 중복 금지, 필수) / 외부 코드(ExternalCode) |
 | 센터·창고·로케이션 | [`tb_center_contact`](#tb_center_contact) | CenterContact | 센터 담당자 (0073): 운영사 담당자와 같은 모양, 최대 10명, 대표 1명 (센터 저장 때 함께 저장) |
 | 센터·창고·로케이션 | [`tb_center_temp_zone`](#tb_center_temp_zone) | CenterTempZone | 센터 취급 온도대 (0073): 운영사 TEMP_ZONE 상수 재사용 |
 | 센터·창고·로케이션 | [`tb_location`](#tb_location) | Location | 로케이션: 재고가 실제로 놓이는 한 칸, 바코드로 스캔하는 최소 단위 (docs/decisions/0028, 0075) |
@@ -42,7 +42,7 @@
 | 권역·주소 | [`tb_region_zip_bjd`](#tb_region_zip_bjd) | RegionZipBjd | 우편번호 ↔ 법정동 (N:M): 2개 이상 법정동에 걸치면 경계 우편번호 |
 | 단위·팔레트 | [`tb_pallet_type`](#tb_pallet_type) | PalletType | 팔레트 종류 (0083): PLT 계산 기준. 시스템 기본(operator_id NULL) + 운영사 행 — 운영사 행이 같은 코드의 시스템 행을 덮어쓴다 |
 | 단위·팔레트 | [`tb_unit`](#tb_unit) | Unit |  |
-| 화주사 | [`tb_shipper`](#tb_shipper) | Shipper | 화주사 (docs/decisions/0035, 0080 — 정의서 docs/specs/shipper.md, 표 이름은 tb_shipper 유지) 코드 3층 (0025): systemCode SH000001(자동·불변) / code(사용자 코드, 같은 운영사 안에서 중복 금지) / 외부 코드(ExternalCode) |
+| 화주사 | [`tb_shipper`](#tb_shipper) | Shipper | 화주사 (docs/decisions/0035, 0080 — 정의서 docs/specs/shipper.md, 표 이름은 tb_shipper 유지) 코드 3층 (0084): id(내부) / code(화주사코드, 비우면 자동 체번 SH0001, 수정 불가) / custCode(운영사 ERP 코드 등) + 외부 코드(ExternalCode) |
 | 화주사 | [`tb_shipper_center`](#tb_shipper_center) | ShipperCenter | 화주사의 이용 센터 (화주사 ↔ 센터, 1개 이상) — 센터 직원은 자기 센터를 이용하는 화주사만 본다 기본 센터는 화주당 1개 (부분 고유), 센터별 운영 설정 재정의는 비어 있으면 화주 값 (0080, 화면은 2차) |
 | 화주사 | [`tb_shipper_contact`](#tb_shipper_contact) | ShipperContact | 화주사 담당자 (운영사 담당자와 같은 모양, 화주사만 최대 10명 — 0080), 대표 1명, 담당 업무는 공통코드 CONTACT_ROLE 연동 담당(if_contact_yn): 화주당 최대 1명, 이메일 필수 (API 키 발급·만료 알림 받는 사람) |
 | 연동 API | [`tb_api_client`](#tb_api_client) | ApiClient | API 키: 형식 {환경}_{식별부}_{비밀부} (예: live_ak7f2c9x_…) — 식별부로 찾고 전체를 해시 비교 화주·환경별 사용 중(ACTIVE) 키는 최대 2개 (교체 기간에 새 키·옛 키를 함께 쓰게) |
@@ -53,10 +53,10 @@
 | 연동 API | [`tb_api_rate_bucket`](#tb_api_rate_bucket) | ApiRateBucket | 호출 한도 카운터: 키별 1분 구간마다 한 줄 (고정 구간, 지난 구간은 지움) |
 | 연동 API | [`tb_api_request_item`](#tb_api_request_item) | ApiRequestItem | 건별 결과 (등록 API의 배열 한 건마다) |
 | 연동 API | [`tb_api_request_log`](#tb_api_request_log) | ApiRequestLog | API 요청 로그: 요청 하나에 한 줄 (응답을 보낸 뒤 저장). 본문은 개인정보를 가린 뒤 저장하고 90일 뒤 비운다 |
-| 거래처·납품처 | [`tb_customer`](#tb_customer) | Customer | 거래처 (docs/decisions/0043): 화주사의 고객사 — 출고(MVP 이후) 때 물건을 받는 곳 코드 3층 (0025): systemCode CU00000001(자동·불변) / code(거래처코드, 같은 화주사 안에서 중복 금지, 비우면 시스템 코드) / 외부 코드(ExternalCode CUSTOMER) |
+| 거래처·납품처 | [`tb_customer`](#tb_customer) | Customer | 거래처 (docs/decisions/0043): 화주사의 고객사 — 출고(MVP 이후) 때 물건을 받는 곳 코드 3층 (0084): id(내부) / code(거래처코드, 비우면 자동 체번 {화주 접두어}C000001, 화주 안에서 고유·수정 불가) / custCode(화주 시스템 거래처코드) + 외부 코드(ExternalCode CUSTOMER) |
 | 거래처·납품처 | [`tb_customer_contact`](#tb_customer_contact) | CustomerContact |  |
 | 거래처·납품처 | [`tb_ship_to`](#tb_ship_to) | ShipTo | 납품처: 물건이 실제로 도착하는 곳 (0082). 거래처 하나에 여러 곳, 기본 납품처 정확히 1곳, 사용 중 1곳 이상 납품처마다 배송센터가 정해진다 (assignShipToCenter: 연동 IF / 권역 자동 AUTO / 화면 수동 MANUAL) |
-| 품목 | [`tb_item`](#tb_item) | Item | 품목 (docs/decisions/0041, 0083): 화주사가 맡긴 상품의 관리 단위 코드 3층 (0025): systemCode IT00000001(자동·불변) / code(품목코드: 화주 코드 그대로, 필수, 화주사 안에서 고유, 등록 후 변경 불가 — 0083) / 외부 코드(ExternalCode ITEM) 기한·LOT·시리얼 관리 여부는 상속하지 않는 명시값: 신규 등록 때 화주 실제 값을 복사하고, 이후 화주 설정이 바뀌어도 그대로 (재고 구조를 정하므로, 0083) |
+| 품목 | [`tb_item`](#tb_item) | Item | 품목 (docs/decisions/0041, 0083): 화주사가 맡긴 상품의 관리 단위 코드 3층 (0084): id(내부) / code(품목코드, 비우면 자동 체번 {화주 접두어}S000001, 화주 안에서 고유·수정 불가) / custCode(화주 시스템 품목코드) + 외부 코드(ExternalCode ITEM) 기한·LOT·시리얼 관리 여부는 상속하지 않는 명시값: 신규 등록 때 화주 실제 값을 복사하고, 이후 화주 설정이 바뀌어도 그대로 (재고 구조를 정하므로, 0083) |
 | 품목 | [`tb_item_barcode`](#tb_item_barcode) | ItemBarcode | 품목 바코드 (0083): 단위별 여러 개, 단위별 대표 1개. 같은 화주 안에서 바코드 하나는 품목·단위 하나만 가리킨다 |
 | 품목 | [`tb_item_unit`](#tb_item_unit) | ItemUnit | 품목 단위·환산·규격 (0083): 품목이 쓰는 단위마다 1행, 레벨(BASE·INNER·BOX·PLT)별 1행. 기본단위 행도 반드시 있다 환산수량은 기본단위 기준 (예: 생수 BOX = 24 EA, PLT = 1,440 EA), 소수 자리는 기본단위의 소수 자리수까지 (KG면 2.5 가능) 체적은 BOX 기준, PLT 행은 팔레트 적재 정보(종류·TI·HI)로 자동 계산 |
 | 품목 | [`tb_item_unit_hist`](#tb_item_unit_hist) | ItemUnitHist | 품목 단위 환산수량 변경 이력 (0083): 미완료 ASN·주문이 없을 때만 바꿀 수 있고, 바꾸면 남긴다 |
@@ -476,12 +476,12 @@
 ## tb_center
 
 - 영역: 센터·창고·로케이션 · 모델: `Center`
-- 센터: 운영사의 물류센터 센터: 운영사의 물류센터 (docs/decisions/0026) 코드 3층 (0025): systemCode(자동·불변) / code(사용자 코드, 같은 운영사 안에서 중복 금지) / 외부 코드(ExternalCode)
+- 센터: 운영사의 물류센터 센터: 운영사의 물류센터 (docs/decisions/0026) 코드 (0025·0084): id(내부) / code(사용자 코드, 같은 운영사 안에서 중복 금지, 필수) / 외부 코드(ExternalCode)
 
 | No | 칼럼 | 한글명 | 설명 | 타입 | NULL | 기본값 | 키 |
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | 1 | `center_id` | 센터 ID |  | BIGINT | N | 자동 증가 | PK |
-| 2 | `center_cd` | 센터 코드 | ① 기본 정보 (docs/decisions/0073, docs/specs/center.md) 센터코드: 영문 대문자·숫자 1~20자, 필수, 등록 후 바꿀 수 없음 (라벨·문서에 찍힌다) | VARCHAR(20) | N |  | UK |
+| 2 | `center_cd` | 센터 코드 | 시스템 코드: CT000001 (내부용 불변 코드) ① 기본 정보 (docs/decisions/0073, docs/specs/center.md) 센터코드: 영문 대문자·숫자 1~20자, 필수, 등록 후 바꿀 수 없음 (라벨·문서에 찍힌다) | VARCHAR(20) | N |  | UK |
 | 3 | `center_nm` | 센터 명 |  | VARCHAR(100) | N |  |  |
 | 4 | `created_at` | 등록 일시 | 등록 일시 (자동) | TIMESTAMP(3) | N | CURRENT_TIMESTAMP |  |
 | 5 | `updated_at` | 수정 일시 | 수정 일시 (자동) | TIMESTAMP(3) | N |  |  |
@@ -491,67 +491,65 @@
 | 9 | `manager_nm` | 관리자 명 | 예전 센터장 칸 (사용자 결정으로 유지, 담당자 표와 별개) | TEXT | Y |  |  |
 | 10 | `manager_tel_no` | 관리자 전화 번호 |  | TEXT | Y |  |  |
 | 11 | `tel_no` | 전화 번호 |  | VARCHAR(15) | Y |  |  |
-| 12 | `sys_cd` | 시스템코드 | 시스템 코드: CT000001 (내부용 불변 코드) | TEXT | N |  | UK |
-| 13 | `zip_cd` | 우편번호 |  | VARCHAR(10) | Y |  |  |
-| 14 | `created_by` | 등록 자 | 등록·수정한 사람 아이디(username, 자동: 현재 작업자 / 시드 seed / 기존 데이터 system), 동시 수정 막기용 버전 (docs/db-conventions.md 공통 칸) | VARCHAR(50) | N | system |  |
-| 15 | `row_version` | 행버전 | 동시 수정 막기용 버전 (수정할 때마다 +1, 0038) | INTEGER | N | 1 |  |
-| 16 | `updated_by` | 수정 자 | 수정자 아이디 (자동) | VARCHAR(50) | N | system |  |
-| 17 | `status_cd` | 상태 코드 | 운영 상태 (상수 CENTER_STATUS): PREPARING 준비중 / ACTIVE 운영중 / SUSPENDED 일시중지 / CLOSED 폐쇄 폐쇄만 데이터 범위에서 빠지고, 새 업무(입고·재고 등) 고르기는 운영중만 | VARCHAR(20) | N | PREPARING |  |
-| 18 | `del_yn` | 삭제여부 | 논리 삭제: 'Y'면 지운 것 (목록·조회에서 빠지고 되살릴 수 있다, 0038) | CHAR(1) | N | N |  |
-| 19 | `operator_id` | 운영사 ID | 운영사 (멀티테넌트: 같은 운영사 사람만 보고 고친다, docs/decisions/0039) | BIGINT | N |  | UK FK → tb_operator.operator_id |
-| 20 | `addr_jibun` | 주소 지번 |  | VARCHAR(200) | Y |  |  |
-| 21 | `alloc_rule_cd` | 할당 규칙 코드 |  | VARCHAR(10) | Y |  |  |
-| 22 | `biz_reg_no` | 사업자등록번호 | 운영사와 다를 때만 (NULL = 운영사 값), 숫자만 | CHAR(10) | Y |  |  |
-| 23 | `bonded_area_cd` | 보세 영역 코드 |  | VARCHAR(20) | Y |  |  |
-| 24 | `bonded_license_no` | 보세 면허 번호 |  | VARCHAR(30) | Y |  |  |
-| 25 | `bonded_type_cd` | 보세 유형 코드 |  | VARCHAR(20) | Y |  |  |
-| 26 | `bonded_yn` | 보세 여부 | ④ 시설 자격 (1차: 보세 여부 / 2차: 나머지 — 보세 칸은 나중에 tb_center_bonded로 옮길 수 있다) | CHAR(1) | N | N |  |
-| 27 | `ceiling_height_m` | 천장 높이(m) |  | DECIMAL(5,2) | Y |  |  |
-| 28 | `center_nm_en` | 센터 명 영문 |  | VARCHAR(100) | Y |  |  |
-| 29 | `center_short_nm` | 센터 약칭 명 |  | VARCHAR(30) | Y |  |  |
-| 30 | `center_type_cd` | 센터 유형 코드 | 센터 유형 (상수 CENTER_TYPE): OWN 자가 / LEASE 임차 / PARTNER 협력·위탁 / VIRTUAL 가상 | VARCHAR(20) | N | LEASE |  |
-| 31 | `close_dt` | 마감 일자 |  | DATE | Y |  |  |
-| 32 | `country_cd` | 국가 코드 | ② 위치·연락처 (전화번호는 하이픈 없이 숫자만, 0029) | CHAR(2) | N | KR |  |
-| 33 | `customs_office_cd` | 세관 사무실 코드 |  | VARCHAR(10) | Y |  |  |
-| 34 | `default_inbound_loc_id` | 기본 입고 로케이션 ID | 기본 로케이션 3개: 센터 생성·보정 때 입고대기·출고대기·반품대기 창고의 DEFAULT를 연결 (ensureCenterDefaults) | BIGINT | Y |  | FK → tb_location.location_id |
-| 35 | `default_outbound_loc_id` | 기본 출고 로케이션 ID |  | BIGINT | Y |  | FK → tb_location.location_id |
-| 36 | `default_return_loc_id` | 기본 반품 로케이션 ID |  | BIGINT | Y |  | FK → tb_location.location_id |
-| 37 | `directions` | 오시는길 |  | VARCHAR(1000) | Y |  |  |
-| 38 | `dock_cnt` | 도크 수 |  | INTEGER | Y |  |  |
-| 39 | `email` | 이메일 |  | VARCHAR(100) | Y |  |  |
-| 40 | `expiry_mgmt_yn` | 기한 관리 여부 |  | CHAR(1) | Y |  |  |
-| 41 | `ext_attr` | 확장속성 | 확장 속성 (JSON) | JSONB | Y |  |  |
-| 42 | `floor_area_m2` | 층 영역(㎡) | ③ 시설 정보 (1차: 연면적·보관면적·도크 / 2차: 나머지) | DECIMAL(12,2) | Y |  |  |
-| 43 | `floor_cnt` | 층 수 |  | INTEGER | Y |  |  |
-| 44 | `food_storage_yn` | 식품 보관 여부 |  | CHAR(1) | N | N |  |
-| 45 | `gln_cd` | GLN 코드 |  | VARCHAR(13) | Y |  |  |
-| 46 | `hazmat_yn` | 위험물 여부 |  | CHAR(1) | N | N |  |
-| 47 | `inbound_cutoff_time` | 입고 마감 시각 |  | TIME WITHOUT TIME ZONE | Y |  |  |
-| 48 | `land_area_m2` | 토지 영역(㎡) |  | DECIMAL(12,2) | Y |  |  |
-| 49 | `latitude` | 위도 |  | DECIMAL(10,7) | Y |  |  |
-| 50 | `longitude` | 경도 |  | DECIMAL(10,7) | Y |  |  |
-| 51 | `lot_mgmt_yn` | LOT 관리 여부 |  | CHAR(1) | Y |  |  |
-| 52 | `open_dt` | 열림 일자 |  | DATE | Y |  |  |
-| 53 | `pallet_capa_cnt` | 팔레트 용량 수 |  | INTEGER | Y |  |  |
-| 54 | `pharma_yn` | 의약품 여부 |  | CHAR(1) | N | N |  |
-| 55 | `region_nm` | 권역 명 |  | VARCHAR(50) | Y |  |  |
-| 56 | `remark` | 비고 | 비고 | VARCHAR(1000) | Y |  |  |
-| 57 | `serial_mgmt_yn` | 시리얼 관리 여부 |  | CHAR(1) | Y |  |  |
-| 58 | `ship_cutoff_time` | 출고 마감 시각 |  | TIME WITHOUT TIME ZONE | Y |  |  |
-| 59 | `sort_seq` | 정렬순서 | 정렬 순서 | INTEGER | N | 0 |  |
-| 60 | `status_reason` | 상태 사유 |  | VARCHAR(200) | Y |  |  |
-| 61 | `storage_area_m2` | 보관 영역(㎡) |  | DECIMAL(12,2) | Y |  |  |
-| 62 | `sub_biz_no` | 종 사업자 번호 |  | CHAR(4) | Y |  |  |
-| 63 | `timezone` | 시간대 |  | VARCHAR(50) | Y |  |  |
-| 64 | `warehouse_reg_no` | 창고 등록 번호 |  | VARCHAR(30) | Y |  |  |
-| 65 | `work_days` | 작업 일수 | 월~일 Y/N 7글자 | CHAR(7) | N | YYYYYNN |  |
-| 66 | `work_end_time` | 작업 종료 시각 |  | TIME WITHOUT TIME ZONE | Y |  |  |
-| 67 | `work_start_time` | 작업 시작 시각 | ⑤ 운영 설정 — 상속 칸(출고 마감·타임존·할당 규칙·로트·유통기한·시리얼)은 NULL = 운영사 값 | TIME WITHOUT TIME ZONE | Y |  |  |
+| 12 | `zip_cd` | 우편번호 |  | VARCHAR(10) | Y |  |  |
+| 13 | `created_by` | 등록 자 | 등록·수정한 사람 아이디(username, 자동: 현재 작업자 / 시드 seed / 기존 데이터 system), 동시 수정 막기용 버전 (docs/db-conventions.md 공통 칸) | VARCHAR(50) | N | system |  |
+| 14 | `row_version` | 행버전 | 동시 수정 막기용 버전 (수정할 때마다 +1, 0038) | INTEGER | N | 1 |  |
+| 15 | `updated_by` | 수정 자 | 수정자 아이디 (자동) | VARCHAR(50) | N | system |  |
+| 16 | `status_cd` | 상태 코드 | 운영 상태 (상수 CENTER_STATUS): PREPARING 준비중 / ACTIVE 운영중 / SUSPENDED 일시중지 / CLOSED 폐쇄 폐쇄만 데이터 범위에서 빠지고, 새 업무(입고·재고 등) 고르기는 운영중만 | VARCHAR(20) | N | PREPARING |  |
+| 17 | `del_yn` | 삭제여부 | 논리 삭제: 'Y'면 지운 것 (목록·조회에서 빠지고 되살릴 수 있다, 0038) | CHAR(1) | N | N |  |
+| 18 | `operator_id` | 운영사 ID | 운영사 (멀티테넌트: 같은 운영사 사람만 보고 고친다, docs/decisions/0039) | BIGINT | N |  | UK FK → tb_operator.operator_id |
+| 19 | `addr_jibun` | 주소 지번 |  | VARCHAR(200) | Y |  |  |
+| 20 | `alloc_rule_cd` | 할당 규칙 코드 |  | VARCHAR(10) | Y |  |  |
+| 21 | `biz_reg_no` | 사업자등록번호 | 운영사와 다를 때만 (NULL = 운영사 값), 숫자만 | CHAR(10) | Y |  |  |
+| 22 | `bonded_area_cd` | 보세 영역 코드 |  | VARCHAR(20) | Y |  |  |
+| 23 | `bonded_license_no` | 보세 면허 번호 |  | VARCHAR(30) | Y |  |  |
+| 24 | `bonded_type_cd` | 보세 유형 코드 |  | VARCHAR(20) | Y |  |  |
+| 25 | `bonded_yn` | 보세 여부 | ④ 시설 자격 (1차: 보세 여부 / 2차: 나머지 — 보세 칸은 나중에 tb_center_bonded로 옮길 수 있다) | CHAR(1) | N | N |  |
+| 26 | `ceiling_height_m` | 천장 높이(m) |  | DECIMAL(5,2) | Y |  |  |
+| 27 | `center_nm_en` | 센터 명 영문 |  | VARCHAR(100) | Y |  |  |
+| 28 | `center_short_nm` | 센터 약칭 명 |  | VARCHAR(30) | Y |  |  |
+| 29 | `center_type_cd` | 센터 유형 코드 | 센터 유형 (상수 CENTER_TYPE): OWN 자가 / LEASE 임차 / PARTNER 협력·위탁 / VIRTUAL 가상 | VARCHAR(20) | N | LEASE |  |
+| 30 | `close_dt` | 마감 일자 |  | DATE | Y |  |  |
+| 31 | `country_cd` | 국가 코드 | ② 위치·연락처 (전화번호는 하이픈 없이 숫자만, 0029) | CHAR(2) | N | KR |  |
+| 32 | `customs_office_cd` | 세관 사무실 코드 |  | VARCHAR(10) | Y |  |  |
+| 33 | `default_inbound_loc_id` | 기본 입고 로케이션 ID | 기본 로케이션 3개: 센터 생성·보정 때 입고대기·출고대기·반품대기 창고의 DEFAULT를 연결 (ensureCenterDefaults) | BIGINT | Y |  | FK → tb_location.location_id |
+| 34 | `default_outbound_loc_id` | 기본 출고 로케이션 ID |  | BIGINT | Y |  | FK → tb_location.location_id |
+| 35 | `default_return_loc_id` | 기본 반품 로케이션 ID |  | BIGINT | Y |  | FK → tb_location.location_id |
+| 36 | `directions` | 오시는길 |  | VARCHAR(1000) | Y |  |  |
+| 37 | `dock_cnt` | 도크 수 |  | INTEGER | Y |  |  |
+| 38 | `email` | 이메일 |  | VARCHAR(100) | Y |  |  |
+| 39 | `expiry_mgmt_yn` | 기한 관리 여부 |  | CHAR(1) | Y |  |  |
+| 40 | `ext_attr` | 확장속성 | 확장 속성 (JSON) | JSONB | Y |  |  |
+| 41 | `floor_area_m2` | 층 영역(㎡) | ③ 시설 정보 (1차: 연면적·보관면적·도크 / 2차: 나머지) | DECIMAL(12,2) | Y |  |  |
+| 42 | `floor_cnt` | 층 수 |  | INTEGER | Y |  |  |
+| 43 | `food_storage_yn` | 식품 보관 여부 |  | CHAR(1) | N | N |  |
+| 44 | `gln_cd` | GLN 코드 |  | VARCHAR(13) | Y |  |  |
+| 45 | `hazmat_yn` | 위험물 여부 |  | CHAR(1) | N | N |  |
+| 46 | `inbound_cutoff_time` | 입고 마감 시각 |  | TIME WITHOUT TIME ZONE | Y |  |  |
+| 47 | `land_area_m2` | 토지 영역(㎡) |  | DECIMAL(12,2) | Y |  |  |
+| 48 | `latitude` | 위도 |  | DECIMAL(10,7) | Y |  |  |
+| 49 | `longitude` | 경도 |  | DECIMAL(10,7) | Y |  |  |
+| 50 | `lot_mgmt_yn` | LOT 관리 여부 |  | CHAR(1) | Y |  |  |
+| 51 | `open_dt` | 열림 일자 |  | DATE | Y |  |  |
+| 52 | `pallet_capa_cnt` | 팔레트 용량 수 |  | INTEGER | Y |  |  |
+| 53 | `pharma_yn` | 의약품 여부 |  | CHAR(1) | N | N |  |
+| 54 | `region_nm` | 권역 명 |  | VARCHAR(50) | Y |  |  |
+| 55 | `remark` | 비고 | 비고 | VARCHAR(1000) | Y |  |  |
+| 56 | `serial_mgmt_yn` | 시리얼 관리 여부 |  | CHAR(1) | Y |  |  |
+| 57 | `ship_cutoff_time` | 출고 마감 시각 |  | TIME WITHOUT TIME ZONE | Y |  |  |
+| 58 | `sort_seq` | 정렬순서 | 정렬 순서 | INTEGER | N | 0 |  |
+| 59 | `status_reason` | 상태 사유 |  | VARCHAR(200) | Y |  |  |
+| 60 | `storage_area_m2` | 보관 영역(㎡) |  | DECIMAL(12,2) | Y |  |  |
+| 61 | `sub_biz_no` | 종 사업자 번호 |  | CHAR(4) | Y |  |  |
+| 62 | `timezone` | 시간대 |  | VARCHAR(50) | Y |  |  |
+| 63 | `warehouse_reg_no` | 창고 등록 번호 |  | VARCHAR(30) | Y |  |  |
+| 64 | `work_days` | 작업 일수 | 월~일 Y/N 7글자 | CHAR(7) | N | YYYYYNN |  |
+| 65 | `work_end_time` | 작업 종료 시각 |  | TIME WITHOUT TIME ZONE | Y |  |  |
+| 66 | `work_start_time` | 작업 시작 시각 | ⑤ 운영 설정 — 상속 칸(출고 마감·타임존·할당 규칙·로트·유통기한·시리얼)은 NULL = 운영사 값 | TIME WITHOUT TIME ZONE | Y |  |  |
 
 **고유 인덱스**
 
 - `tb_center_operator_id_center_cd_key`: `CREATE UNIQUE INDEX tb_center_operator_id_center_cd_key ON tb_center (operator_id, center_cd) WHERE (del_yn = 'N'::bpchar)`
-- `tb_center_sys_cd_key`: `CREATE UNIQUE INDEX tb_center_sys_cd_key ON tb_center (sys_cd)`
 
 **검사 조건**
 
@@ -713,48 +711,46 @@
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | 1 | `warehouse_id` | 창고 ID |  | BIGINT | N | 자동 증가 | PK |
 | 2 | `center_id` | 센터 ID | 등록 후 바꿀 수 없다 | BIGINT | N |  | UK FK → tb_center.center_id |
-| 3 | `sys_cd` | 시스템코드 | 시스템 코드: WH000001 | TEXT | N |  | UK |
-| 4 | `warehouse_cd` | 창고 코드 | 창고코드: 필수, 같은 센터 안에서 중복 금지, 등록 후 수정 불가 (영문 대문자·숫자·밑줄) | VARCHAR(20) | N |  | UK |
-| 5 | `warehouse_nm` | 창고 명 |  | VARCHAR(100) | N |  |  |
-| 6 | `warehouse_type_cd` | 창고 유형 코드 | ① 기본 정보 [1차] | VARCHAR(20) | N | STORAGE | UK |
-| 7 | `created_at` | 등록 일시 | 등록 일시 (자동) | TIMESTAMP(3) | N | CURRENT_TIMESTAMP |  |
-| 8 | `updated_at` | 수정 일시 | 수정 일시 (자동) | TIMESTAMP(3) | N |  |  |
-| 9 | `temp_zone_cd` | 온도대 코드 | 센터 취급 온도대(tb_center_temp_zone) 중 하나 | VARCHAR(20) | N |  |  |
-| 10 | `created_by` | 등록 자 | 등록·수정한 사람 아이디(username, 자동: 현재 작업자 / 시드 seed / 기존 데이터 system), 동시 수정 막기용 버전 (docs/db-conventions.md 공통 칸) | VARCHAR(50) | N | system |  |
-| 11 | `row_version` | 행버전 | 동시 수정 막기용 버전 (수정할 때마다 +1, 0038) | INTEGER | N | 1 |  |
-| 12 | `updated_by` | 수정 자 | 수정자 아이디 (자동) | VARCHAR(50) | N | system |  |
-| 13 | `status_cd` | 상태 코드 | 상태 | VARCHAR(20) | N | ACTIVE |  |
-| 14 | `del_yn` | 삭제여부 | 코드는 삭제 안 된 것끼리만 겹치면 안 된다 (지운 코드는 다시 쓸 수 있다, 0038) 논리 삭제: 'Y'면 지운 것 (목록·조회에서 빠지고 되살릴 수 있다, 0038) | CHAR(1) | N | N |  |
-| 15 | `operator_id` | 운영사 ID | 운영사 (멀티테넌트: 같은 운영사 사람만 보고 고친다, docs/decisions/0039) | BIGINT | N |  | FK → tb_operator.operator_id |
-| 16 | `system_yn` | 시스템 여부 | 시스템 기본 창고 (센터 등록 때 자동 생성되는 입고·출고·반품 대기): 삭제·코드·유형·명칭 변경·사용 중지 불가 | CHAR(1) | N | N |  |
-| 17 | `description` | 설명 |  | VARCHAR(200) | Y |  |  |
-| 18 | `sort_seq` | 정렬순서 | 정렬 순서 | INTEGER | N | 10 |  |
-| 19 | `building_nm` | 건물 명 | ② 위치·시설 [1차: 동·층·면적 / 2차: 나머지] | VARCHAR(50) | Y |  |  |
-| 20 | `floor_no` | 층 번호 |  | VARCHAR(10) | Y |  |  |
-| 21 | `area_m2` | 영역(㎡) |  | DECIMAL(12,2) | Y |  |  |
-| 22 | `ceiling_height_m` | 천장 높이(m) |  | DECIMAL(5,2) | Y |  |  |
-| 23 | `pallet_capa_cnt` | 팔레트 용량 수 |  | INTEGER | Y |  |  |
-| 24 | `storage_method_cd` | 보관 방식 코드 | 보관 방식: 운영사 공통코드 STORAGE_METHOD | VARCHAR(20) | Y |  |  |
-| 25 | `bonded_yn` | 보세 여부 | 센터가 보세·위험물 자격이 있을 때만 Y | CHAR(1) | N | N |  |
-| 26 | `hazmat_yn` | 위험물 여부 |  | CHAR(1) | N | N |  |
-| 27 | `inbound_yn` | 입고 여부 | ③ 운영 속성 [1차]: 유형을 고르면 유형별 기본값(WAREHOUSE_TYPE_DEFAULTS)으로 채우고 고칠 수 있다 | CHAR(1) | N | Y |  |
-| 28 | `outbound_yn` | 출고 여부 |  | CHAR(1) | N | Y |  |
-| 29 | `allocatable_yn` | 할당가능 여부 | 이 창고 재고를 주문에 할당할 수 있는지 (가용재고 포함 여부) | CHAR(1) | N | Y |  |
-| 30 | `default_stock_status_cd` | 기본 재고 상태 코드 | 이 창고에 적치될 때 기본 재고상태 (STOCK_STATUS) | VARCHAR(20) | N | NORMAL |  |
-| 31 | `alloc_priority` | 할당 우선순위 | 여러 창고에 재고가 있을 때 작은 값 먼저 (1~999) | INTEGER | N | 100 |  |
-| 32 | `default_loc_id` | 기본 로케이션 ID | 로케이션을 정하지 않고 적치할 때 쓰는 곳 (시스템 기본 창고는 DEFAULT 로케이션) | BIGINT | Y |  | FK → tb_location.location_id |
-| 33 | `manager_user_id` | 관리자 사용자 ID | ④ 관리·담당 [2차] | BIGINT | Y |  | FK → tb_user.user_id |
-| 34 | `dedicated_shipper_id` | 전용 화주사 ID | 전용 화주사 (NULL = 공용 창고) | BIGINT | Y |  | FK → tb_shipper.shipper_id |
-| 35 | `loc_cd_prefix` | 로케이션 코드 접두 | 로케이션 일괄 생성 때 쓰는 접두어·구분자 (구분자가 없으면 '-') | VARCHAR(10) | Y |  |  |
-| 36 | `loc_cd_separator` | 로케이션 코드 구분자 |  | CHAR(1) | Y |  |  |
-| 37 | `remark` | 비고 | ⑤ 확장 | VARCHAR(1000) | Y |  |  |
-| 38 | `ext_attr` | 확장속성 | 확장 속성 (JSON) | JSONB | Y |  |  |
+| 3 | `warehouse_cd` | 창고 코드 | 시스템 코드: WH000001 창고코드: 필수, 같은 센터 안에서 중복 금지, 등록 후 수정 불가 (영문 대문자·숫자·밑줄) | VARCHAR(20) | N |  | UK |
+| 4 | `warehouse_nm` | 창고 명 |  | VARCHAR(100) | N |  |  |
+| 5 | `warehouse_type_cd` | 창고 유형 코드 | ① 기본 정보 [1차] | VARCHAR(20) | N | STORAGE | UK |
+| 6 | `created_at` | 등록 일시 | 등록 일시 (자동) | TIMESTAMP(3) | N | CURRENT_TIMESTAMP |  |
+| 7 | `updated_at` | 수정 일시 | 수정 일시 (자동) | TIMESTAMP(3) | N |  |  |
+| 8 | `temp_zone_cd` | 온도대 코드 | 센터 취급 온도대(tb_center_temp_zone) 중 하나 | VARCHAR(20) | N |  |  |
+| 9 | `created_by` | 등록 자 | 등록·수정한 사람 아이디(username, 자동: 현재 작업자 / 시드 seed / 기존 데이터 system), 동시 수정 막기용 버전 (docs/db-conventions.md 공통 칸) | VARCHAR(50) | N | system |  |
+| 10 | `row_version` | 행버전 | 동시 수정 막기용 버전 (수정할 때마다 +1, 0038) | INTEGER | N | 1 |  |
+| 11 | `updated_by` | 수정 자 | 수정자 아이디 (자동) | VARCHAR(50) | N | system |  |
+| 12 | `status_cd` | 상태 코드 | 상태 | VARCHAR(20) | N | ACTIVE |  |
+| 13 | `del_yn` | 삭제여부 | 코드는 삭제 안 된 것끼리만 겹치면 안 된다 (지운 코드는 다시 쓸 수 있다, 0038) 논리 삭제: 'Y'면 지운 것 (목록·조회에서 빠지고 되살릴 수 있다, 0038) | CHAR(1) | N | N |  |
+| 14 | `operator_id` | 운영사 ID | 운영사 (멀티테넌트: 같은 운영사 사람만 보고 고친다, docs/decisions/0039) | BIGINT | N |  | FK → tb_operator.operator_id |
+| 15 | `system_yn` | 시스템 여부 | 시스템 기본 창고 (센터 등록 때 자동 생성되는 입고·출고·반품 대기): 삭제·코드·유형·명칭 변경·사용 중지 불가 | CHAR(1) | N | N |  |
+| 16 | `description` | 설명 |  | VARCHAR(200) | Y |  |  |
+| 17 | `sort_seq` | 정렬순서 | 정렬 순서 | INTEGER | N | 10 |  |
+| 18 | `building_nm` | 건물 명 | ② 위치·시설 [1차: 동·층·면적 / 2차: 나머지] | VARCHAR(50) | Y |  |  |
+| 19 | `floor_no` | 층 번호 |  | VARCHAR(10) | Y |  |  |
+| 20 | `area_m2` | 영역(㎡) |  | DECIMAL(12,2) | Y |  |  |
+| 21 | `ceiling_height_m` | 천장 높이(m) |  | DECIMAL(5,2) | Y |  |  |
+| 22 | `pallet_capa_cnt` | 팔레트 용량 수 |  | INTEGER | Y |  |  |
+| 23 | `storage_method_cd` | 보관 방식 코드 | 보관 방식: 운영사 공통코드 STORAGE_METHOD | VARCHAR(20) | Y |  |  |
+| 24 | `bonded_yn` | 보세 여부 | 센터가 보세·위험물 자격이 있을 때만 Y | CHAR(1) | N | N |  |
+| 25 | `hazmat_yn` | 위험물 여부 |  | CHAR(1) | N | N |  |
+| 26 | `inbound_yn` | 입고 여부 | ③ 운영 속성 [1차]: 유형을 고르면 유형별 기본값(WAREHOUSE_TYPE_DEFAULTS)으로 채우고 고칠 수 있다 | CHAR(1) | N | Y |  |
+| 27 | `outbound_yn` | 출고 여부 |  | CHAR(1) | N | Y |  |
+| 28 | `allocatable_yn` | 할당가능 여부 | 이 창고 재고를 주문에 할당할 수 있는지 (가용재고 포함 여부) | CHAR(1) | N | Y |  |
+| 29 | `default_stock_status_cd` | 기본 재고 상태 코드 | 이 창고에 적치될 때 기본 재고상태 (STOCK_STATUS) | VARCHAR(20) | N | NORMAL |  |
+| 30 | `alloc_priority` | 할당 우선순위 | 여러 창고에 재고가 있을 때 작은 값 먼저 (1~999) | INTEGER | N | 100 |  |
+| 31 | `default_loc_id` | 기본 로케이션 ID | 로케이션을 정하지 않고 적치할 때 쓰는 곳 (시스템 기본 창고는 DEFAULT 로케이션) | BIGINT | Y |  | FK → tb_location.location_id |
+| 32 | `manager_user_id` | 관리자 사용자 ID | ④ 관리·담당 [2차] | BIGINT | Y |  | FK → tb_user.user_id |
+| 33 | `dedicated_shipper_id` | 전용 화주사 ID | 전용 화주사 (NULL = 공용 창고) | BIGINT | Y |  | FK → tb_shipper.shipper_id |
+| 34 | `loc_cd_prefix` | 로케이션 코드 접두 | 로케이션 일괄 생성 때 쓰는 접두어·구분자 (구분자가 없으면 '-') | VARCHAR(10) | Y |  |  |
+| 35 | `loc_cd_separator` | 로케이션 코드 구분자 |  | CHAR(1) | Y |  |  |
+| 36 | `remark` | 비고 | ⑤ 확장 | VARCHAR(1000) | Y |  |  |
+| 37 | `ext_attr` | 확장속성 | 확장 속성 (JSON) | JSONB | Y |  |  |
 
 **고유 인덱스**
 
 - `tb_warehouse_center_id_warehouse_cd_key`: `CREATE UNIQUE INDEX tb_warehouse_center_id_warehouse_cd_key ON tb_warehouse (center_id, warehouse_cd) WHERE (del_yn = 'N'::bpchar)`
 - `tb_warehouse_one_system_per_center`: `CREATE UNIQUE INDEX tb_warehouse_one_system_per_center ON tb_warehouse (center_id, warehouse_type_cd) WHERE (system_yn = 'Y'::bpchar)`
-- `tb_warehouse_sys_cd_key`: `CREATE UNIQUE INDEX tb_warehouse_sys_cd_key ON tb_warehouse (sys_cd)`
 
 **인덱스**
 
@@ -1131,7 +1127,7 @@
 ## tb_shipper
 
 - 영역: 화주사 · 모델: `Shipper`
-- 화주사 (docs/decisions/0035, 0080 — 정의서 docs/specs/shipper.md, 표 이름은 tb_shipper 유지) 코드 3층 (0025): systemCode SH000001(자동·불변) / code(사용자 코드, 같은 운영사 안에서 중복 금지) / 외부 코드(ExternalCode)
+- 화주사 (docs/decisions/0035, 0080 — 정의서 docs/specs/shipper.md, 표 이름은 tb_shipper 유지) 코드 3층 (0084): id(내부) / code(화주사코드, 비우면 자동 체번 SH0001, 수정 불가) / custCode(운영사 ERP 코드 등) + 외부 코드(ExternalCode)
 
 | No | 칼럼 | 한글명 | 설명 | 타입 | NULL | 기본값 | 키 |
 | --- | --- | --- | --- | --- | --- | --- | --- |
@@ -1150,67 +1146,72 @@
 | 13 | `fax_no` | 팩스 번호 |  | TEXT | Y |  |  |
 | 14 | `label_unit_cd` | 라벨 단위 코드 | (값: PLT, BOX) | ENUM LabelUnit | N | 'PLT'::"LabelUnit" |  |
 | 15 | `tel_no` | 전화 번호 | ② 연락처·주소 | TEXT | Y |  |  |
-| 16 | `sys_cd` | 시스템코드 | 시스템 코드 (자동 채번·불변, 0025) | TEXT | N |  | UK |
-| 17 | `expiry_mgmt_yn` | 기한 관리 여부 |  | CHAR(1) | Y |  |  |
-| 18 | `lot_mgmt_yn` | LOT 관리 여부 | ④ 운영 설정 (상속: 비어 있으면 위 단계 값 — 0073·0080, getEffectiveSetting) 로트·유통기한은 품목 기본값으로도 쓴다 (품목에서 그대로 쓰거나 개별 지정, 0003 결정 2) | CHAR(1) | Y |  |  |
-| 19 | `zip_cd` | 우편번호 |  | TEXT | Y |  |  |
-| 20 | `created_by` | 등록 자 | 등록·수정한 사람 아이디(username, 자동: 현재 작업자 / 시드 seed / 기존 데이터 system), 동시 수정 막기용 버전 (docs/db-conventions.md 공통 칸) | VARCHAR(50) | N | system |  |
-| 21 | `row_version` | 행버전 | 동시 수정 막기용 버전 (수정할 때마다 +1, 0038) | INTEGER | N | 1 |  |
-| 22 | `updated_by` | 수정 자 | 수정자 아이디 (자동) | VARCHAR(50) | N | system |  |
-| 23 | `status_cd` | 상태 코드 | 상태 (상수 SHIPPER_STATUS, 0080): 준비중 → 운영중 → 일시정지 → 해지. 일시정지·해지는 사유 필수 해지만 데이터 범위에서 빠진다 (소속 사용자 로그인 불가) | VARCHAR(20) | N | PREPARING |  |
-| 24 | `del_yn` | 삭제여부 | 논리 삭제: 'Y'면 지운 것 (목록·조회에서 빠지고 되살릴 수 있다, 0038) | CHAR(1) | N | N |  |
-| 25 | `operator_id` | 운영사 ID | 운영사 (멀티테넌트: 같은 운영사 사람만 보고 고친다, docs/decisions/0039) | BIGINT | N |  | UK FK → tb_operator.operator_id |
-| 26 | `addr_jibun` | 주소 지번 |  | VARCHAR(200) | Y |  |  |
-| 27 | `alloc_rule_cd` | 할당 규칙 코드 |  | VARCHAR(10) | Y |  |  |
-| 28 | `api_enabled_yn` | API 사용 여부 |  | CHAR(1) | N | N |  |
-| 29 | `auto_create_item_yn` | 자동 생성 품목 여부 |  | CHAR(1) | N | N |  |
-| 30 | `auto_create_ship_to_yn` | 자동 생성 납품처 여부 |  | CHAR(1) | N | Y |  |
-| 31 | `auto_renew_yn` | 자동 갱신 여부 |  | CHAR(1) | N | Y |  |
-| 32 | `biz_entity_cd` | 사업자 대상 코드 | 사업자 구분·과세유형: 상수 BIZ_ENTITY·TAX_TYPE (운영사와 같은 값) | VARCHAR(10) | N | CORP |  |
-| 33 | `closing_day` | 마감 일 | 정산 마감일 1~31, 99 = 말일. 비어 있으면 운영사 값 | SMALLINT | Y |  |  |
-| 34 | `contract_end_dt` | 계약 종료 일자 | 비어 있으면 자동연장(기한 없음) | DATE | Y |  |  |
-| 35 | `contract_start_dt` | 계약 시작 일자 | ③ 계약·정산 | DATE | N | CURRENT_DATE |  |
-| 36 | `corp_reg_no` | 법인 등록 번호 |  | CHAR(13) | Y |  |  |
-| 37 | `country_cd` | 국가 코드 |  | CHAR(2) | N | KR |  |
-| 38 | `ext_attr` | 확장속성 | 확장 속성 (JSON) | JSONB | Y |  |  |
-| 39 | `homepage_url` | 홈페이지 URL |  | VARCHAR(200) | Y |  |  |
-| 40 | `if_method_cd` | 연동 방식 코드 | ⑥ 연동 (API 키 관리는 다음 작업 — 정의서 PART 2) 연동 방식: PORTAL·API·FILE·EDI | VARCHAR(20) | N | PORTAL |  |
-| 41 | `industry_cd` | 업종 코드 |  | VARCHAR(20) | Y |  |  |
-| 42 | `min_inbound_shelf_days` | 최소 입고 잔여유통일수 | 유통기한 잔여일 기준 (비어 있으면 검사 안 함, 상속 아님) | INTEGER | Y |  |  |
-| 43 | `min_outbound_shelf_days` | 최소 출고 잔여유통일수 |  | INTEGER | Y |  |  |
-| 44 | `order_no_unique_scope_cd` | 주문 번호 고유 권한범위 코드 | 주문번호 중복 기준: CLIENT(화주 전체 기간)·CLIENT_DAY(일자별) | VARCHAR(20) | N | CLIENT |  |
-| 45 | `partial_ship_yn` | 부분 출고 여부 |  | CHAR(1) | N | Y |  |
-| 46 | `payment_terms_days` | 결제 조건 일수 | 결제 조건: 마감 후 n일 | INTEGER | Y |  |  |
-| 47 | `remark` | 비고 | 비고 | VARCHAR(1000) | Y |  |  |
-| 48 | `serial_mgmt_yn` | 시리얼 관리 여부 |  | CHAR(1) | Y |  |  |
-| 49 | `settle_cycle_cd` | 정산 주기 코드 | 정산 주기: 공통코드 SETTLE_CYCLE | VARCHAR(10) | N | MONTHLY |  |
-| 50 | `ship_cutoff_time` | 출고 마감 시각 |  | TIME WITHOUT TIME ZONE | Y |  |  |
-| 51 | `ship_to_center_policy_cd` | 납품처 센터 정책 코드 | ⑤ 거래처·주문 정책 (포털·API 공통, 상수) 납품처 배송센터 미지정: AUTO_HOLD·AUTO_REJECT·REQUIRED | VARCHAR(20) | N | AUTO_HOLD |  |
-| 52 | `shipper_nm_en` | 화주사 명 영문 | ① 기본 정보 | VARCHAR(100) | Y |  |  |
-| 53 | `shipper_short_nm` | 화주사 약칭 명 |  | VARCHAR(30) | Y |  |  |
-| 54 | `shipper_type_cd` | 화주사 유형 코드 | 화주 유형·업종: 공통코드 SHIPPER_TYPE·SHIPPER_INDUSTRY (표시·분류용) | VARCHAR(20) | Y |  |  |
-| 55 | `shortage_policy_cd` | 부족 정책 코드 | 재고 부족 시 처리: 상수 SHORTAGE_POLICY (HOLD·PARTIAL·CANCEL_SHORT) | VARCHAR(20) | N | HOLD |  |
-| 56 | `sort_seq` | 정렬순서 | 정렬 순서 | INTEGER | N | 0 |  |
-| 57 | `status_reason` | 상태 사유 |  | VARCHAR(200) | Y |  |  |
-| 58 | `sub_biz_no` | 종 사업자 번호 |  | CHAR(4) | Y |  |  |
-| 59 | `tax_invoice_email` | 세금 송장 이메일 |  | VARCHAR(100) | Y |  |  |
-| 60 | `tax_type_cd` | 세금 유형 코드 |  | VARCHAR(10) | N | GENERAL |  |
+| 16 | `expiry_mgmt_yn` | 기한 관리 여부 |  | CHAR(1) | Y |  |  |
+| 17 | `lot_mgmt_yn` | LOT 관리 여부 | ④ 운영 설정 (상속: 비어 있으면 위 단계 값 — 0073·0080, getEffectiveSetting) 로트·유통기한은 품목 기본값으로도 쓴다 (품목에서 그대로 쓰거나 개별 지정, 0003 결정 2) | CHAR(1) | Y |  |  |
+| 18 | `zip_cd` | 우편번호 |  | TEXT | Y |  |  |
+| 19 | `created_by` | 등록 자 | 등록·수정한 사람 아이디(username, 자동: 현재 작업자 / 시드 seed / 기존 데이터 system), 동시 수정 막기용 버전 (docs/db-conventions.md 공통 칸) | VARCHAR(50) | N | system |  |
+| 20 | `row_version` | 행버전 | 동시 수정 막기용 버전 (수정할 때마다 +1, 0038) | INTEGER | N | 1 |  |
+| 21 | `updated_by` | 수정 자 | 수정자 아이디 (자동) | VARCHAR(50) | N | system |  |
+| 22 | `status_cd` | 상태 코드 | 상태 (상수 SHIPPER_STATUS, 0080): 준비중 → 운영중 → 일시정지 → 해지. 일시정지·해지는 사유 필수 해지만 데이터 범위에서 빠진다 (소속 사용자 로그인 불가) | VARCHAR(20) | N | PREPARING |  |
+| 23 | `del_yn` | 삭제여부 | 논리 삭제: 'Y'면 지운 것 (목록·조회에서 빠지고 되살릴 수 있다, 0038) | CHAR(1) | N | N |  |
+| 24 | `operator_id` | 운영사 ID | 운영사 (멀티테넌트: 같은 운영사 사람만 보고 고친다, docs/decisions/0039) | BIGINT | N |  | UK FK → tb_operator.operator_id |
+| 25 | `addr_jibun` | 주소 지번 |  | VARCHAR(200) | Y |  |  |
+| 26 | `alloc_rule_cd` | 할당 규칙 코드 |  | VARCHAR(10) | Y |  |  |
+| 27 | `api_enabled_yn` | API 사용 여부 |  | CHAR(1) | N | N |  |
+| 28 | `auto_create_item_yn` | 자동 생성 품목 여부 |  | CHAR(1) | N | N |  |
+| 29 | `auto_create_ship_to_yn` | 자동 생성 납품처 여부 |  | CHAR(1) | N | Y |  |
+| 30 | `auto_renew_yn` | 자동 갱신 여부 |  | CHAR(1) | N | Y |  |
+| 31 | `biz_entity_cd` | 사업자 대상 코드 | 사업자 구분·과세유형: 상수 BIZ_ENTITY·TAX_TYPE (운영사와 같은 값) | VARCHAR(10) | N | CORP |  |
+| 32 | `closing_day` | 마감 일 | 정산 마감일 1~31, 99 = 말일. 비어 있으면 운영사 값 | SMALLINT | Y |  |  |
+| 33 | `contract_end_dt` | 계약 종료 일자 | 비어 있으면 자동연장(기한 없음) | DATE | Y |  |  |
+| 34 | `contract_start_dt` | 계약 시작 일자 | ③ 계약·정산 | DATE | N | CURRENT_DATE |  |
+| 35 | `corp_reg_no` | 법인 등록 번호 |  | CHAR(13) | Y |  |  |
+| 36 | `country_cd` | 국가 코드 |  | CHAR(2) | N | KR |  |
+| 37 | `ext_attr` | 확장속성 | 확장 속성 (JSON) | JSONB | Y |  |  |
+| 38 | `homepage_url` | 홈페이지 URL |  | VARCHAR(200) | Y |  |  |
+| 39 | `if_method_cd` | 연동 방식 코드 | ⑥ 연동 (API 키 관리는 다음 작업 — 정의서 PART 2) 연동 방식: PORTAL·API·FILE·EDI | VARCHAR(20) | N | PORTAL |  |
+| 40 | `industry_cd` | 업종 코드 |  | VARCHAR(20) | Y |  |  |
+| 41 | `min_inbound_shelf_days` | 최소 입고 잔여유통일수 | 유통기한 잔여일 기준 (비어 있으면 검사 안 함, 상속 아님) | INTEGER | Y |  |  |
+| 42 | `min_outbound_shelf_days` | 최소 출고 잔여유통일수 |  | INTEGER | Y |  |  |
+| 43 | `order_no_unique_scope_cd` | 주문 번호 고유 권한범위 코드 | 주문번호 중복 기준: CLIENT(화주 전체 기간)·CLIENT_DAY(일자별) | VARCHAR(20) | N | CLIENT |  |
+| 44 | `partial_ship_yn` | 부분 출고 여부 |  | CHAR(1) | N | Y |  |
+| 45 | `payment_terms_days` | 결제 조건 일수 | 결제 조건: 마감 후 n일 | INTEGER | Y |  |  |
+| 46 | `remark` | 비고 | 비고 | VARCHAR(1000) | Y |  |  |
+| 47 | `serial_mgmt_yn` | 시리얼 관리 여부 |  | CHAR(1) | Y |  |  |
+| 48 | `settle_cycle_cd` | 정산 주기 코드 | 정산 주기: 공통코드 SETTLE_CYCLE | VARCHAR(10) | N | MONTHLY |  |
+| 49 | `ship_cutoff_time` | 출고 마감 시각 |  | TIME WITHOUT TIME ZONE | Y |  |  |
+| 50 | `ship_to_center_policy_cd` | 납품처 센터 정책 코드 | ⑤ 거래처·주문 정책 (포털·API 공통, 상수) 납품처 배송센터 미지정: AUTO_HOLD·AUTO_REJECT·REQUIRED | VARCHAR(20) | N | AUTO_HOLD |  |
+| 51 | `shipper_nm_en` | 화주사 명 영문 | ① 기본 정보 | VARCHAR(100) | Y |  |  |
+| 52 | `shipper_short_nm` | 화주사 약칭 명 |  | VARCHAR(30) | Y |  |  |
+| 53 | `shipper_type_cd` | 화주사 유형 코드 | 화주 유형·업종: 공통코드 SHIPPER_TYPE·SHIPPER_INDUSTRY (표시·분류용) | VARCHAR(20) | Y |  |  |
+| 54 | `shortage_policy_cd` | 부족 정책 코드 | 재고 부족 시 처리: 상수 SHORTAGE_POLICY (HOLD·PARTIAL·CANCEL_SHORT) | VARCHAR(20) | N | HOLD |  |
+| 55 | `sort_seq` | 정렬순서 | 정렬 순서 | INTEGER | N | 0 |  |
+| 56 | `status_reason` | 상태 사유 |  | VARCHAR(200) | Y |  |  |
+| 57 | `sub_biz_no` | 종 사업자 번호 |  | CHAR(4) | Y |  |  |
+| 58 | `tax_invoice_email` | 세금 송장 이메일 |  | VARCHAR(100) | Y |  |  |
+| 59 | `tax_type_cd` | 세금 유형 코드 |  | VARCHAR(10) | N | GENERAL |  |
+| 60 | `code_prefix` | 코드접두어 | 거래처·품목 자동 체번 접두어 2글자 (I·O·0·1 제외), 운영사 안에서 고유. 하위 코드가 발행되면 바꿀 수 없다 (0084) | CHAR(2) | N |  | UK |
+| 61 | `if_key_type_cd` | 연동조회키 | 연동(API·엑셀)에서 거래처·납품처·품목을 찾는 키: CODE(우리 코드) / CUST_CD(사용자 정의 코드) | VARCHAR(20) | N | CODE |  |
+| 62 | `shipper_cust_cd` | 화주사 사용자정의코드 | 사용자 정의 코드 (운영사 ERP 코드 등), 운영사 안에서 고유 (값이 있을 때) | VARCHAR(50) | Y |  | UK |
 
 **고유 인덱스**
 
+- `tb_shipper_operator_id_code_prefix_key`: `CREATE UNIQUE INDEX tb_shipper_operator_id_code_prefix_key ON tb_shipper (operator_id, code_prefix) WHERE (del_yn = 'N'::bpchar)`
+- `tb_shipper_operator_id_cust_cd_key`: `CREATE UNIQUE INDEX tb_shipper_operator_id_cust_cd_key ON tb_shipper (operator_id, shipper_cust_cd) WHERE ((shipper_cust_cd IS NOT NULL) AND (del_yn = 'N'::bpchar))`
 - `tb_shipper_operator_id_shipper_cd_key`: `CREATE UNIQUE INDEX tb_shipper_operator_id_shipper_cd_key ON tb_shipper (operator_id, shipper_cd) WHERE (del_yn = 'N'::bpchar)`
-- `tb_shipper_sys_cd_key`: `CREATE UNIQUE INDEX tb_shipper_sys_cd_key ON tb_shipper (sys_cd)`
 
 **검사 조건**
 
 - `tb_shipper_alloc_rule_cd_check`: `CHECK ((alloc_rule_cd) IN ('FIFO', 'FEFO', 'LIFO'))`
 - `tb_shipper_biz_entity_cd_check`: `CHECK ((biz_entity_cd) IN ('CORP', 'INDIVIDUAL'))`
 - `tb_shipper_closing_day_check`: `CHECK ((closing_day IS NULL) OR ((closing_day >= 1) AND (closing_day <= 31)) OR (closing_day = 99))`
+- `tb_shipper_code_prefix_check`: `CHECK (code_prefix ~ '^[A-HJ-NP-Z][A-HJ-NP-Z2-9]$')`
 - `tb_shipper_contract_dt_check`: `CHECK ((contract_end_dt IS NULL) OR (contract_end_dt >= contract_start_dt))`
 - `tb_shipper_corp_reg_no_check`: `CHECK (corp_reg_no ~ '^[0-9]{13}$')`
 - `tb_shipper_count_check`: `CHECK (((COALESCE(payment_terms_days, 0) >= 0) AND (COALESCE(payment_terms_days, 0) <= 365)) AND ((COALESCE(min_inbound_shelf_days, 0) >= 0) AND (COALESCE(min_inbound_shelf_days, 0) <= 9999)) AND ((COALESCE(min_outbound_shelf_days, 0) >= 0) AND (COALESCE(min_outbound_shelf_days, 0) <= 9999)))`
 - `tb_shipper_del_yn_check`: `CHECK (del_yn IN ('Y', 'N')`
 - `tb_shipper_expiry_mgmt_yn_check`: `CHECK (expiry_mgmt_yn IN ('Y', 'N')`
+- `tb_shipper_if_key_type_cd_check`: `CHECK ((if_key_type_cd) IN ('CODE', 'CUST_CD'))`
 - `tb_shipper_if_method_cd_check`: `CHECK ((if_method_cd) IN ('PORTAL', 'API', 'FILE', 'EDI'))`
 - `tb_shipper_lot_mgmt_yn_check`: `CHECK (lot_mgmt_yn IN ('Y', 'N')`
 - `tb_shipper_order_no_scope_cd_check`: `CHECK ((order_no_unique_scope_cd) IN ('CLIENT', 'CLIENT_DAY'))`
@@ -1479,53 +1480,53 @@
 ## tb_customer
 
 - 영역: 거래처·납품처 · 모델: `Customer`
-- 거래처 (docs/decisions/0043): 화주사의 고객사 — 출고(MVP 이후) 때 물건을 받는 곳 코드 3층 (0025): systemCode CU00000001(자동·불변) / code(거래처코드, 같은 화주사 안에서 중복 금지, 비우면 시스템 코드) / 외부 코드(ExternalCode CUSTOMER)
+- 거래처 (docs/decisions/0043): 화주사의 고객사 — 출고(MVP 이후) 때 물건을 받는 곳 코드 3층 (0084): id(내부) / code(거래처코드, 비우면 자동 체번 {화주 접두어}C000001, 화주 안에서 고유·수정 불가) / custCode(화주 시스템 거래처코드) + 외부 코드(ExternalCode CUSTOMER)
 
 | No | 칼럼 | 한글명 | 설명 | 타입 | NULL | 기본값 | 키 |
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | 1 | `customer_id` | 거래처 ID |  | BIGINT | N | 자동 증가 | PK |
 | 2 | `operator_id` | 운영사 ID | 운영사 (멀티테넌트: 같은 운영사 사람만 보고 고친다, docs/decisions/0039) | BIGINT | N |  | FK → tb_operator.operator_id |
 | 3 | `shipper_id` | 화주사 ID |  | BIGINT | N |  | UK FK → tb_shipper.shipper_id |
-| 4 | `sys_cd` | 시스템코드 | 시스템 코드는 내부용. 거래처코드는 화주가 쓰는 코드 그대로 — 필수·등록 후 변경 불가 (0082, API 업무 키) | TEXT | N |  | UK |
-| 5 | `customer_cd` | 거래처 코드 |  | VARCHAR(30) | N |  | UK |
-| 6 | `customer_nm` | 거래처 명 |  | VARCHAR(200) | N |  |  |
-| 7 | `biz_reg_no` | 사업자등록번호 | 사업자등록번호·전화번호는 하이픈 없이 숫자만 (0029) | CHAR(10) | Y |  |  |
-| 8 | `ceo_nm` | 대표자 명 |  | VARCHAR(50) | Y |  |  |
-| 9 | `tel_no` | 전화 번호 |  | VARCHAR(15) | Y |  |  |
-| 10 | `email` | 이메일 |  | VARCHAR(100) | Y |  |  |
-| 11 | `zip_cd` | 우편번호 |  | VARCHAR(10) | Y |  |  |
-| 12 | `addr1` | 주소 |  | VARCHAR(200) | Y |  |  |
-| 13 | `addr2` | 상세주소 |  | VARCHAR(200) | Y |  |  |
-| 14 | `region_cd` | 권역 코드 | 법정동코드 10자리 (정제 결과) | CHAR(10) | Y |  |  |
-| 15 | `remark` | 비고 | 비고 | VARCHAR(1000) | Y |  |  |
-| 16 | `status_cd` | 상태 코드 | 상태 (상수 CUSTOMER_STATUS): ACTIVE 거래중 / SUSPENDED 거래중지 (신규 출고요청만 막는다) | VARCHAR(20) | N | ACTIVE |  |
-| 17 | `created_at` | 등록 일시 | 등록 일시 (자동) | TIMESTAMP(3) | N | CURRENT_TIMESTAMP |  |
-| 18 | `updated_at` | 수정 일시 | 수정 일시 (자동) | TIMESTAMP(3) | N |  |  |
-| 19 | `created_by` | 등록 자 | 등록·수정한 사람 아이디(username, 자동: 현재 작업자 / 시드 seed / 기존 데이터 system), 동시 수정 막기용 버전 (docs/db-conventions.md 공통 칸) | VARCHAR(50) | N | system |  |
-| 20 | `updated_by` | 수정 자 | 수정자 아이디 (자동) | VARCHAR(50) | N | system |  |
-| 21 | `row_version` | 행버전 | 동시 수정 막기용 버전 (수정할 때마다 +1, 0038) | INTEGER | N | 1 |  |
-| 22 | `del_yn` | 삭제여부 | 논리 삭제: 'Y'면 지운 것 (목록·조회에서 빠지고 되살릴 수 있다, 0038) | CHAR(1) | N | N |  |
-| 23 | `addr_grade` | 주소 등급 | 주소 정제 등급 A~F (0076 ADDR_GRADE) | CHAR(1) | Y |  |  |
-| 24 | `addr_jibun` | 주소 지번 |  | VARCHAR(200) | Y |  |  |
-| 25 | `addr_norm_at` | 주소 정제 일시 |  | TIMESTAMP(3) | Y |  |  |
-| 26 | `customer_group_cd` | 거래처 그룹 코드 |  | VARCHAR(30) | Y |  |  |
-| 27 | `customer_short_nm` | 거래처 약칭 명 |  | VARCHAR(30) | Y |  |  |
-| 28 | `customer_type_cd` | 거래처 유형 코드 | 거래처 유형: 공통코드 PARTNER_TYPE (분류·표시), 거래처 그룹: 화주가 쓰는 그룹 (자유 입력) | VARCHAR(20) | Y |  |  |
-| 29 | `ext_attr` | 확장속성 | 확장 속성 (JSON) | JSONB | Y |  |  |
-| 30 | `fax_no` | 팩스 번호 |  | VARCHAR(15) | Y |  |  |
-| 31 | `last_if_at` | 마지막연동일시 | 마지막 연동 일시 | TIMESTAMP(3) | Y |  |  |
-| 32 | `last_request_id` | 마지막 요청 ID | 마지막 연동 요청 ID | VARCHAR(40) | Y |  |  |
-| 33 | `min_shelf_days` | 최소 잔여유통일수 | 출고 조건 (거래처가 요구, 화주 설정보다 우선 — 적용은 출고 할당 작업에서) 비어 있으면 화주 출고 최소 잔여일 | INTEGER | Y |  |  |
-| 34 | `min_shelf_ratio` | 최소 잔여기한 비율 | 전체 유통기간 대비 잔여 비율 % (예: 66.67). 일수와 둘 다 있으면 더 엄격한 쪽 | DECIMAL(5,2) | Y |  |  |
-| 35 | `order_addr_mode_cd` | 주문 주소 방식 코드 | 주문 주소 사용 방식 (상수): SHIP_TO(납품처 지정) / ORDER_ADDR(주문의 수령인 주소 — 온라인몰·B2C) | VARCHAR(20) | N | SHIP_TO |  |
-| 36 | `raw_addr` | 원본 주소 |  | VARCHAR(500) | Y |  |  |
-| 37 | `raw_zip_cd` | 원본 우편번호 | 주소: 원본(입력·연동 그대로)은 보존하고 정제 결과는 따로 (0082) | VARCHAR(10) | Y |  |  |
-| 38 | `source_cd` | 출처 코드 | 연동 정보 (읽기 전용): 등록 경로 DATA_SOURCE, 최근 연동 | VARCHAR(20) | N | SCREEN |  |
+| 4 | `customer_cd` | 거래처 코드 | 시스템 코드는 내부용. 거래처코드는 화주가 쓰는 코드 그대로 — 필수·등록 후 변경 불가 (0082, API 업무 키) | VARCHAR(30) | N |  | UK |
+| 5 | `customer_nm` | 거래처 명 |  | VARCHAR(200) | N |  |  |
+| 6 | `biz_reg_no` | 사업자등록번호 | 사업자등록번호·전화번호는 하이픈 없이 숫자만 (0029) | CHAR(10) | Y |  |  |
+| 7 | `ceo_nm` | 대표자 명 |  | VARCHAR(50) | Y |  |  |
+| 8 | `tel_no` | 전화 번호 |  | VARCHAR(15) | Y |  |  |
+| 9 | `email` | 이메일 |  | VARCHAR(100) | Y |  |  |
+| 10 | `zip_cd` | 우편번호 |  | VARCHAR(10) | Y |  |  |
+| 11 | `addr1` | 주소 |  | VARCHAR(200) | Y |  |  |
+| 12 | `addr2` | 상세주소 |  | VARCHAR(200) | Y |  |  |
+| 13 | `region_cd` | 권역 코드 | 법정동코드 10자리 (정제 결과) | CHAR(10) | Y |  |  |
+| 14 | `remark` | 비고 | 비고 | VARCHAR(1000) | Y |  |  |
+| 15 | `status_cd` | 상태 코드 | 상태 (상수 CUSTOMER_STATUS): ACTIVE 거래중 / SUSPENDED 거래중지 (신규 출고요청만 막는다) | VARCHAR(20) | N | ACTIVE |  |
+| 16 | `created_at` | 등록 일시 | 등록 일시 (자동) | TIMESTAMP(3) | N | CURRENT_TIMESTAMP |  |
+| 17 | `updated_at` | 수정 일시 | 수정 일시 (자동) | TIMESTAMP(3) | N |  |  |
+| 18 | `created_by` | 등록 자 | 등록·수정한 사람 아이디(username, 자동: 현재 작업자 / 시드 seed / 기존 데이터 system), 동시 수정 막기용 버전 (docs/db-conventions.md 공통 칸) | VARCHAR(50) | N | system |  |
+| 19 | `updated_by` | 수정 자 | 수정자 아이디 (자동) | VARCHAR(50) | N | system |  |
+| 20 | `row_version` | 행버전 | 동시 수정 막기용 버전 (수정할 때마다 +1, 0038) | INTEGER | N | 1 |  |
+| 21 | `del_yn` | 삭제여부 | 논리 삭제: 'Y'면 지운 것 (목록·조회에서 빠지고 되살릴 수 있다, 0038) | CHAR(1) | N | N |  |
+| 22 | `addr_grade` | 주소 등급 | 주소 정제 등급 A~F (0076 ADDR_GRADE) | CHAR(1) | Y |  |  |
+| 23 | `addr_jibun` | 주소 지번 |  | VARCHAR(200) | Y |  |  |
+| 24 | `addr_norm_at` | 주소 정제 일시 |  | TIMESTAMP(3) | Y |  |  |
+| 25 | `customer_group_cd` | 거래처 그룹 코드 |  | VARCHAR(30) | Y |  |  |
+| 26 | `customer_short_nm` | 거래처 약칭 명 |  | VARCHAR(30) | Y |  |  |
+| 27 | `customer_type_cd` | 거래처 유형 코드 | 거래처 유형: 공통코드 PARTNER_TYPE (분류·표시), 거래처 그룹: 화주가 쓰는 그룹 (자유 입력) | VARCHAR(20) | Y |  |  |
+| 28 | `ext_attr` | 확장속성 | 확장 속성 (JSON) | JSONB | Y |  |  |
+| 29 | `fax_no` | 팩스 번호 |  | VARCHAR(15) | Y |  |  |
+| 30 | `last_if_at` | 마지막연동일시 | 마지막 연동 일시 | TIMESTAMP(3) | Y |  |  |
+| 31 | `last_request_id` | 마지막 요청 ID | 마지막 연동 요청 ID | VARCHAR(40) | Y |  |  |
+| 32 | `min_shelf_days` | 최소 잔여유통일수 | 출고 조건 (거래처가 요구, 화주 설정보다 우선 — 적용은 출고 할당 작업에서) 비어 있으면 화주 출고 최소 잔여일 | INTEGER | Y |  |  |
+| 33 | `min_shelf_ratio` | 최소 잔여기한 비율 | 전체 유통기간 대비 잔여 비율 % (예: 66.67). 일수와 둘 다 있으면 더 엄격한 쪽 | DECIMAL(5,2) | Y |  |  |
+| 34 | `order_addr_mode_cd` | 주문 주소 방식 코드 | 주문 주소 사용 방식 (상수): SHIP_TO(납품처 지정) / ORDER_ADDR(주문의 수령인 주소 — 온라인몰·B2C) | VARCHAR(20) | N | SHIP_TO |  |
+| 35 | `raw_addr` | 원본 주소 |  | VARCHAR(500) | Y |  |  |
+| 36 | `raw_zip_cd` | 원본 우편번호 | 주소: 원본(입력·연동 그대로)은 보존하고 정제 결과는 따로 (0082) | VARCHAR(10) | Y |  |  |
+| 37 | `source_cd` | 출처 코드 | 연동 정보 (읽기 전용): 등록 경로 DATA_SOURCE, 최근 연동 | VARCHAR(20) | N | SCREEN |  |
+| 38 | `customer_cust_cd` | 거래처 사용자정의코드 | 사용자 정의 코드 (화주 시스템의 거래처코드), 화주 안에서 고유 (값이 있을 때) | VARCHAR(50) | Y |  | UK |
 
 **고유 인덱스**
 
+- `tb_customer_shipper_id_cust_cd_key`: `CREATE UNIQUE INDEX tb_customer_shipper_id_cust_cd_key ON tb_customer (shipper_id, customer_cust_cd) WHERE ((customer_cust_cd IS NOT NULL) AND (del_yn = 'N'::bpchar))`
 - `tb_customer_shipper_id_customer_cd_key`: `CREATE UNIQUE INDEX tb_customer_shipper_id_customer_cd_key ON tb_customer (shipper_id, customer_cd) WHERE (del_yn = 'N'::bpchar)`
-- `tb_customer_sys_cd_key`: `CREATE UNIQUE INDEX tb_customer_sys_cd_key ON tb_customer (sys_cd)`
 
 **인덱스**
 
@@ -1579,8 +1580,8 @@
 | 2 | `operator_id` | 운영사 ID | 운영사 (멀티테넌트 키 — 다른 운영사 데이터는 보이지 않는다, 0039) | BIGINT | N |  | FK → tb_operator.operator_id |
 | 3 | `shipper_id` | 화주사 ID | 조회 성능용 (거래처의 화주사와 같다) | BIGINT | N |  | FK → tb_shipper.shipper_id |
 | 4 | `customer_id` | 거래처 ID |  | BIGINT | N |  | UK FK → tb_customer.customer_id |
-| 5 | `ship_to_cd` | 납품처 코드 | 거래처 안에서 고유, 등록 후 변경 불가. 자동 생성 기본 납품처는 거래처코드와 같다 | VARCHAR(30) | N |  | UK |
-| 6 | `ship_to_nm` | 납품처 명 |  | VARCHAR(100) | N |  |  |
+| 5 | `ship_to_cd` | 납품처 코드 | 거래처 안에서 고유, 등록 후 변경 불가. 비우면 자동 체번 {거래처코드}-01 (기본 납품처 포함, 0084) | VARCHAR(40) | N |  | UK |
+| 6 | `ship_to_nm` | 납품처 명 | 거래처명(200자)을 그대로 쓰는 기본 납품처가 있으므로 같은 길이 (H2) | VARCHAR(200) | N |  |  |
 | 7 | `default_yn` | 기본 여부 |  | CHAR(1) | N | N |  |
 | 8 | `system_created_yn` | 시스템 등록 여부 | 거래처 주소로 자동 만든 납품처 | CHAR(1) | N | N |  |
 | 9 | `addr_sync_yn` | 주소 동기화 여부 | 기본 납품처에서만 의미: Y면 거래처 주소가 바뀔 때 함께 바뀐다 (직접 고치면 N) | CHAR(1) | N | N |  |
@@ -1624,9 +1625,11 @@
 | 47 | `created_by` | 등록 자 | 등록자 아이디 (자동: 작업자 / seed / system) | VARCHAR(50) | N | system |  |
 | 48 | `updated_by` | 수정 자 | 수정자 아이디 (자동) | VARCHAR(50) | N | system |  |
 | 49 | `row_version` | 행버전 | 동시 수정 막기용 버전 (수정할 때마다 +1, 0038) | INTEGER | N | 1 |  |
+| 50 | `ship_to_cust_cd` | 납품처 사용자정의코드 | 사용자 정의 코드 (화주 시스템의 납품처코드), 거래처 안에서 고유 (값이 있을 때) | VARCHAR(50) | Y |  | UK |
 
 **고유 인덱스**
 
+- `tb_ship_to_customer_id_cust_cd_key`: `CREATE UNIQUE INDEX tb_ship_to_customer_id_cust_cd_key ON tb_ship_to (customer_id, ship_to_cust_cd) WHERE ((ship_to_cust_cd IS NOT NULL) AND (del_yn = 'N'::bpchar))`
 - `tb_ship_to_customer_id_ship_to_cd_key`: `CREATE UNIQUE INDEX tb_ship_to_customer_id_ship_to_cd_key ON tb_ship_to (customer_id, ship_to_cd) WHERE (del_yn = 'N'::bpchar)`
 - `tb_ship_to_default_key`: `CREATE UNIQUE INDEX tb_ship_to_default_key ON tb_ship_to (customer_id) WHERE ((default_yn = 'Y'::bpchar) AND (del_yn = 'N'::bpchar))`
 
@@ -1654,77 +1657,77 @@
 ## tb_item
 
 - 영역: 품목 · 모델: `Item`
-- 품목 (docs/decisions/0041, 0083): 화주사가 맡긴 상품의 관리 단위 코드 3층 (0025): systemCode IT00000001(자동·불변) / code(품목코드: 화주 코드 그대로, 필수, 화주사 안에서 고유, 등록 후 변경 불가 — 0083) / 외부 코드(ExternalCode ITEM) 기한·LOT·시리얼 관리 여부는 상속하지 않는 명시값: 신규 등록 때 화주 실제 값을 복사하고, 이후 화주 설정이 바뀌어도 그대로 (재고 구조를 정하므로, 0083)
+- 품목 (docs/decisions/0041, 0083): 화주사가 맡긴 상품의 관리 단위 코드 3층 (0084): id(내부) / code(품목코드, 비우면 자동 체번 {화주 접두어}S000001, 화주 안에서 고유·수정 불가) / custCode(화주 시스템 품목코드) + 외부 코드(ExternalCode ITEM) 기한·LOT·시리얼 관리 여부는 상속하지 않는 명시값: 신규 등록 때 화주 실제 값을 복사하고, 이후 화주 설정이 바뀌어도 그대로 (재고 구조를 정하므로, 0083)
 
 | No | 칼럼 | 한글명 | 설명 | 타입 | NULL | 기본값 | 키 |
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | 1 | `item_id` | 품목 ID |  | BIGINT | N | 자동 증가 | PK |
 | 2 | `operator_id` | 운영사 ID | 운영사 (멀티테넌트: 같은 운영사 사람만 보고 고친다, docs/decisions/0039) | BIGINT | N |  | FK → tb_operator.operator_id |
 | 3 | `shipper_id` | 화주사 ID |  | BIGINT | N |  | UK FK → tb_shipper.shipper_id |
-| 4 | `sys_cd` | 시스템코드 | 시스템 코드 (자동 채번·불변, 0025) | TEXT | N |  | UK |
-| 5 | `item_cd` | 품목 코드 | ① 기본 정보 (0083): 품목코드는 화주 코드 그대로, 화주 안에서 고유·수정 불가 | VARCHAR(50) | N |  | UK |
-| 6 | `item_nm` | 품목 명 |  | VARCHAR(200) | N |  |  |
-| 7 | `spec_nm` | 규격 명 | 규격 (예: 500g×24입, 1.8L) | VARCHAR(100) | Y |  |  |
-| 8 | `base_unit_id` | 기본 단위 ID | ② 단위: 기본단위 = 재고를 세는 단위 (PACK 불가, 재고·거래가 생기면 수정 불가). 단위별 환산·규격은 tb_item_unit | BIGINT | N |  | FK → tb_unit.unit_id |
-| 9 | `lot_mgmt_yn` | LOT 관리 여부 |  | CHAR(1) | N | N |  |
-| 10 | `expiry_mgmt_yn` | 기한 관리 여부 | ⑤ 소비기한·LOT: 관리 여부 3개는 상속하지 않는 명시값 (신규 때 화주 실제 값을 복사, 이후 화주 설정 변경에 영향 없음) | CHAR(1) | N | N |  |
-| 11 | `label_unit_cd` | 라벨 단위 코드 | 라벨 단위 (입고 라벨 출력, 0041) (값: PLT, BOX) | ENUM LabelUnit | Y |  |  |
-| 12 | `expiry_alert_day_cnt` | 기한 알림 일 수 | 임박 알림 기준일 (잔여일이 이보다 짧으면 "임박") | INTEGER | Y |  |  |
-| 13 | `remark` | 비고 | 비고 | VARCHAR(1000) | Y |  |  |
-| 14 | `status_cd` | 상태 코드 | ACTIVE 사용 / INACTIVE 사용중지 / DISCONTINUED 단종 (신규 입고 불가, 재고 출고는 가능) | VARCHAR(20) | N | ACTIVE |  |
-| 15 | `created_at` | 등록 일시 | 등록 일시 (자동) | TIMESTAMP(3) | N | CURRENT_TIMESTAMP |  |
-| 16 | `updated_at` | 수정 일시 | 수정 일시 (자동) | TIMESTAMP(3) | N |  |  |
-| 17 | `created_by` | 등록 자 | 등록·수정한 사람 아이디(username, 자동: 현재 작업자 / 시드 seed / 기존 데이터 system), 동시 수정 막기용 버전 (docs/db-conventions.md 공통 칸) | VARCHAR(50) | N | system |  |
-| 18 | `updated_by` | 수정 자 | 수정자 아이디 (자동) | VARCHAR(50) | N | system |  |
-| 19 | `row_version` | 행버전 | 동시 수정 막기용 버전 (수정할 때마다 +1, 0038) | INTEGER | N | 1 |  |
-| 20 | `del_yn` | 삭제여부 | 논리 삭제: 'Y'면 지운 것 (목록·조회에서 빠지고 되살릴 수 있다, 0038) | CHAR(1) | N | N |  |
-| 21 | `abc_class_cd` | ABC 분류 코드 |  | VARCHAR(5) | Y |  |  |
-| 22 | `alloc_rule_cd` | 할당 규칙 코드 | NULL = 화주 값 (상속) | VARCHAR(10) | Y |  |  |
-| 23 | `box_only_ship_yn` | 박스 만 출고 여부 | ⑥ 출고 조건 | CHAR(1) | N | N |  |
-| 24 | `brand_nm` | 브랜드 명 |  | VARCHAR(100) | Y |  |  |
-| 25 | `category1` | 분류1 |  | VARCHAR(50) | Y |  |  |
-| 26 | `category2` | 분류2 |  | VARCHAR(50) | Y |  |  |
-| 27 | `category3` | 분류3 |  | VARCHAR(50) | Y |  |  |
-| 28 | `currency_cd` | 통화 코드 |  | CHAR(3) | Y |  |  |
-| 29 | `default_inbound_unit_id` | 기본 입고 단위 ID | 기본 입고·주문단위: NULL = 자동 (입고 = BOX, 없으면 기본단위 / 주문 = 기본단위) | BIGINT | Y |  | FK → tb_unit.unit_id |
-| 30 | `default_order_unit_id` | 기본 주문 단위 ID |  | BIGINT | Y |  | FK → tb_unit.unit_id |
-| 31 | `expiry_input_cd` | 기한 입력 코드 |  | VARCHAR(20) | Y |  |  |
-| 32 | `expiry_type_cd` | 기한 유형 코드 |  | VARCHAR(20) | Y |  |  |
-| 33 | `ext_attr` | 확장속성 | 확장 속성 (JSON) | JSONB | Y |  |  |
-| 34 | `fragile_yn` | 파손주의 여부 |  | CHAR(1) | N | N |  |
-| 35 | `hazmat_class_cd` | 위험물 분류 코드 |  | VARCHAR(20) | Y |  |  |
-| 36 | `hazmat_yn` | 위험물 여부 |  | CHAR(1) | N | N |  |
-| 37 | `hs_cd` | HS 코드 |  | VARCHAR(12) | Y |  |  |
-| 38 | `item_nm_en` | 품목 명 영문 |  | VARCHAR(200) | Y |  |  |
-| 39 | `item_short_nm` | 품목 약칭 명 |  | VARCHAR(50) | Y |  |  |
-| 40 | `item_type_cd` | 품목 유형 코드 | 품목 유형 (상수 ITEM_TYPE — SET이면 세트 품목) | VARCHAR(20) | N | GOODS |  |
-| 41 | `item_value_amt` | 품목 값 금액 | 품목 가액 (기본단위 1개 기준, 파손·분실 보상용) | DECIMAL(15,2) | Y |  |  |
-| 42 | `last_if_at` | 마지막연동일시 | 마지막 연동 일시 | TIMESTAMP(3) | Y |  |  |
-| 43 | `last_request_id` | 마지막 요청 ID | 마지막 연동 요청 ID | VARCHAR(40) | Y |  |  |
-| 44 | `lot_source_cd` | LOT 출처 코드 |  | VARCHAR(20) | Y |  |  |
-| 45 | `maker_nm` | 제조사 명 |  | VARCHAR(100) | Y |  |  |
-| 46 | `max_stack_box` | 최대 적층 박스 |  | INTEGER | Y |  |  |
-| 47 | `min_inbound_shelf_days` | 최소 입고 잔여유통일수 | NULL = 화주 값 (상속) | INTEGER | Y |  |  |
-| 48 | `min_order_qty` | 최소 주문 수량 |  | DECIMAL(15,3) | Y |  |  |
-| 49 | `min_outbound_shelf_days` | 최소 출고 잔여유통일수 |  | INTEGER | Y |  |  |
-| 50 | `origin_country_cd` | 원산지 국가 코드 | 원산지 (ISO 3166 두 글자) | CHAR(2) | Y |  |  |
-| 51 | `pallet_box_qty` | 팔레트 박스 수량 |  | INTEGER | Y |  |  |
-| 52 | `pallet_hi` | 팔레트 단수(HI) |  | INTEGER | Y |  |  |
-| 53 | `pallet_ti` | 팔레트 단당박스수(TI) |  | INTEGER | Y |  |  |
-| 54 | `pallet_type_cd` | 팔레트 유형 코드 | ③ 팔레트 적재: 종류 + 단당 박스 수(TI) × 단수(HI) → PLT 행 자동 계산. TI·HI 없이 팔레트당 박스 수만 넣어도 된다 | VARCHAR(20) | Y |  |  |
-| 55 | `serial_mgmt_yn` | 시리얼 관리 여부 |  | CHAR(1) | N | N |  |
-| 56 | `set_yn` | 세트 여부 |  | CHAR(1) | N | N |  |
-| 57 | `shelf_life_days` | 총기한일수 |  | INTEGER | Y |  |  |
-| 58 | `source_cd` | 출처 코드 | ⑦ 연동 정보 (거래처와 같다) | VARCHAR(20) | N | SCREEN |  |
-| 59 | `storage_temp_max` | 보관 온도 최대 |  | DECIMAL(5,1) | Y |  |  |
-| 60 | `storage_temp_min` | 보관 온도 최소 |  | DECIMAL(5,1) | Y |  |  |
-| 61 | `temp_zone_cd` | 온도대 코드 | ④ 보관 조건 | VARCHAR(20) | N | AMBIENT |  |
-| 62 | `upright_yn` | 세움보관 여부 |  | CHAR(1) | N | N |  |
+| 4 | `item_cd` | 품목 코드 | ① 기본 정보: 품목코드는 화주 안에서 고유·수정 불가, 비우면 자동 체번 (0083 → 0084) | VARCHAR(50) | N |  | UK |
+| 5 | `item_nm` | 품목 명 |  | VARCHAR(200) | N |  |  |
+| 6 | `spec_nm` | 규격 명 | 규격 (예: 500g×24입, 1.8L) | VARCHAR(100) | Y |  |  |
+| 7 | `base_unit_id` | 기본 단위 ID | ② 단위: 기본단위 = 재고를 세는 단위 (PACK 불가, 재고·거래가 생기면 수정 불가). 단위별 환산·규격은 tb_item_unit | BIGINT | N |  | FK → tb_unit.unit_id |
+| 8 | `lot_mgmt_yn` | LOT 관리 여부 |  | CHAR(1) | N | N |  |
+| 9 | `expiry_mgmt_yn` | 기한 관리 여부 | ⑤ 소비기한·LOT: 관리 여부 3개는 상속하지 않는 명시값 (신규 때 화주 실제 값을 복사, 이후 화주 설정 변경에 영향 없음) | CHAR(1) | N | N |  |
+| 10 | `label_unit_cd` | 라벨 단위 코드 | 라벨 단위 (입고 라벨 출력, 0041) (값: PLT, BOX) | ENUM LabelUnit | Y |  |  |
+| 11 | `expiry_alert_day_cnt` | 기한 알림 일 수 | 임박 알림 기준일 (잔여일이 이보다 짧으면 "임박") | INTEGER | Y |  |  |
+| 12 | `remark` | 비고 | 비고 | VARCHAR(1000) | Y |  |  |
+| 13 | `status_cd` | 상태 코드 | ACTIVE 사용 / INACTIVE 사용중지 / DISCONTINUED 단종 (신규 입고 불가, 재고 출고는 가능) | VARCHAR(20) | N | ACTIVE |  |
+| 14 | `created_at` | 등록 일시 | 등록 일시 (자동) | TIMESTAMP(3) | N | CURRENT_TIMESTAMP |  |
+| 15 | `updated_at` | 수정 일시 | 수정 일시 (자동) | TIMESTAMP(3) | N |  |  |
+| 16 | `created_by` | 등록 자 | 등록·수정한 사람 아이디(username, 자동: 현재 작업자 / 시드 seed / 기존 데이터 system), 동시 수정 막기용 버전 (docs/db-conventions.md 공통 칸) | VARCHAR(50) | N | system |  |
+| 17 | `updated_by` | 수정 자 | 수정자 아이디 (자동) | VARCHAR(50) | N | system |  |
+| 18 | `row_version` | 행버전 | 동시 수정 막기용 버전 (수정할 때마다 +1, 0038) | INTEGER | N | 1 |  |
+| 19 | `del_yn` | 삭제여부 | 논리 삭제: 'Y'면 지운 것 (목록·조회에서 빠지고 되살릴 수 있다, 0038) | CHAR(1) | N | N |  |
+| 20 | `abc_class_cd` | ABC 분류 코드 |  | VARCHAR(5) | Y |  |  |
+| 21 | `alloc_rule_cd` | 할당 규칙 코드 | NULL = 화주 값 (상속) | VARCHAR(10) | Y |  |  |
+| 22 | `box_only_ship_yn` | 박스 만 출고 여부 | ⑥ 출고 조건 | CHAR(1) | N | N |  |
+| 23 | `brand_nm` | 브랜드 명 |  | VARCHAR(100) | Y |  |  |
+| 24 | `category1` | 분류1 |  | VARCHAR(50) | Y |  |  |
+| 25 | `category2` | 분류2 |  | VARCHAR(50) | Y |  |  |
+| 26 | `category3` | 분류3 |  | VARCHAR(50) | Y |  |  |
+| 27 | `currency_cd` | 통화 코드 |  | CHAR(3) | Y |  |  |
+| 28 | `default_inbound_unit_id` | 기본 입고 단위 ID | 기본 입고·주문단위: NULL = 자동 (입고 = BOX, 없으면 기본단위 / 주문 = 기본단위) | BIGINT | Y |  | FK → tb_unit.unit_id |
+| 29 | `default_order_unit_id` | 기본 주문 단위 ID |  | BIGINT | Y |  | FK → tb_unit.unit_id |
+| 30 | `expiry_input_cd` | 기한 입력 코드 |  | VARCHAR(20) | Y |  |  |
+| 31 | `expiry_type_cd` | 기한 유형 코드 |  | VARCHAR(20) | Y |  |  |
+| 32 | `ext_attr` | 확장속성 | 확장 속성 (JSON) | JSONB | Y |  |  |
+| 33 | `fragile_yn` | 파손주의 여부 |  | CHAR(1) | N | N |  |
+| 34 | `hazmat_class_cd` | 위험물 분류 코드 |  | VARCHAR(20) | Y |  |  |
+| 35 | `hazmat_yn` | 위험물 여부 |  | CHAR(1) | N | N |  |
+| 36 | `hs_cd` | HS 코드 |  | VARCHAR(12) | Y |  |  |
+| 37 | `item_nm_en` | 품목 명 영문 |  | VARCHAR(200) | Y |  |  |
+| 38 | `item_short_nm` | 품목 약칭 명 |  | VARCHAR(50) | Y |  |  |
+| 39 | `item_type_cd` | 품목 유형 코드 | 품목 유형 (상수 ITEM_TYPE — SET이면 세트 품목) | VARCHAR(20) | N | GOODS |  |
+| 40 | `item_value_amt` | 품목 값 금액 | 품목 가액 (기본단위 1개 기준, 파손·분실 보상용) | DECIMAL(15,2) | Y |  |  |
+| 41 | `last_if_at` | 마지막연동일시 | 마지막 연동 일시 | TIMESTAMP(3) | Y |  |  |
+| 42 | `last_request_id` | 마지막 요청 ID | 마지막 연동 요청 ID | VARCHAR(40) | Y |  |  |
+| 43 | `lot_source_cd` | LOT 출처 코드 |  | VARCHAR(20) | Y |  |  |
+| 44 | `maker_nm` | 제조사 명 |  | VARCHAR(100) | Y |  |  |
+| 45 | `max_stack_box` | 최대 적층 박스 |  | INTEGER | Y |  |  |
+| 46 | `min_inbound_shelf_days` | 최소 입고 잔여유통일수 | NULL = 화주 값 (상속) | INTEGER | Y |  |  |
+| 47 | `min_order_qty` | 최소 주문 수량 |  | DECIMAL(15,3) | Y |  |  |
+| 48 | `min_outbound_shelf_days` | 최소 출고 잔여유통일수 |  | INTEGER | Y |  |  |
+| 49 | `origin_country_cd` | 원산지 국가 코드 | 원산지 (ISO 3166 두 글자) | CHAR(2) | Y |  |  |
+| 50 | `pallet_box_qty` | 팔레트 박스 수량 |  | INTEGER | Y |  |  |
+| 51 | `pallet_hi` | 팔레트 단수(HI) |  | INTEGER | Y |  |  |
+| 52 | `pallet_ti` | 팔레트 단당박스수(TI) |  | INTEGER | Y |  |  |
+| 53 | `pallet_type_cd` | 팔레트 유형 코드 | ③ 팔레트 적재: 종류 + 단당 박스 수(TI) × 단수(HI) → PLT 행 자동 계산. TI·HI 없이 팔레트당 박스 수만 넣어도 된다 | VARCHAR(20) | Y |  |  |
+| 54 | `serial_mgmt_yn` | 시리얼 관리 여부 |  | CHAR(1) | N | N |  |
+| 55 | `set_yn` | 세트 여부 |  | CHAR(1) | N | N |  |
+| 56 | `shelf_life_days` | 총기한일수 |  | INTEGER | Y |  |  |
+| 57 | `source_cd` | 출처 코드 | ⑦ 연동 정보 (거래처와 같다) | VARCHAR(20) | N | SCREEN |  |
+| 58 | `storage_temp_max` | 보관 온도 최대 |  | DECIMAL(5,1) | Y |  |  |
+| 59 | `storage_temp_min` | 보관 온도 최소 |  | DECIMAL(5,1) | Y |  |  |
+| 60 | `temp_zone_cd` | 온도대 코드 | ④ 보관 조건 | VARCHAR(20) | N | AMBIENT |  |
+| 61 | `upright_yn` | 세움보관 여부 |  | CHAR(1) | N | N |  |
+| 62 | `item_cust_cd` | 품목 사용자정의코드 | 사용자 정의 코드 (화주 시스템의 품목코드), 화주 안에서 고유 (값이 있을 때) | VARCHAR(50) | Y |  | UK |
 
 **고유 인덱스**
 
+- `tb_item_shipper_id_cust_cd_key`: `CREATE UNIQUE INDEX tb_item_shipper_id_cust_cd_key ON tb_item (shipper_id, item_cust_cd) WHERE ((item_cust_cd IS NOT NULL) AND (del_yn = 'N'::bpchar))`
 - `tb_item_shipper_id_item_cd_key`: `CREATE UNIQUE INDEX tb_item_shipper_id_item_cd_key ON tb_item (shipper_id, item_cd) WHERE (del_yn = 'N'::bpchar)`
-- `tb_item_sys_cd_key`: `CREATE UNIQUE INDEX tb_item_sys_cd_key ON tb_item (sys_cd)`
 
 **인덱스**
 

@@ -89,6 +89,7 @@ const BUNDANG = '4113510900'
 const input = (overrides: Partial<CustomerCreateInput> = {}): CustomerCreateInput => ({
   shipperId: String(gana),
   code: 'C1',
+  custCode: '',
   name: '한빛마트 분당점',
   shortName: '',
   customerType: '',
@@ -197,7 +198,7 @@ afterAll(async () => {
 })
 
 describe('거래처 등록 · 수정', () => {
-  it('시스템 코드 자동, 번호는 숫자만, 담당자 함께, 납품처가 없으면 거래처 주소로 기본 납품처', async () => {
+  it('번호는 숫자만, 담당자 함께, 납품처가 없으면 거래처 주소로 기본 납품처', async () => {
     await assignZip('13529', icn)
     const created = await create({
       code: 'hanbit-1',
@@ -207,7 +208,6 @@ describe('거래처 등록 · 수정', () => {
       where: { id: BigInt(created.id) },
       include: { contacts: true, shipTos: true },
     })
-    expect(saved.systemCode).toMatch(/^CU\d{8}$/)
     expect(saved).toMatchObject({
       code: 'HANBIT-1',
       operatorId: TEST_OPERATOR_ID,
@@ -222,10 +222,10 @@ describe('거래처 등록 · 수정', () => {
     expect(saved.contacts.map((c) => [c.duty, c.name, c.isPrimary])).toEqual([
       ['OUTBOUND', '박담당', 'Y'],
     ])
-    // 기본 납품처: 거래처코드·이름 그대로, 주소 동기화, 권역 자동으로 이천센터
+    // 기본 납품처: 코드는 거래처코드-01 자동 체번(0084), 이름 그대로, 주소 동기화, 권역 자동으로 이천센터
     expect(saved.shipTos).toHaveLength(1)
     expect(saved.shipTos[0]).toMatchObject({
-      code: 'HANBIT-1',
+      code: 'HANBIT-1-01',
       name: '한빛마트 분당점',
       isDefault: 'Y',
       systemCreatedYn: 'Y',
@@ -242,10 +242,14 @@ describe('거래처 등록 · 수정', () => {
     })
   })
 
-  it('거래처코드는 필수 · 화주사 안에서 겹칠 수 없다, 납품처도 주소도 없으면 거부', async () => {
-    expect(await createCustomerAction(input({ code: '' }))).toMatchObject({
+  it('거래처코드는 비우면 자동 · 화주사 안에서 겹칠 수 없다, 납품처도 주소도 없으면 거부', async () => {
+    // 비우면 화주 접두어 + C + 6자리 (0084), 자동 체번 모양은 직접 넣을 수 없다
+    const auto = await createCustomerAction(input({ code: '' }))
+    const prefix = (await prisma.shipper.findUniqueOrThrow({ where: { id: gana } })).codePrefix
+    expect(auto.ok && auto.data.code).toBe(`${prefix}C000001`)
+    expect(await createCustomerAction(input({ code: `${prefix}C000099` }))).toMatchObject({
       ok: false,
-      error: { code: 'VALIDATION' },
+      error: { code: 'VALIDATION', message: expect.stringContaining('자동 체번 모양') },
     })
     await create({ code: 'hanbit' })
     expect(await createCustomerAction(input({ code: 'HANBIT' }))).toMatchObject({

@@ -31,7 +31,6 @@ import type { CenterOption } from './queries'
 
 type Row = {
   id: string
-  systemCode: string
   code: string
   name: string
   description: string | null
@@ -128,13 +127,6 @@ const COLUMNS: DataGridColumn<Row>[] = [
     defaultHidden: true,
   },
   {
-    id: 'systemCode',
-    header: '시스템 코드',
-    accessor: 'systemCode',
-    align: 'center',
-    defaultHidden: true,
-  },
-  {
     id: 'sortOrder',
     header: '정렬순서',
     accessor: 'sortOrder',
@@ -170,7 +162,7 @@ export function WarehousesList({
       label: '검색어',
       type: 'keyword',
       span: 3,
-      placeholder: '창고코드·창고명·시스템 코드',
+      placeholder: '창고코드·창고명',
     },
     { key: 'type', label: '창고 유형', type: 'multi', options: WAREHOUSE_TYPE.options },
     {

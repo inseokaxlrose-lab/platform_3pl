@@ -45,12 +45,12 @@ describe('품목 입력 규칙 — 기본', () => {
     })
   })
 
-  it('등록: 화주사·품목코드 필수, 품목코드는 대문자로 정리하고 영문·숫자·점·하이픈·밑줄 50자까지', () => {
+  it('등록: 화주사 필수, 품목코드는 비우면 자동(0084) · 대문자로 정리하고 영문·숫자·점·하이픈·밑줄 50자까지', () => {
     const create = (code: string, shipperId = '9') => ({ ...input(), shipperId, code })
     expect(itemCreateSchema.parse(create(' sku-001.a_1 ')).code).toBe('SKU-001.A_1')
-    expect(errorsOf(create('', ''), itemCreateSchema)).toMatchObject({
+    expect(itemCreateSchema.parse(create('')).code).toBe('')
+    expect(errorsOf(create('', ''), itemCreateSchema)).toEqual({
       shipperId: '화주사를 골라 주세요.',
-      code: '품목코드를 입력해 주세요.',
     })
     expect(errorsOf(create('SKU 1'), itemCreateSchema).code).toContain('영문·숫자')
     expect(errorsOf(create('A'.repeat(51)), itemCreateSchema).code).toContain('50자')

@@ -136,7 +136,6 @@ export function ShipToSheet({
             <Field
               label="납품처코드"
               span={6}
-              required
               error={errors.code}
               htmlFor={id('code')}
               hint={isNew ? '등록 후 바꿀 수 없습니다' : '바꿀 수 없습니다'}
@@ -146,7 +145,8 @@ export function ShipToSheet({
                 value={draft.code}
                 onChange={(e) => set({ code: e.target.value })}
                 disabled={disabled || !isNew}
-                maxLength={30}
+                maxLength={40}
+                placeholder="비워 두면 자동 생성 ({거래처코드}-01)"
               />
             </Field>
             <Field label="상태" span={6} htmlFor={id('status')}>
@@ -166,6 +166,21 @@ export function ShipToSheet({
                   ))}
                 </SelectContent>
               </Select>
+            </Field>
+            <Field
+              label="사용자 정의 코드"
+              span={6}
+              error={errors.custCode}
+              htmlFor={id('custCode')}
+              hint="화주 시스템의 납품처코드 (선택)"
+            >
+              <Input
+                id={id('custCode')}
+                value={draft.custCode ?? ''}
+                onChange={(e) => set({ custCode: e.target.value })}
+                disabled={disabled}
+                maxLength={50}
+              />
             </Field>
             <Field label="납품처명" span={12} required error={errors.name} htmlFor={id('name')}>
               <Input

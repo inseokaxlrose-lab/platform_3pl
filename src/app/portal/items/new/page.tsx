@@ -24,7 +24,7 @@ export default async function PortalNewItemPage() {
       header={{
         title: '품목 등록',
         description:
-          '품목코드는 화주가 쓰는 코드를 그대로 넣습니다 (등록 후 바꿀 수 없음). 기한·LOT 관리는 화주사 설정을 기본값으로 가져옵니다.',
+          '품목코드는 비워 두면 자동으로 붙고 등록 후 바꿀 수 없습니다. 화주 시스템의 코드는 사용자 정의 코드에 넣습니다. 기한·LOT 관리는 화주사 설정을 기본값으로 가져옵니다.',
         actions: <BackToListButton listPath="/portal/items" />,
       }}
       options={options}

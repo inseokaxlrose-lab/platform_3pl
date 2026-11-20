@@ -43,9 +43,18 @@ const NEED_CONFIRM = { ...NOT_DELETED, status: 'ACTIVE', centerAssignStatus: 'NE
 export async function listCustomers(input: ListQuery, scope: DataScope) {
   const { filters } = input
   const query = toPrismaQuery(input, {
-    searchFields: ['code', 'name', 'shortName', 'businessNumber', 'shipper.name', 'shipper.code'],
+    searchFields: [
+      'code',
+      'custCode',
+      'name',
+      'shortName',
+      'businessNumber',
+      'shipper.name',
+      'shipper.code',
+    ],
     sortable: {
       code: 'code',
+      custCode: 'custCode',
       name: 'name',
       shipper: 'shipper.code',
       customerType: 'customerType',
@@ -90,8 +99,8 @@ export async function listCustomers(input: ListQuery, scope: DataScope) {
       where,
       select: {
         id: true,
-        systemCode: true,
         code: true,
+        custCode: true,
         name: true,
         customerType: true,
         customerGroup: true,

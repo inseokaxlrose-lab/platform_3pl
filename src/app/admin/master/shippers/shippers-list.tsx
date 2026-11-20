@@ -12,7 +12,6 @@ import { changeShippersStatusAction, listShippersAction } from './actions'
 
 type Row = {
   id: string
-  systemCode: string
   code: string
   name: string
   shipperType: string | null
@@ -55,13 +54,6 @@ const COLUMNS: DataGridColumn<Row>[] = [
     sortable: true,
     hideable: false,
     pinned: true,
-  },
-  {
-    id: 'systemCode',
-    header: '시스템 코드',
-    accessor: 'systemCode',
-    align: 'center',
-    defaultHidden: true,
   },
   {
     id: 'shipperType',
@@ -149,7 +141,7 @@ export function ShippersList({
       label: '검색어',
       type: 'keyword',
       span: 4,
-      placeholder: '화주사 코드·시스템 코드·화주사명·약칭',
+      placeholder: '화주사 코드·사용자 정의 코드·화주사명·약칭',
     },
     { key: 'status', label: '상태', type: 'multi', options: SHIPPER_STATUS.options },
     {

@@ -57,8 +57,8 @@ export const addressShape = {
   addressDetail: optionalText(200),
 }
 
-// 사용자 코드 (docs/decisions/0025): 비우면 시스템 코드를 쓴다. 소문자는 대문자로
-// 영문·숫자·하이픈·밑줄 2~20자 (시스템 코드 모양 금지는 저장할 때 서버에서 검사)
+// 직접 넣는 코드 (docs/decisions/0084): 비우면 자동 체번. 소문자는 대문자로
+// 영문·숫자·하이픈·밑줄 2~20자 (자동 체번 모양 금지는 저장할 때 서버에서 검사)
 export const userCodeField = (label: string) =>
   z
     .string()

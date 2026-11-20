@@ -66,6 +66,7 @@ export function customerInputOf(customer: CustomerInputSource): CustomerInput {
     return {
       id: String(s.id),
       code: s.code,
+      custCode: text(s.custCode),
       name: s.name,
       isDefault: isYes(s.isDefault),
       addrSync: isYes(s.addrSyncYn),
@@ -85,6 +86,7 @@ export function customerInputOf(customer: CustomerInputSource): CustomerInput {
     }
   })
   return {
+    custCode: text(customer.custCode),
     name: customer.name,
     shortName: text(customer.shortName),
     customerType: text(customer.customerType),
@@ -135,7 +137,6 @@ export async function getCustomerForEdit(id: bigint, scope: DataScope) {
   return textIds({
     id: customer.id,
     code: customer.code,
-    systemCode: customer.systemCode,
     rowVersion: customer.rowVersion,
     status: customer.status,
     source: customer.source,

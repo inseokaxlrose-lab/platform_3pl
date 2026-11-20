@@ -48,7 +48,10 @@ export const apiItemBarcodeSchema = z.object({
 })
 
 export const apiItemSchema = z.object({
-  itemCd: z.string({ error: 'itemCd를 보내 주세요.' }).trim().min(1, 'itemCd를 보내 주세요.'),
+  // 찾는 키는 화주사 연동 조회 키에 따른다 (0084): CODE → itemCd 필수, CUST_CD → itemCustCd 필수
+  // CUST_CD 화주가 새 품목에 itemCd를 안 보내면 품목코드는 자동 생성
+  itemCd: z.string().trim().max(50, '50자 이하입니다.').optional(),
+  itemCustCd: text(50),
   itemNm: z.string().trim().max(200).optional(),
   itemNmEn: text(200),
   shortNm: text(50),

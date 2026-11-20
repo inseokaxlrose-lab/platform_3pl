@@ -1,5 +1,5 @@
 import 'server-only'
-import { nextSystemCode, type Db } from '@/lib/master-code/system-code'
+import type { Db } from '@/lib/prisma'
 import { pickSystemTempZone, WAREHOUSE_TYPE_DEFAULTS } from '@/lib/warehouses/warehouse-codes'
 import { toYn } from '@/lib/yn'
 
@@ -69,7 +69,6 @@ export async function ensureCenterDefaults(db: Db, centerId: bigint) {
         data: {
           operatorId,
           centerId,
-          systemCode: await nextSystemCode('WAREHOUSE', db),
           code: taken ? `${staging.code}_STG` : staging.code,
           name: staging.name,
           type: staging.type,

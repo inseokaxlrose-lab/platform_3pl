@@ -176,7 +176,6 @@ describe('단위 추가 · 수정', () => {
       data: {
         operatorId: TEST_OPERATOR_ID,
         shipperId: ids.gana,
-        systemCode: 'IT-T-GN',
         code: 'HERB',
         name: '약초',
         baseUnitId: BigInt(gn.id),

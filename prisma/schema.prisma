@@ -211,14 +211,13 @@ model UserPermissionOverride {
 
 // 센터: 운영사의 물류센터
 // 센터: 운영사의 물류센터 (docs/decisions/0026)
-// 코드 3층 (0025): systemCode(자동·불변) / code(사용자 코드, 같은 운영사 안에서 중복 금지) / 외부 코드(ExternalCode)
+// 코드 (0025·0084): id(내부) / code(사용자 코드, 같은 운영사 안에서 중복 금지, 필수) / 외부 코드(ExternalCode)
 model Center {
   id                   BigInt    @id @default(autoincrement()) @map("center_id")
   // 운영사 (멀티테넌트: 같은 운영사 사람만 보고 고친다, docs/decisions/0039)
   operatorId           BigInt    @map("operator_id")
   operator             Operator  @relation(fields: [operatorId], references: [id], onDelete: Restrict)
   // 시스템 코드: CT000001 (내부용 불변 코드)
-  systemCode           String    @unique @map("sys_cd")
   // ① 기본 정보 (docs/decisions/0073, docs/specs/center.md)
   // 센터코드: 영문 대문자·숫자 1~20자, 필수, 등록 후 바꿀 수 없음 (라벨·문서에 찍힌다)
   code                 String    @map("center_cd") @db.VarChar(20)
@@ -382,7 +381,6 @@ model Warehouse {
   // 등록 후 바꿀 수 없다
   centerId           BigInt     @map("center_id")
   // 시스템 코드: WH000001
-  systemCode         String     @unique @map("sys_cd")
   // 창고코드: 필수, 같은 센터 안에서 중복 금지, 등록 후 수정 불가 (영문 대문자·숫자·밑줄)
   code               String     @map("warehouse_cd") @db.VarChar(20)
   name               String     @map("warehouse_nm") @db.VarChar(100)
@@ -592,14 +590,19 @@ enum LabelUnit {
 }
 
 // 화주사 (docs/decisions/0035, 0080 — 정의서 docs/specs/shipper.md, 표 이름은 tb_shipper 유지)
-// 코드 3층 (0025): systemCode SH000001(자동·불변) / code(사용자 코드, 같은 운영사 안에서 중복 금지) / 외부 코드(ExternalCode)
+// 코드 3층 (0084): id(내부) / code(화주사코드, 비우면 자동 체번 SH0001, 수정 불가) / custCode(운영사 ERP 코드 등) + 외부 코드(ExternalCode)
 model Shipper {
   id                   BigInt    @id @default(autoincrement()) @map("shipper_id")
   // 운영사 (멀티테넌트: 같은 운영사 사람만 보고 고친다, docs/decisions/0039)
   operatorId           BigInt    @map("operator_id")
   operator             Operator  @relation(fields: [operatorId], references: [id], onDelete: Restrict)
-  systemCode           String    @unique @map("sys_cd")
   code                 String    @map("shipper_cd")
+  // 거래처·품목 자동 체번 접두어 2글자 (I·O·0·1 제외), 운영사 안에서 고유. 하위 코드가 발행되면 바꿀 수 없다 (0084)
+  codePrefix           String    @map("code_prefix") @db.Char(2)
+  // 사용자 정의 코드 (운영사 ERP 코드 등), 운영사 안에서 고유 (값이 있을 때)
+  custCode             String?   @map("shipper_cust_cd") @db.VarChar(50)
+  // 연동(API·엑셀)에서 거래처·납품처·품목을 찾는 키: CODE(우리 코드) / CUST_CD(사용자 정의 코드)
+  ifKeyType            String    @default("CODE") @map("if_key_type_cd") @db.VarChar(20)
   name                 String    @map("shipper_nm")
   // ── ① 기본 정보
   nameEn               String?   @map("shipper_nm_en") @db.VarChar(100)
@@ -699,6 +702,8 @@ model Shipper {
 
   // 코드는 삭제 안 된 것끼리만 겹치면 안 된다 (지운 것은 다시 쓸 수 있다, 0038)
   @@unique([operatorId, code], where: raw("del_yn = 'N'"), map: "tb_shipper_operator_id_shipper_cd_key")
+  @@unique([operatorId, codePrefix], where: raw("del_yn = 'N'"), map: "tb_shipper_operator_id_code_prefix_key")
+  @@unique([operatorId, custCode], where: raw("shipper_cust_cd IS NOT NULL AND del_yn = 'N'"), map: "tb_shipper_operator_id_cust_cd_key")
   @@map("tb_shipper")
 }
 
@@ -1200,7 +1205,7 @@ model OperatorUnit {
 }
 
 // ── 품목 (docs/decisions/0041, 0083): 화주사가 맡긴 상품의 관리 단위
-// 코드 3층 (0025): systemCode IT00000001(자동·불변) / code(품목코드: 화주 코드 그대로, 필수, 화주사 안에서 고유, 등록 후 변경 불가 — 0083) / 외부 코드(ExternalCode ITEM)
+// 코드 3층 (0084): id(내부) / code(품목코드, 비우면 자동 체번 {화주 접두어}S000001, 화주 안에서 고유·수정 불가) / custCode(화주 시스템 품목코드) + 외부 코드(ExternalCode ITEM)
 // 기한·LOT·시리얼 관리 여부는 상속하지 않는 명시값: 신규 등록 때 화주 실제 값을 복사하고, 이후 화주 설정이 바뀌어도 그대로 (재고 구조를 정하므로, 0083)
 model Item {
   id            BigInt   @id @default(autoincrement()) @map("item_id")
@@ -1209,9 +1214,10 @@ model Item {
   operator      Operator @relation(fields: [operatorId], references: [id], onDelete: Restrict)
   shipperId     BigInt   @map("shipper_id")
   shipper       Shipper  @relation(fields: [shipperId], references: [id], onDelete: Restrict)
-  systemCode    String   @unique @map("sys_cd")
-  // ── ① 기본 정보 (0083): 품목코드는 화주 코드 그대로, 화주 안에서 고유·수정 불가
+  // ── ① 기본 정보: 품목코드는 화주 안에서 고유·수정 불가, 비우면 자동 체번 (0083 → 0084)
   code          String   @map("item_cd") @db.VarChar(50)
+  // 사용자 정의 코드 (화주 시스템의 품목코드), 화주 안에서 고유 (값이 있을 때)
+  custCode      String?  @map("item_cust_cd") @db.VarChar(50)
   name          String   @map("item_nm") @db.VarChar(200)
   nameEn        String?  @map("item_nm_en") @db.VarChar(200)
   shortName     String?  @map("item_short_nm") @db.VarChar(50)
@@ -1309,6 +1315,7 @@ model Item {
 
   // 품목코드는 같은 화주사의 삭제 안 된 것끼리만 겹치면 안 된다 (0038)
   @@unique([shipperId, code], where: raw("del_yn = 'N'"), map: "tb_item_shipper_id_item_cd_key")
+  @@unique([shipperId, custCode], where: raw("item_cust_cd IS NOT NULL AND del_yn = 'N'"), map: "tb_item_shipper_id_cust_cd_key")
   @@index([operatorId, shipperId, status])
   @@index([shipperId, name])
   @@index([shipperId, category1])
@@ -1434,7 +1441,7 @@ model PalletType {
 }
 
 // ── 거래처 (docs/decisions/0043): 화주사의 고객사 — 출고(MVP 이후) 때 물건을 받는 곳
-// 코드 3층 (0025): systemCode CU00000001(자동·불변) / code(거래처코드, 같은 화주사 안에서 중복 금지, 비우면 시스템 코드) / 외부 코드(ExternalCode CUSTOMER)
+// 코드 3층 (0084): id(내부) / code(거래처코드, 비우면 자동 체번 {화주 접두어}C000001, 화주 안에서 고유·수정 불가) / custCode(화주 시스템 거래처코드) + 외부 코드(ExternalCode CUSTOMER)
 model Customer {
   id             BigInt   @id @default(autoincrement()) @map("customer_id")
   // 운영사 (멀티테넌트: 같은 운영사 사람만 보고 고친다, docs/decisions/0039)
@@ -1443,8 +1450,9 @@ model Customer {
   shipperId      BigInt   @map("shipper_id")
   shipper        Shipper  @relation(fields: [shipperId], references: [id], onDelete: Restrict)
   // 시스템 코드는 내부용. 거래처코드는 화주가 쓰는 코드 그대로 — 필수·등록 후 변경 불가 (0082, API 업무 키)
-  systemCode     String   @unique @map("sys_cd")
   code           String   @map("customer_cd") @db.VarChar(30)
+  // 사용자 정의 코드 (화주 시스템의 거래처코드), 화주 안에서 고유 (값이 있을 때)
+  custCode       String?  @map("customer_cust_cd") @db.VarChar(50)
   name           String   @map("customer_nm") @db.VarChar(200)
   shortName      String?  @map("customer_short_nm") @db.VarChar(30)
   // 거래처 유형: 공통코드 PARTNER_TYPE (분류·표시), 거래처 그룹: 화주가 쓰는 그룹 (자유 입력)
@@ -1502,6 +1510,7 @@ model Customer {
 
   // 거래처코드는 같은 화주사의 삭제 안 된 것끼리만 겹치면 안 된다 (0038)
   @@unique([shipperId, code], where: raw("del_yn = 'N'"), map: "tb_customer_shipper_id_customer_cd_key")
+  @@unique([shipperId, custCode], where: raw("customer_cust_cd IS NOT NULL AND del_yn = 'N'"), map: "tb_customer_shipper_id_cust_cd_key")
   @@index([operatorId, shipperId, status])
   @@index([shipperId, name])
   @@index([businessNumber])
@@ -1520,9 +1529,12 @@ model ShipTo {
   shipper         Shipper  @relation(fields: [shipperId], references: [id], onDelete: Restrict)
   customerId      BigInt   @map("customer_id")
   customer        Customer @relation(fields: [customerId], references: [id], onDelete: Restrict)
-  // 거래처 안에서 고유, 등록 후 변경 불가. 자동 생성 기본 납품처는 거래처코드와 같다
-  code            String   @map("ship_to_cd") @db.VarChar(30)
-  name            String   @map("ship_to_nm") @db.VarChar(100)
+  // 거래처 안에서 고유, 등록 후 변경 불가. 비우면 자동 체번 {거래처코드}-01 (기본 납품처 포함, 0084)
+  code            String   @map("ship_to_cd") @db.VarChar(40)
+  // 사용자 정의 코드 (화주 시스템의 납품처코드), 거래처 안에서 고유 (값이 있을 때)
+  custCode        String?  @map("ship_to_cust_cd") @db.VarChar(50)
+  // 거래처명(200자)을 그대로 쓰는 기본 납품처가 있으므로 같은 길이 (H2)
+  name            String   @map("ship_to_nm") @db.VarChar(200)
   isDefault       String   @default("N") @map("default_yn") @db.Char(1)
   // 거래처 주소로 자동 만든 납품처
   systemCreatedYn String   @default("N") @map("system_created_yn") @db.Char(1)
@@ -1584,6 +1596,7 @@ model ShipTo {
 
   // 코드는 같은 거래처의 삭제 안 된 것끼리만 겹치면 안 된다
   @@unique([customerId, code], where: raw("del_yn = 'N'"), map: "tb_ship_to_customer_id_ship_to_cd_key")
+  @@unique([customerId, custCode], where: raw("ship_to_cust_cd IS NOT NULL AND del_yn = 'N'"), map: "tb_ship_to_customer_id_cust_cd_key")
   // 기본 납품처는 거래처당 하나 (삭제 안 된 것 중)
   @@unique([customerId], where: raw("default_yn = 'Y' AND del_yn = 'N'"), map: "tb_ship_to_default_key")
   @@index([shipperId, centerAssignStatus])

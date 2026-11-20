@@ -181,7 +181,7 @@ export function buildOpenApi(serverUrl: string) {
         post: {
           summary: '품목 등록·수정 (upsert)',
           description: [
-            '업무 키는 `itemCd`(화주 안에서 고유, 바꿀 수 없음). 없으면 만들고, 있으면 **보낸 칸만** 고칩니다 (안 보낸 칸은 그대로, `null`은 값 지우기).',
+            '업무 키는 화주의 연동 조회 키에 따라 `itemCd`(기본) 또는 `itemCustCd`(사용자 정의 코드). `itemCustCd`로 찾는 화주가 새 품목에 `itemCd`를 안 보내면 품목코드는 자동으로 붙습니다(바꿀 수 없음). 없으면 만들고, 있으면 **보낸 칸만** 고칩니다 (안 보낸 칸은 그대로, `null`은 값 지우기).',
             '`uoms`·`barcodes`는 **보낸 행만** 추가·수정합니다 (빠진 행은 그대로, 지우려면 `delete: true`). 기본단위는 `baseUom`으로만 정합니다.',
             '단위 코드는 우리 단위 코드 또는 외부코드 매핑(대상 단위)의 코드. `pallet`(종류·ti·hi 또는 boxQty)이 있으면 PLT를 계산하고, 보낸 PLT와 다르면 경고 `PLT_RECALCULATED`.',
             '새 품목에서 `expiryMgmt`·`lotMgmt`를 안 보내면 화주 설정을 따릅니다. 재고가 있으면 기본단위·관리 여부를 바꿀 수 없습니다(`ITEM_STOCK_EXISTS`).',
@@ -291,6 +291,7 @@ const ITEM = {
   type: 'object',
   properties: {
     itemCd: { type: 'string' },
+    itemCustCd: { type: 'string', nullable: true },
     itemNm: { type: 'string' },
     itemType: { type: 'string' },
     baseUom: { type: 'string' },

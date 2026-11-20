@@ -1,11 +1,9 @@
 import 'server-only'
-import { looksLikeSystemCode } from '@/config/master-codes'
 import { TEMP_ZONE, type TempZoneKey } from '@/config/operator-codes'
 import { ActionError } from '@/lib/actions/action-error'
 import { currentActor, requireOperatorId } from '@/lib/actor'
 import { assertCodeValues } from '@/lib/common-code/common-codes'
 import { timeToDate } from '@/lib/format/time'
-import { nextSystemCode } from '@/lib/master-code/system-code'
 import { assertRowVersion, withVersionGuard } from '@/lib/row-version'
 import { prisma, type Db } from '@/lib/prisma'
 import { DELETED_ONLY } from '@/lib/status'
@@ -20,14 +18,8 @@ import {
 
 // 센터 저장 (docs/decisions/0026, 0073). 권한·데이터 범위 검사는 서버 액션에서 한다
 
-// 센터코드 검사: 시스템 코드 모양 금지, 같은 운영사의 다른 센터와 중복 금지
+// 센터코드 검사: 같은 운영사의 다른 센터와 중복 금지 (센터코드는 필수 입력 — 시스템 코드는 0084에서 없앰)
 async function assertCenterCode(db: Db, code: string) {
-  if (looksLikeSystemCode('CENTER', code)) {
-    throw new ActionError(
-      'VALIDATION',
-      `'${code}'는 시스템 코드 모양이라 센터코드로 쓸 수 없습니다.`,
-    )
-  }
   const owner = await db.center.findFirst({
     where: { operatorId: requireOperatorId(), code },
     select: { id: true },
@@ -228,11 +220,9 @@ export async function createCenter(data: CenterCreateData) {
   return prisma.$transaction(async (tx) => {
     await assertCenterLimit(tx)
     await assertCenterCode(tx, data.code)
-    const systemCode = await nextSystemCode('CENTER', tx)
     const center = await tx.center.create({
       data: {
         operatorId: requireOperatorId(),
-        systemCode,
         code: data.code,
         status: 'PREPARING',
         ...centerFields(data),
@@ -245,12 +235,12 @@ export async function createCenter(data: CenterCreateData) {
     // 기본 로케이션 연결로 버전이 올라가므로 마지막 값을 돌려준다
     return tx.center.findUniqueOrThrow({
       where: { id: center.id },
-      select: { id: true, systemCode: true, code: true, rowVersion: true },
+      select: { id: true, code: true, rowVersion: true },
     })
   })
 }
 
-// 수정: 코드·시스템 코드·상태는 바뀌지 않는다 (상태는 changeCenterStatus)
+// 수정: 코드·상태는 바뀌지 않는다 (상태는 changeCenterStatus)
 // rowVersion: 화면이 불러온 버전 (그 사이 다른 사람이 저장했으면 충돌)
 export async function updateCenter(id: bigint, rowVersion: number, data: CenterData) {
   return prisma.$transaction(async (tx) => {

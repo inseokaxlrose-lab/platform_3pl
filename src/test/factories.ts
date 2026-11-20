@@ -1,11 +1,10 @@
-import { nextSystemCode } from '@/lib/master-code/system-code'
 import { prisma } from '@/lib/prisma'
 import { toStatus } from '@/lib/status'
 import { TEST_OPERATOR_ID } from './reset-database'
 
 // DB 테스트용 데이터 만들기 도우미 (테스트 DB에서만 사용)
 
-// 센터 (시스템 코드는 실제처럼 시퀀스로 발급, 입고대기 창고는 만들지 않음 — 필요한 테스트에서 따로)
+// 센터 (입고대기 창고는 만들지 않음 — 필요한 테스트에서 따로)
 // operatorId: 기본은 테스트 운영사 (다른 운영사 격리 테스트에서만 바꾼다)
 export async function createTestCenter(
   code: string,
@@ -14,7 +13,6 @@ export async function createTestCenter(
   return prisma.center.create({
     data: {
       operatorId: data.operatorId ?? TEST_OPERATOR_ID,
-      systemCode: await nextSystemCode('CENTER'),
       code,
       name: data.name ?? `${code} 센터`,
       // 센터 상태 4단계 (0073): 사용 = 운영중, 사용 중지 = 일시중지(사유 필수)
@@ -25,17 +23,32 @@ export async function createTestCenter(
   })
 }
 
-export function createTestShipper(
+// 코드 접두어로 쓸 수 있는 글자 (I·O·0·1 제외, 0084) — 운영사마다 등록 순서대로 AA, AB, …
+const PREFIX_FIRST = 'ABCDEFGHJKLMNPQRSTUVWXYZ'
+const PREFIX_SECOND = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'
+async function nextTestPrefix(operatorId: bigint) {
+  const n = await prisma.shipper.count({ where: { operatorId, delYn: { in: ['Y', 'N'] } } })
+  return PREFIX_FIRST[Math.floor(n / 32) % 24] + PREFIX_SECOND[n % 32]
+}
+
+export async function createTestShipper(
   code: string,
-  data: { name?: string; isActive?: boolean; operatorId?: bigint } = {},
+  data: {
+    name?: string
+    isActive?: boolean
+    operatorId?: bigint
+    codePrefix?: string
+    ifKeyType?: 'CODE' | 'CUST_CD'
+  } = {},
 ) {
   const operatorId = data.operatorId ?? TEST_OPERATOR_ID
   return prisma.shipper.create({
-    // 시스템 코드: 테스트에서는 시퀀스 대신 코드로 만든 고유 값 (운영사마다 같은 코드를 쓸 수 있어 운영사 번호를 붙인다)
     data: {
       operatorId,
       code,
-      systemCode: `SH-T${operatorId}-${code}`,
+      // 거래처·품목 자동 체번 접두어 (안 주면 AA, AB, … 순서)
+      codePrefix: data.codePrefix ?? (await nextTestPrefix(operatorId)),
+      ifKeyType: data.ifKeyType ?? 'CODE',
       name: data.name ?? `${code} 화주`,
       // 화주사 상태 4단계 (0080): 사용 = 운영중, 사용 중지 = 일시정지(사유 필수)
       ...((data.isActive ?? true)

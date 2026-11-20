@@ -7,6 +7,7 @@ import type { BarcodeType, UnitLevel } from '@/lib/items/item-codes'
 import { EMPTY_UNIT_ROW } from '@/lib/items/item-defaults'
 import type { ItemInput } from '@/lib/items/item-schema'
 import { ItemInputError, upsertItem } from '@/lib/items/item-upsert'
+import { keyWhere, shipperIfKeyType, type IfKeyType } from '@/lib/master-code/if-key'
 import { prisma, type Db } from '@/lib/prisma'
 import { sharedOperatorFilter } from '@/lib/scope/data-scope'
 import { qtyText, parseQty } from '@/lib/units/convert'
@@ -96,6 +97,8 @@ function patchOf(input: ApiItemInput, resolve: UnitResolver) {
       barcodes: current.barcodes.map((b) => ({ ...b })),
     }
     const has = (key: keyof ApiItemInput) => input[key] !== undefined
+    // 사용자 정의 코드 (CUST_CD 키면 upsert가 키 값으로 다시 채운다)
+    if (has('itemCustCd')) next.custCode = input.itemCustCd ?? ''
     // 글자 칸
     const TEXT: [keyof ApiItemInput, keyof ItemInput][] = [
       ['itemNm', 'name'],
@@ -247,6 +250,7 @@ function patchOf(input: ApiItemInput, resolve: UnitResolver) {
 
 const FIELD_OF: Record<string, string> = {
   code: 'itemCd',
+  custCode: 'itemCustCd',
   name: 'itemNm',
   nameEn: 'itemNmEn',
   shortName: 'shortNm',
@@ -292,7 +296,7 @@ const zodError = (error: z.ZodError) => {
   const issue = error.issues[0]
   const path = issue?.path.join('.') ?? ''
   return {
-    code: path === 'itemCd' ? 'ITEM_CD_INVALID' : 'VALIDATION_FAILED',
+    code: path === 'itemCd' || path === 'itemCustCd' ? 'ITEM_CD_INVALID' : 'VALIDATION_FAILED',
     message: issue?.message ?? '입력값을 확인해 주세요.',
     field: path || undefined,
   }
@@ -360,34 +364,49 @@ const UNIT_SELECT = {
 const warningsOf = (warnings: ItemWarning[]) =>
   warnings.map((w) => ({ code: w.code, message: w.message }))
 
+// 키 정리: 품목코드는 대문자, 사용자 정의 코드는 화주 시스템 값 그대로 (앞뒤 공백만 뺀다)
+const keyOf = (keyType: IfKeyType, value: string) =>
+  keyType === 'CUST_CD' ? value.trim() : value.trim().toUpperCase()
+
 // ── POST /items
 
 export async function postItems(ctx: ApiHandlerContext): Promise<ApiHandlerResult> {
   const list = readItems(ctx.body)
   const resolve = await unitResolver(ctx)
+  // 찾는 키: 화주사 연동 조회 키 (0084)
+  const keyType = await shipperIfKeyType(prisma, ctx.api.shipperId)
+  const keyName = keyType === 'CUST_CD' ? 'itemCustCd' : 'itemCd'
   const items: ItemResult[] = []
   for (const [index, raw] of list.entries()) {
     const seq = index + 1
-    const docNo =
-      typeof (raw as { itemCd?: unknown })?.itemCd === 'string'
-        ? String((raw as { itemCd: string }).itemCd)
-            .trim()
-            .toUpperCase()
-        : null
+    const rawKey = (raw as Record<string, unknown> | null)?.[keyName]
+    const docNo = typeof rawKey === 'string' ? keyOf(keyType, rawKey) : null
     const parsed = apiItemSchema.safeParse(raw)
     if (!parsed.success) {
       items.push(fail(seq, docNo, zodError(parsed.error)))
       continue
     }
     const input = parsed.data
-    const code = input.itemCd.toUpperCase()
+    const key = keyOf(keyType, (keyType === 'CUST_CD' ? input.itemCustCd : input.itemCd) ?? '')
+    if (!key) {
+      items.push(
+        fail(seq, null, {
+          code: 'ITEM_CD_INVALID',
+          message: `${keyName}를 보내 주세요 (이 화주사의 품목 조회 키).`,
+          field: keyName,
+        }),
+      )
+      continue
+    }
     try {
       const done = await writeTransaction(ctx, async (tx: Db) => {
         const result = await upsertItem(
           tx,
           {
             shipperId: ctx.api.shipperId,
-            code,
+            keyType,
+            key,
+            code: input.itemCd ? input.itemCd.toUpperCase() : undefined,
             patch: patchOf(input, resolve),
             status: input.status,
           },
@@ -401,10 +420,12 @@ export async function postItems(ctx: ApiHandlerContext): Promise<ApiHandlerResul
       })
       items.push({
         seq,
-        docNo: done.result.code,
+        docNo: key,
         result: done.result.action,
         internalId: done.result.id,
         extra: {
+          itemCd: done.result.code,
+          itemCustCd: done.result.custCode,
           ...computed(done.saved.units, done.saved.palletBoxQty),
           warnings: warningsOf(done.result.warnings),
         },
@@ -423,6 +444,7 @@ export async function postItems(ctx: ApiHandlerContext): Promise<ApiHandlerResul
 const ITEM_SELECT = {
   id: true,
   code: true,
+  custCode: true,
   name: true,
   nameEn: true,
   shortName: true,
@@ -489,6 +511,7 @@ function toItem(row: ItemRow) {
   const dec = (v: unknown) => n(v as { toString(): string } | null)
   return {
     itemCd: r.code,
+    itemCustCd: r.custCode,
     itemNm: r.name,
     itemNmEn: r.nameEn,
     shortNm: r.shortName,
@@ -576,11 +599,12 @@ export async function getItems(ctx: ApiHandlerContext) {
   }
 }
 
-// GET /items/{itemCd} — 바코드 포함
+// GET /items/{itemCd} — 바코드 포함. 경로 값은 화주사 연동 조회 키(품목코드 또는 사용자 정의 코드)
 export async function getItem(ctx: ApiHandlerContext) {
-  const code = (ctx.params.itemCd ?? '').trim().toUpperCase()
+  const keyType = await shipperIfKeyType(prisma, ctx.api.shipperId)
+  const code = keyOf(keyType, ctx.params.itemCd ?? '')
   const row = await prisma.item.findFirst({
-    where: { shipperId: ctx.api.shipperId, code },
+    where: { shipperId: ctx.api.shipperId, ...keyWhere(keyType, code) },
     select: {
       ...ITEM_SELECT,
       barcodes: {

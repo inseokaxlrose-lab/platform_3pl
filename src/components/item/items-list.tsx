@@ -36,8 +36,8 @@ export type ItemRow = Row
 
 type Row = {
   id: string
-  systemCode: string
   code: string
+  custCode: string | null
   name: string
   spec: string | null
   itemType: string
@@ -95,7 +95,8 @@ const columnsOf = (basePath: string, withShipper: boolean): DataGridColumn<Row>[
   { id: 'itemType', header: '유형', accessor: 'itemType', sortable: true },
   { id: 'category1', header: '분류1', accessor: 'category1', sortable: true },
   { id: 'barcode', header: '바코드', accessor: 'barcode', defaultHidden: true },
-  { id: 'systemCode', header: '시스템 코드', accessor: 'systemCode', defaultHidden: true },
+  // 사용자 정의 코드 (화주 시스템의 코드, 0084)
+  { id: 'custCode', header: '사용자 정의 코드', accessor: 'custCode', sortable: true },
   { id: 'baseUnit', header: '기본단위', accessor: 'baseUnit' },
   { id: 'boxQty', header: 'BOX 입수', accessor: 'boxQty', align: 'right' },
   { id: 'pltBoxQty', header: 'PLT 입수(BOX)', accessor: 'pltBoxQty', align: 'right' },

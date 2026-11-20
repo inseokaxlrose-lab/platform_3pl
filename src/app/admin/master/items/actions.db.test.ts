@@ -147,7 +147,6 @@ describe('품목 등록', () => {
   it('시스템 코드 자동, 품목코드 그대로(대문자), 단위는 레벨별 행, 관리 여부는 명시값, 운영사·출처 자동', async () => {
     const created = await create({ code: 'sku-1', ...withExpiry, ...withLot })
     const saved = await savedItem(created.id)
-    expect(saved.systemCode).toMatch(/^IT\d{8}$/)
     expect(saved).toMatchObject({
       code: 'SKU-1',
       operatorId: TEST_OPERATOR_ID,
@@ -217,10 +216,15 @@ describe('품목 등록', () => {
     expect((await createItemAction(input({ shipperId: String(dara), code: 'SKU-1' }))).ok).toBe(
       true,
     )
-    // 품목코드는 필수
-    expect(await createItemAction(input({ code: '' }))).toMatchObject({
+    // 품목코드를 비우면 자동 체번: 화주 접두어 + S + 6자리 (0084)
+    const auto = await createItemAction(input({ code: '' }))
+    expect(auto).toMatchObject({ ok: true })
+    const prefix = (await prisma.shipper.findUniqueOrThrow({ where: { id: gana } })).codePrefix
+    expect(auto.ok && auto.data.code).toBe(`${prefix}S000001`)
+    // 자동 체번 모양은 직접 넣을 수 없다
+    expect(await createItemAction(input({ code: `${prefix}S000099` }))).toMatchObject({
       ok: false,
-      error: { code: 'VALIDATION' },
+      error: { code: 'VALIDATION', message: expect.stringContaining('자동 체번 모양') },
     })
   })
 

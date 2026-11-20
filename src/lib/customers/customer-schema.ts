@@ -23,18 +23,18 @@ export {
   MAX_CONTACTS as MAX_CUSTOMER_CONTACTS,
 } from '@/lib/contacts/contact-schema'
 
-// 거래처코드·납품처코드: 화주 코드 그대로 — 영문·숫자·하이픈·밑줄 1~30자 (소문자는 대문자로), 필수, 등록 후 변경 불가
-const codeField = (label: string) =>
+// 거래처코드·납품처코드: 영문·숫자·하이픈·밑줄 30자 이하 (소문자는 대문자로), 등록 후 변경 불가
+// 비우면 자동 체번 — 거래처 {화주 접두어}C000001, 납품처 {거래처코드}-01 (0084)
+const codeField = (label: string, max: number) =>
   z
     .string()
     .trim()
     .toUpperCase()
-    .min(1, `${label}를 입력해 주세요.`)
-    .max(30, '30자 이하로 입력해 주세요.')
-    .regex(/^[A-Z0-9_-]+$/, `${label}는 영문·숫자·하이픈·밑줄만 씁니다.`)
+    .max(max, `${max}자 이하로 입력해 주세요.`)
+    .regex(/^[A-Z0-9_-]*$/, `${label}는 영문·숫자·하이픈·밑줄만 씁니다.`)
 
-export const customerCodeField = codeField('거래처코드')
-export const shipToCodeField = codeField('납품처코드')
+export const customerCodeField = codeField('거래처코드', 30)
+export const shipToCodeField = codeField('납품처코드', 40)
 
 // 법정동코드 10자리 (주소 검색 결과를 자동으로 채운다, 화면 미노출)
 const regionCodeField = z
@@ -51,7 +51,9 @@ export const shipToSchema = z
     // 있으면 고치고, 없으면 새로
     id: optionalIdSchema.default(null),
     code: shipToCodeField,
-    name: requiredText('납품처명을 입력해 주세요.', 100),
+    // 사용자 정의 코드 (화주 시스템의 납품처코드, 0084)
+    custCode: optionalText(50),
+    name: requiredText('납품처명을 입력해 주세요.', 200),
     isDefault: z.boolean(),
     // 기본 납품처: 거래처 주소와 함께 바뀜 (켜져 있으면 주소 칸은 거래처 주소를 쓴다)
     addrSync: z.boolean(),
@@ -92,7 +94,8 @@ const shipTosSchema = z
   .max(200, '납품처는 한 번에 200곳까지입니다.')
   .superRefine((rows, ctx) => {
     if (rows.length === 0) return
-    const codes = rows.map((r) => r.code)
+    // 비운 코드는 저장할 때 자동 체번 — 넣은 코드끼리만 비교
+    const codes = rows.map((r) => r.code).filter(Boolean)
     if (new Set(codes).size !== codes.length) {
       ctx.addIssue({ code: 'custom', message: '같은 납품처코드가 두 번 있습니다.' })
     }
@@ -121,6 +124,8 @@ const shipTosSchema = z
   })
 
 const customerShape = {
+  // 사용자 정의 코드 (화주 시스템의 거래처코드, 0084) — 수정할 수 있다
+  custCode: optionalText(50),
   name: requiredText('거래처명을 입력해 주세요.', 200),
   shortName: optionalText(30),
   customerType: optionalText(20),
@@ -183,6 +188,7 @@ export type ShipToData = z.output<typeof shipToSchema>
 export const EMPTY_SHIP_TO: ShipToInput = {
   id: '',
   code: '',
+  custCode: '',
   name: '',
   isDefault: false,
   addrSync: false,

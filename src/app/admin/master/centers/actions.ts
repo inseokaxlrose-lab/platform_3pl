@@ -46,10 +46,9 @@ export const listCentersAction = createAction({
     }
     const { filters } = input
     const query = toPrismaQuery(input, {
-      searchFields: ['code', 'systemCode', 'name', 'shortName'],
+      searchFields: ['code', 'name', 'shortName'],
       sortable: {
         code: 'code',
-        systemCode: 'systemCode',
         name: 'name',
         type: 'type',
         status: 'status',
@@ -88,7 +87,6 @@ export const listCentersAction = createAction({
         take: query.take,
         select: {
           id: true,
-          systemCode: true,
           code: true,
           name: true,
           type: true,

@@ -4,7 +4,7 @@ import { currentActor, requireOperatorId } from '@/lib/actor'
 import { assertCodeValues } from '@/lib/common-code/common-codes'
 import { CONTACT_ROLE_GROUP } from '@/lib/contacts/contact-schema'
 import { deleteExternalCodes } from '@/lib/master-code/external-codes'
-import { nextSystemCode } from '@/lib/master-code/system-code'
+import { isAutoPattern, issueCode, issueCodes } from '@/lib/numbering/numbering'
 import { prisma, type Db } from '@/lib/prisma'
 import { normalizeAddress } from '@/lib/regions/address-normalize'
 import type { AddressSearcher } from '@/lib/regions/juso-client'
@@ -39,10 +39,46 @@ const assignNotice = (needConfirm: string[]) =>
     ? `배송센터 확인이 필요한 납품처가 있습니다: ${needConfirm.join(', ')}`
     : undefined
 
-// 거래처코드: 같은 화주사 안에서 중복 금지 (지운 것은 다시 쓸 수 있다)
-async function assertCustomerCode(db: Db, shipperId: bigint, code: string) {
+// 거래처코드(직접 입력): 자동 체번 모양 금지({접두어}C000001 — 나중 자동 발급과 겹침), 같은 화주사 안에서 중복 금지
+async function assertCustomerCode(db: Db, shipperId: bigint, code: string, prefix: string) {
+  if (await isAutoPattern(db, 'CUSTOMER', { operatorId: requireOperatorId(), prefix }, code)) {
+    throw new ActionError(
+      'VALIDATION',
+      `'${code}'는 자동 체번 모양이라 거래처코드로 쓸 수 없습니다. 비워 두면 자동으로 붙습니다.`,
+    )
+  }
   const owner = await db.customer.findFirst({ where: { shipperId, code }, select: { id: true } })
   if (owner) throw new ActionError('CONFLICT', `이 화주사에 이미 있는 거래처코드입니다: ${code}`)
+}
+
+// 사용자 정의 코드: 같은 화주사 안에서 중복 금지 (값이 있을 때, 0084)
+async function assertCustomerCustCode(
+  db: Db,
+  shipperId: bigint,
+  custCode: string | null,
+  exceptId?: bigint,
+) {
+  if (!custCode) return
+  const owner = await db.customer.findFirst({
+    where: { shipperId, custCode },
+    select: { id: true, code: true },
+  })
+  if (owner && owner.id !== exceptId) {
+    throw new ActionError(
+      'CONFLICT',
+      `이 화주사의 다른 거래처(${owner.code})가 쓰는 사용자 정의 코드입니다: ${custCode}`,
+    )
+  }
+}
+
+// 화주사의 코드 접두어 (거래처·품목 자동 체번)
+export async function shipperPrefixOf(db: Db, shipperId: bigint) {
+  const shipper = await db.shipper.findUnique({
+    where: { id: shipperId },
+    select: { codePrefix: true },
+  })
+  if (!shipper) throw new ActionError('NOT_FOUND', '화주사를 찾을 수 없습니다.')
+  return shipper.codePrefix
 }
 
 async function assertCodes(
@@ -126,6 +162,7 @@ type CustomerRef = {
 const EXISTING_SHIP_TO_SELECT = {
   id: true,
   code: true,
+  custCode: true,
   name: true,
   isDefault: true,
   addrSyncYn: true,
@@ -148,6 +185,7 @@ const EXISTING_SHIP_TO_SELECT = {
 type ExistingShipTo = {
   id: bigint
   code: string
+  custCode: string | null
   name: string
   isDefault: string
   addrSyncYn: string
@@ -223,6 +261,42 @@ async function syncShipTos(
     select: EXISTING_SHIP_TO_SELECT,
   })
   const byId = new Map(existing.map((s) => [s.id, s]))
+  const operatorId = requireOperatorId()
+  // 새 납품처: 직접 넣은 코드는 자동 체번 모양({거래처코드}-01) 금지, 비운 코드는 한 번에 체번 (0084)
+  for (const row of rows) {
+    if (row.id !== null || !row.code) continue
+    if (await isAutoPattern(db, 'SHIP_TO', { operatorId, prefix: customer.code }, row.code)) {
+      throw new ActionError(
+        'VALIDATION',
+        `'${row.code}'는 자동 체번 모양이라 납품처코드로 쓸 수 없습니다. 비워 두면 자동으로 붙습니다.`,
+      )
+    }
+  }
+  const blank = rows.filter((r) => r.id === null && !r.code)
+  if (blank.length > 0) {
+    const codes = await issueCodes(
+      db,
+      'SHIP_TO',
+      { operatorId, customerId: customer.id, prefix: customer.code },
+      blank.length,
+    )
+    blank.forEach((row, i) => (row.code = codes[i]))
+  }
+  // 사용자 정의 코드: 거래처 안에서 중복 금지 (보낸 것끼리·이미 있는 다른 납품처와)
+  const custSeen = new Map<string, string>()
+  for (const row of rows) {
+    if (!row.custCode) continue
+    const other =
+      custSeen.get(row.custCode) ??
+      existing.find((s) => s.custCode === row.custCode && s.id !== row.id)?.code
+    if (other && other !== row.code) {
+      throw new ActionError(
+        'CONFLICT',
+        `다른 납품처(${other})가 쓰는 사용자 정의 코드입니다: ${row.custCode}`,
+      )
+    }
+    custSeen.set(row.custCode, row.code)
+  }
   for (const row of rows) {
     if (row.id !== null) {
       const found = byId.get(row.id)
@@ -254,7 +328,6 @@ async function syncShipTos(
   }
 
   const results: ShipToSaveResult[] = []
-  const operatorId = requireOperatorId()
   const actor = currentActor()
   for (const [index, row] of rows.entries()) {
     // 주소 동기화: 기본 납품처면 거래처 주소를 쓴다
@@ -269,6 +342,7 @@ async function syncShipTos(
     // partial이면 순서는 기존 자리 그대로, 새 납품처는 뒤에
     const sortOrder = options.partial ? (found?.sortOrder ?? existing.length + index) : index
     const common = {
+      custCode: row.custCode,
       name: row.name,
       isDefault: toYn(row.isDefault),
       addrSyncYn: toYn(sync),
@@ -366,8 +440,10 @@ const needConfirmCodes = (results: ShipToSaveResult[]) =>
 // 거래처 주소로 만드는 기본 납품처 (납품처 없이 등록할 때)
 const defaultShipToRow = (customer: CustomerRef): ShipToData => ({
   id: null,
-  code: customer.code,
-  name: customer.name.slice(0, 100),
+  // 비워 두면 자동 체번 {거래처코드}-01 (0084)
+  code: '',
+  custCode: null,
+  name: customer.name,
   isDefault: true,
   addrSync: true,
   status: 'ACTIVE',
@@ -398,23 +474,27 @@ export async function createCustomerIn(
   if (!isShipperSetupStatus(shipper.status)) {
     throw new ActionError('CONFLICT', '준비중·운영중인 화주사에만 거래처를 등록할 수 있습니다.')
   }
-  await assertCustomerCode(db, data.shipperId, data.code)
+  const prefix = await shipperPrefixOf(db, data.shipperId)
+  if (data.code) await assertCustomerCode(db, data.shipperId, data.code, prefix)
+  await assertCustomerCustCode(db, data.shipperId, data.custCode)
   await assertCodes(db, data)
-  const { shipperId, code, ...rest } = data
+  const { shipperId, ...rest } = data
+  // 거래처코드: 비우면 자동 체번 {화주 접두어}C000001
+  const code =
+    data.code ||
+    (await issueCode(db, 'CUSTOMER', { operatorId: requireOperatorId(), shipperId, prefix }))
   const customer = await db.customer.create({
     data: {
       ...fieldsOf(rest),
       ...(await customerAddressFields(db, rest, null, options.searcher)),
       operatorId: requireOperatorId(),
       shipperId,
-      systemCode: await nextSystemCode('CUSTOMER', db),
       code,
       source: options.source ?? 'SCREEN',
       ...(options.requestId && { lastIfAt: new Date(), lastRequestId: options.requestId }),
     },
     select: {
       id: true,
-      systemCode: true,
       code: true,
       rowVersion: true,
       shipperId: true,
@@ -430,13 +510,12 @@ export async function createCustomerIn(
   const shipTos = await syncShipTos(db, customer, rows, options)
   if (data.shipTos.length === 0) {
     await db.shipTo.updateMany({
-      where: { customerId: customer.id, code: customer.code },
+      where: { customerId: customer.id, code: shipTos[0].code },
       data: { systemCreatedYn: 'Y' },
     })
   }
   return {
     id: customer.id,
-    systemCode: customer.systemCode,
     code: customer.code,
     rowVersion: customer.rowVersion,
     notice: assignNotice(needConfirmCodes(shipTos)),
@@ -444,7 +523,7 @@ export async function createCustomerIn(
   }
 }
 
-// 수정 본체 (트랜잭션 안): 화주사·코드·시스템 코드는 바뀌지 않는다
+// 수정 본체 (트랜잭션 안): 화주사·거래처코드는 바뀌지 않는다 (사용자 정의 코드는 바꿀 수 있다)
 // rowVersion: 화면이 불러온 버전 (그 사이 다른 사람이 저장했으면 충돌)
 export async function updateCustomerIn(
   db: Db,
@@ -467,6 +546,7 @@ export async function updateCustomerIn(
   })
   assertRowVersion(found, rowVersion, '거래처를 찾을 수 없습니다.')
   const current = found!
+  await assertCustomerCustCode(db, current.shipperId, data.custCode, id)
   if (data.shipTos.length === 0) {
     throw new ActionError('VALIDATION', '사용 중인 납품처가 1곳 이상 있어야 합니다.')
   }

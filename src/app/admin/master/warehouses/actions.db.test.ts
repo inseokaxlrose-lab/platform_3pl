@@ -147,10 +147,9 @@ describe('창고 등록', () => {
       allocPriority: 100,
     })
     expect(saved.areaM2?.toString()).toBe('1200.5')
-    expect(saved.systemCode).toMatch(/^WH\d{6}$/)
   })
 
-  it('창고코드: 필수, 같은 센터 안에서만 중복 금지, 시스템 코드 모양 금지', async () => {
+  it('창고코드: 필수, 같은 센터 안에서만 중복 금지', async () => {
     expect(await createWarehouseAction(input({ code: '' }))).toMatchObject({
       ok: false,
       error: { code: 'VALIDATION' },
@@ -164,10 +163,6 @@ describe('창고 등록', () => {
     expect((await createWarehouseAction(input({ centerId: String(f.gmh), code: 'A01' }))).ok).toBe(
       true,
     )
-    expect(await createWarehouseAction(input({ code: 'WH000123' }))).toMatchObject({
-      ok: false,
-      error: { code: 'VALIDATION' },
-    })
     expect(await createWarehouseAction(input({ code: 'A-1' }))).toMatchObject({
       ok: false,
       error: { code: 'VALIDATION' },

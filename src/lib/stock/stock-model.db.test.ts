@@ -28,7 +28,6 @@ beforeEach(async () => {
     data: {
       operatorId: TEST_OPERATOR_ID,
       shipperId: shipper.id,
-      systemCode: 'IT-T-1',
       code: 'SKU1',
       name: '생수',
       baseUnitId: unit.id,
