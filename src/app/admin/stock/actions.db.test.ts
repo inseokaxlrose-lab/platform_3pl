@@ -99,6 +99,17 @@ describe('재고 조회', () => {
     expect([expired.rowCount, expired.rows[0].lotNo]).toEqual([1, 'M0'])
   })
 
+  it('품목에 임박 기준이 없으면 운영 설정의 기본 임박 일수로 판정 (0092)', async () => {
+    await prisma.item.update({ where: { id: f.milk }, data: { expiryAlertDays: null } })
+    const stateOf = async () =>
+      (await list({ view: 'lot' })).rows.find((r) => r.lotNo === 'M1')?.state
+    expect(await stateOf()).toBe('OK')
+    await prisma.operatorSetting.create({
+      data: { operatorId: TEST_OPERATOR_ID, key: 'expiryAlertDays', value: 15 },
+    })
+    expect(await stateOf()).toBe('SOON')
+  })
+
   it('수량 0은 기본으로 빼고, 조건으로 포함', async () => {
     await runInContext({ actor: 'kim', operatorId: TEST_OPERATOR_ID }, () =>
       stockTransaction((tx) =>

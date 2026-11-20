@@ -5,6 +5,7 @@ import { prisma } from '@/lib/prisma'
 import { scopeFilter, type DataScope } from '@/lib/scope/data-scope'
 import { breakdownQty, formatQty, parseQty, qtyText } from '@/lib/units/convert'
 import { STOCK_STATUS } from '@/config/operator-codes'
+import { getOperatorSetting } from '@/lib/settings/operator-settings'
 import { expiryState, kstToday } from './expiry'
 
 // 재고 조회 (docs/decisions/0060) — 운영사 화면·화주 포털 공용, 서버 액션에서 부른다
@@ -79,6 +80,9 @@ export async function listStock(input: ListQuery, scope: DataScope) {
   const { filters } = input
   const view = parseView(filters.view)
   const today = kstToday()
+  // 품목에 임박 기준이 없으면 운영사 설정의 기본 임박 일수 (0092)
+  const defaultAlert =
+    scope.kind === 'NONE' ? null : await getOperatorSetting(scope.operatorId, 'expiryAlertDays')
   const query = toPrismaQuery(input, {
     searchFields: ['item.code', 'item.name', 'location.code', 'lotNo', 'shipper.name'],
     sortable: {
@@ -143,7 +147,7 @@ export async function listStock(input: ListQuery, scope: DataScope) {
       rows.map((s) => {
         const total = qty(s.qty)
         const allocated = qty(s.allocatedQty)
-        const expiry = expiryState(s.expiryOn, s.item.expiryAlertDays, today)
+        const expiry = expiryState(s.expiryOn, s.item.expiryAlertDays ?? defaultAlert, today)
         return {
           id: String(s.id),
           center: `${s.center.name} (${s.center.code})`,
@@ -215,7 +219,7 @@ export async function listStock(input: ListQuery, scope: DataScope) {
       const expiryOn = 'expiryOn' in g ? (g.expiryOn as Date | null) : null
       const expiry =
         view === 'lot'
-          ? expiryState(expiryOn, item.expiryAlertDays, today)
+          ? expiryState(expiryOn, item.expiryAlertDays ?? defaultAlert, today)
           : expiryState(null, null, today)
       return {
         id: [

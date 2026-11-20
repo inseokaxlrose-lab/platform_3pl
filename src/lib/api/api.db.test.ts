@@ -7,6 +7,8 @@ import { changeShipperStatus } from '@/lib/shippers/shippers'
 import { createTestCenter, createTestShipper } from '@/test/factories'
 import { resetDatabase, TEST_OPERATOR_ID } from '@/test/reset-database'
 import { apiRoute, flushApiTasks, readItems, writeTransaction } from './api-route'
+import { addDays } from '@/lib/items/expiry-dates'
+import { kstToday } from '@/lib/stock/expiry'
 import { issueApiKey, revokeApiKey, updateApiKey } from './api-keys'
 
 // 화주 연동 API 공통 틀 (0081): 인증·상태·권한·호출 한도·멱등·dry-run·로그
@@ -164,6 +166,15 @@ describe('키 발급·인증 · GET /me', () => {
     expect((await prisma.apiClient.findUniqueOrThrow({ where: { id: key.id } })).status).toBe(
       'EXPIRED',
     )
+  })
+
+  it('운영 설정의 최대 유효기간: 만료일 필수, 그 일수 안만 (0092)', async () => {
+    await prisma.operatorSetting.create({
+      data: { operatorId: TEST_OPERATOR_ID, key: 'apiKeyMaxDays', value: 30 },
+    })
+    await expect(issue()).rejects.toThrow('만료일을 넣어 주세요')
+    await expect(issue({ expiresOn: addDays(kstToday(), 31) })).rejects.toThrow('최대 30일')
+    expect((await issue({ expiresOn: addDays(kstToday(), 30) })).fullKey).toBeTruthy()
   })
 
   it('허용 IP·API 사용·화주 상태(준비중 TEST만, 해지 시 키 자동 폐기)', async () => {
