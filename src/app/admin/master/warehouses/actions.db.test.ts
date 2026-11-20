@@ -169,6 +169,21 @@ describe('창고 등록', () => {
     })
   })
 
+  it('사용자 정의 코드: 같은 센터 안에서만 중복 금지 (0093)', async () => {
+    await create({ code: 'A01', custCode: 'Z-1' })
+    expect(await createWarehouseAction(input({ code: 'A02', custCode: 'Z-1' }))).toMatchObject({
+      ok: false,
+      error: { code: 'CONFLICT', message: expect.stringContaining('A01') },
+    })
+    expect(
+      (
+        await createWarehouseAction(
+          input({ centerId: String(f.gmh), code: 'A02', custCode: 'Z-1' }),
+        )
+      ).ok,
+    ).toBe(true)
+  })
+
   it('온도대는 센터 취급 온도대 안에서만, 보세는 보세 센터만', async () => {
     expect(await createWarehouseAction(input({ tempZone: 'FROZEN' }))).toMatchObject({
       ok: false,

@@ -74,7 +74,7 @@ export const listWarehousesAction = createAction({
     }
     const { filters } = input
     const query = toPrismaQuery(input, {
-      searchFields: ['code', 'name'],
+      searchFields: ['code', 'name', 'custCode'],
       sortable: {
         center: 'center.code',
         code: 'code',

@@ -19,6 +19,7 @@ type Row = {
   userType: UserTypeKey
   isActive: boolean
   createdAt: Date
+  lastLoginAt: Date | null
   affiliation: string | null
   groups: string | null
 }
@@ -50,6 +51,13 @@ const COLUMNS: DataGridColumn<Row>[] = [
     accessor: (row) => String(row.isActive),
     sortable: true,
     format: { status: ACTIVE_STATUS },
+  },
+  {
+    id: 'lastLoginAt',
+    header: '마지막 로그인',
+    accessor: 'lastLoginAt',
+    format: 'datetime',
+    sortable: true,
   },
   {
     id: 'createdAt',

@@ -2,6 +2,7 @@ import { z } from 'zod'
 import { rowVersionField } from '@/lib/row-version'
 import { affiliationIssues } from './affiliation'
 import { idSchema } from '@/lib/id'
+import { optionalPhone, optionalText } from '@/lib/validation/common-fields'
 
 // 사용자 입력 규칙 — 화면·서버 공용 (docs/decisions/0018)
 
@@ -94,6 +95,14 @@ export const emailSchema = z
   .optional()
   .transform((value) => value || undefined)
 
+// 연락처·부서·직책·사번 (선택, 0093) — 전화는 숫자만 저장
+export const profileShape = {
+  phone: optionalPhone.default(''),
+  deptName: optionalText(50).default(''),
+  positionName: optionalText(50).default(''),
+  empNo: optionalText(30).default(''),
+}
+
 // 소속·권한그룹 (센터 직원 → 센터, 화주사 사용자 → 화주사)
 export const affiliationShape = {
   centerIds: z.array(idSchema).max(50).default([]),
@@ -121,6 +130,7 @@ export const createUserSchema = z
     name: nameSchema,
     userType: z.enum(USER_TYPES),
     email: emailSchema,
+    ...profileShape,
     ...passwordChoiceShape,
     ...affiliationShape,
   })
@@ -134,6 +144,7 @@ export const updateUserSchema = z.object({
   rowVersion: rowVersionField,
   name: nameSchema,
   email: emailSchema,
+  ...profileShape,
   ...affiliationShape,
 })
 
@@ -143,6 +154,7 @@ export const updateUserFormSchema = z
     userType: z.enum(USER_TYPES),
     name: nameSchema,
     email: emailSchema,
+    ...profileShape,
     ...affiliationShape,
   })
   .superRefine(checkAffiliation)
@@ -153,6 +165,10 @@ export type UserFormValue = {
   name: string
   userType: UserTypeValue
   email: string
+  phone: string
+  deptName: string
+  positionName: string
+  empNo: string
   passwordMode: PasswordMode
   password: string
   passwordConfirm: string

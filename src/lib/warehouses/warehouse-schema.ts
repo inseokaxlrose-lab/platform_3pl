@@ -28,6 +28,8 @@ const yn = z.boolean()
 export const warehouseShape = {
   // ① 기본 정보
   name: requiredText('창고명을 입력해 주세요.', 100),
+  // 사용자 정의 코드 (ERP 저장위치 등, 0093) — 비우면 없음, 시스템 기본 창고도 고칠 수 있다
+  custCode: optionalText(50).default(''),
   type: oneOf(WAREHOUSE_TYPE.values, '창고 유형을 골라 주세요.'),
   // 센터 취급 온도대 중 하나 (서버가 센터 값과 맞춰 본다)
   tempZone: oneOf(TEMP_ZONE.values, '온도대를 골라 주세요.'),

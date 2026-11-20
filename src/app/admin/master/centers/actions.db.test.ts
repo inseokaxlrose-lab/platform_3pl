@@ -156,6 +156,17 @@ describe('센터 등록', () => {
     })
   })
 
+  it('사용자 정의 코드(화주 시스템 코드): 비워도 되고, 운영사 안에서 겹치면 거부 (0093)', async () => {
+    const custOf = async (id: string) =>
+      (await prisma.center.findUniqueOrThrow({ where: { id: BigInt(id) } })).custCode
+    expect(await custOf((await create({ code: 'ICN', custCode: 'WH-01' })).id)).toBe('WH-01')
+    expect(await custOf((await create({ code: 'GMH', custCode: '' })).id)).toBeNull()
+    expect(await createCenterAction(input({ code: 'PUS', custCode: 'WH-01' }))).toMatchObject({
+      ok: false,
+      error: { code: 'CONFLICT', message: expect.stringContaining('ICN') },
+    })
+  })
+
   it('주소 필수, 없는 담당 업무 코드는 거부', async () => {
     expect(await createCenterAction(input({ zipCode: '', address: '' }))).toMatchObject({
       ok: false,

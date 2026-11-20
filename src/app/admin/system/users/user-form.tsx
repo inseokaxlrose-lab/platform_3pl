@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import type { z } from 'zod'
 import { StatusBadge } from '@/components/common'
-import { CheckboxList, EmailInput } from '@/components/inputs'
+import { CheckboxList, EmailInput, PhoneInput } from '@/components/inputs'
 import {
   Field,
   FormGrid,
@@ -75,6 +75,10 @@ export function UserForm({ options, user, extraSections = [], header }: UserForm
       passwordConfirm: '',
       centerIds: user?.centerIds ?? [],
       shipperId: user?.shipperId ?? '',
+      phone: user?.phone ?? '',
+      deptName: user?.deptName ?? '',
+      positionName: user?.positionName ?? '',
+      empNo: user?.empNo ?? '',
       permissionGroupIds: user?.permissionGroupIds ?? [],
     } satisfies UserFormValue as UserFormValue,
     // 등록·수정 규칙이 다르지만 둘 다 같은 화면 입력값(UserFormValue)을 검사한다 (없는 칸은 무시)
@@ -100,6 +104,10 @@ export function UserForm({ options, user, extraSections = [], header }: UserForm
             rowVersion: version ?? user.rowVersion,
             name: value.name,
             email: value.email,
+            phone: value.phone,
+            deptName: value.deptName,
+            positionName: value.positionName,
+            empNo: value.empNo,
             ...affiliation,
           })
         : createUserAction({ ...value, ...affiliation }).then((result) => {
@@ -136,6 +144,20 @@ export function UserForm({ options, user, extraSections = [], header }: UserForm
         disabled={disabled}
         autoComplete="new-password"
         placeholder={key === 'password' ? PASSWORD_RULE_TEXT : undefined}
+        aria-invalid={Boolean(errors[key])}
+      />
+    </Field>
+  )
+
+  // 부서·직책·사번 같은 짧은 글자 칸 (0093)
+  const text = (key: 'deptName' | 'positionName' | 'empNo', label: string, maxLength: number) => (
+    <Field label={label} span={4} error={errors[key]} htmlFor={`user-${key}`}>
+      <Input
+        id={`user-${key}`}
+        value={value[key]}
+        onChange={(e) => set({ [key]: e.target.value })}
+        disabled={disabled}
+        maxLength={maxLength}
         aria-invalid={Boolean(errors[key])}
       />
     </Field>
@@ -209,6 +231,18 @@ export function UserForm({ options, user, extraSections = [], header }: UserForm
               aria-invalid={Boolean(errors.email)}
             />
           </Field>
+          <Field label="연락처" span={4} error={errors.phone} htmlFor="user-phone">
+            <PhoneInput
+              id="user-phone"
+              value={value.phone}
+              onChange={(phone) => set({ phone })}
+              disabled={disabled}
+              aria-invalid={Boolean(errors.phone)}
+            />
+          </Field>
+          {text('deptName', '부서', 50)}
+          {text('positionName', '직책', 50)}
+          {text('empNo', '사번', 30)}
           {isNew && (
             <>
               <PasswordModeField

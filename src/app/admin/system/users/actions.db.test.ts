@@ -6,6 +6,7 @@ import { loadUserPermissions } from '@/lib/permissions/load-user-permissions'
 import { prisma } from '@/lib/prisma'
 import { getCurrentPermissions, getCurrentUser } from '@/lib/session'
 import { createUserAccount } from '@/lib/users/create-user-account'
+import { LOCK_THRESHOLD, recordFailure } from '@/lib/users/login-guard'
 import { createTestCenter, createTestShipper, versionOf } from '@/test/factories'
 import { resetDatabase, TEST_OPERATOR_ID } from '@/test/reset-database'
 import {
@@ -14,6 +15,7 @@ import {
   resetUserPasswordAction,
   setUserActiveAction,
   setUsersActiveAction,
+  unlockUserAction,
   updateUserAction,
   updateUserOverridesAction,
 } from './actions'
@@ -244,6 +246,63 @@ describe('사용자 수정', () => {
     expect((await getUserForEdit(BigInt(id), OWN_SCOPE))?.centerIds.sort()).toEqual(
       [String(centerId), String(second.id)].sort(),
     )
+  })
+})
+
+describe('연락처·부서·직책·사번 (0093)', () => {
+  it('등록할 때 저장하고, 수정에서 바꾸거나 비운다 (전화는 숫자만)', async () => {
+    const created = await createUserAction(
+      newUser({ phone: '01012345678', deptName: '물류팀', positionName: '팀장', empNo: 'E-001' }),
+    )
+    const id = created.ok ? created.data.id : ''
+    expect(await getUserForEdit(BigInt(id), OWN_SCOPE)).toMatchObject({
+      phone: '01012345678',
+      deptName: '물류팀',
+      positionName: '팀장',
+      empNo: 'E-001',
+    })
+
+    const result = await updateUserAction({
+      id,
+      rowVersion: await versionOf('user', id),
+      name: '김작업',
+      email: '',
+      phone: '0212345678',
+      deptName: '',
+      positionName: '파트장',
+      empNo: '',
+      centerIds: [String(centerId)],
+      shipperId: '',
+      permissionGroupIds: [],
+    })
+    expect(result.ok).toBe(true)
+    const saved = await prisma.user.findUniqueOrThrow({ where: { id: BigInt(id) } })
+    expect(saved).toMatchObject({
+      phone: '0212345678',
+      deptName: null,
+      positionName: '파트장',
+      empNo: null,
+    })
+  })
+})
+
+describe('로그인 잠금 풀기 (0093)', () => {
+  it('잠긴 계정을 풀면 잠금 표시가 사라지고 바로 로그인된다', async () => {
+    const created = await createUserAction(newUser())
+    const id = created.ok ? created.data.id : ''
+    for (let i = 0; i < LOCK_THRESHOLD; i++) {
+      await recordFailure('kim.worker', { ip: null, userAgent: null })
+    }
+    expect((await getUserForEdit(BigInt(id), OWN_SCOPE))?.security.locked).toBe(true)
+
+    expect(await unlockUserAction({ id })).toMatchObject({ ok: true })
+
+    const user = await getUserForEdit(BigInt(id), OWN_SCOPE)
+    expect(user?.security).toMatchObject({ locked: false, loginFailCount: 0 })
+    expect(user?.loginHistory.map((row) => row.result)).toEqual(Array(LOCK_THRESHOLD).fill('FAIL'))
+    expect(
+      await auth.api.signInUsername({ body: { username: 'kim.worker', password: PASSWORD } }),
+    ).toBeTruthy()
   })
 })
 

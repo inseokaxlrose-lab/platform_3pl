@@ -113,6 +113,7 @@ export async function findStockedWarehouseIds(db: Db, ids: bigint[]) {
 function warehouseFields(data: WarehouseCreateData) {
   return {
     name: data.name,
+    custCode: data.custCode,
     type: data.type,
     tempZone: data.tempZone,
     description: data.description,
@@ -149,11 +150,32 @@ async function allocatableNotice(db: Db, centerId: bigint) {
     : null
 }
 
+// 사용자 정의 코드: 센터 안에서 겹치지 않게 (지운 창고 제외, 0093)
+async function assertWarehouseCustCode(
+  db: Db,
+  centerId: bigint,
+  custCode: string | null,
+  exceptId?: bigint,
+) {
+  if (!custCode) return
+  const owner = await db.warehouse.findFirst({
+    where: { centerId, custCode },
+    select: { id: true, code: true },
+  })
+  if (owner && owner.id !== exceptId) {
+    throw new ActionError(
+      'CONFLICT',
+      `이 센터의 다른 창고(${owner.code})가 쓰는 사용자 정의 코드입니다: ${custCode}`,
+    )
+  }
+}
+
 // 등록. 사용자가 만드는 창고는 시스템 기본 창고가 아니다
 export async function createWarehouse(centerId: bigint, code: string, data: WarehouseCreateData) {
   return prisma.$transaction(async (tx) => {
     const center = await loadCenter(tx, centerId)
     await assertWarehouseCode(tx, centerId, code)
+    await assertWarehouseCustCode(tx, centerId, data.custCode)
     assertFitsCenter(center, data)
     await assertReferences(tx, data, centerId)
     const warehouse = await tx.warehouse.create({
@@ -187,10 +209,16 @@ export async function updateWarehouse(id: bigint, rowVersion: number, data: Ware
     })
     assertRowVersion(found, rowVersion, '창고를 찾을 수 없습니다.')
     const current = found!
+    await assertWarehouseCustCode(tx, current.centerId, data.custCode, id)
 
     // 시스템 기본 창고: 설명·정렬순서·비고만
     const fields = isYes(current.systemYn)
-      ? { description: data.description, sortOrder: data.sortOrder, remark: data.remark }
+      ? {
+          description: data.description,
+          sortOrder: data.sortOrder,
+          remark: data.remark,
+          custCode: data.custCode,
+        }
       : await (async () => {
           const center = await loadCenter(tx, current.centerId)
           assertFitsCenter(center, data)

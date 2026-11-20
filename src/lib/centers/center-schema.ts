@@ -54,6 +54,8 @@ export const centerShape = {
   name: requiredText('센터명을 입력해 주세요.', 100),
   nameEn: optionalText(100),
   shortName: optionalText(30),
+  // 사용자 정의 코드 (ERP 플랜트 등, 0093) — 비우면 없음
+  custCode: optionalText(50).default(''),
   type: oneOf(CENTER_TYPE.values, '센터 유형을 골라 주세요.'),
   openedOn: optionalDateText,
   businessNumber: optionalBusinessNumber,

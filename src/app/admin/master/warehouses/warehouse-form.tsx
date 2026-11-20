@@ -91,6 +91,7 @@ export function WarehouseForm(props: WarehouseFormProps) {
           centerId: initialCenterId,
           code: '',
           name: '',
+          custCode: '',
           type: 'STORAGE',
           tempZone: defaultTempZone(zonesOfCenter(initialCenterId)),
           description: '',
@@ -144,7 +145,7 @@ export function WarehouseForm(props: WarehouseFormProps) {
   const tempZoneOptions = TEMP_ZONE.options.filter((o) => centerZones.includes(o.value))
 
   // 글자 한 칸
-  type TextKey = 'name' | 'description' | 'buildingName' | 'floorNo'
+  type TextKey = 'name' | 'custCode' | 'description' | 'buildingName' | 'floorNo'
   const text = (
     key: TextKey,
     label: string,
@@ -238,6 +239,10 @@ export function WarehouseForm(props: WarehouseFormProps) {
             lock: true,
             maxLength: 100,
             placeholder: '예: A동 상온',
+          })}
+          {text('custCode', '사용자 정의 코드', 3, {
+            maxLength: 50,
+            placeholder: 'ERP 저장위치 코드 등 (선택)',
           })}
           <Field
             label="창고 유형"

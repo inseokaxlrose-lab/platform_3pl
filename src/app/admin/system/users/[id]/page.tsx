@@ -5,6 +5,7 @@ import { BackToListButton } from '@/components/master-list'
 import { AccessDenied } from '@/components/permission'
 import { getCurrentScope, getCurrentUser, hasPermission } from '@/lib/session'
 import { AccountPanel } from '../account-panel'
+import { LoginHistory } from '../login-history'
 import { OverridePanel } from '../override-panel'
 import { getUserForEdit, getUserFormOptions, getUserOverrides } from '../queries'
 import { UserForm } from '../user-form'
@@ -61,6 +62,13 @@ export default async function EditUserPage({ params }: PageProps<'/admin/system/
               },
             ]
           : []),
+        {
+          id: 'login-history',
+          title: '로그인 이력',
+          standalone: 'view' as const,
+          description: '최근 20건입니다. 로그인을 5번 연속 틀리면 30분 동안 잠깁니다.',
+          content: <LoginHistory rows={user.loginHistory} />,
+        },
       ]}
     />
   )
