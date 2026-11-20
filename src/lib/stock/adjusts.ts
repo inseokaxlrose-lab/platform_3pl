@@ -8,7 +8,7 @@ import { scopeFilter, type DataScope } from '@/lib/scope/data-scope'
 import { checkQtyDecimals, parseQty, qtyText } from '@/lib/units/convert'
 import { ADJUST_TYPE_LABELS, type AdjustData } from './adjust-schema'
 import { assertCodeValues } from '@/lib/common-code/common-codes'
-import { adjustStock } from './stock-change'
+import { adjustStock, type StockStatus } from './stock-change'
 import { stockTransaction } from './stock-transaction'
 import { labelOf } from '@/lib/db-value'
 
@@ -125,7 +125,14 @@ export async function confirmAdjust(id: bigint) {
             countedQty: true,
             changeQty: true,
             stock: {
-              select: { id: true, locationId: true, itemId: true, lotNo: true, expiryOn: true },
+              select: {
+                id: true,
+                locationId: true,
+                itemId: true,
+                lotNo: true,
+                expiryOn: true,
+                status: true,
+              },
             },
           },
         },
@@ -151,6 +158,8 @@ export async function confirmAdjust(id: bigint) {
             itemId: line.stock.itemId,
             lotNo: line.stock.lotNo,
             expiryOn: line.stock.expiryOn?.toISOString().slice(0, 10) ?? null,
+            // 그 재고 줄의 상태 그대로 (0088)
+            status: line.stock.status as StockStatus,
           },
           qty: qtyText(change),
           reasonCd: adjust.reasonCd,

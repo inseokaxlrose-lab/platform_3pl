@@ -4,7 +4,7 @@ import { isLocationUsable } from '@/lib/locations/location-usable'
 import { ActionError } from '@/lib/actions/action-error'
 import { currentActor, requireOperatorId } from '@/lib/actor'
 import type { Db } from '@/lib/prisma'
-import { moveStock } from '@/lib/stock/stock-change'
+import { moveStock, type StockStatus } from '@/lib/stock/stock-change'
 import { stockTransaction } from '@/lib/stock/stock-transaction'
 import { parseQty, qtyText } from '@/lib/units/convert'
 import type { PutawayData } from './putaway-schema'
@@ -54,7 +54,7 @@ export async function registerPutaway(data: PutawayData) {
           lotNo: true,
           expiryOn: true,
           receipt: { select: { asnId: true } },
-          stock: { select: { locationId: true, itemId: true } },
+          stock: { select: { locationId: true, itemId: true, status: true } },
         },
       })
       if (!receiptLine || receiptLine.receipt.asnId !== asn.id) {
@@ -107,6 +107,8 @@ export async function registerPutaway(data: PutawayData) {
           itemId: receiptLine.stock.itemId,
           lotNo: receiptLine.lotNo,
           expiryOn,
+          // 입고대기 재고의 상태 그대로 (입고 창고 기본 상태, 0088)
+          status: receiptLine.stock.status as StockStatus,
         },
         toLocationId: line.toLocationId,
         qty: qtyText(qty),

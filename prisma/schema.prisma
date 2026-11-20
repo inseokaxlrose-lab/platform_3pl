@@ -1647,6 +1647,8 @@ model Stock {
   item        Item      @relation(fields: [itemId], references: [id], onDelete: Restrict)
   lotNo       String?   @map("lot_no") @db.VarChar(50)
   expiryOn    DateTime? @map("expiry_dt") @db.Date
+  // 재고상태 (재고 주소의 일부, 0088): NORMAL 정상 / HOLD 보류 / DAMAGED 불량 / QUARANTINE 격리 — 정상만 가용
+  status      String    @default("NORMAL") @map("stock_status_cd") @db.VarChar(20)
 
   // 수량 (기본단위). 0 이상
   qty          Decimal @default(0) @map("stock_qty") @db.Decimal(18, 3)
@@ -1662,7 +1664,7 @@ model Stock {
   receiptLines InboundReceiptLine[]
   adjustLines  StockAdjustLine[]
 
-  @@unique([locationId, itemId, lotNo, expiryOn], map: "tb_stock_address_key")
+  @@unique([locationId, itemId, lotNo, expiryOn, status], map: "tb_stock_address_key")
   @@index([operatorId])
   @@index([centerId, shipperId, itemId])
   @@index([itemId])
@@ -1684,6 +1686,8 @@ model StockTxn {
   itemId      BigInt    @map("item_id")
   lotNo       String?   @map("lot_no") @db.VarChar(50)
   expiryOn    DateTime? @map("expiry_dt") @db.Date
+  // 그때의 재고상태 (0088)
+  status      String    @default("NORMAL") @map("stock_status_cd") @db.VarChar(20)
   type        String    @map("txn_type_cd") @db.VarChar(20)
   // 변동 수량 (+ 늘어남 / − 줄어듦, 기본단위, 0 아님)과 변동 후 수량
   qtyChange   Decimal   @map("chg_qty") @db.Decimal(18, 3)

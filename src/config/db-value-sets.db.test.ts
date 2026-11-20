@@ -115,6 +115,8 @@ const VALUE_SETS: Record<string, readonly string[]> = {
   'tb_warehouse.warehouse_type_cd': WAREHOUSE_TYPE.values,
   'tb_warehouse.temp_zone_cd': TEMP_ZONE.values,
   'tb_warehouse.default_stock_status_cd': STOCK_STATUS.values,
+  'tb_stock.stock_status_cd': STOCK_STATUS.values,
+  'tb_stock_txn.stock_status_cd': STOCK_STATUS.values,
   'tb_location.status_cd': STATUS_VALUES,
   'tb_zone.status_cd': STATUS_VALUES,
   // 공통코드·단위·팔레트·외부 코드·체번

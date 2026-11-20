@@ -118,11 +118,12 @@ export const PERMISSION_MENUS = {
   'inbound.putaway': { label: '적치', group: '입고', area: 'admin', actions: ['read', 'confirm'] },
 
   // ── 운영사 화면 · 재고
+  // update: 재고상태 변경(정상·보류·불량·격리, 0088)
   'stock.inventory': {
     label: '재고 조회',
     group: '재고',
     area: 'admin',
-    actions: ['read', 'export'],
+    actions: ['read', 'update', 'export'],
   },
   // 실사·조정: 작업자가 등록(create)하고 관리자가 확정(confirm)하는 2단계
   'stock.adjustments': {
