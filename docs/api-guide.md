@@ -146,6 +146,56 @@ curl -s https://wms.example.com/api/v1/me -H "X-API-Key: $WMS_API_KEY"
 - 정책으로 반려된 납품처는 `shipTos[].result = "FAIL"`과 `errors`가 오고, 거래처는 정상 처리됩니다. 단, 그 때문에 기본 납품처가 없어지는 새 거래처는 거래처도 `FAIL`입니다.
 - TEST 키는 같은 결과(자동 지정될 배송센터 포함)를 계산만 하고 저장하지 않습니다.
 
-## 11. 문의
+## 11. 품목 API
+
+품목(item)은 화주가 맡기는 상품입니다. 입고예정(ASN)·출고요청은 품목코드로 들어오므로, **입고예정보다 먼저 품목을 연동**하세요. 필드와 화면 칸·엑셀 제목의 대응은 [`docs/api-item-fields.md`](api-item-fields.md)에 있습니다.
+
+| 메서드 | 경로 | 권한 | 설명 |
+| --- | --- | --- | --- |
+| POST | `/items` | `ITEM_WRITE` | 품목 upsert (단위·팔레트·바코드 포함), 최대 500건 |
+| GET | `/items` | `ITEM_READ` | 목록 (`updatedAfter`·`cursor`·`limit`) |
+| GET | `/items/{itemCd}` | `ITEM_READ` | 상세 (단위·바코드·PLT 계산값 포함) |
+
+**upsert 규칙 (꼭 읽어 주세요)**
+
+1. 업무 키는 `itemCd`(화주 안에서 고유)입니다. **등록 후 바꿀 수 없습니다.**
+2. 이미 있는 품목은 **보낸 필드만 고칩니다.** 안 보낸 필드는 그대로이고, `null`을 보내면 그 값을 지웁니다(필수 필드는 지울 수 없음).
+3. `uoms`·`barcodes`는 **보낸 행만** 추가·수정합니다. 지우려면 그 행에 `"delete": true`를 보내세요. 기본단위는 `baseUom`으로만 정합니다.
+4. 단위 코드는 우리 단위 코드(EA·BOX·PLT 등) 또는 운영사가 **외부코드 매핑(대상: 단위)**에 등록한 화주 코드입니다. 화주가 CS·CT 같은 자기 코드를 쓰면 운영사에 매핑을 요청하세요.
+5. `pallet`(종류·`ti`·`hi`, 또는 `boxQty`)를 보내면 PLT 수량·높이·중량을 계산합니다. 적재 정보가 없을 때만 `uoms`의 PLT `qtyInBase`를 직접 씁니다.
+6. 새 품목에서 `expiryMgmt`·`lotMgmt`를 안 보내면 **화주 설정**을 따릅니다. 기한 관리면 `expiryType`·`expiryInput`, 제조일 입력이면 `shelfLifeDays`, LOT 관리면 `lotSource`가 필요합니다.
+7. **재고나 미완료 입고예정이 있는 품목**은 `baseUom`·`expiryMgmt`·`lotMgmt`·`serialMgmt`를 바꿀 수 없습니다(`ITEM_STOCK_EXISTS`·`ITEM_OPEN_DOC_EXISTS`). 다른 필드는 고칠 수 있습니다.
+8. 바코드는 같은 화주사 안에서만 겹칠 수 없습니다(`BARCODE_DUPLICATE`). EAN-13·ITF-14 등은 체크디지트를 검사합니다.
+9. 내용이 지금과 같으면 `UNCHANGED`입니다(수정일이 바뀌지 않음). 같은 요청을 다시 보내도 안전합니다.
+
+**요청 예시**
+
+```json
+[
+  { "itemCd": "A10001", "itemNm": "진라면 매운맛 120g", "itemType": "PRODUCT", "baseUom": "EA",
+    "uoms": [ { "uom": "BOX", "level": "BOX", "qtyInBase": 40,
+                "widthCm": 52.0, "depthCm": 36.0, "heightCm": 28.0, "grossWeightKg": 5.4 } ],
+    "pallet": { "type": "T11", "ti": 8, "hi": 6 },
+    "expiryMgmt": true, "expiryType": "CONSUME", "expiryInput": "EXPIRY", "shelfLifeDays": 240,
+    "lotMgmt": true, "lotSource": "INPUT",
+    "barcodes": [ { "uom": "EA", "barcode": "8801234567893", "type": "EAN13", "primary": true } ] }
+]
+```
+
+**응답 건별 결과** — 계산값과 경고(저장은 됨)가 함께 옵니다.
+
+```json
+{ "seq": 1, "docNo": "A10001", "result": "CREATED", "id": "3001",
+  "volumeStatus": "OK",
+  "box": { "qtyInBase": 40, "cbm": 0.052416, "grossWeightKg": 5.4 },
+  "plt": { "qtyInBase": 1920, "boxQty": 48, "heightCm": 183, "cbm": 2.2143, "grossWeightKg": 284.2, "calculated": true },
+  "warnings": [ { "code": "PALLET_HEIGHT_EXCEEDED", "message": "팔레트 높이 183.0cm가 권장 180cm를 넘습니다." } ] }
+```
+
+- `warnings`는 저장된 뒤 알려 주는 것입니다(체적 미등록·밀도 이상·팔레트 높이/중량 초과 등). 코드 목록은 대응표 문서에 있습니다.
+- 실패한 건은 `result: "FAIL"`과 `errors[]`(`code`·`message`·`field`)가 옵니다. 한 건이 실패해도 나머지 건은 처리됩니다.
+- TEST 키는 같은 결과(계산값·경고 포함)를 계산만 하고 저장하지 않습니다.
+
+## 12. 문의
 
 문제가 생기면 **`requestId`**, 호출 일시, 엔드포인트를 운영사에 알려 주세요. 운영사는 "연동 → API 호출 이력"에서 요청·응답 본문(개인정보는 가려 저장)과 건별 결과를 확인합니다.
