@@ -61,8 +61,8 @@
 | currency_cd | currency | CHAR(3) | `KRW` |
 | timezone | timezone | VARCHAR(50) | `Asia/Seoul` |
 | lang_cd | lang | VARCHAR(5) | `ko-KR` |
-| weight_unit_cd | weightUnit | VARCHAR(5) | `KG` · KG/LB |
-| length_unit_cd | lengthUnit | VARCHAR(5) | `CM` · CM/INCH |
+| weight_unit_id | weightUnitId | BIGINT (FK `tb_unit`) | 시스템 `KG` · 중량 단위 (0084) |
+| length_unit_id | lengthUnitId | BIGINT (FK `tb_unit`) | 시스템 `CM` · 길이 단위 (0084) |
 | alloc_rule_cd | allocRule | VARCHAR(10) | `FIFO` · FIFO/FEFO/LIFO |
 | lot_mgmt_yn · expiry_mgmt_yn · serial_mgmt_yn | useLot · useExpiry · useSerial | CHAR(1) | `N`, Y/N |
 | ship_cutoff_time | shipCutoffTime | TIME(0) | 비어 있음 (TimeInput은 2차 화면 때 만든다) |
@@ -76,7 +76,7 @@
 | contract_start_dt | contractStartOn | DATE | 등록일 (기존 운영사는 등록일로 변환) |
 | contract_end_dt | contractEndOn | DATE | 비어 있으면 무기한 · 목록 칸 |
 | billing_basis_cd | billingBasis | VARCHAR(10) | 비어 있음 · 값 목록 검사 |
-| max_user_cnt · max_center_cnt · max_client_cnt | maxUserCount · maxCenterCount · maxClientCount | INT | 비어 있으면 무제한 |
+| max_user_cnt · max_center_cnt · max_shipper_cnt | maxUserCount · maxCenterCount · maxShipperCount | INT | 비어 있으면 무제한 |
 | billing_email · tax_invoice_email | billingEmail · taxInvoiceEmail | VARCHAR(100) | |
 | sales_channel_cd | salesChannel | VARCHAR(20) | 값 목록 미정 → 검사 없음 |
 

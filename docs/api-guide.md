@@ -112,32 +112,36 @@ curl -s https://wms.example.com/api/v1/me -H "X-API-Key: $WMS_API_KEY"
 
 ## 10. 거래처 · 납품처 API
 
-거래처(partner)는 화주가 물건을 파는 상대, 납품처(shipTo)는 실제로 물건을 받는 곳입니다. 출고요청은 거래처와 납품처 코드로 들어오므로, **주문보다 먼저 거래처를 연동**하세요. 필드와 화면 칸의 대응은 [`docs/api-partner-fields.md`](api-partner-fields.md)에 있습니다.
+거래처(customer)는 화주가 물건을 파는 상대, 납품처(shipTo)는 실제로 물건을 받는 곳입니다. 출고요청은 거래처와 납품처 코드로 들어오므로, **주문보다 먼저 거래처를 연동**하세요. 필드와 화면 칸의 대응은 [`docs/api-customer-fields.md`](api-customer-fields.md)에 있습니다.
 
 | 메서드 | 경로 | 권한 | 설명 |
 | --- | --- | --- | --- |
-| POST | `/partners` | `PARTNER_WRITE` | 거래처 upsert (납품처 배열 포함 가능), 최대 500건 |
-| GET | `/partners` | `PARTNER_READ` | 목록 (`updatedAfter`·`cursor`·`limit`) |
-| GET | `/partners/{partnerCd}` | `PARTNER_READ` | 상세 (납품처 포함) |
-| POST | `/partners/{partnerCd}/ship-tos` | `PARTNER_WRITE` | 납품처 upsert, 최대 500건 (건 하나 = 납품처 하나) |
-| GET | `/partners/{partnerCd}/ship-tos` | `PARTNER_READ` | 납품처 목록 |
+| POST | `/customers` | `CUSTOMER_WRITE` | 거래처 upsert (납품처 배열 포함 가능), 최대 500건 |
+| GET | `/customers` | `CUSTOMER_READ` | 목록 (`updatedAfter`·`cursor`·`limit`) |
+| GET | `/customers/{customerCd}` | `CUSTOMER_READ` | 상세 (납품처 포함) |
+| POST | `/customers/{customerCd}/ship-tos` | `CUSTOMER_WRITE` | 납품처 upsert, 최대 500건 (건 하나 = 납품처 하나) |
+| GET | `/customers/{customerCd}/ship-tos` | `CUSTOMER_READ` | 납품처 목록 |
 
 **upsert 규칙 (꼭 읽어 주세요)**
 
-1. 업무 키는 `partnerCd`(화주 안에서 고유), 납품처는 `partnerCd + shipToCd`입니다. 둘 다 **등록 후 바꿀 수 없습니다.**
+1. 업무 키는 화주사의 **연동 조회 키**를 따릅니다(품목 API와 같음).
+   - **우리 코드**(기본): 거래처는 `customerCd`, 납품처는 `customerCd + shipToCd`. 둘 다 필수입니다.
+   - **사용자 정의 코드**: 거래처는 `customerCustCd`, 납품처는 `shipToCustCd`가 키이고 필수입니다. 새 거래처·납품처에 `customerCd`·`shipToCd`를 안 보내면 자동으로 붙고(예: `GNC000001`, `GNC000001-01`) 응답으로 알려 줍니다. 경로의 `{customerCd}`에도 `customerCustCd` 값을 넣습니다.
+   - 우리 코드(`customerCd`·`shipToCd`)는 **등록 후 바꿀 수 없습니다.**
 2. 이미 있는 거래처는 **보낸 필드만 고칩니다.** 안 보낸 필드는 그대로이고, `null`을 보내면 그 값을 지웁니다(필수 필드는 지울 수 없음).
 3. `shipTos`는 **보낸 납품처만** 추가·수정합니다. 배열에 없는 기존 납품처는 건드리지 않습니다. 쓰지 않는 납품처는 `"status": "INACTIVE"`로 보내세요.
-4. 새 거래처에 `shipTos`가 없으면 거래처 주소로 **기본 납품처**를 만듭니다(코드·이름은 거래처와 같게). 주소도 없으면 `PARTNER_ADDRESS_REQUIRED`.
+4. 새 거래처에 `shipTos`가 없으면 거래처 주소로 **기본 납품처**를 만듭니다(코드는 `{customerCd}-01`, 이름은 거래처와 같게). 주소도 없으면 `CUSTOMER_ADDRESS_REQUIRED`.
 5. 기본 납품처는 거래처당 정확히 1곳입니다. `"default": true`로 보내면 나머지는 기본에서 풀립니다.
 6. 배송센터: `centerCd`가 있으면 그 센터(이용 센터여야 함), `null`이면 주소로 자동 지정, 안 보내면 지금 지정 그대로입니다. 정하지 못했을 때의 처리는 화주 정책에 따릅니다(대응표 문서 마지막 표).
 7. 내용이 지금과 같으면 `UNCHANGED`입니다(수정일이 바뀌지 않음). 같은 요청을 다시 보내도 안전합니다.
 
-**응답 건별 결과** — 거래처 결과 안에 납품처별 결과가 함께 옵니다.
+**응답 건별 결과** — 거래처 결과 안에 납품처별 결과가 함께 옵니다. `docNo`는 보낸 키(우리 코드 또는 사용자 정의 코드)이고, 저장된 우리 코드·사용자 정의 코드를 함께 돌려줍니다.
 
 ```json
 { "seq": 1, "docNo": "P10023", "result": "CREATED", "id": "1201",
+  "customerCd": "P10023", "customerCustCd": null,
   "shipTos": [
-    { "shipToCd": "P10023-01", "result": "CREATED", "addrGrade": "A", "zipCd": "06236",
+    { "shipToCd": "P10023-01", "shipToCustCd": null, "result": "CREATED", "addrGrade": "A", "zipCd": "06236",
       "centerCd": "ICN", "centerAssignType": "AUTO", "centerAssignStatus": "ASSIGNED", "regionMismatch": false }
   ] }
 ```

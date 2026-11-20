@@ -301,7 +301,7 @@
 | `widthCm` / `depthCm` / `heightCm` | `width_cm` / `depth_cm` / `height_cm` | DECIMAL(8,2) | 1차 | 저장은 cm (화면은 운영사 단위) |
 | `maxCbm` / `maxWeightKg` / `maxPalletCnt` | `max_cbm` / `max_weight_kg` / `max_pallet_cnt` | DECIMAL(10,4) / DECIMAL(10,2) / INT | 1차 | 무게 저장은 kg |
 | `inboundYn` / `outboundYn` / `allocatableYn` | `inbound_yn` / `outbound_yn` / `allocatable_yn` | CHAR(1) NULL | 1차·상속 | NULL = 창고 값 |
-| `mixItemYn` / `mixLotYn` / `mixClientYn` | `mix_item_yn` / `mix_lot_yn` / `mix_client_yn` | CHAR(1) | 1차 | 기본 Y / Y / **N** |
+| `mixItemYn` / `mixLotYn` / `mixShipperYn` | `mix_item_yn` / `mix_lot_yn` / `mix_shipper_yn` | CHAR(1) | 1차 | 기본 Y / Y / **N** |
 | `putawaySeq` / `pickSeq` | `putaway_seq` / `pick_seq` | INT | 1차 | |
 | `lockYn` / `lockReason` / `lockAt` | `lock_yn` / `lock_reason_cd` / `lock_at` | | 2차 | 잠그면 사유(공통코드 `LOCK_REASON`) 필수 (검사 조건) |
 | `abcClass` / `dedicatedShipperId` / `checkDigit` / `lastCountOn` | `abc_class_cd` / `dedicated_shipper_id` / `check_digit` / `last_count_dt` | | 2차 | 공통코드 `ABC_CLASS` / 화주사 FK |

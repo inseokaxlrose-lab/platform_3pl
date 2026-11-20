@@ -1,7 +1,7 @@
 # 0084. 코드 체계(체번) — 체번 규칙·현재값 표, 운영사·날짜별 문서번호
 
 - 날짜: 2026-11-20
-- 상태: 채택 (① 체번 기반 · ② 코드 3층 완료 — ③ 용어·타입부터는 다음 단계)
+- 상태: 채택 (① 체번 기반 · ② 코드 3층 · ③ 용어·타입 완료 — ④ 중간 항목부터는 다음 단계)
 - 관련: 0025 (기준정보 코드 3층 — ②에서 갱신), 0047 (문서 번호 — 대체), 0039 (멀티테넌트)
 - 정의서: `docs/specs/system_code.md` (테이블 정의서 검토 + 체번 반영안)
 - 코드: `src/lib/numbering/` (`numbering-codes.ts` 값·번호 모양, `numbering.ts` 발급), `src/lib/documents/doc-no.ts`
@@ -71,12 +71,22 @@
 - **연동 조회 키(`if_key_type_cd`)**: 화주사마다 `CODE`(우리 코드, 기본) / `CUST_CD`(사용자 정의 코드). 품목 엑셀 업로드·품목 API가 이 키로 대상을 찾는다(`src/lib/master-code/if-key.ts`의 `keyWhere`).
   - `CODE`: 업로드에서 품목코드를 비운 줄은 매번 새 품목(자동 체번). API는 `itemCd` 필수.
   - `CUST_CD`: 업로드는 사용자정의코드 칸, API는 `itemCustCd`가 필수. 새 품목의 품목코드는 함께 보낸 값 또는 자동. 기존 품목에 다른 품목코드를 보내면 `ITEM_CD_INVALID`. `GET /items/{key}`의 경로 값도 이 키.
-  - 거래처 API·업로드의 조회 키 적용은 ③(partner → customer 이름 정리)에서 한다.
+  - 거래처 API·업로드의 조회 키 적용은 ③에서 했다.
 - 화주사 수정에서 다른 화주사 코드를 보내면 거부한다(화면은 읽기 전용).
+
+## ③ 용어·타입
+
+- **client → shipper** (H5): `max_client_cnt`→`max_shipper_cnt`, `mix_client_yn`→`mix_shipper_yn`, 주문번호 중복 기준 값 `CLIENT`·`CLIENT_DAY`→`SHIPPER`·`SHIPPER_DAY`, 배송센터 확인 사유 `NOT_CLIENT_CENTER`→`NOT_SHIPPER_CENTER`. 칼럼은 `RENAME`으로(데이터 유지), 값은 마이그레이션에서 바꾸고 검사 조건을 다시 만들었다.
+- **partner → customer** (H5): API 경로 `/partners`→`/customers`, 필드 `partnerCd`·`partnerNm`·`partnerType`·`partnerGroup`→`customerCd`·`customerNm`·`customerType`·`customerGroup`, 권한 `PARTNER_READ/WRITE`→`CUSTOMER_READ/WRITE`(발급된 키도 마이그레이션이 바꿈), API 구분(`api_cd`)·오류코드(`PARTNER_*`→`CUSTOMER_*`), 공통코드 그룹 `PARTNER_TYPE`→`CUSTOMER_TYPE`, 필드 대응표 `docs/api-customer-fields.md`. 개발 단계라 옛 경로는 남기지 않는다.
+  - 그대로 둔 것: 센터 유형 `PARTNER`(협력·위탁 센터 — 거래처와 뜻이 다름), `tb_api_client`(API를 부르는 주체), 요청 로그 가리기에서 `customer` 칸은 계속 가린다(개인 구매자일 수 있음).
+- **거래처 조회 키**: 화주 연동 조회 키가 `CUST_CD`면 거래처는 `customerCustCd`, 납품처는 `shipToCustCd`로 찾는다(API·엑셀). 새 거래처·납품처의 우리 코드는 보낸 값 또는 자동 체번이고, 다른 우리 코드를 보내면 `CUSTOMER_CD_INVALID`·`SHIP_TO_CD_INVALID`. 경로 `{customerCd}`도 조회 키 값. 응답은 우리 코드·사용자 정의 코드를 함께 준다.
+- **H4 화주사 타입**: `tb_shipper`·`tb_shipper_contact`의 TEXT 칼럼을 운영사·거래처와 같은 길이의 VARCHAR로(코드 20, 이름 100, 주소 200, 전화·팩스 15, 이메일 100, 사업자번호 CHAR(10)), 사업자번호 10자리·전화·팩스 8~15자리 숫자 검사 추가.
+- **H6 운영사 표시 단위**: `weight_unit_cd`·`length_unit_cd`(코드 글자) → `weight_unit_id`·`length_unit_id`(FK `tb_unit`). 기본값은 DB 함수 `system_unit_id('KG'/'CM')`(시스템 단위 id). 유형(중량·길이)과 범위(시스템 또는 그 운영사 단위)는 FK로 표현되지 않아 트리거로 검사한다. 단위 코드가 운영사마다 겹칠 수 있어 코드로는 어떤 단위인지 확정되지 않기 때문.
 
 ## 버린 안
 
 - **종류별 DB 시퀀스 유지 (0047)**: 운영사·날짜별로 1부터 시작할 수 없고, 운영사마다 자리수·접두어를 바꿀 수 없다.
 - **`MAX(번호)+1`**: 동시에 등록하면 같은 번호가 나온다.
+- **옛 API 경로(`/partners`)를 별칭으로 남기기**: 아직 연동한 화주가 없는 개발 단계라 두 이름을 함께 유지할 이유가 없다.
 - **시스템 코드(`sys_cd`)를 그대로 두기**: 사용자 코드가 비면 시스템 코드를 쓰는 이중 구조라 화면·API·라벨마다 어느 코드를 쓸지 헷갈렸다. 우리 코드 하나를 자동 체번으로 채우는 쪽이 단순하다.
 - **`NULLS NOT DISTINCT` 고유 인덱스 하나**: Prisma 스키마로 표현되지 않아 스키마와 DB가 어긋난다 — 부분 인덱스 2개로.
