@@ -6,6 +6,7 @@ import { scopeFilter, type DataScope } from '@/lib/scope/data-scope'
 import { parseQty, qtyText } from '@/lib/units/convert'
 import { STOCK_SCOPE } from './stock-list'
 import { labelOf } from '@/lib/db-value'
+import { buildLocationBarcode } from '@/lib/locations/location-barcode'
 
 // 재고 이력 조회 (docs/decisions/0062) — 재고가 바뀐 한 번 한 번 (입고·이동(적치)·조정)
 // 조건 키: keyword · type(여러 개) · center · shipper · txnAt(기간) · ref(원본 문서 종류)
@@ -83,7 +84,7 @@ export async function listStockHistory(input: ListQuery, scope: DataScope) {
       type: t.type,
       typeLabel: labelOf(TXN_TYPE_LABELS, t.type),
       center: `${t.stock.center.name} (${t.stock.center.code})`,
-      location: `${t.stock.warehouse.code} / ${t.stock.location.code}`,
+      location: buildLocationBarcode(t.stock.warehouse.code, t.stock.location.code),
       shipper: `${t.stock.shipper.name} (${t.stock.shipper.code})`,
       itemCode: t.stock.item.code,
       itemName: t.stock.item.name,

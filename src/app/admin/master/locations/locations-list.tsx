@@ -35,6 +35,8 @@ type Row = EditingLocation & {
   isActive: boolean
   center: string
   warehouse: string
+  // 스캔용 바코드 (창고코드.로케이션코드, 0084 ⑤)
+  barcode: string
   zone: string | null
   rowNo: string | null
   levelNo: string | null
@@ -73,6 +75,7 @@ const columnsFor = (units: DisplayUnits): DataGridColumn<Row>[] => [
   },
   { id: 'center', header: '센터', accessor: 'center', sortable: true },
   { id: 'warehouse', header: '창고', accessor: 'warehouse', sortable: true },
+  { id: 'barcode', header: '바코드', accessor: 'barcode' },
   { id: 'zone', header: '구역', accessor: 'zone', sortable: true, align: 'center' },
   { id: 'rowNo', header: '열', accessor: 'rowNo', sortable: true, align: 'center' },
   { id: 'levelNo', header: '단', accessor: 'levelNo', sortable: true, align: 'center' },
