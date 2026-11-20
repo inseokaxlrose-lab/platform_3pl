@@ -1,7 +1,7 @@
 # 0084. 코드 체계(체번) — 체번 규칙·현재값 표, 운영사·날짜별 문서번호
 
 - 날짜: 2026-11-20
-- 상태: 채택 (① 체번 기반 · ② 코드 3층 · ③ 용어·타입 · ④-1 칼럼 이름 완료 — ④-2 타입·검사부터는 다음 단계)
+- 상태: 채택 (① 체번 기반 · ② 코드 3층 · ③ 용어·타입 · ④-1 칼럼 이름 · ④-2 타입·검사 완료 — ④-3 구조부터는 다음 단계)
 - 관련: 0025 (기준정보 코드 3층 — ②에서 갱신), 0047 (문서 번호 — 대체), 0039 (멀티테넌트)
 - 정의서: `docs/specs/system_code.md` (테이블 정의서 검토 + 체번 반영안)
 - 코드: `src/lib/numbering/` (`numbering-codes.ts` 값·번호 모양, `numbering.ts` 발급), `src/lib/documents/doc-no.ts`
@@ -102,10 +102,24 @@ DB 칼럼 이름만 바꾸고(RENAME — 데이터 유지) 프로그램의 Prism
 | M12 | `tb_customer.region_cd`(법정동코드)·`tb_center.region_nm`(시군구) | `bjd_cd`·`sigungu_nm` (납품처와 같은 이름) |
 | M16 | `tb_api_rate_bucket.window_start` | `window_start_at` (일시는 `_at`) |
 
+### ④-2 타입·검사
+
+- **M6 ENUM 13개 → VARCHAR(20) + CHECK**: 칸 15개. 값은 `USING 칸::text`로 그대로 옮기고, ENUM 값을 직접 쓰던 검사 조건 7개는 지웠다가 다시 만들었다. `tb_asn.reg_channel_cd`에 `API`(입고예정 API용) 값을 더했다.
+  - 값 목록 상수 ↔ DB CHECK 비교 테스트 `src/config/db-value-sets.db.test.ts`: DB의 모든 값 목록 검사 조건(89칸)을 읽어, 상수가 없는 칸·DB에 없는 상수·값이 다른 칸이 있으면 실패한다. 자리가 없던 값 목록은 `src/config/db-codes.ts`에 모았다.
+  - Prisma가 주는 타입이 `string`이 되어, 값에 따라 동작이 달라지는 곳은 `toValue`로 좁히고(`src/lib/db-value.ts`), 표시용 행 타입은 `string`으로 넓혔다.
+  - 단위 목록의 기본 정렬(유형 순서)은 ENUM 정의 순서에 기대고 있었다 → 정렬을 고르지 않았을 때 프로그램에서 `UNIT_TYPES` 순서로 정렬한다. 사용자가 고른 열 정렬(상태 등)은 알파벳 순이 된다.
+- **M7**: 값 목록 코드 칸을 VARCHAR(20)으로(10자였던 26칸), 우리 표의 TEXT 칸 16개를 길이를 정한 VARCHAR로. 공통코드 코드는 업무 표의 코드 칸(20자)에 들어가므로 입력 규칙도 30자 → 20자.
+- **M11**: 정제 우편번호 `tb_customer`·`tb_ship_to.zip_cd` CHAR(5) + 숫자 5자리 검사.
+- **M14**: 같은 내용의 상태 검사 조건 중복(`tb_location`·`tb_warehouse`) 하나씩 삭제.
+- **M15**: 빠진 FK 9개(`tb_putaway` 4, `tb_stock_adjust.center_id`, 입고확정·조정 줄의 `stock_txn_id`, API 멱등·호출 한도의 `api_client_id`). 이력·로그 표에서 나가는 FK는 일부러 두지 않는다(db-conventions).
+- **M5**: 운영사·화주사·거래처 담당자에도 "대표 1명" 부분 UNIQUE.
+- **M18**: `tb_center.manager_nm`·`manager_tel_no` 삭제. 값이 있고 담당자가 없는 센터는 대표 담당자(센터장, `MANAGER`)로 옮겼다.
+
 ## 버린 안
 
 - **종류별 DB 시퀀스 유지 (0047)**: 운영사·날짜별로 1부터 시작할 수 없고, 운영사마다 자리수·접두어를 바꿀 수 없다.
 - **`MAX(번호)+1`**: 동시에 등록하면 같은 번호가 나온다.
+- **ENUM 유지**: 값을 더할 때마다 `ALTER TYPE`이 필요하고 트랜잭션 안에서 새 값을 바로 못 쓰는 등 제약이 많다. 다른 기준정보 칸은 이미 VARCHAR + CHECK라 한 방식으로 통일한다.
 - **옛 API 경로(`/partners`)를 별칭으로 남기기**: 아직 연동한 화주가 없는 개발 단계라 두 이름을 함께 유지할 이유가 없다.
 - **시스템 코드(`sys_cd`)를 그대로 두기**: 사용자 코드가 비면 시스템 코드를 쓰는 이중 구조라 화면·API·라벨마다 어느 코드를 쓸지 헷갈렸다. 우리 코드 하나를 자동 체번으로 채우는 쪽이 단순하다.
 - **`NULLS NOT DISTINCT` 고유 인덱스 하나**: Prisma 스키마로 표현되지 않아 스키마와 DB가 어긋난다 — 부분 인덱스 2개로.
