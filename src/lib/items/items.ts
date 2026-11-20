@@ -24,7 +24,7 @@ import {
   stackWarning,
   type ItemWarning,
 } from './item-calc'
-import { UNIT_LEVEL_ORDER, type BarcodeType, type UnitLevel } from './item-codes'
+import { UNIT_LEVEL_ORDER, type BarcodeType, type ItemStatus, type UnitLevel } from './item-codes'
 import type { ItemCreateData, ItemData } from './item-schema'
 
 // 품목 저장 (docs/decisions/0041, 0083). 권한·데이터 범위 검사는 서버 액션에서 한다
@@ -496,7 +496,14 @@ export const updateItem = (
   options?: ItemSaveOptions,
 ) => prisma.$transaction((tx) => updateItemIn(tx, id, rowVersion, data, options))
 
-// 사용 / 사용중지 (여러 건) — 단종은 ② 단계의 상태 변경에서
+// 상태 바꾸기 (여러 건): 사용·사용중지·단종 (0083 ②)
+// 단종 = 새 입고예정에서 고를 수 없음(재고 출고는 출고 기능에서 허용), 사용중지 = 새 입고·출고요청 모두 불가
+export async function setItemsStatus(ids: bigint[], status: ItemStatus) {
+  const { count } = await prisma.item.updateMany({ where: { id: { in: ids } }, data: { status } })
+  return { count }
+}
+
+// 사용 / 사용중지 (여러 건) — 화주 포털·수정 화면의 사용 여부 버튼
 export async function setItemsActive(ids: bigint[], isActive: boolean) {
   const { count } = await prisma.item.updateMany({
     where: { id: { in: ids } },

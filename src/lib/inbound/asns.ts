@@ -133,7 +133,13 @@ export function resolveAsnLine(item: AsnLineItem | undefined, line: AsnLineValue
     throw new ActionError('VALIDATION', message)
   }
   if (!item) return fail('이 화주사의 품목이 아닙니다.')
-  if (!isActiveStatus(item.status)) fail(`사용 중지된 품목입니다 (${item.code}).`)
+  if (!isActiveStatus(item.status)) {
+    fail(
+      item.status === 'DISCONTINUED'
+        ? `단종된 품목은 새 입고예정에 넣을 수 없습니다 (${item.code}).`
+        : `사용 중지된 품목입니다 (${item.code}).`,
+    )
+  }
 
   const { baseQty: expectedQty, entryUnit, entryQty } = entryToBase(item, line.unit, line.qty)
 
