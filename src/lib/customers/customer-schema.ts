@@ -12,7 +12,7 @@ import {
   optionalText,
   requiredText,
 } from '@/lib/validation/common-fields'
-import { ORDER_ADDR_MODE, SHIP_TO_STATUS } from './customer-codes'
+import { ORDER_ADDR_MODE, SHIP_TO_STATUS, CUSTOMER_ROLE } from './customer-codes'
 
 // 거래처·납품처 입력 규칙 — 화면·서버 공용 (docs/decisions/0043, 0082)
 
@@ -129,6 +129,8 @@ const customerShape = {
   name: requiredText('거래처명을 입력해 주세요.', 200),
   shortName: optionalText(30),
   customerType: optionalText(20),
+  // 역할 (0090): 매입처만이면 납품처를 만들지 않는다
+  role: oneOf(CUSTOMER_ROLE.values, '거래처 역할을 골라 주세요.').default('SALES'),
   customerGroup: optionalText(30),
   businessNumber: optionalBusinessNumber,
   ceoName: optionalText(50),
@@ -151,12 +153,12 @@ const customerShape = {
   shipTos: shipTosSchema,
 }
 
-// 납품처가 없으면 거래처 주소 필수 (CUSTOMER_ADDRESS_REQUIRED)
+// 납품처가 없으면 거래처 주소 필수 (CUSTOMER_ADDRESS_REQUIRED) — 매입처만인 거래처는 납품처를 만들지 않으므로 제외 (0090)
 const requireAddressWithoutShipTo = (
-  value: { shipTos: unknown[]; address: string | null; zipCode: string | null },
+  value: { shipTos: unknown[]; address: string | null; zipCode: string | null; role: string },
   ctx: z.RefinementCtx,
 ) => {
-  if (value.shipTos.length === 0 && !value.address) {
+  if (value.role !== 'PURCHASE' && value.shipTos.length === 0 && !value.address) {
     ctx.addIssue({
       code: 'custom',
       path: ['address'],

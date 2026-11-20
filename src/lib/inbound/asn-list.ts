@@ -85,6 +85,8 @@ export async function listAsns(input: ListQuery, scope: DataScope) {
         createdAt: true,
         shipper: { select: { code: true, name: true } },
         center: { select: { code: true, name: true } },
+        // 공급처 (0090)
+        supplier: { select: { code: true, name: true } },
         lines: {
           select: { expectedQty: true, confirmedQty: true, closedQty: true },
         },
@@ -93,7 +95,7 @@ export async function listAsns(input: ListQuery, scope: DataScope) {
     prisma.asn.count({ where }),
   ])
   return {
-    rows: rows.map(({ shipper, center, lines, ...row }) => {
+    rows: rows.map(({ shipper, center, supplier, lines, ...row }) => {
       const remaining = lines.filter(
         (l) =>
           parseQty(l.expectedQty.toString()) >
@@ -107,6 +109,7 @@ export async function listAsns(input: ListQuery, scope: DataScope) {
         expectedOn: row.expectedOn.toISOString().slice(0, 10),
         shipper: `${shipper.name} (${shipper.code})`,
         center: `${center.name} (${center.code})`,
+        supplier: supplier ? `${supplier.name} (${supplier.code})` : null,
         lineCount: lines.length,
         // 잔량이 남은 줄 / 예정보다 많이 받은 줄
         remainingLines: remaining,

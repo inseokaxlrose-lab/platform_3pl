@@ -19,6 +19,7 @@ export type AsnRow = {
   channel: string
   expectedOn: string
   shipperRefNo: string | null
+  supplier: string | null
   status: string
   putawayStatus: string
   shipper: string
@@ -95,6 +96,7 @@ const columnsOf = (basePath: string, withShipper: boolean): DataGridColumn<AsnRo
       ),
   },
   { id: 'shipperRefNo', header: '화주사 문서 번호', accessor: 'shipperRefNo' },
+  { id: 'supplier', header: '공급처', accessor: 'supplier' },
   {
     id: 'channel',
     header: '등록 경로',

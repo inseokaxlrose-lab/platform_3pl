@@ -45,6 +45,12 @@ export const customerUploadTemplate: UploadTemplate = {
       example: 'STORE',
       note: '공통코드 CUSTOMER_TYPE의 코드',
     },
+    {
+      key: 'customerRole',
+      header: '거래처역할',
+      example: '매출처',
+      note: '매출처 / 매입처 / 둘다 (비우면 그대로·새 거래처는 매출처). 매입처는 납품처가 없어도 됩니다',
+    },
     { key: 'customerGroup', header: '거래처그룹', example: '수도권 매장' },
     { key: 'bizRegNo', header: '사업자등록번호', example: '120-81-23456' },
     { key: 'ceoNm', header: '대표자' },

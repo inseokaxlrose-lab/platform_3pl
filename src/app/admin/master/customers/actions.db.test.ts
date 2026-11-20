@@ -524,3 +524,40 @@ describe('데이터 범위 · 삭제', () => {
     })
   })
 })
+
+describe('거래처 역할 (0090)', () => {
+  it('매입처는 주소·납품처 없이 등록·수정할 수 있고 기본 납품처를 만들지 않는다, 역할로 거른다', async () => {
+    const supplier = await create({
+      code: 'V1',
+      name: '가나제조',
+      role: 'PURCHASE',
+      zipCode: '',
+      address: '',
+      addressDetail: '',
+      regionCode: '',
+    })
+    expect(await prisma.shipTo.count({ where: { customerId: BigInt(supplier.id) } })).toBe(0)
+    const edit = await getCustomerForEdit(BigInt(supplier.id), ALL)
+    expect(edit?.input).toMatchObject({ role: 'PURCHASE', shipTos: [] })
+    expect(
+      await updateCustomerAction({
+        ...edit!.input,
+        name: '가나제조(주)',
+        id: supplier.id,
+        rowVersion: edit!.rowVersion,
+      }),
+    ).toMatchObject({ ok: true })
+    // 매출처는 여전히 주소(또는 납품처)가 필요하다
+    expect(
+      await createCustomerAction(
+        input({ code: 'C9', zipCode: '', address: '', addressDetail: '', regionCode: '' }),
+      ),
+    ).toMatchObject({ ok: false })
+    await create({ code: 'C2' })
+    const result = await listCustomersAction({
+      ...createDataGridState(),
+      filters: { role: 'PURCHASE' },
+    })
+    expect(result.ok && result.data.rows.map((r) => [r.code, r.role])).toEqual([['V1', 'PURCHASE']])
+  })
+})

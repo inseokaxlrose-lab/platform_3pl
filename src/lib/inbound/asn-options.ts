@@ -28,7 +28,11 @@ export type AsnItemOption = {
   shelfLifeDays: number | null
 }
 
+// 공급처 (0090): 화주사별 매입처·둘 다 거래처
+export type AsnSupplierOption = { id: string; code: string; name: string; shipperId: string }
+
 export type AsnFormOptions = {
   centers: AsnCenterOption[]
   shippers: AsnShipperOption[]
+  suppliers: AsnSupplierOption[]
 }

@@ -1443,6 +1443,10 @@ model Customer {
   shortName      String?  @map("customer_short_nm") @db.VarChar(30)
   // 거래처 유형: 공통코드 CUSTOMER_TYPE (분류·표시), 거래처 그룹: 화주가 쓰는 그룹 (자유 입력)
   customerType   String?  @map("customer_type_cd") @db.VarChar(20)
+  // 역할 (0090): SALES 매출처(납품받는 곳) / PURCHASE 매입처(공급처, 납품처 없음) / BOTH 둘 다
+  role           String   @default("SALES") @map("customer_role_cd") @db.VarChar(20)
+  // 이 거래처가 공급처인 ASN
+  suppliedAsns   Asn[]    @relation("AsnSupplier")
   customerGroup  String?  @map("customer_group_cd") @db.VarChar(30)
   // 사업자등록번호·전화번호는 하이픈 없이 숫자만 (0029)
   businessNumber String?  @map("biz_reg_no") @db.Char(10)
@@ -1738,13 +1742,16 @@ model Asn {
   // ASN 번호 (자동: AS + 등록일 YYMMDD + '-' + 일련번호, 운영사 전체에서 하나)
   asnNo      String   @map("asn_no") @db.VarChar(20)
 
-  type         String   @default("SHIPPER") @map("inbound_type_cd") @db.VarChar(20)
-  channel      String   @map("reg_channel_cd") @db.VarChar(20)
+  type         String    @default("SHIPPER") @map("inbound_type_cd") @db.VarChar(20)
+  channel      String    @map("reg_channel_cd") @db.VarChar(20)
   // 입고 예정일
-  expectedOn   DateTime @map("expected_dt") @db.Date
+  expectedOn   DateTime  @map("expected_dt") @db.Date
   // 화주사 쪽 문서 번호 (발주번호 등, 선택)
-  shipperRefNo String?  @map("shipper_ref_no") @db.VarChar(50)
-  remark       String?  @db.VarChar(1000)
+  shipperRefNo String?   @map("shipper_ref_no") @db.VarChar(50)
+  // 공급처 (0090): 같은 화주사의 매입처·둘 다 거래처 (선택)
+  supplierId   BigInt?   @map("supplier_id")
+  supplier     Customer? @relation("AsnSupplier", fields: [supplierId], references: [id], onDelete: Restrict)
+  remark       String?   @db.VarChar(1000)
 
   status        String    @default("PLANNED") @map("asn_status_cd") @db.VarChar(20)
   putawayStatus String    @default("WAITING") @map("putaway_status_cd") @db.VarChar(20)
@@ -1775,6 +1782,7 @@ model Asn {
   @@index([operatorId])
   @@index([centerId, status])
   @@index([shipperId, expectedOn])
+  @@index([supplierId])
   @@map("tb_asn")
 }
 

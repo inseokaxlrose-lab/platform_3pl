@@ -51,6 +51,12 @@ export function asnUploadTemplate(withShipper: boolean): UploadTemplate {
         example: 'PO-1001',
         note: '발주번호 등 (선택)',
       },
+      {
+        key: 'supplierCode',
+        header: '공급처코드',
+        example: '',
+        note: '이 화주사의 매입처 거래처코드 (선택)',
+      },
       { key: 'itemCode', header: '품목코드', required: true, example: 'WATER' },
       {
         key: 'unit',

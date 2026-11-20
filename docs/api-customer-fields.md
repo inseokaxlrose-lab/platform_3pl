@@ -21,6 +21,7 @@
 | `bizRegNo` | 사업자등록번호 | 사업자등록번호 | `biz_reg_no` | 숫자만 저장 |
 | `ceoNm` | 대표자 | 대표자 | `ceo_nm` | |
 | `orderAddrMode` | 주문 주소 사용 | — | `order_addr_mode_cd` | `SHIP_TO`(납품처 지정, 기본) · `ORDER_ADDR`(주문 수령인 주소) |
+| `customerRole` | 거래처 역할 | — | `customer_role_cd` | `SALES`(매출처, 새 거래처 기본) · `PURCHASE`(매입처·공급처 — 납품처를 만들지 않고 주소 선택) · `BOTH` (0090) |
 | `telNo` | 대표 전화 | 대표전화 | `tel_no` | 숫자만 저장 |
 | `faxNo` | 팩스 | 팩스 | `fax_no` | 숫자만 저장 |
 | `email` | 이메일 | 이메일 | `email` | |

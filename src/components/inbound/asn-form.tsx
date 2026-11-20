@@ -128,6 +128,7 @@ export function AsnForm({
           })(),
           expectedOn: today(),
           shipperRefNo: '',
+          supplierId: '',
           remark: '',
           lines: [{ ...EMPTY_ASN_LINE }],
         },
@@ -177,6 +178,8 @@ export function AsnForm({
   )
 
   const shipper = options.shippers.find((s) => s.id === value.shipperId)
+  // 공급처: 이 화주사의 매입처·둘 다 거래처 (0090)
+  const supplierOptions = options.suppliers.filter((s) => s.shipperId === value.shipperId)
   const centers = options.centers.filter((c) => shipper?.centerIds.includes(c.id))
 
   const sections: MasterFormSection[] = [
@@ -202,6 +205,7 @@ export function AsnForm({
                   set({
                     shipperId,
                     centerId: next?.centerIds.length === 1 ? next.centerIds[0] : '',
+                    supplierId: '',
                     lines: [{ ...EMPTY_ASN_LINE }],
                   })
                 }}
@@ -283,6 +287,30 @@ export function AsnForm({
               value={value.shipperRefNo}
               onChange={(e) => set({ shipperRefNo: e.target.value })}
               disabled={disabled}
+            />
+          </Field>
+          <Field
+            label="공급처"
+            span={4}
+            error={errors.supplierId}
+            htmlFor={id('supplierId')}
+            hint="물건을 보내는 매입처 거래처 (선택)"
+          >
+            <SearchSelect
+              id={id('supplierId')}
+              options={[
+                { value: '', label: '선택 안 함' },
+                ...supplierOptions.map((s) => ({
+                  value: s.id,
+                  label: `${s.name} (${s.code})`,
+                  keywords: s.code,
+                })),
+              ]}
+              value={value.supplierId ?? ''}
+              onChange={(supplierId) => set({ supplierId })}
+              placeholder={value.shipperId ? '선택 안 함' : '화주사를 먼저 골라 주세요'}
+              searchPlaceholder="거래처코드·이름"
+              disabled={disabled || !value.shipperId}
             />
           </Field>
           <Field label="비고" span={12} error={errors.remark} htmlFor={id('remark')}>

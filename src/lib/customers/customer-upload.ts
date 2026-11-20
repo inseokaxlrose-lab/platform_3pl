@@ -33,6 +33,7 @@ const CUSTOMER_KEYS = [
   'customerNm',
   'shortNm',
   'customerType',
+  'customerRole',
   'customerGroup',
   'bizRegNo',
   'ceoNm',
@@ -56,6 +57,8 @@ const SHIP_TO_KEYS = {
   deliveryMemo: 'deliveryMemo',
   centerCd: 'centerCd',
 } as const
+
+const ROLE_OF: Record<string, string> = { 매출처: 'SALES', 매입처: 'PURCHASE', 둘다: 'BOTH' }
 
 const STATUS_OF: Record<string, string> = {
   거래중: 'ACTIVE',
@@ -158,6 +161,10 @@ async function groupRows(rows: UploadRow[], scope: DataScope) {
       if (key === 'minShelfDays') {
         if (!/^\d+$/.test(value)) add(first, key, '숫자로 넣어 주세요.')
         else item.minShelfDays = Number(value)
+      } else if (key === 'customerRole') {
+        // 역할 (0090): 매출처 / 매입처 / 둘다 (비우면 그대로·새 거래처는 매출처)
+        if (!ROLE_OF[value]) add(first, key, '매출처 / 매입처 / 둘다 중 하나입니다.')
+        else item.customerRole = ROLE_OF[value] as CustomerItem['customerRole']
       } else if (key === 'status') {
         if (!STATUS_OF[value]) add(first, key, '거래중 / 거래중지 중 하나입니다.')
         else item.status = STATUS_OF[value]

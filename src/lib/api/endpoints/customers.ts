@@ -232,6 +232,7 @@ const CUSTOMER_SELECT = {
   businessNumber: true,
   ceoName: true,
   orderAddrMode: true,
+  role: true,
   phone: true,
   fax: true,
   email: true,
@@ -260,6 +261,7 @@ type CustomerRow = {
   businessNumber: string | null
   ceoName: string | null
   orderAddrMode: string
+  role: string
   phone: string | null
   fax: string | null
   email: string | null
@@ -288,6 +290,7 @@ const toCustomer = (c: CustomerRow) => ({
   bizRegNo: c.businessNumber,
   ceoNm: c.ceoName,
   orderAddrMode: c.orderAddrMode,
+  customerRole: c.role,
   telNo: c.phone,
   faxNo: c.fax,
   email: c.email,

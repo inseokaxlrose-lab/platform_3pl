@@ -1,4 +1,5 @@
 import 'server-only'
+import { SUPPLIER_ROLES } from '@/lib/customers/customer-codes'
 import { requireOperatorId } from '@/lib/actor'
 import { resolveUnitDecimals } from '@/lib/units/unit-status'
 import { ActionError } from '@/lib/actions/action-error'
@@ -81,12 +82,28 @@ export async function checkAsnUpload(
   // 단위 소수 자리수: 시스템 단위는 이 운영사의 값 (0079)
   resolveUnitDecimals(items)
   const itemByKey = new Map(items.map((item) => [`${item.shipperId}:${item.code}`, item]))
+  // 공급처 후보 (0090)
+  const suppliers = await prisma.customer.findMany({
+    where: {
+      shipperId: { in: [...shipperIds] },
+      role: { in: [...SUPPLIER_ROLES] },
+      status: 'ACTIVE',
+    },
+    select: { id: true, code: true, shipperId: true },
+  })
+  const supplierByKey = new Map(suppliers.map((s) => [`${s.shipperId}:${s.code}`, s]))
 
   const result: Group[] = []
   for (const [key, groupRows] of groups) {
     const first = groupRows[0]
     // 헤더 칸은 묶음 안에서 같아야 한다
-    const headerKeys = ['shipperCode', 'centerCode', 'expectedOn', 'shipperRefNo'] as const
+    const headerKeys = [
+      'shipperCode',
+      'centerCode',
+      'expectedOn',
+      'shipperRefNo',
+      'supplierCode',
+    ] as const
     let consistent = true
     for (const row of groupRows.slice(1)) {
       for (const column of headerKeys) {
@@ -119,6 +136,12 @@ export async function checkAsnUpload(
     }
     if ((first.values.shipperRefNo ?? '').length > 50)
       add(first, 'shipperRefNo', '50자 이하로 넣어 주세요.')
+    // 공급처 (0090): 이 화주사의 거래중인 매입처·둘 다 거래처코드
+    const supplierCode = (first.values.supplierCode ?? '').trim().toUpperCase()
+    const supplier = supplierCode ? supplierByKey.get(`${shipper.id}:${supplierCode}`) : undefined
+    if (supplierCode && !supplier) {
+      add(first, 'supplierCode', '이 화주사의 거래중인 매입처 거래처가 아닙니다.')
+    }
 
     // 라인: 입력 규칙 → 품목·단위·수량·로트 검사 (화면 등록과 같은 함수)
     const lines: AsnCreateData['lines'] = []
@@ -167,7 +190,13 @@ export async function checkAsnUpload(
       }
     }
 
-    if (consistent && center && expectedOn && lines.length === groupRows.length) {
+    if (
+      consistent &&
+      center &&
+      expectedOn &&
+      (!supplierCode || supplier) &&
+      lines.length === groupRows.length
+    ) {
       result.push({
         key,
         rows: groupRows,
@@ -176,6 +205,7 @@ export async function checkAsnUpload(
           centerId: center.id,
           expectedOn,
           shipperRefNo: first.values.shipperRefNo || null,
+          supplierId: supplier?.id ?? null,
           remark: null,
           lines,
         },

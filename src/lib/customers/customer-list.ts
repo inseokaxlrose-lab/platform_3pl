@@ -39,7 +39,7 @@ export async function assertCustomersInScope(ids: bigint[], scope: DataScope, de
 const ALIVE_SHIP_TO = { ...NOT_DELETED }
 const NEED_CONFIRM = { ...NOT_DELETED, status: 'ACTIVE', centerAssignStatus: 'NEED_CONFIRM' }
 
-// 목록 (검색 조건 키 — 기본: shipper·keyword·status / 상세: type·group·orderAddrMode·source·needConfirm·createdAt)
+// 목록 (검색 조건 키 — 기본: shipper·keyword·status / 상세: role·type·group·orderAddrMode·source·needConfirm·createdAt)
 export async function listCustomers(input: ListQuery, scope: DataScope) {
   const { filters } = input
   const query = toPrismaQuery(input, {
@@ -86,6 +86,8 @@ export async function listCustomers(input: ListQuery, scope: DataScope) {
       codesFilter(filters, 'orderAddrMode')
         ? { orderAddrMode: codesFilter(filters, 'orderAddrMode') }
         : {},
+      // 역할 (0090)
+      codesFilter(filters, 'role') ? { role: codesFilter(filters, 'role') } : {},
       codesFilter(filters, 'source') ? { source: codesFilter(filters, 'source') } : {},
       // 배송센터 확인이 필요한 납품처가 있는 거래처
       filters.needConfirm === 'Y' ? { shipTos: { some: NEED_CONFIRM } } : {},
@@ -103,6 +105,7 @@ export async function listCustomers(input: ListQuery, scope: DataScope) {
         custCode: true,
         name: true,
         customerType: true,
+        role: true,
         customerGroup: true,
         businessNumber: true,
         phone: true,

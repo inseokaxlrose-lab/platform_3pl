@@ -1,4 +1,5 @@
 import 'server-only'
+import { SUPPLIER_ROLES } from '@/lib/customers/customer-codes'
 import { isMfgInput } from '@/lib/items/expiry-dates'
 import { shipperDefaultsSelect, shipperItemDefaults } from '@/lib/shippers/shipper-defaults'
 import { resolveUnitDecimals, unitDecimalsSelect } from '@/lib/units/unit-status'
@@ -24,7 +25,7 @@ const dateText = (value: Date | null) => (value ? value.toISOString().slice(0, 1
 
 // 등록·수정 화면의 선택지: 범위 안의 사용 중인 센터 + 화주사(이용 센터 중 범위 안의 것)
 export async function getAsnFormOptions(scope: DataScope): Promise<AsnFormOptions> {
-  const [centers, shippers] = await Promise.all([
+  const [centers, shippers, suppliers] = await Promise.all([
     prisma.center.findMany({
       where: { AND: [scopeFilter(scope, CENTER_SCOPE), ACTIVE_ONLY] },
       select: { id: true, code: true, name: true },
@@ -35,6 +36,17 @@ export async function getAsnFormOptions(scope: DataScope): Promise<AsnFormOption
       select: { id: true, code: true, name: true, centers: { select: { centerId: true } } },
       orderBy: { code: 'asc' },
     }),
+    // 공급처: 범위 안 화주사의 거래중인 매입처·둘 다 거래처 (0090)
+    prisma.customer.findMany({
+      where: {
+        AND: [
+          scopeFilter(scope, SHIPPER_SCOPE),
+          { role: { in: [...SUPPLIER_ROLES] }, status: 'ACTIVE' },
+        ],
+      },
+      select: { id: true, code: true, name: true, shipperId: true },
+      orderBy: { code: 'asc' },
+    }),
   ])
   const allowed = new Set(centers.map((c) => c.id))
   return textIds({
@@ -43,6 +55,7 @@ export async function getAsnFormOptions(scope: DataScope): Promise<AsnFormOption
       ...s,
       centerIds: used.map((u) => u.centerId).filter((id) => allowed.has(id)),
     })),
+    suppliers,
   })
 }
 
@@ -138,6 +151,7 @@ export async function getAsnForEdit(id: bigint, scope: DataScope) {
     centerId: String(asn.centerId),
     expectedOn: dateText(asn.expectedOn),
     shipperRefNo: asn.shipperRefNo ?? '',
+    supplierId: asn.supplierId ? String(asn.supplierId) : '',
     remark: asn.remark ?? '',
     lines: asn.lines.map((line) => ({
       itemId: String(line.itemId),

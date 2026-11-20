@@ -1,7 +1,8 @@
 import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { MILK_OPTIONS } from '@/test/item-input'
 import { ALL_PERMISSION_CODES, type PermissionCode } from '@/config/permissions'
-import { getAsnForEdit } from '@/lib/inbound/asn-queries'
+import { getAsnForEdit, getAsnFormOptions } from '@/lib/inbound/asn-queries'
+import { findUsedCustomerIds } from '@/lib/customers/customers'
 import type { AsnCreateInput } from '@/lib/inbound/asn-schema'
 import { prisma } from '@/lib/prisma'
 import type { DataScope } from '@/lib/scope/data-scope'
@@ -320,5 +321,38 @@ describe('화주 포털', () => {
       ok: false,
       error: { code: 'FORBIDDEN' },
     })
+  })
+})
+
+describe('공급처 (0090)', () => {
+  const customer = (shipperId: bigint, code: string, role: string, status = 'ACTIVE') =>
+    prisma.customer.create({
+      data: { operatorId: TEST_OPERATOR_ID, shipperId, code, name: code, role, status },
+      select: { id: true },
+    })
+
+  it('같은 화주사의 거래중인 매입처·둘 다 거래처만, 수정 화면·선택지·쓰인 거래처', async () => {
+    const vendor = await customer(ids.gana, 'V1', 'PURCHASE')
+    const both = await customer(ids.gana, 'B1', 'BOTH')
+    const store = await customer(ids.gana, 'S1', 'SALES')
+    const other = await customer(ids.dara, 'V2', 'PURCHASE')
+    const stopped = await customer(ids.gana, 'V3', 'PURCHASE', 'SUSPENDED')
+
+    const created = await create({ supplierId: String(vendor.id) })
+    expect((await getAsnForEdit(BigInt(created.id), ALL))?.input.supplierId).toBe(String(vendor.id))
+    expect(await createAsnAction(input({ supplierId: String(both.id) }))).toMatchObject({
+      ok: true,
+    })
+    for (const bad of [store.id, other.id, stopped.id]) {
+      expect(await createAsnAction(input({ supplierId: String(bad) }))).toMatchObject({
+        ok: false,
+        error: { code: 'VALIDATION' },
+      })
+    }
+    // 선택지: 화주사별 거래중인 매입처·둘 다
+    const options = await getAsnFormOptions(ALL)
+    expect(options.suppliers.map((s) => s.code).sort()).toEqual(['B1', 'V1', 'V2'])
+    // ASN 공급처로 쓰인 거래처는 지울 수 없다
+    expect(await findUsedCustomerIds([vendor.id, store.id])).toEqual([vendor.id])
   })
 })

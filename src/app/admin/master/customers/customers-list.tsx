@@ -20,6 +20,7 @@ import {
   DATA_SOURCE,
   ORDER_ADDR_MODE,
   CUSTOMER_TYPE_GROUP,
+  CUSTOMER_ROLE,
 } from '@/lib/customers/customer-codes'
 import { customerUploadTemplate } from '@/lib/customers/customer-upload-template'
 import {
@@ -37,6 +38,7 @@ type Row = {
   custCode: string | null
   name: string
   customerType: string | null
+  role: string
   customerGroup: string | null
   businessNumber: string | null
   phone: string | null
@@ -70,6 +72,12 @@ const COLUMNS: DataGridColumn<Row>[] = [
     accessor: 'customerType',
     format: { code: CUSTOMER_TYPE_GROUP },
     sortable: true,
+  },
+  // 역할 (0090)
+  {
+    id: 'role',
+    header: '역할',
+    accessor: (r) => CUSTOMER_ROLE.labels[r.role as keyof typeof CUSTOMER_ROLE.labels] ?? r.role,
   },
   {
     id: 'customerGroup',
@@ -188,6 +196,13 @@ export function CustomersList({
       label: '거래처 유형',
       type: 'codeMulti',
       codeGroup: CUSTOMER_TYPE_GROUP,
+      detail: true,
+    },
+    {
+      key: 'role',
+      label: '거래처 역할',
+      type: 'multi',
+      options: CUSTOMER_ROLE.options,
       detail: true,
     },
     { key: 'customerGroup', label: '거래처 그룹', type: 'text', detail: true },
