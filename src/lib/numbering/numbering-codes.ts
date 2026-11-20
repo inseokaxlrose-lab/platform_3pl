@@ -88,3 +88,20 @@ export function autoPatternOf(rule: NumberingRuleSpec, prefix: string) {
     `^${escape(prefix)}${escape(rule.typeChar ?? '')}${date}${escape(rule.separator ?? '')}\\d{${rule.seqLength},}$`,
   )
 }
+
+// 다음 번호 미리보기 (체번 규칙 화면·서버 공용, 0085): 접두어 예와 초기화 주기별 다음 일련번호로
+export function previewCode(
+  rule: NumberingRuleSpec,
+  prefix: string,
+  nextByCycle: Record<string, string>,
+  at: Date,
+  timeZone: string,
+) {
+  const head = codeHead(
+    rule,
+    rule.prefixSource === 'FIXED' ? (rule.fixedPrefix ?? '') : prefix,
+    at,
+    timeZone,
+  )
+  return formatCode(head, BigInt(nextByCycle[rule.resetCycle] ?? '1'), rule.seqLength)
+}
