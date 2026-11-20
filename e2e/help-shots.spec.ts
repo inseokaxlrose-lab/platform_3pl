@@ -244,9 +244,9 @@ const SHOTS: Shot[] = [
     src: '/help/admin/system/codes/main.png',
     url: '/admin/system/codes',
     account: 'admin',
-    // 첫 그룹을 골라 오른쪽에 코드가 보이게
+    // 사유 코드 그룹을 골라 오른쪽에 코드·귀책이 보이게 (0087)
     prepare: async (page) => {
-      await page.getByRole('cell', { name: '담당 업무', exact: true }).click()
+      await page.getByRole('cell', { name: '검수 불량 사유', exact: true }).click()
       await expect(
         page.getByRole('region', { name: '코드', exact: true }).locator('tbody tr').first(),
       ).toBeVisible()
