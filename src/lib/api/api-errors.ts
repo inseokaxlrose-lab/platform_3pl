@@ -87,6 +87,59 @@ export const API_ERRORS = {
     category: '정책 위반',
     message: '주소를 확인하지 못해 배송센터를 정할 수 없습니다.',
   },
+  // ── 품목 (0083 ③) — 건별 결과(items[].errors[])로 온다
+  ITEM_CD_INVALID: {
+    status: 400,
+    category: '형식',
+    message: 'itemCd는 영문·숫자·점·하이픈·밑줄 50자 이하입니다.',
+  },
+  BASE_UOM_INVALID: {
+    status: 422,
+    category: '정책 위반',
+    message: '기본단위가 올바르지 않습니다 (포장 단위·사용 중지 단위는 안 됨).',
+  },
+  UOM_NOT_FOUND: { status: 404, category: '참조 없음', message: '없는 단위 코드입니다.' },
+  UOM_QTY_INVALID: {
+    status: 422,
+    category: '정책 위반',
+    message: '환산수량이 올바르지 않습니다 (레벨 순서·소수 자리).',
+  },
+  PALLET_TYPE_NOT_FOUND: { status: 404, category: '참조 없음', message: '없는 팔레트 종류입니다.' },
+  BARCODE_DUPLICATE: {
+    status: 409,
+    category: '중복',
+    message: '이 화주사의 다른 품목이 쓰는 바코드입니다.',
+  },
+  BARCODE_CHECKDIGIT: {
+    status: 400,
+    category: '형식',
+    message: '바코드 자리수·체크디지트가 맞지 않습니다.',
+  },
+  EXPIRY_INFO_REQUIRED: {
+    status: 422,
+    category: '정책 위반',
+    message: '기한 관리 품목은 expiryType·expiryInput이 필요합니다.',
+  },
+  SHELF_LIFE_REQUIRED: {
+    status: 422,
+    category: '정책 위반',
+    message: '제조일 입력 방식은 shelfLifeDays가 필요합니다.',
+  },
+  LOT_SOURCE_REQUIRED: {
+    status: 422,
+    category: '정책 위반',
+    message: 'LOT 관리 품목은 lotSource가 필요합니다.',
+  },
+  ITEM_STOCK_EXISTS: {
+    status: 409,
+    category: '상태 불가',
+    message: '재고가 있어 기본단위·기한/LOT/시리얼 관리 여부를 바꿀 수 없습니다.',
+  },
+  ITEM_OPEN_DOC_EXISTS: {
+    status: 409,
+    category: '상태 불가',
+    message: '미완료 입고예정이 있어 바꿀 수 없습니다.',
+  },
   REGION_UNASSIGNED: {
     status: 422,
     category: '정책 위반',

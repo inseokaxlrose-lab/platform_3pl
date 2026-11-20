@@ -1,11 +1,12 @@
 # 0083. 품목 정의서 반영 — 단위·규격·팔레트 적재·기한/LOT·바코드
 
 - 날짜: 2026-11-19
-- 상태: 채택 (①② 단계 완료 — ③ 품목 API는 다음 작업)
+- 상태: 채택 (①②③ 단계 완료)
 - 관련: 0041 (품목 첫 설계 — 일부 대체), 0042 (단위 환산), 0078·0079 (단위 기준정보·운영사 단위 설정), 0080 (화주사 상태), 0038 (논리 삭제·버전), 0030·0040 (상수 + DB 검사 조건)
 - 정의서: `docs/specs/item.md` (`tb_item_uom`은 `tb_item_unit`, `tb_uom`은 `tb_unit`, `client`는 `shipper`로 읽음)
 - 코드: `src/lib/items/` (`item-codes.ts` 코드값, `item-calc.ts` 계산, `item-schema.ts` 입력 규칙, `items.ts` 저장, `item-uom.ts`·`item-convert.ts` 환산), `src/lib/pallets/`, `src/components/item/`, `src/app/admin/master/pallet-types/`
 - 마이그레이션: `20261119000000_item_spec`, `20261119010000_item_default_units_nullable`
+- 연동 문서: `docs/api-guide.md` 11장, `docs/api-item-fields.md` (필드 대응표·경고 코드), `docs/api-error-codes.md` (품목 오류코드)
 
 ## 사용자 결정 (모두 추천안)
 
@@ -120,6 +121,28 @@
 - 형식 오류(없는 화주사·단위 코드, Y/N·숫자, 같은 품목 두 줄)는 그 칸에, 업무 오류(입력 규칙·단위 순서·바코드 중복 등)는 그 행에. 미리보기는 같은 처리를 해 보고 되돌리며, 요약에 신규·수정·변경 없음·체적 미등록·팔레트 높이/중량 초과 건수.
 - 오류가 하나라도 있으면 전체 등록 안 함(0049). 권한은 등록·수정 둘 다(거래처 업로드와 같다).
 
+## ③ 단계 — 품목 API (2026-11-20)
+
+### 엔드포인트 (`src/lib/api/endpoints/items.ts`, 라우트 `src/app/api/v1/items/**`)
+
+| 메서드 | 경로 | 권한 | API 구분 |
+| --- | --- | --- | --- |
+| POST | `/items` | `ITEM_WRITE` | `ITEM_UPSERT` — 최대 500건, 건마다 따로 저장(한 건 실패가 다른 건을 되돌리지 않음), TEST 키는 계산만 |
+| GET | `/items` | `ITEM_READ` | `ITEM_LIST` — `updatedAfter`·`cursor`·`limit` (거래처 목록과 같은 규칙) |
+| GET | `/items/{itemCd}` | `ITEM_READ` | `ITEM_GET` — 단위·바코드·계산값 포함 |
+
+### 규칙
+
+- 입력은 연동 이름(`apiItemSchema`, `item-api-schema.ts`)으로 받고, 엑셀 업로드와 **같은 upsert 서비스**로 저장한다. 연동 이름 → 품목 입력으로 바꾸는 `patch`만 API 쪽에 있다.
+  - 안 보낸 칸은 그대로, `null`은 지우기. `uoms`·`barcodes`는 보낸 행만, 지우기는 `delete: true` (정의서 7장).
+  - `uoms`의 `level`은 새 행에 필수, 이미 있는 같은 단위면 생략 가능. 기본단위는 `baseUom`으로만 (`uoms`로 보내면 `BASE_UOM_INVALID`).
+  - 새 품목에서 `expiryMgmt`·`lotMgmt`를 생략하면 화주 설정(upsert의 새 품목 처음 값). API는 엑셀과 달리 기한 종류·입력 방식·LOT 생성 방식을 채워 주지 않는다 — 빠지면 `EXPIRY_INFO_REQUIRED`·`LOT_SOURCE_REQUIRED` (연동은 값을 명확히).
+- **단위 코드**: 우리 단위 코드(시스템 기본·운영사 추가)를 먼저 찾고, 없으면 외부코드 매핑(대상 단위, 0068)에서 찾는다. 외부 코드는 연동 상대(SAP·ERP)별로 저장되고 API 키는 연동 상대에 묶이지 않으므로, 이 운영사의 매핑에서 **한 단위로만** 정해질 때 쓴다(여러 단위면 `UOM_NOT_FOUND`). 화주별 연동 상대가 생기면 그 상대의 매핑만 보게 바꾼다.
+- **오류코드**: 서비스의 업무 오류에 연동 코드를 붙인다 — `ActionError`의 세 번째 값 `apiCode`(화면은 쓰지 않음), 입력 규칙 오류는 `params.apiCode`(거래처 입력 규칙과 같은 방식). upsert는 입력 규칙 오류를 `ItemInputError`(코드 + 칸 경로)로 던지고, API가 칸 경로를 연동 이름(`uoms`·`pallet.type`·`expiryType` 등)으로 바꿔 `field`에 담는다.
+  - 새 코드: `ITEM_CD_INVALID`·`BASE_UOM_INVALID`·`UOM_NOT_FOUND`·`UOM_QTY_INVALID`·`PALLET_TYPE_NOT_FOUND`·`BARCODE_DUPLICATE`·`BARCODE_CHECKDIGIT`·`EXPIRY_INFO_REQUIRED`·`SHELF_LIFE_REQUIRED`·`LOT_SOURCE_REQUIRED`·`ITEM_STOCK_EXISTS`·`ITEM_OPEN_DOC_EXISTS` (정의서 목록 + 팔레트 종류)
+- **응답**: 건마다 계산값(`volumeStatus`, `box`: 환산수량·CBM·중량, `plt`: 환산수량·박스 수·높이·CBM·중량·계산 여부)과 경고(`warnings[]`). 경고 코드는 오류 카탈로그가 아니라 대응표 문서에 둔다(저장은 되므로 오류가 아니다).
+- 등록 경로 `API`, `last_if_at`·`last_request_id`에 요청을 남긴다.
+
 ## 버린 안
 
 - **새 표 `tb_item_uom`**: 이미 ASN·재고·라벨이 `tb_item_unit`을 읽고 있어, 표를 바꾸면 고칠 곳만 늘어난다.
@@ -130,3 +153,5 @@
 - **엑셀 바코드 시트 따로 (②)**: 공통 업로드 틀을 여러 시트로 넓혀야 한다. 대표 바코드는 칸으로 충분하고 여러 개는 화면·API로.
 - **엑셀 빈 칸 = 지움 (②)**: 실수로 비운 칸이 규격·바코드를 지운다.
 - **팔레트 일괄을 전부 아니면 전무로 (②)**: BOX 없는 품목 하나 때문에 나머지를 못 넣는다.
+- **API에서 uoms에 PLT를 보내면 늘 무시 (③)**: 적재 정보가 없는 화주는 PLT를 넣을 길이 없다. 적재 정보가 있을 때만 계산값으로 바꾸고 경고(①의 결정과 같다).
+- **경고 코드를 오류 카탈로그에 (③)**: 오류는 FAIL, 경고는 저장 성공이라 섞으면 화주 시스템이 분기를 잘못한다.

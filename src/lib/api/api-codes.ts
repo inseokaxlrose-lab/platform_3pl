@@ -52,6 +52,9 @@ export const API_CODE_LABELS: Record<string, string> = {
   PARTNER_GET: '거래처 상세 (GET /partners/{partnerCd})',
   SHIP_TO_UPSERT: '납품처 등록·수정 (POST /partners/{partnerCd}/ship-tos)',
   SHIP_TO_LIST: '납품처 목록 (GET /partners/{partnerCd}/ship-tos)',
+  ITEM_UPSERT: '품목 등록·수정 (POST /items)',
+  ITEM_LIST: '품목 목록 (GET /items)',
+  ITEM_GET: '품목 상세 (GET /items/{itemCd})',
 }
 
 // 요청 로그 결과

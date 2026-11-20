@@ -76,6 +76,7 @@ async function checkUnits(db: Db, data: ItemData, keep: bigint[]) {
     throw new ActionError(
       'VALIDATION',
       '기본단위는 사용 중인 수량·중량·부피·길이·면적 단위 중에서 골라 주세요.',
+      'BASE_UOM_INVALID',
     )
   }
   for (const row of data.units) {
@@ -85,6 +86,7 @@ async function checkUnits(db: Db, data: ItemData, keep: bigint[]) {
       throw new ActionError(
         'VALIDATION',
         `${row.level} 단위는 사용 중인 포장 단위 중에서 골라 주세요.`,
+        'UOM_NOT_FOUND',
       )
     }
     if (!checkQtyDecimals(row.convQty, base.decimals)) {
@@ -93,6 +95,7 @@ async function checkUnits(db: Db, data: ItemData, keep: bigint[]) {
         base.decimals === 0
           ? `${unit.code} 환산수량은 정수로 입력해 주세요. (기본단위 ${base.code})`
           : `${unit.code} 환산수량은 소수 ${base.decimals}자리까지입니다. (기본단위 ${base.code})`,
+        'UOM_QTY_INVALID',
       )
     }
   }
@@ -142,10 +145,19 @@ async function buildUnits(db: Db, data: ItemData, byId: Map<bigint, UnitInfo>) {
   const pallet = { ti: data.palletTi, hi: data.palletHi, boxQty: data.palletBoxQty }
   if (palletBoxQty(pallet)) {
     const box = rows.find((r) => r.level === 'BOX')
-    if (!box) throw new ActionError('VALIDATION', '팔레트 적재를 계산하려면 BOX 단위가 필요합니다.')
+    if (!box)
+      throw new ActionError(
+        'VALIDATION',
+        '팔레트 적재를 계산하려면 BOX 단위가 필요합니다.',
+        'UOM_NOT_FOUND',
+      )
     const spec = await getPalletSpec(db, requireOperatorId(), data.palletTypeCode)
     if (data.palletTypeCode && !spec) {
-      throw new ActionError('VALIDATION', `없는 팔레트 종류입니다: ${data.palletTypeCode}`)
+      throw new ActionError(
+        'VALIDATION',
+        `없는 팔레트 종류입니다: ${data.palletTypeCode}`,
+        'PALLET_TYPE_NOT_FOUND',
+      )
     }
     const calc = calcPallet(box, spec, pallet)!
     const sent = rows.findIndex((r) => r.level === 'PLT')
@@ -177,7 +189,8 @@ async function buildUnits(db: Db, data: ItemData, byId: Map<bigint, UnitInfo>) {
   const ladder = checkUnitLadder(
     rows.map((r) => ({ level: r.level, unitCode: r.unitCode, convQty: r.convQty })),
   )
-  if (ladder.errors.length > 0) throw new ActionError('VALIDATION', ladder.errors[0])
+  if (ladder.errors.length > 0)
+    throw new ActionError('VALIDATION', ladder.errors[0], 'UOM_QTY_INVALID')
   warnings.push(...ladder.warnings)
   for (const r of rows) {
     if (r.autoCalc) continue
@@ -201,7 +214,8 @@ async function buildUnits(db: Db, data: ItemData, byId: Map<bigint, UnitInfo>) {
 async function buildBarcodes(db: Db, shipperId: bigint, itemId: bigint | null, data: ItemData) {
   for (const b of data.barcodes) {
     const problem = checkBarcode(b.barcodeType as BarcodeType, b.barcode)
-    if (problem) throw new ActionError('VALIDATION', `바코드 ${b.barcode}: ${problem}`)
+    if (problem)
+      throw new ActionError('VALIDATION', `바코드 ${b.barcode}: ${problem}`, 'BARCODE_CHECKDIGIT')
   }
   if (data.barcodes.length > 0) {
     const taken = await db.itemBarcode.findFirst({
@@ -217,6 +231,7 @@ async function buildBarcodes(db: Db, shipperId: bigint, itemId: bigint | null, d
       throw new ActionError(
         'CONFLICT',
         `이 화주사의 다른 품목(${taken.item.code})이 쓰는 바코드입니다: ${taken.barcode}`,
+        'BARCODE_DUPLICATE',
       )
     }
   }
@@ -232,10 +247,18 @@ async function buildBarcodes(db: Db, shipperId: bigint, itemId: bigint | null, d
 function fieldsOf(data: ItemData, units: UnitRow[]) {
   const unitIds = new Set(units.map((u) => u.unitId))
   if (data.defaultInboundUnitId !== null && !unitIds.has(data.defaultInboundUnitId)) {
-    throw new ActionError('VALIDATION', '기본 입고단위는 이 품목의 단위 중에서 골라 주세요.')
+    throw new ActionError(
+      'VALIDATION',
+      '기본 입고단위는 이 품목의 단위 중에서 골라 주세요.',
+      'UOM_NOT_FOUND',
+    )
   }
   if (data.defaultOrderUnitId !== null && !unitIds.has(data.defaultOrderUnitId)) {
-    throw new ActionError('VALIDATION', '기본 주문단위는 이 품목의 단위 중에서 골라 주세요.')
+    throw new ActionError(
+      'VALIDATION',
+      '기본 주문단위는 이 품목의 단위 중에서 골라 주세요.',
+      'UOM_NOT_FOUND',
+    )
   }
   return {
     name: data.name,
@@ -342,7 +365,11 @@ export async function createItemIn(db: Db, data: ItemCreateData, options: ItemSa
   })
   if (!shipper) throw new ActionError('NOT_FOUND', '화주사를 찾을 수 없습니다.')
   if (!isShipperSetupStatus(shipper.status)) {
-    throw new ActionError('CONFLICT', '준비중·운영중인 화주사에만 품목을 등록할 수 있습니다.')
+    throw new ActionError(
+      'CONFLICT',
+      '준비중·운영중인 화주사에만 품목을 등록할 수 있습니다.',
+      'STATUS_NOT_ALLOWED',
+    )
   }
   await assertItemCode(db, data.shipperId, data.code)
   const { byId } = await checkUnits(db, data, [])
@@ -417,6 +444,7 @@ export async function updateItemIn(
       throw new ActionError(
         'CONFLICT',
         `${used.stock ? '재고가' : '미완료 ASN이'} 있어 기본단위·기한/LOT/시리얼 관리 여부를 바꿀 수 없습니다.`,
+        used.stock ? 'ITEM_STOCK_EXISTS' : 'ITEM_OPEN_DOC_EXISTS',
       )
     }
   }
@@ -447,6 +475,7 @@ export async function updateItemIn(
       throw new ActionError(
         'CONFLICT',
         `${open.entryUnit} 단위로 입력된 미완료 ASN(${open.asn.asnNo})이 있어 환산수량을 바꿀 수 없습니다.`,
+        'ITEM_OPEN_DOC_EXISTS',
       )
     }
   }
