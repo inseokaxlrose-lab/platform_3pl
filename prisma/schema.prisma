@@ -20,6 +20,7 @@ datasource db {
 // Better Auth 필드 이름·구조는 바꾸지 않는다.
 // ─────────────────────────────────────────────
 
+// 사용자: 로그인 계정과 유형·소속 (Better Auth user 표 — 이름·구조 유지, 0011·0037)
 model User {
   id              BigInt    @id @default(autoincrement()) @map("user_id")
   // 운영사 (멀티테넌트, 0039). 플랫폼 관리자만 비어 있고 나머지 유형은 반드시 있다 (DB 검사 조건 tb_user_operator_matches_type)
@@ -67,6 +68,7 @@ model User {
   @@map("tb_user")
 }
 
+// 로그인 세션 (Better Auth)
 model Session {
   id        BigInt   @id @default(autoincrement()) @map("session_id")
   expiresAt DateTime @map("expires_at")
@@ -104,6 +106,7 @@ model Account {
   @@map("tb_account")
 }
 
+// 인증 확인값 (Better Auth — 비밀번호 재설정 등)
 model Verification {
   id         BigInt   @id @default(autoincrement()) @map("verification_id")
   identifier String
@@ -190,7 +193,6 @@ model UserPermissionOverride {
 // 조직 (0003 결정 1) — 데이터 범위에 필요한 최소 정보만. 자세한 정보는 M2(센터)·M3(화주사)에서 추가
 // ─────────────────────────────────────────────
 
-// 센터: 운영사의 물류센터
 // 센터: 운영사의 물류센터 (docs/decisions/0026)
 // 코드 (0025·0084): id(내부) / code(사용자 코드, 같은 운영사 안에서 중복 금지, 필수) / 외부 코드(ExternalCode)
 model Center {
@@ -1027,9 +1029,8 @@ model ExternalCode {
 }
 
 // ── 공통코드 (docs/decisions/0030): 코드 그룹(서랍) → 코드(서랍 속 물건) 2단계
-// 분류·표시용 값만 공통코드로 관리한다. 프로그램이 값에 따라 동작을 바꾸는 값(창고 유형 등)은 enum으로 둔다
+// 분류·표시용 값만 공통코드로 관리한다. 프로그램이 값에 따라 동작을 바꾸는 값(창고 유형 등)은 상수 + VARCHAR + CHECK로 둔다 (0084)
 // 업무 표에는 코드 글자(CodeItem.code)를 그대로 저장한다 (예: 담당자 업무 'INBOUND')
-
 model CodeGroup {
   id          BigInt     @id @default(autoincrement()) @map("code_group_id")
   // 운영사 (멀티테넌트: 같은 운영사 사람만 보고 고친다, docs/decisions/0039)
@@ -1059,6 +1060,7 @@ model CodeGroup {
   @@map("tb_code_group")
 }
 
+// 공통코드 항목: 그룹 안의 코드·이름 (docs/decisions/0030)
 model CodeItem {
   id          BigInt    @id @default(autoincrement()) @map("code_item_id")
   // 운영사 (멀티테넌트: 같은 운영사 사람만 보고 고친다, docs/decisions/0039)
@@ -1090,6 +1092,7 @@ model CodeItem {
   @@map("tb_code_item")
 }
 
+// 단위 기준정보: 시스템 기본 단위 + 운영사 추가 단위 (docs/decisions/0078)
 model Unit {
   id          BigInt    @id @default(autoincrement()) @map("unit_id")
   // 운영사: 비어 있으면 시스템 기본 단위 (모든 운영사가 함께 보고, 운영사는 고칠 수 없다)
@@ -1587,6 +1590,7 @@ model ShipTo {
   @@map("tb_ship_to")
 }
 
+// 거래처 담당자 (담당자 표 4개 공통 모양, 0084)
 model CustomerContact {
   id           BigInt   @id @default(autoincrement()) @map("customer_contact_id")
   customerId   BigInt   @map("customer_id")
@@ -1952,7 +1956,6 @@ model Putaway {
 
 // ─── 재고 실사·조정 (M6, docs/decisions/0061) ─────────────────
 // 작업자가 등록하고(등록) 관리자가 확정하면(확정) 재고가 바뀐다 (권한 stock.adjustments.create / confirm)
-
 model StockAdjust {
   id         BigInt   @id @default(autoincrement()) @map("adjust_id")
   operatorId BigInt   @map("operator_id")
