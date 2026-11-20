@@ -9,13 +9,14 @@ import {
   PhoneInput,
 } from '@/components/inputs'
 import {
+  contactExtraColumns,
   EditableSubTable,
   Field,
+  type FieldSpan,
   FormGrid,
+  type MasterFormHeader,
   MasterFormPage,
   useMasterForm,
-  type FieldSpan,
-  type MasterFormHeader,
 } from '@/components/master-form'
 import { Input } from '@/components/ui/input'
 import {
@@ -308,6 +309,7 @@ export function OperatorForm({
                 { key: 'name', label: '담당자명', required: true, width: '8rem' },
                 { key: 'phone', label: '연락처', width: '10rem', input: 'phone' },
                 { key: 'email', label: '이메일', input: 'email' },
+                ...contactExtraColumns(),
               ]}
               createRow={() => ({ ...EMPTY_CONTACT })}
               maxRows={MAX_OPERATOR_CONTACTS}
