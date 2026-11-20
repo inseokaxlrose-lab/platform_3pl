@@ -16,7 +16,7 @@ export function homeOf(userType: UserTypeValue) {
 
 // 로그인 후 돌아갈 주소(?next=) 검사
 // - 우리 사이트 안의 주소만: '/'로 시작하고 '//'·'/\'로 시작하지 않음 (다른 사이트로 보내는 공격 방지)
-// - 자기 영역의 주소만: 화주사 사용자가 /admin 주소로 가지 않게
+// - 자기 영역의 주소만: 화주사 사용자가 /admin 주소로 가지 않게 (공통 화면 /account/password는 허용)
 // - 조건에 맞지 않으면 자기 영역 홈
 export function safeNextPath(next: string | null | undefined, userType: UserTypeValue) {
   const home = homeOf(userType)
@@ -24,5 +24,7 @@ export function safeNextPath(next: string | null | undefined, userType: UserType
     return home
   }
   const path = next.split(/[?#]/)[0]
+  // 비밀번호 변경 화면은 모든 영역 공통 (0086)
+  if (path === '/account/password') return path
   return path === home || path.startsWith(`${home}/`) ? next : home
 }

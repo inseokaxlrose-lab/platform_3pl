@@ -172,3 +172,23 @@ describe("permission: 'signed-in' (개인 설정용)", () => {
     })
   })
 })
+
+describe('임시 비밀번호 상태 (0086)', () => {
+  it('비밀번호를 바꾸기 전에는 다른 액션을 막고, 허용한 액션(비밀번호 변경)만 실행된다', async () => {
+    vi.mocked(getCurrentUser).mockResolvedValue({ ...user, passwordChangeRequired: true })
+    vi.mocked(getCurrentPermissions).mockResolvedValue(new Set(['inbound.asn.close']))
+    expect(await closeAsn({ asnId: '1', reason: '마감' })).toMatchObject({
+      ok: false,
+      error: { code: 'FORBIDDEN', message: expect.stringContaining('비밀번호를 먼저') },
+    })
+    expect(handler).not.toHaveBeenCalled()
+
+    const change = createAction({
+      permission: 'signed-in',
+      allowWhilePasswordChange: true,
+      input: z.object({}),
+      handler: async () => ({ changed: true }),
+    })
+    expect(await change({})).toEqual({ ok: true, data: { changed: true } })
+  })
+})
