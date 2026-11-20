@@ -3,7 +3,8 @@ import { idField } from '@/lib/id'
 import { optionalText } from '@/lib/validation/common-fields'
 
 // 재고 실사·조정 입력 규칙 — 화면·서버 공용 (docs/decisions/0061)
-// 실사(COUNT): 줄마다 센 수량(0 이상) / 조정(ADJUST): 줄마다 바꿀 수량(±, 0 아님). 수량은 기본단위, 사유 필수
+// 실사(COUNT): 줄마다 센 수량(0 이상) / 조정(ADJUST): 줄마다 바꿀 수량(±, 0 아님). 수량은 기본단위
+// 사유: 공통코드 ADJUST_REASON에서 고른다(필수, 0087). 글자 칸은 사유 메모(선택)
 
 export const ADJUST_TYPE_LABELS = { COUNT: '실사', ADJUST: '조정' } as const
 export const ADJUST_STATUS_LABELS = { DRAFT: '등록', CONFIRMED: '확정', CANCELED: '취소' } as const
@@ -15,11 +16,8 @@ export const adjustSchema = z
   .object({
     type: z.enum(['COUNT', 'ADJUST'], '유형을 골라 주세요.'),
     centerId: idField('센터를 골라 주세요.'),
-    reason: z
-      .string()
-      .trim()
-      .min(1, '사유를 입력해 주세요.')
-      .max(200, '200자 이하로 입력해 주세요.'),
+    reasonCd: z.string().trim().min(1, '사유를 골라 주세요.').max(20),
+    reason: optionalText(200),
     remark: optionalText(500),
     lines: z
       .array(

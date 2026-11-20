@@ -1,5 +1,6 @@
 'use client'
 
+import { ReasonText } from '@/components/common-code'
 import type { DataGridColumn, StatusFormat } from '@/components/data-grid'
 import { MasterListPage, type SearchFieldDef, useListQuery } from '@/components/master-list'
 import type { ListFetcher } from '@/components/master-list/use-list-query'
@@ -12,7 +13,8 @@ export type AdjustRow = {
   type: string
   status: string
   center: string
-  reason: string
+  reasonCd: string | null
+  reason: string | null
   lineCount: number
   createdAt: Date
   createdBy: string
@@ -50,7 +52,12 @@ const COLUMNS: DataGridColumn<AdjustRow>[] = [
     format: { status: STATUS_FORMAT },
   },
   { id: 'center', header: '센터', accessor: 'center' },
-  { id: 'reason', header: '사유', accessor: 'reason' },
+  {
+    id: 'reason',
+    header: '사유',
+    accessor: (r) => [r.reasonCd, r.reason].filter(Boolean).join(' '),
+    cell: (r) => <ReasonText group="ADJUST_REASON" code={r.reasonCd} memo={r.reason} />,
+  },
   { id: 'lineCount', header: '줄 수', accessor: 'lineCount', format: 'number' },
   { id: 'createdBy', header: '등록자', accessor: 'createdBy' },
   {

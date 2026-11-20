@@ -1,5 +1,6 @@
 'use client'
 
+import { ReasonText } from '@/components/common-code'
 import type { DataGridColumn } from '@/components/data-grid'
 import { MasterListPage, type SearchFieldDef, useListQuery } from '@/components/master-list'
 import type { ListFetcher } from '@/components/master-list/use-list-query'
@@ -22,6 +23,7 @@ export type HistoryRow = {
   qtyAfter: string
   ref: string | null
   groupId: string | null
+  reasonCd: string | null
   reason: string | null
   createdBy: string
 }
@@ -74,7 +76,13 @@ const COLUMNS: DataGridColumn<HistoryRow>[] = [
     ),
   },
   { id: 'ref', header: '원본 문서', accessor: 'ref' },
-  { id: 'reason', header: '사유', accessor: 'reason' },
+  {
+    id: 'reason',
+    header: '사유',
+    accessor: (r) => [r.reasonCd, r.reason].filter(Boolean).join(' '),
+    // 조정은 ADJUST_REASON 코드 (상태 변경 사유는 A2에서 HOLD_REASON)
+    cell: (r) => <ReasonText group="ADJUST_REASON" code={r.reasonCd} memo={r.reason} />,
+  },
   { id: 'createdBy', header: '처리자', accessor: 'createdBy' },
   { id: 'groupId', header: '묶음 번호', accessor: 'groupId', defaultHidden: true },
 ]

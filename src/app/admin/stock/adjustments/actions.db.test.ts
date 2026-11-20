@@ -59,6 +59,7 @@ describe('실사·조정', () => {
       await createAdjustAction({
         type: 'COUNT',
         centerId: String(f.icn),
+        reasonCd: 'COUNT_DIFF',
         reason: '정기 실사',
         remark: '',
         lines: [
@@ -89,6 +90,8 @@ describe('실사·조정', () => {
     const txn = await prisma.stockTxn.findFirstOrThrow({ where: { type: 'ADJUST' } })
     expect(txn).toMatchObject({ refType: 'ADJUSTMENT', createdBy: 'manager' })
     expect(txn.reason).toContain('정기 실사')
+    // 사유 코드는 조정 문서와 재고 이력에 함께 남는다 (0087)
+    expect(txn.reasonCd).toBe('COUNT_DIFF')
     const saved = await prisma.stockAdjust.findFirstOrThrow({
       include: { lines: { orderBy: { lineNo: 'asc' } } },
     })
@@ -109,6 +112,7 @@ describe('실사·조정', () => {
       await createAdjustAction({
         type: 'ADJUST',
         centerId: String(f.icn),
+        reasonCd: '',
         reason: ' ',
         remark: '',
         lines: [{ stockId: water, qty: '-1' }],
@@ -118,6 +122,7 @@ describe('실사·조정', () => {
       await createAdjustAction({
         type: 'ADJUST',
         centerId: String(f.icn),
+        reasonCd: 'COUNT_DIFF',
         reason: '파손',
         remark: '',
         lines: [{ stockId: water, qty: '0' }],
@@ -127,6 +132,7 @@ describe('실사·조정', () => {
       await createAdjustAction({
         type: 'ADJUST',
         centerId: String(f.icn),
+        reasonCd: 'COUNT_DIFF',
         reason: '착오 정정',
         remark: '',
         lines: [
@@ -139,6 +145,7 @@ describe('실사·조정', () => {
       await createAdjustAction({
         type: 'ADJUST',
         centerId: String(f.icn),
+        reasonCd: 'COUNT_DIFF',
         reason: '분실',
         remark: '',
         lines: [{ stockId: water, qty: '-500' }],
@@ -159,7 +166,14 @@ describe('실사·조정', () => {
 
   it('소수 자리·다른 센터 재고·같은 재고 두 번은 등록 거부, 취소는 등록 상태만', async () => {
     const bad = (lines: { stockId: string; qty: string }[], centerId = String(f.icn)) =>
-      createAdjustAction({ type: 'COUNT', centerId, reason: '실사', remark: '', lines })
+      createAdjustAction({
+        type: 'COUNT',
+        centerId,
+        reasonCd: 'COUNT_DIFF',
+        reason: '실사',
+        remark: '',
+        lines,
+      })
     expect(await bad([{ stockId: water, qty: '1.5' }])).toMatchObject({
       ok: false,
       error: { message: expect.stringContaining('소수 0자리') },
@@ -193,6 +207,7 @@ describe('실사·조정', () => {
       await createAdjustAction({
         type: 'COUNT',
         centerId: String(f.icn),
+        reasonCd: 'COUNT_DIFF',
         reason: '실사',
         remark: '',
         lines: [{ stockId: water, qty: '1' }],

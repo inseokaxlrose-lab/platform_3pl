@@ -7,6 +7,7 @@ import { prisma, type Tx } from '@/lib/prisma'
 import { scopeFilter, type DataScope } from '@/lib/scope/data-scope'
 import { checkQtyDecimals, parseQty, qtyText } from '@/lib/units/convert'
 import { ADJUST_TYPE_LABELS, type AdjustData } from './adjust-schema'
+import { assertCodeValues } from '@/lib/common-code/common-codes'
 import { adjustStock } from './stock-change'
 import { stockTransaction } from './stock-transaction'
 import { labelOf } from '@/lib/db-value'
@@ -36,6 +37,8 @@ export async function createAdjust(data: AdjustData, scope: DataScope) {
     throw new ActionError('NOT_FOUND', '센터를 찾을 수 없습니다.')
   }
   return prisma.$transaction(async (tx) => {
+    // 사유 코드: 이 운영사 공통코드 ADJUST_REASON의 사용 중인 코드 (0087)
+    await assertCodeValues(tx, 'ADJUST_REASON', [data.reasonCd], { label: '조정 사유' })
     const stocks = await tx.stock.findMany({
       where: { id: { in: data.lines.map((l) => l.stockId) }, centerId: data.centerId },
       select: {
@@ -79,6 +82,7 @@ export async function createAdjust(data: AdjustData, scope: DataScope) {
         adjustNo: await nextDocumentNumber('ADJUST', tx),
         type: data.type,
         centerId: data.centerId,
+        reasonCd: data.reasonCd,
         reason: data.reason,
         remark: data.remark,
         createdBy: currentActor(),
@@ -112,6 +116,7 @@ export async function confirmAdjust(id: bigint) {
       select: {
         adjustNo: true,
         type: true,
+        reasonCd: true,
         reason: true,
         lines: {
           orderBy: { lineNo: 'asc' },
@@ -136,7 +141,7 @@ export async function confirmAdjust(id: bigint) {
       let stockTxnId: bigint | null = null
       if (change !== 0n) {
         const reason =
-          `${labelOf(ADJUST_TYPE_LABELS, adjust.type)} ${adjust.adjustNo}: ${adjust.reason}`.slice(
+          `${labelOf(ADJUST_TYPE_LABELS, adjust.type)} ${adjust.adjustNo}${adjust.reason ? `: ${adjust.reason}` : ''}`.slice(
             0,
             200,
           )
@@ -148,6 +153,7 @@ export async function confirmAdjust(id: bigint) {
             expiryOn: line.stock.expiryOn?.toISOString().slice(0, 10) ?? null,
           },
           qty: qtyText(change),
+          reasonCd: adjust.reasonCd,
           reason,
           ref: { refType: 'ADJUSTMENT', refId: id, refNo: adjust.adjustNo },
         })

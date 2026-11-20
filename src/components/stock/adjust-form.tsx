@@ -1,5 +1,6 @@
 'use client'
 
+import { CodeSelect } from '@/components/inputs'
 import { useRouter } from 'next/navigation'
 import { useEffect, useMemo, useState } from 'react'
 import { QtyInput, SearchSelect } from '@/components/inputs'
@@ -62,6 +63,7 @@ export function AdjustForm({
     initial: {
       type: 'COUNT',
       centerId: centers.length === 1 ? centers[0].id : '',
+      reasonCd: '',
       reason: '',
       remark: '',
       lines: [{ ...EMPTY_LINE }],
@@ -149,11 +151,27 @@ export function AdjustForm({
           </Field>
           <Field
             label="사유"
-            span={12}
+            span={4}
             required
+            error={errors.reasonCd}
+            htmlFor="adjust-reason-cd"
+            hint="공통코드 '재고 조정 사유'에서 고릅니다"
+          >
+            <CodeSelect
+              id="adjust-reason-cd"
+              group="ADJUST_REASON"
+              value={value.reasonCd}
+              onChange={(reasonCd) => set({ reasonCd })}
+              disabled={disabled}
+              invalid={Boolean(errors.reasonCd)}
+            />
+          </Field>
+          <Field
+            label="사유 메모"
+            span={8}
             error={errors.reason}
             htmlFor="adjust-reason"
-            hint="예: 정기 실사 / 파손 / 분실 / 입고 수량 착오"
+            hint="예: 3월 정기 실사 / A-01-01 랙 파손"
           >
             <Input
               id="adjust-reason"

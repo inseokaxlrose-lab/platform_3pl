@@ -1,5 +1,6 @@
 'use client'
 
+import { ReasonText } from '@/components/common-code'
 import { BanIcon, CheckCheckIcon } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { ConfirmDialog, StatusBadge } from '@/components/common'
@@ -107,7 +108,9 @@ export function AdjustDetailPanel({
         </div>
         <div className="flex gap-3 sm:col-span-2">
           <dt className="w-20 text-muted-foreground">사유</dt>
-          <dd>{adjust.reason}</dd>
+          <dd>
+            <ReasonText group="ADJUST_REASON" code={adjust.reasonCd} memo={adjust.reason} />
+          </dd>
         </div>
         {adjust.remark && (
           <div className="flex gap-3 sm:col-span-2">
