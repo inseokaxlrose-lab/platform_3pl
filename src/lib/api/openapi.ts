@@ -1,7 +1,7 @@
 import { z } from 'zod'
 import { API_SCOPE, MAX_ITEMS_PER_REQUEST } from './api-codes'
 import { API_ERRORS } from './api-errors'
-import { partnerSchema, partnerShipToSchema } from '@/lib/customers/customer-upsert'
+import { apiCustomerSchema, apiShipToSchema } from '@/lib/customers/customer-upsert'
 import { apiItemSchema } from '@/lib/items/item-api-schema'
 import { meResponseSchema } from './endpoints/me'
 
@@ -100,27 +100,27 @@ export function buildOpenApi(serverUrl: string) {
           },
         },
       },
-      // ── 거래처·납품처 (0082 ③, 필드 대응: docs/api-partner-fields.md)
-      '/partners': {
+      // ── 거래처·납품처 (0082 ③, 필드 대응: docs/api-customer-fields.md)
+      '/customers': {
         post: {
           summary: '거래처 등록·수정 (upsert)',
           description: [
-            '업무 키는 `partnerCd`(화주 안에서 고유, 바꿀 수 없음). 없으면 만들고, 있으면 **보낸 칸만** 고칩니다 (안 보낸 칸은 그대로, `null`은 값 지우기).',
+            '업무 키는 화주의 연동 조회 키에 따라 `customerCd`·`shipToCd`(기본) 또는 `customerCustCd`·`shipToCustCd`(사용자 정의 코드). 사용자 정의 코드로 찾는 화주가 새 거래처·납품처에 우리 코드를 안 보내면 자동으로 붙습니다(바꿀 수 없음). 없으면 만들고, 있으면 **보낸 칸만** 고칩니다 (안 보낸 칸은 그대로, `null`은 값 지우기).',
             '`shipTos`는 **보낸 납품처만** 추가·수정합니다 (빠진 납품처는 그대로, 사용 중지는 `status: INACTIVE`). 새 거래처에 `shipTos`가 없으면 거래처 주소로 기본 납품처를 만듭니다.',
             '`centerCd`가 있으면 그 센터, `null`이면 권역 자동, 안 보내면 지금 지정 그대로. 화주 정책으로 반려된 납품처만 `shipTos[].result = FAIL`.',
             '내용이 같으면 `UNCHANGED`(수정일 그대로).',
           ].join('\n\n'),
-          operationId: 'upsertPartners',
+          operationId: 'upsertCustomers',
           tags: ['거래처'],
           parameters: [idempotencyHeader()],
-          requestBody: arrayBody(schema(partnerSchema)),
+          requestBody: arrayBody(schema(apiCustomerSchema)),
           responses: itemsResponses({ shipTos: { type: 'array', items: SHIP_TO_RESULT } }),
         },
         get: {
           summary: '거래처 목록',
           description:
             '수정일시가 `updatedAfter`보다 뒤인 거래처를 키 순서로. 다음 쪽은 응답의 `nextCursor`를 `cursor`로 보내세요.',
-          operationId: 'listPartners',
+          operationId: 'listCustomers',
           tags: ['거래처'],
           parameters: [
             { name: 'updatedAfter', in: 'query', schema: { type: 'string', format: 'date-time' } },
@@ -134,42 +134,42 @@ export function buildOpenApi(serverUrl: string) {
           responses: dataResponses({
             type: 'object',
             properties: {
-              items: { type: 'array', items: PARTNER },
+              items: { type: 'array', items: CUSTOMER_OBJ },
               nextCursor: { type: 'string', nullable: true },
             },
           }),
         },
       },
-      '/partners/{partnerCd}': {
+      '/customers/{customerCd}': {
         get: {
           summary: '거래처 상세 (납품처 포함)',
-          operationId: 'getPartner',
+          operationId: 'getCustomer',
           tags: ['거래처'],
-          parameters: [partnerCdParam()],
+          parameters: [customerCdParam()],
           responses: dataResponses({
             allOf: [
-              PARTNER,
+              CUSTOMER_OBJ,
               { type: 'object', properties: { shipTos: { type: 'array', items: SHIP_TO } } },
             ],
           }),
         },
       },
-      '/partners/{partnerCd}/ship-tos': {
+      '/customers/{customerCd}/ship-tos': {
         post: {
           summary: '납품처 등록·수정 (upsert)',
           description:
-            '건 하나 = 납품처 하나. 규칙은 `POST /partners`의 shipTos와 같습니다. 거래처가 없으면 404.',
+            '건 하나 = 납품처 하나. 규칙은 `POST /customers`의 shipTos와 같습니다. 거래처가 없으면 404.',
           operationId: 'upsertShipTos',
           tags: ['거래처'],
-          parameters: [partnerCdParam(), idempotencyHeader()],
-          requestBody: arrayBody(schema(partnerShipToSchema)),
+          parameters: [customerCdParam(), idempotencyHeader()],
+          requestBody: arrayBody(schema(apiShipToSchema)),
           responses: itemsResponses(SHIP_TO_RESULT.properties),
         },
         get: {
           summary: '납품처 목록',
           operationId: 'listShipTos',
           tags: ['거래처'],
-          parameters: [partnerCdParam()],
+          parameters: [customerCdParam()],
           responses: dataResponses({
             type: 'object',
             properties: { items: { type: 'array', items: SHIP_TO } },
@@ -342,14 +342,15 @@ const ITEM_BARCODE = {
 }
 
 // ── 거래처 응답 모양 (조회)
-const PARTNER = {
+const CUSTOMER_OBJ = {
   type: 'object',
   properties: {
-    partnerCd: { type: 'string' },
-    partnerNm: { type: 'string' },
+    customerCd: { type: 'string' },
+    customerCustCd: nullableText,
+    customerNm: { type: 'string' },
     shortNm: nullableText,
-    partnerType: { ...nullableText, description: '공통코드 PARTNER_TYPE' },
-    partnerGroup: nullableText,
+    customerType: { ...nullableText, description: '공통코드 CUSTOMER_TYPE' },
+    customerGroup: nullableText,
     bizRegNo: { ...nullableText, description: '숫자만' },
     ceoNm: nullableText,
     orderAddrMode: { type: 'string', enum: ['SHIP_TO', 'ORDER_ADDR'] },
@@ -378,7 +379,7 @@ const CENTER_FIELDS = {
   confirmReason: {
     ...nullableText,
     description:
-      'NEED_CONFIRM 사유: ADDR_NOT_RESOLVED·REGION_UNASSIGNED·REGION_MIXED·NOT_CLIENT_CENTER·CENTER_INACTIVE·INVALID_CENTER_CD',
+      'NEED_CONFIRM 사유: ADDR_NOT_RESOLVED·REGION_UNASSIGNED·REGION_MIXED·NOT_SHIPPER_CENTER·CENTER_INACTIVE·INVALID_CENTER_CD',
   },
   regionMismatch: { type: 'boolean', description: '권역 기준 센터와 다른 센터로 지정됨' },
 }
@@ -386,6 +387,7 @@ const SHIP_TO = {
   type: 'object',
   properties: {
     shipToCd: { type: 'string' },
+    shipToCustCd: nullableText,
     shipToNm: { type: 'string' },
     default: { type: 'boolean' },
     addrSync: { type: 'boolean' },
@@ -409,6 +411,7 @@ const SHIP_TO_RESULT = {
   type: 'object',
   properties: {
     shipToCd: { type: 'string' },
+    shipToCustCd: nullableText,
     result: { type: 'string', enum: ['CREATED', 'UPDATED', 'UNCHANGED', 'FAIL'] },
     zipCd: { ...nullableText, description: '정제한 우편번호' },
     ...CENTER_FIELDS,
@@ -427,8 +430,8 @@ function FIELD_ERROR() {
   }
 }
 
-function partnerCdParam() {
-  return { name: 'partnerCd', in: 'path', required: true, schema: { type: 'string' } }
+function customerCdParam() {
+  return { name: 'customerCd', in: 'path', required: true, schema: { type: 'string' } }
 }
 
 function idempotencyHeader() {

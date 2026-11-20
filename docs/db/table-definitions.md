@@ -48,7 +48,7 @@
 | 연동 API | [`tb_api_client`](#tb_api_client) | ApiClient | API 키: 형식 {환경}_{식별부}_{비밀부} (예: live_ak7f2c9x_…) — 식별부로 찾고 전체를 해시 비교 화주·환경별 사용 중(ACTIVE) 키는 최대 2개 (교체 기간에 새 키·옛 키를 함께 쓰게) |
 | 연동 API | [`tb_api_client_event`](#tb_api_client_event) | ApiClientEvent | 키 이력 (감사 로그): 발급·수정·폐기·만료를 한 줄씩 (누가·언제·바뀐 내용) |
 | 연동 API | [`tb_api_client_ip`](#tb_api_client_ip) | ApiClientIp | 허용 IP (하나도 없으면 모든 IP 허용) |
-| 연동 API | [`tb_api_client_scope`](#tb_api_client_scope) | ApiClientScope | 키 권한 (상수 API_SCOPE: PARTNER_READ … STOCK_READ) |
+| 연동 API | [`tb_api_client_scope`](#tb_api_client_scope) | ApiClientScope | 키 권한 (상수 API_SCOPE: CUSTOMER_READ … STOCK_READ) |
 | 연동 API | [`tb_api_idempotency`](#tb_api_idempotency) | ApiIdempotency | 멱등 처리: 같은 키 + 같은 Idempotency-Key → 처음 응답을 그대로 (24시간 뒤 지움) |
 | 연동 API | [`tb_api_rate_bucket`](#tb_api_rate_bucket) | ApiRateBucket | 호출 한도 카운터: 키별 1분 구간마다 한 줄 (고정 구간, 지난 구간은 지움) |
 | 연동 API | [`tb_api_request_item`](#tb_api_request_item) | ApiRequestItem | 건별 결과 (등록 API의 배열 한 건마다) |
@@ -341,33 +341,33 @@
 | 38 | `homepage_url` | 홈페이지 URL |  | VARCHAR(200) | Y |  |  |
 | 39 | `lang_cd` | 언어 코드 |  | VARCHAR(5) | N | ko-KR |  |
 | 40 | `latitude` | 위도 | 좌표 (주소 검색이 주지 않아 지금은 비어 있다) | DECIMAL(10,7) | Y |  |  |
-| 41 | `length_unit_cd` | 길이 단위 코드 |  | VARCHAR(10) | N | CM |  |
-| 42 | `logo_file_id` | 로고 파일 ID |  | BIGINT | Y |  |  |
-| 43 | `longitude` | 경도 |  | DECIMAL(10,7) | Y |  |  |
-| 44 | `lot_mgmt_yn` | LOT 관리 여부 |  | CHAR(1) | N | N |  |
-| 45 | `max_center_cnt` | 최대 센터 수 |  | INTEGER | Y |  |  |
-| 46 | `max_client_cnt` | 최대 클라이언트 수 |  | INTEGER | Y |  |  |
-| 47 | `max_user_cnt` | 최대 사용자 수 | 비어 있으면 무제한 | INTEGER | Y |  |  |
-| 48 | `operator_cd` | 운영사 코드 | ① 기본 정보 [1차] 운영사코드: 영문 대문자·숫자·_- 2~20자, 등록 후 바꿀 수 없다. 관리자 아이디 admin.{코드 소문자} | VARCHAR(20) | N |  | UK |
-| 49 | `operator_nm_en` | 운영사 명 영문 |  | VARCHAR(100) | Y |  |  |
-| 50 | `operator_short_nm` | 운영사 약칭 명 |  | VARCHAR(50) | Y |  |  |
-| 51 | `operator_type_cd` | 운영사 유형 코드 | 운영사 유형 OPERATOR_TYPE (3PL 기본) | VARCHAR(20) | N | 3PL |  |
-| 52 | `plan_cd` | 요금제 코드 | ⑤ 계약·요금제 [2차] (플랫폼만) | VARCHAR(20) | N | TRIAL |  |
-| 53 | `print_company_nm` | 출력 회사 명 | ⑥ 출력 설정 [2차] (파일 표가 생기면 로고·직인에 외래 키를 건다) | VARCHAR(100) | Y |  |  |
-| 54 | `remark` | 비고 | 비고 [1차, 기본 정보 아래] | VARCHAR(1000) | Y |  |  |
-| 55 | `sales_channel_cd` | 영업 채널 코드 | 유입 경로 (플랫폼 관리자만 표시, 값 목록은 아직 정하지 않음) | VARCHAR(20) | Y |  |  |
-| 56 | `serial_mgmt_yn` | 시리얼 관리 여부 |  | CHAR(1) | N | N |  |
-| 57 | `ship_cutoff_time` | 출고 마감 시각 |  | TIME WITHOUT TIME ZONE | Y |  |  |
-| 58 | `stamp_file_id` | 도장 파일 ID |  | BIGINT | Y |  |  |
-| 59 | `status_reason` | 상태 사유 | 상태변경 사유 (정지·해지로 바꿀 때 필수) | VARCHAR(200) | Y |  |  |
-| 60 | `sub_biz_no` | 종 사업자 번호 |  | CHAR(4) | Y |  |  |
-| 61 | `tax_invoice_email` | 세금 송장 이메일 |  | VARCHAR(100) | Y |  |  |
-| 62 | `tax_type_cd` | 세금 유형 코드 | 과세유형 TAX_TYPE | VARCHAR(10) | N | GENERAL |  |
-| 63 | `timezone` | 시간대 |  | VARCHAR(50) | N | Asia/Seoul |  |
-| 64 | `warehouse_reg_no` | 창고 등록 번호 | ③ 물류 자격 [2차] | VARCHAR(30) | Y |  |  |
-| 65 | `weight_unit_cd` | 중량 단위 코드 | 표시 단위: 단위 기준정보의 중량·길이 단위 코드 (시스템 또는 이 운영사의 단위 — DB 트리거로 검사, 0078) | VARCHAR(10) | N | KG |  |
-| 66 | `region_auto_grade` | 권역 자동 등급 | 권역설정 (0076): 자동 지정을 허용할 주소 정제 등급 (기본 D = D 이상 자동) | CHAR(1) | N | D |  |
-| 67 | `default_pallet_type_cd` | 기본 팔레트 유형 코드 | 기본 팔레트 종류 (품목 팔레트 적재의 기본값, 0083) | VARCHAR(20) | N | T11 |  |
+| 41 | `logo_file_id` | 로고 파일 ID |  | BIGINT | Y |  |  |
+| 42 | `longitude` | 경도 |  | DECIMAL(10,7) | Y |  |  |
+| 43 | `lot_mgmt_yn` | LOT 관리 여부 |  | CHAR(1) | N | N |  |
+| 44 | `max_center_cnt` | 최대 센터 수 |  | INTEGER | Y |  |  |
+| 45 | `max_shipper_cnt` | 최대 화주사 수 |  | INTEGER | Y |  |  |
+| 46 | `max_user_cnt` | 최대 사용자 수 | 비어 있으면 무제한 | INTEGER | Y |  |  |
+| 47 | `operator_cd` | 운영사 코드 | ① 기본 정보 [1차] 운영사코드: 영문 대문자·숫자·_- 2~20자, 등록 후 바꿀 수 없다. 관리자 아이디 admin.{코드 소문자} | VARCHAR(20) | N |  | UK |
+| 48 | `operator_nm_en` | 운영사 명 영문 |  | VARCHAR(100) | Y |  |  |
+| 49 | `operator_short_nm` | 운영사 약칭 명 |  | VARCHAR(50) | Y |  |  |
+| 50 | `operator_type_cd` | 운영사 유형 코드 | 운영사 유형 OPERATOR_TYPE (3PL 기본) | VARCHAR(20) | N | 3PL |  |
+| 51 | `plan_cd` | 요금제 코드 | ⑤ 계약·요금제 [2차] (플랫폼만) | VARCHAR(20) | N | TRIAL |  |
+| 52 | `print_company_nm` | 출력 회사 명 | ⑥ 출력 설정 [2차] (파일 표가 생기면 로고·직인에 외래 키를 건다) | VARCHAR(100) | Y |  |  |
+| 53 | `remark` | 비고 | 비고 [1차, 기본 정보 아래] | VARCHAR(1000) | Y |  |  |
+| 54 | `sales_channel_cd` | 영업 채널 코드 | 유입 경로 (플랫폼 관리자만 표시, 값 목록은 아직 정하지 않음) | VARCHAR(20) | Y |  |  |
+| 55 | `serial_mgmt_yn` | 시리얼 관리 여부 |  | CHAR(1) | N | N |  |
+| 56 | `ship_cutoff_time` | 출고 마감 시각 |  | TIME WITHOUT TIME ZONE | Y |  |  |
+| 57 | `stamp_file_id` | 도장 파일 ID |  | BIGINT | Y |  |  |
+| 58 | `status_reason` | 상태 사유 | 상태변경 사유 (정지·해지로 바꿀 때 필수) | VARCHAR(200) | Y |  |  |
+| 59 | `sub_biz_no` | 종 사업자 번호 |  | CHAR(4) | Y |  |  |
+| 60 | `tax_invoice_email` | 세금 송장 이메일 |  | VARCHAR(100) | Y |  |  |
+| 61 | `tax_type_cd` | 세금 유형 코드 | 과세유형 TAX_TYPE | VARCHAR(10) | N | GENERAL |  |
+| 62 | `timezone` | 시간대 |  | VARCHAR(50) | N | Asia/Seoul |  |
+| 63 | `warehouse_reg_no` | 창고 등록 번호 | ③ 물류 자격 [2차] | VARCHAR(30) | Y |  |  |
+| 64 | `region_auto_grade` | 권역 자동 등급 | 권역설정 (0076): 자동 지정을 허용할 주소 정제 등급 (기본 D = D 이상 자동) | CHAR(1) | N | D |  |
+| 65 | `default_pallet_type_cd` | 기본 팔레트 유형 코드 | 기본 팔레트 종류 (품목 팔레트 적재의 기본값, 0083) | VARCHAR(20) | N | T11 |  |
+| 66 | `weight_unit_id` | 중량 단위 ID | 표시 단위: 단위 기준정보의 중량·길이 단위 (시스템 또는 이 운영사의 단위 — 유형은 DB 트리거로 검사, 0078·0084) 기본값은 시스템 KG·CM 단위 (DB 함수 system_unit_id) | BIGINT | N | system_unit_id('KG') | FK → tb_unit.unit_id |
+| 67 | `length_unit_id` | 길이 단위 ID |  | BIGINT | N | system_unit_id('CM') | FK → tb_unit.unit_id |
 
 **고유 인덱스**
 
@@ -667,7 +667,7 @@
 | 32 | `allocatable_yn` | 할당가능 여부 |  | CHAR(1) | Y |  |  |
 | 33 | `mix_item_yn` | 혼적 품목 여부 |  | CHAR(1) | N | Y |  |
 | 34 | `mix_lot_yn` | 혼적 LOT 여부 |  | CHAR(1) | N | Y |  |
-| 35 | `mix_client_yn` | 혼적 클라이언트 여부 | 3PL은 화주 간 재고 섞임 방지가 기본 | CHAR(1) | N | N |  |
+| 35 | `mix_shipper_yn` | 혼적 화주사 여부 | 3PL은 화주 간 재고 섞임 방지가 기본 | CHAR(1) | N | N |  |
 | 36 | `putaway_seq` | 적치 순서 |  | INTEGER | Y |  |  |
 | 37 | `pick_seq` | 피킹 순서 |  | INTEGER | Y |  |  |
 | 38 | `lock_yn` | 잠금 여부 | ⑤ 잠금·관리 [2차] — 잠금(일시적으로 작업 금지)은 사용 중지(장기간 안 씀)와 다르다 | CHAR(1) | N | N |  |
@@ -700,7 +700,7 @@
 - `tb_location_status_cd_check`: `CHECK ((status_cd) IN (('ACTIVE'), ('INACTIVE'))`
 - `tb_location_status_check`: `CHECK ((status_cd) IN ('ACTIVE', 'INACTIVE'))`
 - `tb_location_system_check`: `CHECK ((system_yn = 'N') OR ((status_cd) = 'ACTIVE'))`
-- `tb_location_yn_check`: `CHECK ((system_yn IN ('Y', 'N') AND (mix_item_yn IN ('Y', 'N') AND (mix_lot_yn IN ('Y', 'N') AND (mix_client_yn IN ('Y', 'N') AND (lock_yn IN ('Y', 'N') AND ((inbound_yn IS NULL) OR (inbound_yn IN ('Y', 'N')) AND ((outbound_yn IS NULL) OR (outbound_yn IN ('Y', 'N')) AND ((allocatable_yn IS NULL) OR (allocatable_yn IN ('Y', 'N')))`
+- `tb_location_yn_check`: `CHECK ((system_yn IN ('Y', 'N') AND (mix_item_yn IN ('Y', 'N') AND (mix_lot_yn IN ('Y', 'N') AND (mix_shipper_yn IN ('Y', 'N') AND (lock_yn IN ('Y', 'N') AND ((inbound_yn IS NULL) OR (inbound_yn IN ('Y', 'N')) AND ((outbound_yn IS NULL) OR (outbound_yn IN ('Y', 'N')) AND ((allocatable_yn IS NULL) OR (allocatable_yn IN ('Y', 'N')))`
 
 ## tb_warehouse
 
@@ -1132,23 +1132,23 @@
 | No | 칼럼 | 한글명 | 설명 | 타입 | NULL | 기본값 | 키 |
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | 1 | `shipper_id` | 화주사 ID |  | BIGINT | N | 자동 증가 | PK |
-| 2 | `shipper_cd` | 화주사 코드 |  | TEXT | N |  | UK |
-| 3 | `shipper_nm` | 화주사 명 |  | TEXT | N |  |  |
+| 2 | `shipper_cd` | 화주사 코드 |  | VARCHAR(20) | N |  | UK |
+| 3 | `shipper_nm` | 화주사 명 |  | VARCHAR(100) | N |  |  |
 | 4 | `created_at` | 등록 일시 | 등록 일시 (자동) | TIMESTAMP(3) | N | CURRENT_TIMESTAMP |  |
 | 5 | `updated_at` | 수정 일시 | 수정 일시 (자동) | TIMESTAMP(3) | N |  |  |
-| 6 | `addr1` | 주소 |  | TEXT | Y |  |  |
-| 7 | `addr2` | 상세주소 |  | TEXT | Y |  |  |
-| 8 | `biz_item` | 사업자 품목 |  | TEXT | Y |  |  |
-| 9 | `biz_reg_no` | 사업자등록번호 | 사업자등록번호·전화번호는 하이픈 없이 숫자만 (0029). 화면에서는 필수, 기존 화주는 비어 있을 수 있다 (0080) | TEXT | Y |  |  |
-| 10 | `biz_condition` | 사업자 조건 |  | TEXT | Y |  |  |
-| 11 | `ceo_nm` | 대표자 명 |  | TEXT | Y |  |  |
-| 12 | `email` | 이메일 |  | TEXT | Y |  |  |
-| 13 | `fax_no` | 팩스 번호 |  | TEXT | Y |  |  |
+| 6 | `addr1` | 주소 |  | VARCHAR(200) | Y |  |  |
+| 7 | `addr2` | 상세주소 |  | VARCHAR(200) | Y |  |  |
+| 8 | `biz_item` | 사업자 품목 |  | VARCHAR(100) | Y |  |  |
+| 9 | `biz_reg_no` | 사업자등록번호 | 사업자등록번호·전화번호는 하이픈 없이 숫자만 (0029). 화면에서는 필수, 기존 화주는 비어 있을 수 있다 (0080) | CHAR(10) | Y |  |  |
+| 10 | `biz_condition` | 사업자 조건 |  | VARCHAR(100) | Y |  |  |
+| 11 | `ceo_nm` | 대표자 명 |  | VARCHAR(50) | Y |  |  |
+| 12 | `email` | 이메일 |  | VARCHAR(100) | Y |  |  |
+| 13 | `fax_no` | 팩스 번호 |  | VARCHAR(15) | Y |  |  |
 | 14 | `label_unit_cd` | 라벨 단위 코드 | (값: PLT, BOX) | ENUM LabelUnit | N | 'PLT'::"LabelUnit" |  |
-| 15 | `tel_no` | 전화 번호 | ② 연락처·주소 | TEXT | Y |  |  |
+| 15 | `tel_no` | 전화 번호 | ② 연락처·주소 | VARCHAR(15) | Y |  |  |
 | 16 | `expiry_mgmt_yn` | 기한 관리 여부 |  | CHAR(1) | Y |  |  |
 | 17 | `lot_mgmt_yn` | LOT 관리 여부 | ④ 운영 설정 (상속: 비어 있으면 위 단계 값 — 0073·0080, getEffectiveSetting) 로트·유통기한은 품목 기본값으로도 쓴다 (품목에서 그대로 쓰거나 개별 지정, 0003 결정 2) | CHAR(1) | Y |  |  |
-| 18 | `zip_cd` | 우편번호 |  | TEXT | Y |  |  |
+| 18 | `zip_cd` | 우편번호 |  | VARCHAR(10) | Y |  |  |
 | 19 | `created_by` | 등록 자 | 등록·수정한 사람 아이디(username, 자동: 현재 작업자 / 시드 seed / 기존 데이터 system), 동시 수정 막기용 버전 (docs/db-conventions.md 공통 칸) | VARCHAR(50) | N | system |  |
 | 20 | `row_version` | 행버전 | 동시 수정 막기용 버전 (수정할 때마다 +1, 0038) | INTEGER | N | 1 |  |
 | 21 | `updated_by` | 수정 자 | 수정자 아이디 (자동) | VARCHAR(50) | N | system |  |
@@ -1173,7 +1173,7 @@
 | 40 | `industry_cd` | 업종 코드 |  | VARCHAR(20) | Y |  |  |
 | 41 | `min_inbound_shelf_days` | 최소 입고 잔여유통일수 | 유통기한 잔여일 기준 (비어 있으면 검사 안 함, 상속 아님) | INTEGER | Y |  |  |
 | 42 | `min_outbound_shelf_days` | 최소 출고 잔여유통일수 |  | INTEGER | Y |  |  |
-| 43 | `order_no_unique_scope_cd` | 주문 번호 고유 권한범위 코드 | 주문번호 중복 기준: CLIENT(화주 전체 기간)·CLIENT_DAY(일자별) | VARCHAR(20) | N | CLIENT |  |
+| 43 | `order_no_unique_scope_cd` | 주문 번호 고유 권한범위 코드 | 주문번호 중복 기준: SHIPPER(화주 전체 기간)·SHIPPER_DAY(일자별) | VARCHAR(20) | N | SHIPPER |  |
 | 44 | `partial_ship_yn` | 부분 출고 여부 |  | CHAR(1) | N | Y |  |
 | 45 | `payment_terms_days` | 결제 조건 일수 | 결제 조건: 마감 후 n일 | INTEGER | Y |  |  |
 | 46 | `remark` | 비고 | 비고 | VARCHAR(1000) | Y |  |  |
@@ -1214,7 +1214,8 @@
 - `tb_shipper_if_key_type_cd_check`: `CHECK ((if_key_type_cd) IN ('CODE', 'CUST_CD'))`
 - `tb_shipper_if_method_cd_check`: `CHECK ((if_method_cd) IN ('PORTAL', 'API', 'FILE', 'EDI'))`
 - `tb_shipper_lot_mgmt_yn_check`: `CHECK (lot_mgmt_yn IN ('Y', 'N')`
-- `tb_shipper_order_no_scope_cd_check`: `CHECK ((order_no_unique_scope_cd) IN ('CLIENT', 'CLIENT_DAY'))`
+- `tb_shipper_number_digits_check`: `CHECK (((biz_reg_no IS NULL) OR (biz_reg_no ~ '^[0-9]{10}$')) AND ((tel_no IS NULL) OR ((tel_no) ~ '^[0-9]{8,15}$')) AND ((fax_no IS NULL) OR ((fax_no) ~ '^[0-9]{8,15}$')))`
+- `tb_shipper_order_no_scope_cd_check`: `CHECK ((order_no_unique_scope_cd) IN ('SHIPPER', 'SHIPPER_DAY'))`
 - `tb_shipper_ship_to_center_policy_cd_check`: `CHECK ((ship_to_center_policy_cd) IN ('AUTO_HOLD', 'AUTO_REJECT', 'REQUIRED'))`
 - `tb_shipper_shortage_policy_cd_check`: `CHECK ((shortage_policy_cd) IN ('HOLD', 'PARTIAL', 'CANCEL_SHORT'))`
 - `tb_shipper_status_cd_check`: `CHECK ((status_cd) IN ('PREPARING', 'ACTIVE', 'SUSPENDED', 'TERMINATED'))`
@@ -1271,10 +1272,10 @@
 | 1 | `contact_id` | 담당자 ID |  | BIGINT | N | 자동 증가 | PK |
 | 2 | `shipper_id` | 화주사 ID |  | BIGINT | N |  | UK FK → tb_shipper.shipper_id |
 | 3 | `sort_seq` | 정렬순서 | 정렬 순서 | INTEGER | N |  |  |
-| 4 | `role_cd` | 역할 코드 |  | TEXT | N |  |  |
-| 5 | `contact_nm` | 담당자 명 |  | TEXT | N |  |  |
-| 6 | `tel_no` | 전화 번호 |  | TEXT | Y |  |  |
-| 7 | `email` | 이메일 |  | TEXT | Y |  |  |
+| 4 | `role_cd` | 역할 코드 |  | VARCHAR(20) | N |  |  |
+| 5 | `contact_nm` | 담당자 명 |  | VARCHAR(50) | N |  |  |
+| 6 | `tel_no` | 전화 번호 |  | VARCHAR(15) | Y |  |  |
+| 7 | `email` | 이메일 |  | VARCHAR(100) | Y |  |  |
 | 8 | `primary_yn` | 대표 여부 |  | CHAR(1) | N | N |  |
 | 9 | `if_contact_yn` | 연동 담당자 여부 |  | CHAR(1) | N | N |  |
 
@@ -1291,6 +1292,7 @@
 - `tb_shipper_contact_if_contact_yn_check`: `CHECK (if_contact_yn IN ('Y', 'N')`
 - `tb_shipper_contact_if_email_check`: `CHECK ((if_contact_yn = 'N') OR (email IS NOT NULL))`
 - `tb_shipper_contact_primary_yn_check`: `CHECK (primary_yn IN ('Y', 'N')`
+- `tb_shipper_contact_tel_no_check`: `CHECK ((tel_no IS NULL) OR ((tel_no) ~ '^[0-9]{8,15}$'))`
 
 ## tb_api_client
 
@@ -1379,7 +1381,7 @@
 ## tb_api_client_scope
 
 - 영역: 연동 API · 모델: `ApiClientScope`
-- 키 권한 (상수 API_SCOPE: PARTNER_READ … STOCK_READ)
+- 키 권한 (상수 API_SCOPE: CUSTOMER_READ … STOCK_READ)
 
 | No | 칼럼 | 한글명 | 설명 | 타입 | NULL | 기본값 | 키 |
 | --- | --- | --- | --- | --- | --- | --- | --- |
@@ -1388,7 +1390,7 @@
 
 **검사 조건**
 
-- `tb_api_client_scope_cd_check`: `CHECK ((scope_cd) IN ('PARTNER_READ', 'PARTNER_WRITE', 'ITEM_READ', 'ITEM_WRITE', 'ASN_READ', 'ASN_WRITE', 'ORDER_READ', 'ORDER_WRITE', 'STOCK_READ'))`
+- `tb_api_client_scope_cd_check`: `CHECK ((scope_cd) IN ('CUSTOMER_READ', 'CUSTOMER_WRITE', 'ITEM_READ', 'ITEM_WRITE', 'ASN_READ', 'ASN_WRITE', 'ORDER_READ', 'ORDER_WRITE', 'STOCK_READ'))`
 
 ## tb_api_idempotency
 
@@ -1451,7 +1453,7 @@
 | 3 | `shipper_id` | 화주사 ID |  | BIGINT | Y |  |  |
 | 4 | `api_client_id` | API키 ID |  | BIGINT | Y |  |  |
 | 5 | `env_cd` | 환경 코드 |  | VARCHAR(10) | Y |  |  |
-| 6 | `api_cd` | API 코드 | API 구분 (예: ME, PARTNER_UPSERT, ORDER_CREATE) | VARCHAR(50) | N |  |  |
+| 6 | `api_cd` | API 코드 | API 구분 (예: ME, CUSTOMER_UPSERT, ORDER_CREATE) | VARCHAR(50) | N |  |  |
 | 7 | `http_method` | HTTP 방식 |  | VARCHAR(10) | N |  |  |
 | 8 | `path` | 경로 |  | VARCHAR(300) | N |  |  |
 | 9 | `client_ip` | 클라이언트 IP |  | VARCHAR(45) | Y |  |  |
@@ -1510,7 +1512,7 @@
 | 24 | `addr_norm_at` | 주소 정제 일시 |  | TIMESTAMP(3) | Y |  |  |
 | 25 | `customer_group_cd` | 거래처 그룹 코드 |  | VARCHAR(30) | Y |  |  |
 | 26 | `customer_short_nm` | 거래처 약칭 명 |  | VARCHAR(30) | Y |  |  |
-| 27 | `customer_type_cd` | 거래처 유형 코드 | 거래처 유형: 공통코드 PARTNER_TYPE (분류·표시), 거래처 그룹: 화주가 쓰는 그룹 (자유 입력) | VARCHAR(20) | Y |  |  |
+| 27 | `customer_type_cd` | 거래처 유형 코드 | 거래처 유형: 공통코드 CUSTOMER_TYPE (분류·표시), 거래처 그룹: 화주가 쓰는 그룹 (자유 입력) | VARCHAR(20) | Y |  |  |
 | 28 | `ext_attr` | 확장속성 | 확장 속성 (JSON) | JSONB | Y |  |  |
 | 29 | `fax_no` | 팩스 번호 |  | VARCHAR(15) | Y |  |  |
 | 30 | `last_if_at` | 마지막연동일시 | 마지막 연동 일시 | TIMESTAMP(3) | Y |  |  |
@@ -1646,7 +1648,7 @@
 - `tb_ship_to_center_assign_status_cd_check`: `CHECK ((center_assign_status_cd) IN ('ASSIGNED', 'NEED_CONFIRM'))`
 - `tb_ship_to_center_assign_type_cd_check`: `CHECK ((center_assign_type_cd) IN ('IF', 'AUTO', 'MANUAL'))`
 - `tb_ship_to_center_required_check`: `CHECK ((delivery_center_id IS NOT NULL) OR ((center_assign_status_cd) = 'NEED_CONFIRM'))`
-- `tb_ship_to_confirm_reason_cd_check`: `CHECK ((center_confirm_reason_cd) IN ('ADDR_NOT_RESOLVED', 'REGION_UNASSIGNED', 'REGION_MIXED', 'NOT_CLIENT_CENTER', 'CENTER_INACTIVE', 'INVALID_CENTER_CD'))`
+- `tb_ship_to_confirm_reason_cd_check`: `CHECK ((center_confirm_reason_cd) IN ('ADDR_NOT_RESOLVED', 'REGION_UNASSIGNED', 'REGION_MIXED', 'NOT_SHIPPER_CENTER', 'CENTER_INACTIVE', 'INVALID_CENTER_CD'))`
 - `tb_ship_to_default_active_check`: `CHECK ((default_yn = 'N') OR ((status_cd) = 'ACTIVE') OR (del_yn = 'Y'))`
 - `tb_ship_to_resolve_level_cd_check`: `CHECK ((resolve_level_cd) IN ('ZIP', 'BJD', 'SIGUNGU'))`
 - `tb_ship_to_ship_to_cd_check`: `CHECK ((ship_to_cd) ~ '^[A-Z0-9_-]{1,30}$')`

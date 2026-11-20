@@ -13,7 +13,7 @@ import { assertAllFound, assertNoCodeConflict } from '@/lib/soft-delete'
 import { DELETED_ONLY, NOT_DELETED } from '@/lib/status'
 import { toYn } from '@/lib/yn'
 import { isShipperSetupStatus } from '@/lib/shippers/shipper-codes'
-import { PARTNER_TYPE_GROUP } from './customer-codes'
+import { CUSTOMER_TYPE_GROUP } from './customer-codes'
 import type { CustomerCreateData, CustomerData, ShipToData } from './customer-schema'
 import { assignShipToCenter, type ShipToCenterPolicy } from './ship-to-center'
 
@@ -86,7 +86,7 @@ async function assertCodes(
   data: CustomerData,
   keep?: { type: string | null; duties: string[] },
 ) {
-  await assertCodeValues(db, PARTNER_TYPE_GROUP, data.customerType ? [data.customerType] : [], {
+  await assertCodeValues(db, CUSTOMER_TYPE_GROUP, data.customerType ? [data.customerType] : [], {
     label: '거래처 유형',
     keep: keep?.type ? [keep.type] : [],
   })
@@ -208,8 +208,10 @@ type ExistingShipTo = {
 // 납품처 한 곳의 저장 결과 (API 건별 결과의 shipTos — 0082 ③)
 export type ShipToSaveResult = {
   code: string
+  // 사용자 정의 코드 (연동 조회 키가 CUST_CD면 보낸 납품처와 이것으로 짝짓는다)
+  custCode?: string | null
   result: 'CREATED' | 'UPDATED' | 'UNCHANGED' | 'FAIL'
-  // FAIL: 화주 정책으로 반려 (CENTER_REQUIRED·INVALID_CENTER_CD·NOT_CLIENT_CENTER·…)
+  // FAIL: 화주 정책으로 반려 (CENTER_REQUIRED·INVALID_CENTER_CD·NOT_SHIPPER_CENTER·…)
   error?: { code: string; message: string }
   addressGrade?: string
   zipCode?: string | null
@@ -367,7 +369,11 @@ async function syncShipTos(
           },
         })
       }
-      results.push({ code: row.code, result: same ? 'UNCHANGED' : 'UPDATED' })
+      results.push({
+        code: row.code,
+        custCode: row.custCode,
+        result: same ? 'UNCHANGED' : 'UPDATED',
+      })
       continue
     }
     const assigned = await assignShipToCenter(db, {
@@ -387,7 +393,12 @@ async function syncShipTos(
       if (!options.collectRejects) {
         throw new ActionError('VALIDATION', `${row.code}: ${assigned.rejected.message}`)
       }
-      results.push({ code: row.code, result: 'FAIL', error: assigned.rejected })
+      results.push({
+        code: row.code,
+        custCode: row.custCode,
+        result: 'FAIL',
+        error: assigned.rejected,
+      })
       continue
     }
     const f = assigned.fields
@@ -412,6 +423,7 @@ async function syncShipTos(
     }
     results.push({
       code: row.code,
+      custCode: row.custCode,
       result: found ? 'UPDATED' : 'CREATED',
       addressGrade: f.addressGrade,
       zipCode: f.zipCode,

@@ -19,7 +19,7 @@ import {
   CUSTOMER_STATUS_BADGE,
   DATA_SOURCE,
   ORDER_ADDR_MODE,
-  PARTNER_TYPE_GROUP,
+  CUSTOMER_TYPE_GROUP,
 } from '@/lib/customers/customer-codes'
 import { customerUploadTemplate } from '@/lib/customers/customer-upload-template'
 import {
@@ -68,7 +68,7 @@ const COLUMNS: DataGridColumn<Row>[] = [
     id: 'customerType',
     header: '유형',
     accessor: 'customerType',
-    format: { code: PARTNER_TYPE_GROUP },
+    format: { code: CUSTOMER_TYPE_GROUP },
     sortable: true,
   },
   {
@@ -187,7 +187,7 @@ export function CustomersList({
       key: 'customerType',
       label: '거래처 유형',
       type: 'codeMulti',
-      codeGroup: PARTNER_TYPE_GROUP,
+      codeGroup: CUSTOMER_TYPE_GROUP,
       detail: true,
     },
     { key: 'customerGroup', label: '거래처 그룹', type: 'text', detail: true },

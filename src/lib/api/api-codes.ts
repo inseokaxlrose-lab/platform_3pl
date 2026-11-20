@@ -11,8 +11,8 @@ export const API_KEY_STATUS = codeSet({ ACTIVE: '사용 중', REVOKED: '폐기',
 
 // 키 권한 (정의서 8번 표)
 export const API_SCOPE = codeSet({
-  PARTNER_READ: '거래처 조회',
-  PARTNER_WRITE: '거래처 등록·수정',
+  CUSTOMER_READ: '거래처 조회',
+  CUSTOMER_WRITE: '거래처 등록·수정',
   ITEM_READ: '품목 조회',
   ITEM_WRITE: '품목 등록·수정',
   ASN_READ: '입고예정 조회',
@@ -47,11 +47,11 @@ export const IDEMPOTENCY_HOURS = 24
 // 키 확인 전에 실패한 요청도 이 이름으로 남는다
 export const API_CODE_LABELS: Record<string, string> = {
   ME: '내 정보 (GET /me)',
-  PARTNER_UPSERT: '거래처 등록·수정 (POST /partners)',
-  PARTNER_LIST: '거래처 목록 (GET /partners)',
-  PARTNER_GET: '거래처 상세 (GET /partners/{partnerCd})',
-  SHIP_TO_UPSERT: '납품처 등록·수정 (POST /partners/{partnerCd}/ship-tos)',
-  SHIP_TO_LIST: '납품처 목록 (GET /partners/{partnerCd}/ship-tos)',
+  CUSTOMER_UPSERT: '거래처 등록·수정 (POST /customers)',
+  CUSTOMER_LIST: '거래처 목록 (GET /customers)',
+  CUSTOMER_GET: '거래처 상세 (GET /customers/{customerCd})',
+  SHIP_TO_UPSERT: '납품처 등록·수정 (POST /customers/{customerCd}/ship-tos)',
+  SHIP_TO_LIST: '납품처 목록 (GET /customers/{customerCd}/ship-tos)',
   ITEM_UPSERT: '품목 등록·수정 (POST /items)',
   ITEM_LIST: '품목 목록 (GET /items)',
   ITEM_GET: '품목 상세 (GET /items/{itemCd})',

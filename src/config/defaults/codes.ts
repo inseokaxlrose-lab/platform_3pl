@@ -158,7 +158,7 @@ export const DEFAULT_CODE_GROUPS: readonly DefaultCodeGroup[] = [
   },
   // 거래처 (0082)
   {
-    code: 'PARTNER_TYPE',
+    code: 'CUSTOMER_TYPE',
     name: '거래처 유형',
     description: '거래처(화주가 물건을 파는 상대)의 형태',
     items: [

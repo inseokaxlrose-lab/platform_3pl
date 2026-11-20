@@ -150,8 +150,8 @@ describe('거래처 엑셀 업로드', () => {
       // 거래처 하나 + 납품처 둘 (거래처 칸은 반복)
       {
         shipperCode: 'GANA',
-        partnerCd: 'P1',
-        partnerNm: '행복마트',
+        customerCd: 'P1',
+        customerNm: '행복마트',
         ...GANGNAM,
         shipToCd: 'S1',
         shipToNm: '1호',
@@ -161,8 +161,8 @@ describe('거래처 엑셀 업로드', () => {
       },
       {
         shipperCode: 'GANA',
-        partnerCd: 'P1',
-        partnerNm: '행복마트',
+        customerCd: 'P1',
+        customerNm: '행복마트',
         shipToCd: 'S2',
         shipToNm: '2호',
         shipToZipCd: '06236',
@@ -172,8 +172,8 @@ describe('거래처 엑셀 업로드', () => {
       // 납품처 없이: 거래처 주소로 기본 납품처
       {
         shipperCode: 'gana',
-        partnerCd: 'p2',
-        partnerNm: '두번째',
+        customerCd: 'p2',
+        customerNm: '두번째',
         ...GANGNAM,
         telNo: '02-555-1234',
         status: '거래중지',
@@ -227,19 +227,19 @@ describe('거래처 엑셀 업로드', () => {
       rowsOf([
         {
           shipperCode: 'GANA',
-          partnerCd: 'P1',
-          partnerNm: '행복마트',
+          customerCd: 'P1',
+          customerNm: '행복마트',
           ceoNm: '홍대표',
           ...GANGNAM,
         },
       ]),
     )
     const second = await validateCustomerUploadAction(
-      rowsOf([{ shipperCode: 'GANA', partnerCd: 'P1', telNo: '031-111-2222' }]),
+      rowsOf([{ shipperCode: 'GANA', customerCd: 'P1', telNo: '031-111-2222' }]),
     )
     expect(second).toMatchObject({ ok: true, data: { summary: expect.stringContaining('수정 1') } })
     await commitCustomerUploadAction(
-      rowsOf([{ shipperCode: 'GANA', partnerCd: 'P1', telNo: '031-111-2222' }]),
+      rowsOf([{ shipperCode: 'GANA', customerCd: 'P1', telNo: '031-111-2222' }]),
     )
     expect(await prisma.customer.findFirstOrThrow({ where: { code: 'P1' } })).toMatchObject({
       name: '행복마트',
@@ -247,7 +247,7 @@ describe('거래처 엑셀 업로드', () => {
       phone: '0311112222',
     })
     const same = await validateCustomerUploadAction(
-      rowsOf([{ shipperCode: 'GANA', partnerCd: 'P1', telNo: '031-111-2222' }]),
+      rowsOf([{ shipperCode: 'GANA', customerCd: 'P1', telNo: '031-111-2222' }]),
     )
     expect(same).toMatchObject({
       ok: true,
@@ -257,20 +257,20 @@ describe('거래처 엑셀 업로드', () => {
 
   it('오류가 하나라도 있으면 줄마다 사유를 보여 주고, 등록은 아무것도 저장하지 않는다', async () => {
     const rows = rowsOf([
-      { shipperCode: 'GANA', partnerCd: 'OK1', partnerNm: '정상', ...GANGNAM },
-      { shipperCode: 'NOPE', partnerCd: 'X1', partnerNm: '없는 화주' },
-      { shipperCode: 'GANA', partnerCd: 'NOADDR', partnerNm: '주소 없음' },
+      { shipperCode: 'GANA', customerCd: 'OK1', customerNm: '정상', ...GANGNAM },
+      { shipperCode: 'NOPE', customerCd: 'X1', customerNm: '없는 화주' },
+      { shipperCode: 'GANA', customerCd: 'NOADDR', customerNm: '주소 없음' },
       {
         shipperCode: 'GANA',
-        partnerCd: 'DIFF',
-        partnerNm: '가',
+        customerCd: 'DIFF',
+        customerNm: '가',
         ...GANGNAM,
         shipToCd: 'S1',
         shipToNm: '1호',
         shipToDefault: 'X',
         ...{ shipToAddr1: GANGNAM.addr1 },
       },
-      { shipperCode: 'GANA', partnerCd: 'DIFF', partnerNm: '나' },
+      { shipperCode: 'GANA', customerCd: 'DIFF', customerNm: '나' },
     ])
     const preview = await validateCustomerUploadAction(rows)
     expect(preview.ok).toBe(true)
@@ -287,5 +287,59 @@ describe('거래처 엑셀 업로드', () => {
       error: { code: 'VALIDATION' },
     })
     expect(await prisma.customer.count()).toBe(0)
+  })
+})
+
+describe('조회 키 (0084)', () => {
+  it('CUST_CD 화주: 사용자정의코드로 묶고 찾는다, 우리 코드는 자동, 키가 없으면 그 칸 오류', async () => {
+    await assignZip('06236', icn)
+    await prisma.shipper.update({ where: { id: gana }, data: { ifKeyType: 'CUST_CD' } })
+    const { codePrefix } = await prisma.shipper.findUniqueOrThrow({ where: { id: gana } })
+    const customerCd = `${codePrefix}C000001`
+    const row = (extra: Record<string, string>) => ({
+      shipperCode: 'GANA',
+      customerCustCd: 'erp-c1',
+      customerNm: '화주 거래처',
+      ...GANGNAM,
+      shipToZipCd: GANGNAM.zipCd,
+      shipToAddr1: GANGNAM.addr1,
+      ...extra,
+    })
+
+    // 키(거래처사용자정의코드·납품처사용자정의코드)가 없으면 그 칸 오류
+    const noKey = await validateCustomerUploadAction(
+      rowsOf([
+        { shipperCode: 'GANA', customerCd: 'P1', customerNm: '키 없음', ...GANGNAM },
+        row({ shipToCd: 'S1', shipToNm: '납품처 키 없음' }),
+      ]),
+    )
+    expect(noKey.ok && noKey.data.rows.map((r) => r.errors)).toEqual([
+      [expect.stringContaining('거래처사용자정의코드')],
+      [expect.stringContaining('납품처사용자정의코드')],
+    ])
+
+    expect(
+      await commitCustomerUploadAction(
+        rowsOf([
+          row({ shipToCustCd: 'erp-s1', shipToNm: '1호', shipToDefault: 'Y' }),
+          row({ shipToCustCd: 'erp-s2', shipToNm: '2호' }),
+        ]),
+      ),
+    ).toMatchObject({ ok: true, data: { message: expect.stringContaining('신규 1') } })
+    // 같은 키로 다시 올리면 그 거래처·납품처를 고친다
+    expect(
+      await commitCustomerUploadAction(
+        rowsOf([row({ shipToCustCd: 'erp-s2', shipToNm: '2호 바꿈' })]),
+      ),
+    ).toMatchObject({ ok: true, data: { message: expect.stringContaining('수정 1') } })
+    const saved = await prisma.customer.findFirstOrThrow({
+      where: { shipperId: gana },
+      include: { shipTos: { orderBy: { code: 'asc' } } },
+    })
+    expect(saved).toMatchObject({ code: customerCd, custCode: 'erp-c1' })
+    expect(saved.shipTos.map((s) => [s.code, s.custCode, s.name])).toEqual([
+      [`${customerCd}-01`, 'erp-s1', '1호'],
+      [`${customerCd}-02`, 'erp-s2', '2호 바꿈'],
+    ])
   })
 })

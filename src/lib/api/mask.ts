@@ -6,10 +6,10 @@ const PERSONAL_KEY = /(name|nm|tel|phone|mobile|hp|addr|address|email|receiver|r
 const SECRET_KEY = /(api.?key|secret|password|token)/i
 // 업무 정보 칸은 가리지 않는다 (품목명·센터명·화주명·거래처명·단위명 — 개인정보가 아님)
 // customer는 개인 구매자일 수 있어 넣지 않는다 (덜 가리는 것보다 더 가리는 쪽이 안전)
-const BUSINESS_LEAF = /^(item|product|sku|center|shipper|client|partner|unit|warehouse)/i
+const BUSINESS_LEAF = /^(item|product|sku|center|shipper|client|unit|warehouse)/i
 // 부모가 업무 객체이면 그 안의 일반 칸(name 등)은 그대로: { client: { name } }·{ key: { name } }·{ centers: [{ name }] }
 // 목록 껍데기(items·lines 등)는 업무 객체가 아니다 → 그 안의 receiverName은 가린다
-const BUSINESS_PARENT = /^(client|key|centers?|shipper|warehouse|units?|item|product|partner)$/i
+const BUSINESS_PARENT = /^(client|key|centers?|shipper|warehouse|units?|item|product)$/i
 const GENERIC_LEAF = /^(name|nm|email|tel|phone|address|addr)$/i
 
 // 글자 가운데 가리기: '홍길동' → '홍*동', '01012345678' → '010****5678', 주소는 앞 2마디만

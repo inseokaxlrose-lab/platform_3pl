@@ -89,7 +89,7 @@ function attributeFields(data: LocationBulkData['attributes']) {
     allocatableYn: ynOrNull(data.allocatable),
     mixItemYn: toYn(data.mixItem),
     mixLotYn: toYn(data.mixLot),
-    mixClientYn: toYn(data.mixClient),
+    mixShipperYn: toYn(data.mixShipper),
   }
 }
 
@@ -120,7 +120,7 @@ function locationFields(data: LocationData) {
 async function assertStockFitsRules(
   _db: Db,
   _locationId: bigint,
-  _next: { locType: string; mixClient: boolean },
+  _next: { locType: string; mixShipper: boolean },
 ) {
   void _db
   void _locationId
@@ -183,7 +183,7 @@ export async function updateLocation(id: bigint, rowVersion: number, data: Locat
     } else {
       const zone = await resolveZone(tx, current.warehouseId, data.zoneId, current.zoneId)
       await assertLocationCodes(tx, data)
-      await assertStockFitsRules(tx, id, { locType: data.locType, mixClient: data.mixClient })
+      await assertStockFitsRules(tx, id, { locType: data.locType, mixShipper: data.mixShipper })
       // 전용 화주사를 새로 정하거나 바꿀 때: 이 센터를 이용 중인 화주사만 (0080)
       if (data.dedicatedShipperId && data.dedicatedShipperId !== current.dedicatedShipperId) {
         await assertDedicatedShipper(tx, data.dedicatedShipperId, current.centerId)

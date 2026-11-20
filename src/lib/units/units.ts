@@ -216,7 +216,7 @@ export async function setUnitsActive(ids: bigint[], isActive: boolean) {
 
 async function assertCanDeactivate(
   operatorId: bigint,
-  units: { code: string; isSystem: string }[],
+  units: { id: bigint; code: string; isSystem: string }[],
 ) {
   const fixed = units
     .filter(
@@ -231,10 +231,10 @@ async function assertCanDeactivate(
   }
   const operator = await prisma.operator.findUnique({
     where: { id: operatorId },
-    select: { weightUnit: true, lengthUnit: true },
+    select: { weightUnitId: true, lengthUnitId: true },
   })
   const display = units
-    .filter((u) => u.code === operator?.weightUnit || u.code === operator?.lengthUnit)
+    .filter((u) => u.id === operator?.weightUnitId || u.id === operator?.lengthUnitId)
     .map((u) => u.code)
   if (display.length > 0) {
     throw new ActionError(

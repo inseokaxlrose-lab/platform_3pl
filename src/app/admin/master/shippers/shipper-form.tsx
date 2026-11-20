@@ -113,7 +113,7 @@ const EMPTY: ShipperInput = {
   shipToCenterPolicy: 'AUTO_HOLD',
   autoCreateShipTo: true,
   autoCreateItem: false,
-  orderNoScope: 'CLIENT',
+  orderNoScope: 'SHIPPER',
   ifMethod: 'PORTAL',
   apiEnabled: false,
   centers: [],

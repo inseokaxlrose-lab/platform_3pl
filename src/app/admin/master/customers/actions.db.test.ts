@@ -369,7 +369,7 @@ describe('납품처 · 배송센터 (0082)', () => {
     })
     expect((await shipTosOf(held.id))[0]).toMatchObject({
       centerAssignStatus: 'NEED_CONFIRM',
-      centerConfirmReason: 'NOT_CLIENT_CENTER',
+      centerConfirmReason: 'NOT_SHIPPER_CENTER',
     })
     // 다라상사는 이천·김해 이용 → 김해로 직접 지정 (권역은 이천)
     const created = await create({

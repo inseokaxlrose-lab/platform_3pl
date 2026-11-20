@@ -2,9 +2,9 @@ import type { StatusFormat } from '@/components/data-grid'
 import { codeSet } from '@/config/operator-codes'
 
 // 거래처·납품처 값 목록 (docs/decisions/0082) — 프로그램이 값에 따라 동작을 바꾸므로 상수 + DB 검사 조건
-// DB 검사 조건(마이그레이션 _customer_ship_to)과 값 목록이 같아야 한다. 거래처 유형만 공통코드(PARTNER_TYPE)
+// DB 검사 조건(마이그레이션 _customer_ship_to)과 값 목록이 같아야 한다. 거래처 유형만 공통코드(CUSTOMER_TYPE)
 
-export const PARTNER_TYPE_GROUP = 'PARTNER_TYPE'
+export const CUSTOMER_TYPE_GROUP = 'CUSTOMER_TYPE'
 
 // 거래처 상태: 거래중지는 신규 출고요청만 막는다 (진행 중 주문은 처리, 출고 작업에서 적용)
 export const CUSTOMER_STATUS = codeSet({ ACTIVE: '거래중', SUSPENDED: '거래중지' })
@@ -43,7 +43,7 @@ export const CENTER_CONFIRM_REASON = codeSet({
   ADDR_NOT_RESOLVED: '주소 정제 실패·자동 허용 등급 미만',
   REGION_UNASSIGNED: '권역설정에 배정되지 않은 지역',
   REGION_MIXED: '여러 센터가 섞인 지역',
-  NOT_CLIENT_CENTER: '화주 이용 센터가 아님',
+  NOT_SHIPPER_CENTER: '화주 이용 센터가 아님',
   CENTER_INACTIVE: '센터가 일시중지·폐쇄',
   INVALID_CENTER_CD: '없는 센터코드',
 })

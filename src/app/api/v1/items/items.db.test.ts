@@ -23,7 +23,7 @@ let liveKey = ''
 
 const issue = (
   env: 'LIVE' | 'TEST',
-  scopes: ('ITEM_READ' | 'ITEM_WRITE' | 'PARTNER_READ')[] = ['ITEM_READ', 'ITEM_WRITE'],
+  scopes: ('ITEM_READ' | 'ITEM_WRITE' | 'CUSTOMER_READ')[] = ['ITEM_READ', 'ITEM_WRITE'],
 ) =>
   asOperator(() =>
     issueApiKey({

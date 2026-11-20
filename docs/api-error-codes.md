@@ -35,19 +35,19 @@
 | `STATUS_NOT_ALLOWED` | 409 | 상태 불가 | 지금 상태에서는 할 수 없음 (예: 입고 시작된 ASN 수정) |
 | `DUPLICATE` | 409 | 중복 | 이미 있는 문서번호 (ASN번호·주문번호) — 건별 결과 |
 | `POLICY_VIOLATION` | 422 | 정책 위반 | 화주 정책에 맞지 않음 (예: 미등록 품목 주문 불허) |
-| `PARTNER_CD_INVALID` | 400 | 형식 | `partnerCd`가 영문·숫자·`-`·`_` 30자를 벗어남 — 건별 |
-| `SHIP_TO_CD_INVALID` | 400 | 형식 | `shipToCd` 형식 오류 또는 한 거래처 안에서 두 번 보냄 — 건별 |
-| `PARTNER_ADDRESS_REQUIRED` | 422 | 정책 위반 | 새 거래처에 `shipTos`도 주소도 없음 → 주소(`addr1`)를 보내거나 납품처를 함께 |
+| `CUSTOMER_CD_INVALID` | 400 | 형식 | 거래처 키(조회 키에 따라 `customerCd` 또는 `customerCustCd`)가 없음, `customerCd`가 영문·숫자·`-`·`_` 30자를 벗어남, 우리 코드를 바꾸려 함 — 건별 |
+| `SHIP_TO_CD_INVALID` | 400 | 형식 | 납품처 키(`shipToCd` 또는 `shipToCustCd`)가 없거나 형식 오류, 한 거래처 안에서 두 번 보냄, 우리 코드를 바꾸려 함 — 건별 |
+| `CUSTOMER_ADDRESS_REQUIRED` | 422 | 정책 위반 | 새 거래처에 `shipTos`도 주소도 없음 → 주소(`addr1`)를 보내거나 납품처를 함께 |
 | `DEFAULT_SHIP_TO_REQUIRED` | 422 | 정책 위반 | 기본 납품처가 0곳·2곳이 되는 요청 (기본 납품처가 반려되어 없어진 새 거래처 포함) |
 | `LAST_SHIP_TO_INACTIVE` | 422 | 정책 위반 | 기본·마지막 사용 중 납품처를 `INACTIVE`로 바꾸는 요청 → 다른 납품처를 먼저 기본으로 |
 | `CENTER_REQUIRED` | 422 | 정책 위반 | 화주 정책이 "배송센터 필수"인데 `centerCd`가 없음 — 납품처 건별 |
 | `INVALID_CENTER_CD` | 404 | 참조 없음 | 없는 센터코드 — 납품처 건별 (정책이 자동 보류면 반려 대신 "확인 필요"로 저장) |
-| `NOT_CLIENT_CENTER` | 422 | 정책 위반 | 화주가 이용하지 않는 센터 — 납품처 건별 |
+| `NOT_SHIPPER_CENTER` | 422 | 정책 위반 | 화주가 이용하지 않는 센터 — 납품처 건별 |
 | `CENTER_INACTIVE` | 409 | 상태 불가 | 일시중지·폐쇄된 센터 — 납품처 건별 |
 | `ADDRESS_NOT_RESOLVED` | 422 | 정책 위반 | 주소를 확인하지 못함(정제 실패·자동 지정 등급 미만) — 정책이 자동 반려일 때 납품처 건별 |
 | `REGION_UNASSIGNED` | 422 | 정책 위반 | 권역설정에 배정되지 않은 지역 — 정책이 자동 반려일 때 납품처 건별 |
 | `REGION_MIXED` | 422 | 정책 위반 | 여러 센터가 섞인 지역 → `centerCd`를 보내세요 — 정책이 자동 반려일 때 납품처 건별 |
-| `ITEM_CD_INVALID` | 400 | 형식 | `itemCd`가 영문·숫자·`.`·`-`·`_` 50자를 벗어남 — 품목 건별 |
+| `ITEM_CD_INVALID` | 400 | 형식 | 품목 키(조회 키에 따라 `itemCd` 또는 `itemCustCd`)가 없음, `itemCd`가 영문·숫자·`.`·`-`·`_` 50자를 벗어남, 품목코드를 바꾸려 함 — 품목 건별 |
 | `BASE_UOM_INVALID` | 422 | 정책 위반 | `baseUom`이 포장 단위·사용 중지 단위, 또는 `uoms`로 기본단위를 보냄 — 품목 건별 |
 | `UOM_NOT_FOUND` | 404 | 참조 없음 | 없는 단위 코드(우리 코드·외부코드 매핑 모두 없음), 포장 단위가 아닌 `uoms`, 품목에 없는 단위의 바코드 — 품목 건별 |
 | `UOM_QTY_INVALID` | 422 | 정책 위반 | 환산수량 순서(BASE < INNER < BOX < PLT) 위반, 기본단위 소수 자리 초과 — 품목 건별 |

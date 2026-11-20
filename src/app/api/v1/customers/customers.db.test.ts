@@ -1,10 +1,10 @@
 import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest'
-import { GET as getPartnerRoute } from '@/app/api/v1/partners/[partnerCd]/route'
+import { GET as getCustomerRoute } from '@/app/api/v1/customers/[customerCd]/route'
 import {
   GET as getShipTosRoute,
   POST as postShipTosRoute,
-} from '@/app/api/v1/partners/[partnerCd]/ship-tos/route'
-import { GET as listRoute, POST as postRoute } from '@/app/api/v1/partners/route'
+} from '@/app/api/v1/customers/[customerCd]/ship-tos/route'
+import { GET as listRoute, POST as postRoute } from '@/app/api/v1/customers/route'
 import { runInContext } from '@/lib/actor'
 import { flushApiTasks } from '@/lib/api/api-route'
 import { issueApiKey } from '@/lib/api/api-keys'
@@ -64,7 +64,7 @@ const issue = (env: 'LIVE' | 'TEST') =>
       shipperId,
       env,
       name: `${env} 키`,
-      scopes: ['PARTNER_READ', 'PARTNER_WRITE'],
+      scopes: ['CUSTOMER_READ', 'CUSTOMER_WRITE'],
       ips: [],
       expiresOn: null,
       rateLimitPerMin: 600,
@@ -84,7 +84,7 @@ async function call(
   } = {},
 ) {
   const response = await route(
-    new Request(`http://localhost/api/v1${init.path ?? '/partners'}`, {
+    new Request(`http://localhost/api/v1${init.path ?? '/customers'}`, {
       method: init.method ?? (init.body === undefined ? 'GET' : 'POST'),
       headers: { 'X-API-Key': init.key ?? liveKey, 'Content-Type': 'application/json' },
       ...(init.body !== undefined && { body: JSON.stringify(init.body) }),
@@ -118,9 +118,9 @@ async function assignZip(zipCode: string, centerId: bigint) {
 }
 
 const GANGNAM = { zipCd: '06236', addr1: '서울 강남구 테헤란로 152' }
-const partner = (overrides: Record<string, unknown> = {}) => ({
-  partnerCd: 'P10023',
-  partnerNm: '행복마트 강남점',
+const customer = (overrides: Record<string, unknown> = {}) => ({
+  customerCd: 'P10023',
+  customerNm: '행복마트 강남점',
   telNo: '02-555-1234',
   ...GANGNAM,
   addr2: '1층',
@@ -145,10 +145,10 @@ afterAll(async () => {
   await prisma.$disconnect()
 })
 
-describe('POST /partners', () => {
+describe('POST /customers', () => {
   it('새 거래처 + 납품처: CREATED, 납품처 결과에 정제·배송센터. 같은 요청을 다시 보내면 UNCHANGED', async () => {
     const body = [
-      partner({
+      customer({
         shipTos: [
           {
             shipToCd: 'p10023-back',
@@ -206,52 +206,55 @@ describe('POST /partners', () => {
       where: { requestId: first.body.requestId },
       include: { items: true },
     })
-    expect(log).toMatchObject({ apiCode: 'PARTNER_UPSERT', result: 'SUCCESS' })
+    expect(log).toMatchObject({ apiCode: 'CUSTOMER_UPSERT', result: 'SUCCESS' })
   })
 
   it('보낸 칸만 고친다: 안 보낸 칸은 그대로, null은 지우기. 필수 칸을 null로 지우면 그 건만 VALIDATION_FAILED', async () => {
-    await post([partner({ ceoNm: '홍대표' })])
-    const updated = await post([{ partnerCd: 'P10023', telNo: '031-111-2222', ceoNm: null }])
+    await post([customer({ ceoNm: '홍대표' })])
+    const updated = await post([{ customerCd: 'P10023', telNo: '031-111-2222', ceoNm: null }])
     expect(updated.body.items[0].result).toBe('UPDATED')
     expect(await prisma.customer.findFirstOrThrow({ where: { code: 'P10023' } })).toMatchObject({
       name: '행복마트 강남점',
       phone: '0311112222',
       ceoName: null,
     })
-    const bad = await post([{ partnerCd: 'P10023', partnerNm: null }, partner({ partnerCd: 'P2' })])
+    const bad = await post([
+      { customerCd: 'P10023', customerNm: null },
+      customer({ customerCd: 'P2' }),
+    ])
     expect(bad.body).toMatchObject({
       result: 'PARTIAL',
       summary: { total: 2, success: 1, fail: 1 },
       items: [
-        { seq: 1, result: 'FAIL', errors: [{ code: 'VALIDATION_FAILED', field: 'partnerNm' }] },
+        { seq: 1, result: 'FAIL', errors: [{ code: 'VALIDATION_FAILED', field: 'customerNm' }] },
         { seq: 2, result: 'CREATED' },
       ],
     })
   })
 
-  it('납품처 없이: 주소가 있으면 기본 납품처 자동, 없으면 PARTNER_ADDRESS_REQUIRED. 코드 형식 오류는 PARTNER_CD_INVALID', async () => {
+  it('납품처 없이: 주소가 있으면 기본 납품처 자동, 없으면 CUSTOMER_ADDRESS_REQUIRED. 코드 형식 오류는 CUSTOMER_CD_INVALID', async () => {
     const res = await post([
-      partner(),
-      { partnerCd: 'NOADDR', partnerNm: '주소 없음' },
-      { partnerCd: '한글코드', partnerNm: '코드 오류', ...GANGNAM },
+      customer(),
+      { customerCd: 'NOADDR', customerNm: '주소 없음' },
+      { customerCd: '한글코드', customerNm: '코드 오류', ...GANGNAM },
     ])
     expect(res.body.items).toMatchObject([
       {
         result: 'CREATED',
         shipTos: [{ shipToCd: 'P10023-01', result: 'CREATED', centerCd: 'ICN' }],
       },
-      { result: 'FAIL', errors: [{ code: 'PARTNER_ADDRESS_REQUIRED' }] },
-      { result: 'FAIL', errors: [{ code: 'PARTNER_CD_INVALID', field: 'partnerCd' }] },
+      { result: 'FAIL', errors: [{ code: 'CUSTOMER_ADDRESS_REQUIRED' }] },
+      { result: 'FAIL', errors: [{ code: 'CUSTOMER_CD_INVALID', field: 'customerCd' }] },
     ])
   })
 
   it('보낸 납품처만 고치고 나머지는 그대로. 기본을 옮기고, 마지막 사용 중 납품처는 사용 중지 불가', async () => {
     await post([
-      partner({ shipTos: [{ shipToCd: 'S1', shipToNm: '1호', default: true, ...GANGNAM }] }),
+      customer({ shipTos: [{ shipToCd: 'S1', shipToNm: '1호', default: true, ...GANGNAM }] }),
     ])
     const added = await post([
       {
-        partnerCd: 'P10023',
+        customerCd: 'P10023',
         shipTos: [{ shipToCd: 'S2', shipToNm: '2호', default: true, ...GANGNAM }],
       },
     ])
@@ -266,7 +269,7 @@ describe('POST /partners', () => {
     ])
     const inactive = await post([
       {
-        partnerCd: 'P10023',
+        customerCd: 'P10023',
         shipTos: [
           { shipToCd: 'S1', status: 'INACTIVE' },
           { shipToCd: 'S2', status: 'INACTIVE' },
@@ -281,15 +284,15 @@ describe('POST /partners', () => {
 
   it('화주 정책: REQUIRED는 centerCd 없는 납품처만 FAIL (새 거래처의 유일한 납품처면 거래처도 FAIL)', async () => {
     await post([
-      partner({ shipTos: [{ shipToCd: 'S1', shipToNm: '1호', ...GANGNAM, centerCd: 'ICN' }] }),
+      customer({ shipTos: [{ shipToCd: 'S1', shipToNm: '1호', ...GANGNAM, centerCd: 'ICN' }] }),
     ])
     await prisma.shipper.update({
       where: { id: shipperId },
       data: { shipToCenterPolicy: 'REQUIRED' },
     })
     const res = await post([
-      { partnerCd: 'P10023', shipTos: [{ shipToCd: 'S2', shipToNm: '2호', ...GANGNAM }] },
-      partner({ partnerCd: 'NEW', shipTos: [{ shipToCd: 'N1', shipToNm: '신규', ...GANGNAM }] }),
+      { customerCd: 'P10023', shipTos: [{ shipToCd: 'S2', shipToNm: '2호', ...GANGNAM }] },
+      customer({ customerCd: 'NEW', shipTos: [{ shipToCd: 'N1', shipToNm: '신규', ...GANGNAM }] }),
     ])
     expect(res.body.items).toMatchObject([
       {
@@ -304,13 +307,13 @@ describe('POST /partners', () => {
 
   it('이용 센터가 아닌 centerCd: 자동 보류(기본)는 확인 필요로 저장, 자동 반려는 FAIL', async () => {
     const hold = await post([
-      partner({ shipTos: [{ shipToCd: 'S1', shipToNm: '1호', ...GANGNAM, centerCd: 'GMH' }] }),
+      customer({ shipTos: [{ shipToCd: 'S1', shipToNm: '1호', ...GANGNAM, centerCd: 'GMH' }] }),
     ])
     expect(hold.body.items[0].shipTos[0]).toMatchObject({
       result: 'CREATED',
       centerCd: null,
       centerAssignStatus: 'NEED_CONFIRM',
-      confirmReason: 'NOT_CLIENT_CENTER',
+      confirmReason: 'NOT_SHIPPER_CENTER',
     })
     await prisma.shipper.update({
       where: { id: shipperId },
@@ -318,20 +321,20 @@ describe('POST /partners', () => {
     })
     const reject = await post([
       {
-        partnerCd: 'P10023',
+        customerCd: 'P10023',
         shipTos: [{ shipToCd: 'S2', shipToNm: '2호', ...GANGNAM, centerCd: 'GMH' }],
       },
     ])
     expect(reject.body.items[0].shipTos[0]).toMatchObject({
       result: 'FAIL',
-      errors: [{ code: 'NOT_CLIENT_CENTER' }],
+      errors: [{ code: 'NOT_SHIPPER_CENTER' }],
     })
     void gmh
   })
 
   it('TEST 키는 결과만 계산하고 저장하지 않는다', async () => {
     const testKey = (await issue('TEST')).fullKey
-    const res = await post([partner()], testKey)
+    const res = await post([customer()], testKey)
     expect(res.body).toMatchObject({ dryRun: true, items: [{ result: 'CREATED' }] })
     expect(await prisma.customer.count()).toBe(0)
   })
@@ -339,34 +342,37 @@ describe('POST /partners', () => {
 
 describe('조회 · 납품처 API', () => {
   it('목록은 cursor로 이어 받고, 상세는 납품처 포함, 없는 거래처는 404', async () => {
-    await post([partner({ partnerCd: 'A1' }), partner({ partnerCd: 'A2' })])
-    const first = await call(listRoute, { path: '/partners?limit=1' })
-    expect(first.body.data).toMatchObject({ items: [{ partnerCd: 'A1', shipToCount: 1 }] })
+    await post([customer({ customerCd: 'A1' }), customer({ customerCd: 'A2' })])
+    const first = await call(listRoute, { path: '/customers?limit=1' })
+    expect(first.body.data).toMatchObject({ items: [{ customerCd: 'A1', shipToCount: 1 }] })
     const next = await call(listRoute, {
-      path: `/partners?limit=1&cursor=${first.body.data.nextCursor}`,
+      path: `/customers?limit=1&cursor=${first.body.data.nextCursor}`,
     })
-    expect(next.body.data).toMatchObject({ items: [{ partnerCd: 'A2' }], nextCursor: null })
+    expect(next.body.data).toMatchObject({ items: [{ customerCd: 'A2' }], nextCursor: null })
 
-    const detail = await call(getPartnerRoute, {
-      path: '/partners/a1',
-      params: { partnerCd: 'a1' },
+    const detail = await call(getCustomerRoute, {
+      path: '/customers/a1',
+      params: { customerCd: 'a1' },
     })
     expect(detail.body.data).toMatchObject({
-      partnerCd: 'A1',
+      customerCd: 'A1',
       telNo: '025551234',
       shipTos: [
         { shipToCd: 'A1-01', default: true, centerCd: 'ICN', centerAssignStatus: 'ASSIGNED' },
       ],
     })
-    const missing = await call(getPartnerRoute, { path: '/partners/X', params: { partnerCd: 'X' } })
+    const missing = await call(getCustomerRoute, {
+      path: '/customers/X',
+      params: { customerCd: 'X' },
+    })
     expect(missing).toMatchObject({ status: 404, body: { error: { code: 'NOT_FOUND' } } })
   })
 
-  it('POST /partners/{partnerCd}/ship-tos: 건 하나 = 납품처 하나, GET으로 목록', async () => {
-    await post([partner()])
+  it('POST /customers/{customerCd}/ship-tos: 건 하나 = 납품처 하나, GET으로 목록', async () => {
+    await post([customer()])
     const res = await call(postShipTosRoute, {
-      path: '/partners/P10023/ship-tos',
-      params: { partnerCd: 'P10023' },
+      path: '/customers/P10023/ship-tos',
+      params: { customerCd: 'P10023' },
       body: [
         { shipToCd: 'B1', shipToNm: '물류창고', ...GANGNAM },
         { shipToCd: 'B2', shipToNm: '주소 없음' },
@@ -380,12 +386,107 @@ describe('조회 · 납품처 API', () => {
       ],
     })
     const list = await call(getShipTosRoute, {
-      path: '/partners/P10023/ship-tos',
-      params: { partnerCd: 'P10023' },
+      path: '/customers/P10023/ship-tos',
+      params: { customerCd: 'P10023' },
     })
     expect(list.body.data.items.map((s: { shipToCd: string }) => s.shipToCd)).toEqual([
       'P10023-01',
       'B1',
     ])
+  })
+})
+
+describe('조회 키 (0084)', () => {
+  it('CODE 화주: customerCd가 없으면 건별 오류, customerCustCd·shipToCustCd는 보통 칸으로 저장', async () => {
+    const res = await post([
+      customer({
+        customerCustCd: 'ERP-C1',
+        shipTos: [{ shipToCd: 'S1', shipToCustCd: 'ERP-S1', shipToNm: '1호', ...GANGNAM }],
+      }),
+      { customerNm: '키 없음', ...GANGNAM },
+    ])
+    expect(res.body.items).toMatchObject([
+      {
+        docNo: 'P10023',
+        result: 'CREATED',
+        customerCd: 'P10023',
+        customerCustCd: 'ERP-C1',
+        shipTos: [{ shipToCd: 'S1', shipToCustCd: 'ERP-S1', result: 'CREATED' }],
+      },
+      { result: 'FAIL', errors: [{ code: 'CUSTOMER_CD_INVALID', field: 'customerCd' }] },
+    ])
+  })
+
+  it('CUST_CD 화주: customerCustCd·shipToCustCd로 찾고, 우리 코드는 자동 체번, 경로 키도 사용자 정의 코드', async () => {
+    await prisma.shipper.update({ where: { id: shipperId }, data: { ifKeyType: 'CUST_CD' } })
+    const { codePrefix } = await prisma.shipper.findUniqueOrThrow({ where: { id: shipperId } })
+    const customerCd = `${codePrefix}C000001`
+    const first = await post([
+      {
+        customerCustCd: 'erp-c1',
+        customerNm: '화주 거래처',
+        ...GANGNAM,
+        shipTos: [{ shipToCustCd: 'erp-s1', shipToNm: '1호', default: true, ...GANGNAM }],
+      },
+    ])
+    expect(first.body.items[0]).toMatchObject({
+      docNo: 'erp-c1',
+      result: 'CREATED',
+      customerCd,
+      customerCustCd: 'erp-c1',
+      shipTos: [{ shipToCd: `${customerCd}-01`, shipToCustCd: 'erp-s1', result: 'CREATED' }],
+    })
+    // 같은 키로 다시 보내면 그 거래처·납품처를 고친다 (새 납품처는 -02)
+    const again = await post([
+      {
+        customerCustCd: 'erp-c1',
+        customerNm: '이름 바꿈',
+        shipTos: [
+          { shipToCustCd: 'erp-s1', shipToNm: '1호 바꿈' },
+          { shipToCustCd: 'erp-s2', shipToNm: '2호', ...GANGNAM },
+        ],
+      },
+    ])
+    expect(again.body.items[0]).toMatchObject({
+      result: 'UPDATED',
+      customerCd,
+      shipTos: [
+        { shipToCustCd: 'erp-s1', result: 'UPDATED' },
+        { shipToCd: `${customerCd}-02`, shipToCustCd: 'erp-s2', result: 'CREATED' },
+      ],
+    })
+    expect(await prisma.customer.count({ where: { shipperId } })).toBe(1)
+    // 키가 빠졌거나 우리 코드를 바꾸려 하면 건별 오류
+    const bad = await post([
+      { customerCd: 'X1', customerNm: '키 없음' },
+      { customerCustCd: 'erp-c1', customerCd: 'OTHER' },
+      { customerCustCd: 'erp-c1', shipTos: [{ shipToCd: 'S9', shipToNm: '키 없음' }] },
+    ])
+    expect(bad.body.items).toMatchObject([
+      { errors: [{ code: 'CUSTOMER_CD_INVALID', field: 'customerCustCd' }] },
+      { errors: [{ code: 'CUSTOMER_CD_INVALID', field: 'customerCd' }] },
+      { errors: [{ code: 'SHIP_TO_CD_INVALID', field: 'shipTos[0].shipToCustCd' }] },
+    ])
+
+    // 경로 값도 사용자 정의 코드
+    const detail = await call(getCustomerRoute, {
+      path: '/customers/erp-c1',
+      params: { customerCd: 'erp-c1' },
+    })
+    expect(detail.body.data).toMatchObject({
+      customerCd,
+      customerCustCd: 'erp-c1',
+      customerNm: '이름 바꿈',
+    })
+    const added = await call(postShipTosRoute, {
+      path: '/customers/erp-c1/ship-tos',
+      params: { customerCd: 'erp-c1' },
+      body: [{ shipToCustCd: 'erp-s3', shipToNm: '3호', ...GANGNAM }],
+    })
+    expect(added.body.items[0]).toMatchObject({
+      docNo: 'erp-s3',
+      result: 'CREATED',
+      shipToCd: `${customerCd}-03`,
+    })
   })
 })

@@ -43,7 +43,7 @@ export const locationShape = {
   allocatable: inheritableYn,
   mixItem: z.boolean(),
   mixLot: z.boolean(),
-  mixClient: z.boolean(),
+  mixShipper: z.boolean(),
   putawaySeq: optionalSeq,
   pickSeq: optionalSeq,
 
@@ -103,7 +103,7 @@ export const locationBulkSchema = z.object({
     allocatable: inheritableYn,
     mixItem: z.boolean(),
     mixLot: z.boolean(),
-    mixClient: z.boolean(),
+    mixShipper: z.boolean(),
   }),
 })
 export type LocationBulkInput = z.input<typeof locationBulkSchema>
@@ -123,5 +123,5 @@ export const DEFAULT_BULK_ATTRIBUTES: LocationBulkInput['attributes'] = {
   allocatable: null,
   mixItem: true,
   mixLot: true,
-  mixClient: false,
+  mixShipper: false,
 }

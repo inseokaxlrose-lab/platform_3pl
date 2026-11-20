@@ -79,7 +79,7 @@ const REASON_MESSAGE: Record<CenterConfirmReason, string> = {
   ADDR_NOT_RESOLVED: '주소를 확인하지 못했거나 자동 지정 등급보다 낮습니다.',
   REGION_UNASSIGNED: '권역설정에 배정되지 않은 지역입니다.',
   REGION_MIXED: '여러 센터가 섞인 지역입니다. 배송센터를 직접 골라 주세요.',
-  NOT_CLIENT_CENTER: '화주가 이용하지 않는 센터입니다.',
+  NOT_SHIPPER_CENTER: '화주가 이용하지 않는 센터입니다.',
   CENTER_INACTIVE: '일시중지·폐쇄된 센터입니다.',
   INVALID_CENTER_CD: '없는 센터코드입니다.',
 }
@@ -127,12 +127,12 @@ export async function assignShipToCenter(
     input.tempZone ?? TEMP_ZONE_ALL,
   )
   const regionCenterId = resolution.centerId
-  const clientCenters = await db.shipperCenter.findMany({
+  const shipperCenters = await db.shipperCenter.findMany({
     where: { shipperId: input.shipperId, status: 'ACTIVE' },
     select: { center: { select: { id: true, code: true, name: true, status: true } } },
   })
-  const clientCenterOf = (id: bigint | null) =>
-    id === null ? undefined : clientCenters.find((c) => c.center.id === id)?.center
+  const shipperCenterOf = (id: bigint | null) =>
+    id === null ? undefined : shipperCenters.find((c) => c.center.id === id)?.center
 
   const policy = input.policy
   const hold = (reason: CenterConfirmReason): AssignShipToResult => {
@@ -195,7 +195,7 @@ export async function assignShipToCenter(
           select: { id: true, code: true, name: true, status: true },
         })
     if (!center) return hold('INVALID_CENTER_CD')
-    if (!clientCenterOf(center.id)) return hold('NOT_CLIENT_CENTER')
+    if (!shipperCenterOf(center.id)) return hold('NOT_SHIPPER_CENTER')
     if (INACTIVE_CENTER.includes(center.status)) return hold('CENTER_INACTIVE')
     return assign(center, input.inputType ?? (code ? 'IF' : 'MANUAL'))
   }
@@ -215,8 +215,8 @@ export async function assignShipToCenter(
   }
   // 센터는 나왔지만 자동 지정 등급보다 낮은 주소
   if (resolution.needConfirm) return hold('ADDR_NOT_RESOLVED')
-  const center = clientCenterOf(regionCenterId)
-  if (!center) return hold('NOT_CLIENT_CENTER')
+  const center = shipperCenterOf(regionCenterId)
+  if (!center) return hold('NOT_SHIPPER_CENTER')
   if (INACTIVE_CENTER.includes(center.status)) return hold('CENTER_INACTIVE')
   return assign(center, 'AUTO')
 }

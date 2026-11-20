@@ -2,13 +2,14 @@ import 'server-only'
 import { z } from 'zod'
 import {
   itemErrorOf,
-  partnerSchema,
-  partnerShipToSchema,
-  upsertPartner,
-  type PartnerItem,
+  apiCustomerSchema,
+  apiShipToSchema,
+  upsertCustomer,
+  type CustomerItem,
 } from '@/lib/customers/customer-upsert'
 import type { ShipToSaveResult } from '@/lib/customers/customers'
 import type { ShipToCenterPolicy } from '@/lib/customers/ship-to-center'
+import { keyWhere, shipperIfKeyType, type IfKeyType } from '@/lib/master-code/if-key'
 import { prisma } from '@/lib/prisma'
 import { NOT_DELETED } from '@/lib/status'
 import { isYes } from '@/lib/yn'
@@ -20,12 +21,12 @@ import {
   type ApiHandlerResult,
 } from '../api-route'
 
-// 거래처 API (docs/decisions/0082 ③, 정의서 7번) — 화면의 "거래처"를 연동에서는 partner라고 부른다 (필드 대응: docs/api-partner-fields.md)
-//   POST /partners                       거래처 upsert (납품처 포함 가능)
-//   GET  /partners                       목록 (updatedAfter·cursor)
-//   GET  /partners/{partnerCd}           상세 (납품처 포함)
-//   POST /partners/{partnerCd}/ship-tos  납품처 upsert
-//   GET  /partners/{partnerCd}/ship-tos  납품처 목록
+// 거래처 API (docs/decisions/0082 ③, 정의서 7번) — 화면의 "거래처"를 연동에서는 customer라고 부른다 (필드 대응: docs/api-customer-fields.md)
+//   POST /customers                       거래처 upsert (납품처 포함 가능)
+//   GET  /customers                       목록 (updatedAfter·cursor)
+//   GET  /customers/{customerCd}           상세 (납품처 포함)
+//   POST /customers/{customerCd}/ship-tos  납품처 upsert
+//   GET  /customers/{customerCd}/ship-tos  납품처 목록
 // 등록은 건마다 따로 저장한다 (한 건 실패가 다른 건을 되돌리지 않게). TEST 키는 건마다 계산만 하고 되돌린다
 
 type ItemResult = Extract<ApiHandlerResult, { items: unknown }>['items'][number]
@@ -37,6 +38,7 @@ const API_REASON: Record<string, string> = { ADDR_NOT_RESOLVED: 'ADDRESS_NOT_RES
 function shipToResult(r: ShipToSaveResult) {
   return {
     shipToCd: r.code,
+    shipToCustCd: r.custCode ?? null,
     result: r.result,
     ...(r.result === 'FAIL'
       ? {
@@ -63,29 +65,47 @@ function shipToResult(r: ShipToSaveResult) {
   }
 }
 
-async function policyOf(shipperId: bigint) {
+// 화주 설정: 배송센터 정책 + 연동 조회 키 (0084 — CODE면 customerCd·shipToCd, CUST_CD면 customerCustCd·shipToCustCd)
+async function settingsOf(shipperId: bigint) {
   const shipper = await prisma.shipper.findUniqueOrThrow({
     where: { id: shipperId },
-    select: { shipToCenterPolicy: true },
+    select: { shipToCenterPolicy: true, ifKeyType: true },
   })
-  return shipper.shipToCenterPolicy as ShipToCenterPolicy
+  return {
+    policy: shipper.shipToCenterPolicy as ShipToCenterPolicy,
+    keyType: (shipper.ifKeyType === 'CUST_CD' ? 'CUST_CD' : 'CODE') as IfKeyType,
+  }
+}
+type Settings = Awaited<ReturnType<typeof settingsOf>>
+
+// 키 정리: 우리 코드는 대문자로, 사용자 정의 코드는 화주 시스템 값 그대로 (앞뒤 공백만 뺀다)
+const keyOf = (keyType: IfKeyType, value: string) =>
+  keyType === 'CUST_CD' ? value.trim() : value.trim().toUpperCase()
+const keyNames = (keyType: IfKeyType) =>
+  keyType === 'CUST_CD'
+    ? { customer: 'customerCustCd', shipTo: 'shipToCustCd' }
+    : { customer: 'customerCd', shipTo: 'shipToCd' }
+const rawKey = (raw: unknown, name: string) => {
+  const value = (raw as Record<string, unknown> | null)?.[name]
+  return typeof value === 'string' ? value : null
 }
 
 // 건 하나 처리: 입력 규칙 → 저장(건마다 트랜잭션) → 결과. 업무 오류는 그 건만 FAIL
 async function upsertOne(
   ctx: ApiHandlerContext,
   seq: number,
-  input: PartnerItem,
-  policy: ShipToCenterPolicy,
+  input: CustomerItem,
+  settings: Settings,
 ) {
   try {
     return {
       ok: true as const,
       value: await writeTransaction(ctx, (tx) =>
-        upsertPartner(tx, input, {
+        upsertCustomer(tx, input, {
           shipperId: ctx.api.shipperId,
           source: 'API',
-          policy,
+          policy: settings.policy,
+          keyType: settings.keyType,
           requestId: ctx.requestId,
         }),
       ),
@@ -122,57 +142,65 @@ const validationError = (error: z.ZodError) => {
   }
 }
 
-// POST /partners
-export async function postPartners(ctx: ApiHandlerContext): Promise<ApiHandlerResult> {
+// POST /customers
+export async function postCustomers(ctx: ApiHandlerContext): Promise<ApiHandlerResult> {
   const list = readItems(ctx.body)
-  const policy = await policyOf(ctx.api.shipperId)
+  const settings = await settingsOf(ctx.api.shipperId)
+  const names = keyNames(settings.keyType)
   const items: ItemResult[] = []
   for (const [index, raw] of list.entries()) {
     const seq = index + 1
-    const docNo =
-      typeof (raw as { partnerCd?: unknown })?.partnerCd === 'string'
-        ? String((raw as { partnerCd: string }).partnerCd)
-        : null
-    const parsed = partnerSchema.safeParse(raw)
+    const sentKey = rawKey(raw, names.customer)
+    const docNo = sentKey === null ? null : keyOf(settings.keyType, sentKey)
+    const parsed = apiCustomerSchema.safeParse(raw)
     if (!parsed.success) {
       items.push(fail(seq, docNo, validationError(parsed.error)))
       continue
     }
-    const done = await upsertOne(ctx, seq, parsed.data, policy)
+    const done = await upsertOne(ctx, seq, parsed.data, settings)
     if (!done.ok) {
       items.push(fail(seq, docNo, done.error))
       continue
     }
     items.push({
       seq,
-      docNo: parsed.data.partnerCd.trim().toUpperCase(),
+      docNo,
       result: done.value.result,
       internalId: done.value.id,
-      extra: { shipTos: done.value.shipTos.map(shipToResult) },
+      extra: {
+        customerCd: done.value.code,
+        customerCustCd: done.value.custCode,
+        shipTos: done.value.shipTos.map(shipToResult),
+      },
     })
   }
   return { items }
 }
 
-// POST /partners/{partnerCd}/ship-tos — 건 하나 = 납품처 하나
+// POST /customers/{customerCd}/ship-tos — 건 하나 = 납품처 하나
 export async function postShipTos(ctx: ApiHandlerContext): Promise<ApiHandlerResult> {
-  const partnerCd = (ctx.params.partnerCd ?? '').trim().toUpperCase()
+  const settings = await settingsOf(ctx.api.shipperId)
+  const names = keyNames(settings.keyType)
+  // 경로 값은 거래처 조회 키 (customerCd 또는 customerCustCd)
+  const customerKey = keyOf(settings.keyType, ctx.params.customerCd ?? '')
   const list = readItems(ctx.body)
-  await findPartner(ctx.api.shipperId, partnerCd)
-  const policy = await policyOf(ctx.api.shipperId)
+  await findCustomer(ctx.api.shipperId, settings.keyType, customerKey)
   const items: ItemResult[] = []
   for (const [index, raw] of list.entries()) {
     const seq = index + 1
-    const docNo =
-      typeof (raw as { shipToCd?: unknown })?.shipToCd === 'string'
-        ? String((raw as { shipToCd: string }).shipToCd)
-        : null
-    const parsed = partnerShipToSchema.safeParse(raw)
+    const sentKey = rawKey(raw, names.shipTo)
+    const docNo = sentKey === null ? null : keyOf(settings.keyType, sentKey)
+    const parsed = apiShipToSchema.safeParse(raw)
     if (!parsed.success) {
       items.push(fail(seq, docNo, validationError(parsed.error)))
       continue
     }
-    const done = await upsertOne(ctx, seq, { partnerCd, shipTos: [parsed.data] }, policy)
+    const done = await upsertOne(
+      ctx,
+      seq,
+      { [names.customer]: customerKey, shipTos: [parsed.data] },
+      settings,
+    )
     if (!done.ok) {
       items.push(fail(seq, docNo, done.error))
       continue
@@ -181,26 +209,22 @@ export async function postShipTos(ctx: ApiHandlerContext): Promise<ApiHandlerRes
     const shown = shipToResult(shipTo)
     if (shipTo.result === 'FAIL') {
       items.push(
-        fail(
-          seq,
-          shipTo.code,
-          (shown as { errors: { code: string; message: string }[] }).errors[0],
-        ),
+        fail(seq, docNo, (shown as { errors: { code: string; message: string }[] }).errors[0]),
       )
       continue
     }
-    const { shipToCd, result, ...detail } = shown
-    void shipToCd
-    items.push({ seq, docNo: shipTo.code, result, extra: detail })
+    const { result, ...detail } = shown
+    items.push({ seq, docNo, result, extra: detail })
   }
   return { items }
 }
 
 // ── 조회 ──
 
-const PARTNER_SELECT = {
+const CUSTOMER_SELECT = {
   id: true,
   code: true,
+  custCode: true,
   name: true,
   shortName: true,
   customerType: true,
@@ -226,8 +250,9 @@ const PARTNER_SELECT = {
   updatedAt: true,
 } as const
 
-type PartnerRow = {
+type CustomerRow = {
   code: string
+  custCode: string | null
   name: string
   shortName: string | null
   customerType: string | null
@@ -253,12 +278,13 @@ type PartnerRow = {
   updatedAt: Date
 }
 
-const toPartner = (c: PartnerRow) => ({
-  partnerCd: c.code,
-  partnerNm: c.name,
+const toCustomer = (c: CustomerRow) => ({
+  customerCd: c.code,
+  customerCustCd: c.custCode,
+  customerNm: c.name,
   shortNm: c.shortName,
-  partnerType: c.customerType,
-  partnerGroup: c.customerGroup,
+  customerType: c.customerType,
+  customerGroup: c.customerGroup,
   bizRegNo: c.businessNumber,
   ceoNm: c.ceoName,
   orderAddrMode: c.orderAddrMode,
@@ -280,6 +306,7 @@ const toPartner = (c: PartnerRow) => ({
 
 const SHIP_TO_SELECT = {
   code: true,
+  custCode: true,
   name: true,
   isDefault: true,
   addrSyncYn: true,
@@ -305,6 +332,7 @@ const SHIP_TO_SELECT = {
 
 type ShipToRow = {
   code: string
+  custCode: string | null
   name: string
   isDefault: string
   addrSyncYn: string
@@ -330,6 +358,7 @@ type ShipToRow = {
 
 const toShipTo = (s: ShipToRow) => ({
   shipToCd: s.code,
+  shipToCustCd: s.custCode,
   shipToNm: s.name,
   default: isYes(s.isDefault),
   addrSync: isYes(s.addrSyncYn),
@@ -354,23 +383,30 @@ const toShipTo = (s: ShipToRow) => ({
   updatedAt: s.updatedAt.toISOString(),
 })
 
-async function findPartner(shipperId: bigint, partnerCd: string) {
+// 거래처 찾기 (key는 keyOf로 정리한 조회 키)
+async function findCustomer(shipperId: bigint, keyType: IfKeyType, key: string) {
   const found = await prisma.customer.findFirst({
-    where: { shipperId, code: partnerCd.trim().toUpperCase() },
+    where: { shipperId, ...keyWhere(keyType, key) },
     select: { id: true },
   })
-  if (!found) throw new ApiError('NOT_FOUND', { message: `없는 거래처입니다: ${partnerCd}` })
+  if (!found) throw new ApiError('NOT_FOUND', { message: `없는 거래처입니다: ${key}` })
   return found
 }
 
-// GET /partners?updatedAfter=ISO&cursor=…&limit=100 — 수정일시 오래된 순, 다음 쪽은 nextCursor로
+// 경로 값 → 거래처 (화주 연동 조회 키로)
+async function customerOfPath(ctx: ApiHandlerContext) {
+  const keyType = await shipperIfKeyType(prisma, ctx.api.shipperId)
+  return findCustomer(ctx.api.shipperId, keyType, keyOf(keyType, ctx.params.customerCd ?? ''))
+}
+
+// GET /customers?updatedAfter=ISO&cursor=…&limit=100 — 수정일시 오래된 순, 다음 쪽은 nextCursor로
 export const listQuerySchema = z.object({
   updatedAfter: z.iso.datetime({ offset: true }).optional(),
   cursor: z.string().regex(/^\d+$/, 'cursor는 이전 응답의 nextCursor입니다.').optional(),
   limit: z.coerce.number().int().min(1).max(500).default(100),
 })
 
-export async function getPartners(ctx: ApiHandlerContext) {
+export async function getCustomers(ctx: ApiHandlerContext) {
   const url = new URL(ctx.request.url)
   const query = listQuerySchema.parse(Object.fromEntries(url.searchParams))
   const rows = await prisma.customer.findMany({
@@ -379,24 +415,24 @@ export async function getPartners(ctx: ApiHandlerContext) {
       ...(query.updatedAfter && { updatedAt: { gt: new Date(query.updatedAfter) } }),
       ...(query.cursor && { id: { gt: BigInt(query.cursor) } }),
     },
-    select: { ...PARTNER_SELECT, _count: { select: { shipTos: { where: NOT_DELETED } } } },
+    select: { ...CUSTOMER_SELECT, _count: { select: { shipTos: { where: NOT_DELETED } } } },
     orderBy: { id: 'asc' },
     take: query.limit + 1,
   })
   const page = rows.slice(0, query.limit)
   return {
-    items: page.map(({ _count, ...c }) => ({ ...toPartner(c), shipToCount: _count.shipTos })),
+    items: page.map(({ _count, ...c }) => ({ ...toCustomer(c), shipToCount: _count.shipTos })),
     nextCursor: rows.length > query.limit ? String(page[page.length - 1].id) : null,
   }
 }
 
-// GET /partners/{partnerCd}
-export async function getPartner(ctx: ApiHandlerContext) {
-  const { id } = await findPartner(ctx.api.shipperId, ctx.params.partnerCd ?? '')
-  const customer = await prisma.customer.findUniqueOrThrow({
+// GET /customers/{customerCd}
+export async function getCustomer(ctx: ApiHandlerContext) {
+  const { id } = await customerOfPath(ctx)
+  const row = await prisma.customer.findUniqueOrThrow({
     where: { id },
     select: {
-      ...PARTNER_SELECT,
+      ...CUSTOMER_SELECT,
       shipTos: {
         where: NOT_DELETED,
         select: SHIP_TO_SELECT,
@@ -404,13 +440,13 @@ export async function getPartner(ctx: ApiHandlerContext) {
       },
     },
   })
-  const { shipTos, ...partner } = customer
-  return { ...toPartner(partner), shipTos: shipTos.map(toShipTo) }
+  const { shipTos, ...customer } = row
+  return { ...toCustomer(customer), shipTos: shipTos.map(toShipTo) }
 }
 
-// GET /partners/{partnerCd}/ship-tos
+// GET /customers/{customerCd}/ship-tos
 export async function getShipTos(ctx: ApiHandlerContext) {
-  const { id } = await findPartner(ctx.api.shipperId, ctx.params.partnerCd ?? '')
+  const { id } = await customerOfPath(ctx)
   const shipTos = await prisma.shipTo.findMany({
     where: { customerId: id, ...NOT_DELETED },
     select: SHIP_TO_SELECT,

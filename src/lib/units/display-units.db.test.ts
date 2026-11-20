@@ -13,8 +13,19 @@ afterAll(async () => {
   await prisma.$disconnect()
 })
 
-const setUnits = (weightUnit: string, lengthUnit: string) =>
-  prisma.operator.update({ where: { id: TEST_OPERATOR_ID }, data: { weightUnit, lengthUnit } })
+// 코드 → 단위 id (이 운영사의 단위가 시스템 단위보다 먼저, 없는 코드는 없는 id)
+const unitId = async (code: string) => {
+  const row = await prisma.unit.findFirst({
+    where: { code, OR: [{ operatorId: TEST_OPERATOR_ID }, { operatorId: null }] },
+    orderBy: { operatorId: { sort: 'asc', nulls: 'last' } },
+  })
+  return row?.id ?? 999999999n
+}
+const setUnits = async (weight: string, length: string) =>
+  prisma.operator.update({
+    where: { id: TEST_OPERATOR_ID },
+    data: { weightUnitId: await unitId(weight), lengthUnitId: await unitId(length) },
+  })
 
 describe('운영사 표시 단위', () => {
   it('기본은 kg·cm, 시스템 단위(LB·MM)로 바꾸면 그 환산계수로', async () => {
@@ -50,6 +61,7 @@ describe('운영사 표시 단위', () => {
     })
     await expect(setUnits('EA', 'CM')).rejects.toThrow(/중량 단위/)
     await expect(setUnits('KG', 'KG')).rejects.toThrow(/길이 단위/)
-    await expect(setUnits('XX', 'CM')).rejects.toThrow(/중량 단위/)
+    // 없는 단위 id는 외래 키가 거부
+    await expect(setUnits('XX', 'CM')).rejects.toThrow()
   })
 })
