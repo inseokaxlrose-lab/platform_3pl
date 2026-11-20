@@ -86,6 +86,7 @@ import { IF_KEY_TYPES, LABEL_UNITS } from '@/lib/shippers/shipper-schema'
 import { STATUS } from '@/lib/status'
 import { ADJUST_STATUS_LABELS, ADJUST_TYPE_LABELS } from '@/lib/stock/adjust-schema'
 import { TXN_TYPE_LABELS } from '@/lib/stock/history-list'
+import { HOLIDAY_DAY_TYPE, HOLIDAY_SYNC_STATUS } from '@/lib/holidays/holiday-codes'
 import { UNIT_TYPES } from '@/lib/units/unit-labels'
 import { WAREHOUSE_STATUS, WAREHOUSE_TYPE } from '@/lib/warehouses/warehouse-codes'
 
@@ -214,6 +215,9 @@ const VALUE_SETS: Record<string, readonly string[]> = {
   'tb_carrier_contract.status_cd': CARRIER_STATUS.values,
   // 배송 코스 (0095)
   'tb_route.status_cd': CARRIER_STATUS.values,
+  // 휴무관리 (0096)
+  'tb_operator_holiday.day_type_cd': HOLIDAY_DAY_TYPE.values,
+  'tb_holiday_year.status_cd': HOLIDAY_SYNC_STATUS.values,
   'tb_shipper.sender_addr_type_cd': SENDER_ADDR_TYPE.values,
   'tb_api_request_log.result_cd': API_LOG_RESULT.values,
   'tb_api_request_item.result_cd': API_ITEM_RESULT_VALUES,

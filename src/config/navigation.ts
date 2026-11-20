@@ -31,6 +31,7 @@ import {
   TruckIcon,
   RouteIcon,
   SignatureIcon,
+  CalendarDaysIcon,
 } from 'lucide-react'
 import type { PermissionCode } from './permissions'
 
@@ -308,6 +309,14 @@ const adminNavigation: NavArea = {
           icon: HashIcon,
           ready: true,
           permission: 'system.numbering.read',
+        },
+        {
+          // 휴무관리 (0096): 국가 공휴일(API 자동) + 운영사·센터 휴무·특근
+          title: '휴무관리',
+          href: '/admin/system/holidays',
+          icon: CalendarDaysIcon,
+          ready: true,
+          permission: 'system.holidays.read',
         },
         {
           // 운영 설정 (0092): 운영사가 바꾸는 키-값 설정

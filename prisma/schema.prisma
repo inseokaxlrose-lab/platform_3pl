@@ -310,6 +310,7 @@ model Center {
   // 배송 코스·코스 우편번호 (0095)
   routes           Route[]
   routeZips        RouteZip[]
+  holidays         OperatorHoliday[]
 
   // 논리 삭제: 'Y'면 지운 것 (목록·조회에서 빠지고 되살릴 수 있다, 0038)
   delYn         String              @default("N") @map("del_yn") @db.Char(1)
@@ -997,6 +998,7 @@ model Operator {
   // 배송 코스 (0095)
   routes           Route[]
   routeZips        RouteZip[]
+  holidays         OperatorHoliday[]
 
   // 운영사코드는 삭제 안 된 것끼리만 겹치면 안 된다 (0038)
   @@unique([code], where: raw("del_yn = 'N'"), map: "tb_operator_operator_cd_key")
@@ -2705,4 +2707,54 @@ model LoginHist {
   @@index([userId, createdAt])
   @@index([createdAt])
   @@map("tb_login_hist")
+}
+
+// 국가 공휴일 (0096): 운영사 공통, 공공데이터포털 특일 정보 API로만 채운다 (연도 단위로 통째로 바꿈)
+model Holiday {
+  id        BigInt   @id @default(autoincrement()) @map("holiday_id")
+  holidayOn DateTime @map("holiday_dt") @db.Date
+  name      String   @map("holiday_nm") @db.VarChar(100)
+  createdAt DateTime @default(now()) @map("created_at")
+
+  // 같은 날 이름이 둘일 수 있다 (예: 어린이날과 부처님오신날이 겹친 해)
+  @@unique([holidayOn, name])
+  @@map("tb_holiday")
+}
+
+// 국가 공휴일 연도별 가져오기 결과 (0096): 화면을 열 때 자동으로 가져올지 판단
+model HolidayYear {
+  year         Int      @id @map("holiday_year")
+  // OK 가져옴 / EMPTY 아직 발표 전(0건) / FAILED 실패(키 없음·연결 오류)
+  status       String   @map("status_cd") @db.VarChar(20)
+  holidayCount Int      @default(0) @map("holiday_cnt")
+  message      String?  @map("result_msg") @db.VarChar(500)
+  syncedAt     DateTime @default(now()) @map("synced_at")
+  syncedBy     String   @default("system") @map("synced_by") @db.VarChar(50)
+
+  @@map("tb_holiday_year")
+}
+
+// 운영사 개별 휴일 (0096): 센터를 비우면 운영사 전체. 휴무 CLOSED / 특근 OPEN (국가 공휴일·운영 요일보다 먼저)
+model OperatorHoliday {
+  id         BigInt   @id @default(autoincrement()) @map("operator_holiday_id")
+  operatorId BigInt   @map("operator_id")
+  operator   Operator @relation(fields: [operatorId], references: [id], onDelete: Restrict)
+  centerId   BigInt?  @map("center_id")
+  center     Center?  @relation(fields: [centerId], references: [id], onDelete: Restrict)
+  holidayOn  DateTime @map("holiday_dt") @db.Date
+  name       String   @map("holiday_nm") @db.VarChar(100)
+  dayType    String   @default("CLOSED") @map("day_type_cd") @db.VarChar(20)
+  remark     String?  @db.VarChar(1000)
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
+  createdBy  String   @default("system") @map("created_by") @db.VarChar(50)
+  updatedBy  String   @default("system") @map("updated_by") @db.VarChar(50)
+  rowVersion Int      @default(1) @map("row_version")
+  delYn      String   @default("N") @map("del_yn") @db.Char(1)
+
+  // 같은 범위(운영사 전체 / 센터)에 같은 날짜는 한 건
+  @@unique([operatorId, holidayOn], where: raw("center_id IS NULL AND del_yn = 'N'"), map: "tb_operator_holiday_operator_dt_key")
+  @@unique([centerId, holidayOn], where: raw("center_id IS NOT NULL AND del_yn = 'N'"), map: "tb_operator_holiday_center_dt_key")
+  @@index([holidayOn])
+  @@map("tb_operator_holiday")
 }

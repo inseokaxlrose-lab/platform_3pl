@@ -3,7 +3,7 @@
 > 이 문서는 `npm run db:doc`가 실제 DB 구조와 `prisma/schema.prisma`의 주석으로 만든다. **손으로 고치지 않는다** — 마이그레이션을 적용한 뒤 명령을 다시 돌린다.
 > 엑셀 판: `docs/db/DB_테이블정의서.xlsx` · 이름 규칙: `docs/db-conventions.md`
 
-테이블 75개 · 칼럼 1210개
+테이블 78개 · 칼럼 1233개
 
 ## 목차
 
@@ -23,6 +23,7 @@
 | 인증·권한 | [`tb_verification`](#tb_verification) | Verification | 인증 확인값 (Better Auth — 비밀번호 재설정 등) |
 | 운영사·조직 | [`tb_operator`](#tb_operator) | Operator | 운영사 (docs/specs/operator.md, docs/decisions/0024·0039·0040): 플랫폼을 쓰는 3PL 회사 운영사마다 센터·화주사·공통코드·사용자를 따로 가진다. [1차] = DB·화면, [2차] = DB만(기본값) — 화면은 이후 플랫폼이 정하는 코드(유형·상태·사업자 구분·과세·요금제 등)는 상수 src/config/operator-codes.ts + DB 검사 조건 |
 | 운영사·조직 | [`tb_operator_contact`](#tb_operator_contact) | OperatorContact | 운영사 담당자 [1차] (최대 5명, 화면에서 정한 순서대로). 감사 칸 없이 운영사 이력으로 본다 (0038, 사용자 결정) |
+| 운영사·조직 | [`tb_operator_holiday`](#tb_operator_holiday) | OperatorHoliday | 운영사 개별 휴일 (0096): 센터를 비우면 운영사 전체. 휴무 CLOSED / 특근 OPEN (국가 공휴일·운영 요일보다 먼저) |
 | 운영사·조직 | [`tb_operator_service`](#tb_operator_service) | OperatorService | 운영사 제공 서비스 [2차]: 운영사 공통코드 SERVICE_TYPE (운영사 이력으로 본다) |
 | 운영사·조직 | [`tb_operator_setting`](#tb_operator_setting) | OperatorSetting | 운영사 설정 (docs/decisions/0092): 키-값. 키 목록·기본값·검사 규칙은 src/config/operator-settings.ts 행이 없으면 기본값을 쓴다. 값은 JSON (숫자·글자·예/아니오·비움) |
 | 운영사·조직 | [`tb_operator_temp_zone`](#tb_operator_temp_zone) | OperatorTempZone | 운영사 취급 온도대 [2차]: TEMP_ZONE (AMBIENT·CHILLED·FROZEN·CONSTANT, 상수 + 검사 조건) |
@@ -79,6 +80,8 @@
 | 기타 | [`tb_carrier_contract`](#tb_carrier_contract) | CarrierContract | 운송 계약 (0094): 센터(·화주)별 택배사 계약 — 고객코드·집하 점소·송장번호 대역 화주를 비우면 센터 공용 계약. 출고 때 고르는 순서: 화주×센터 계약 → 센터 공용 계약 → 화주 기본 택배사 |
 | 기타 | [`tb_file`](#tb_file) | File | 첨부파일 (docs/decisions/0091): 파일 정보. 바이트는 저장소(src/lib/files/storage.ts)에 storage_key로 있다 지우지 않는 기록이 아니라 실제로 지운다 (대상에서 떼면 파일도 지운다) — 공통 칸(버전·논리 삭제) 없음 |
 | 기타 | [`tb_file_link`](#tb_file_link) | FileLink | 첨부파일 대상 연결 (0091): 여러 장 붙는 곳 — ITEM 품목(IMAGE 이미지) · INSPECTION 검수(PHOTO 사진). 파일 하나는 한 곳에만 |
+| 기타 | [`tb_holiday`](#tb_holiday) | Holiday | 국가 공휴일 (0096): 운영사 공통, 공공데이터포털 특일 정보 API로만 채운다 (연도 단위로 통째로 바꿈) |
+| 기타 | [`tb_holiday_year`](#tb_holiday_year) | HolidayYear | 국가 공휴일 연도별 가져오기 결과 (0096): 화면을 열 때 자동으로 가져올지 판단 |
 | 기타 | [`tb_login_hist`](#tb_login_hist) | LoginHist | 로그인 이력 (docs/decisions/0093): 시도마다 한 줄 — SUCCESS 성공 / FAIL 실패 / LOCKED 잠김 / DISABLED 사용 중지·운영사 정지 없는 아이디로 시도하면 user_id 없이 아이디 글자만. 운영사는 그 사용자의 운영사 (플랫폼 관리자·없는 아이디는 비움) |
 | 기타 | [`tb_numbering_rule`](#tb_numbering_rule) | NumberingRule | 체번 규칙 (docs/decisions/0084): 대상별 코드·문서번호 모양 operator_id NULL = 시스템 기본 규칙, 값이 있으면 그 운영사의 재정의 (같은 대상이면 운영사 행이 이긴다) 번호 = 접두어(고정 문자 / 화주 code_prefix / 상위 코드) + 구분 문자 + 날짜 + 구분자 + 일련번호 |
 | 기타 | [`tb_numbering_seq`](#tb_numbering_seq) | NumberingSeq | 체번 현재값 (docs/decisions/0084): 운영사 × 대상 × 범위 × 주기마다 마지막 번호 발급은 한 문장으로 원자적 증가 (INSERT … ON CONFLICT DO UPDATE … RETURNING) — MAX()+1 금지 이력이 아니라 카운터라 FK를 두지 않는다 (scope_id는 범위에 따라 운영사 0·화주사·거래처 키) |
@@ -454,6 +457,41 @@
 
 - `tb_operator_contact_notify_yn_check`: `CHECK (notify_yn IN ('Y', 'N')`
 - `tb_operator_contact_primary_yn_check`: `CHECK (primary_yn IN ('Y', 'N')`
+
+## tb_operator_holiday
+
+- 영역: 운영사·조직 · 모델: `OperatorHoliday`
+- 운영사 개별 휴일 (0096): 센터를 비우면 운영사 전체. 휴무 CLOSED / 특근 OPEN (국가 공휴일·운영 요일보다 먼저)
+
+| No | 칼럼 | 한글명 | 설명 | 타입 | NULL | 기본값 | 키 |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| 1 | `operator_holiday_id` | 운영사 holiday ID |  | BIGINT | N | 자동 증가 | PK |
+| 2 | `operator_id` | 운영사 ID | 운영사 (멀티테넌트 키 — 다른 운영사 데이터는 보이지 않는다, 0039) | BIGINT | N |  | UK FK → tb_operator.operator_id |
+| 3 | `center_id` | 센터 ID |  | BIGINT | Y |  | UK FK → tb_center.center_id |
+| 4 | `holiday_dt` | holiday 일자 |  | DATE | N |  | UK |
+| 5 | `holiday_nm` | holiday 명 |  | VARCHAR(100) | N |  |  |
+| 6 | `day_type_cd` | 일 유형 코드 |  | VARCHAR(20) | N | CLOSED |  |
+| 7 | `remark` | 비고 | 비고 | VARCHAR(1000) | Y |  |  |
+| 8 | `created_at` | 등록 일시 | 등록 일시 (자동) | TIMESTAMP(3) | N | CURRENT_TIMESTAMP |  |
+| 9 | `updated_at` | 수정 일시 | 수정 일시 (자동) | TIMESTAMP(3) | N |  |  |
+| 10 | `created_by` | 등록 자 | 등록자 아이디 (자동: 작업자 / seed / system) | VARCHAR(50) | N | system |  |
+| 11 | `updated_by` | 수정 자 | 수정자 아이디 (자동) | VARCHAR(50) | N | system |  |
+| 12 | `row_version` | 행버전 | 동시 수정 막기용 버전 (수정할 때마다 +1, 0038) | INTEGER | N | 1 |  |
+| 13 | `del_yn` | 삭제여부 | 논리 삭제 여부 ('Y' = 지움, 목록에서 빠지고 되살릴 수 있다, 0038) | CHAR(1) | N | N |  |
+
+**고유 인덱스**
+
+- `tb_operator_holiday_center_dt_key`: `CREATE UNIQUE INDEX tb_operator_holiday_center_dt_key ON tb_operator_holiday (center_id, holiday_dt) WHERE ((center_id IS NOT NULL) AND (del_yn = 'N'::bpchar))`
+- `tb_operator_holiday_operator_dt_key`: `CREATE UNIQUE INDEX tb_operator_holiday_operator_dt_key ON tb_operator_holiday (operator_id, holiday_dt) WHERE ((center_id IS NULL) AND (del_yn = 'N'::bpchar))`
+
+**인덱스**
+
+- `tb_operator_holiday_holiday_dt_idx`: `CREATE INDEX tb_operator_holiday_holiday_dt_idx ON tb_operator_holiday (holiday_dt)`
+
+**검사 조건**
+
+- `tb_operator_holiday_day_type_cd_check`: `CHECK ((day_type_cd) IN ('CLOSED', 'OPEN'))`
+- `tb_operator_holiday_del_yn_check`: `CHECK (del_yn IN ('Y', 'N')`
 
 ## tb_operator_service
 
@@ -2616,6 +2654,40 @@
 
 - `tb_file_link_entity_type_cd_check`: `CHECK ((entity_type_cd) IN ('ITEM', 'INSPECTION'))`
 - `tb_file_link_purpose_cd_check`: `CHECK ((purpose_cd) IN ('IMAGE', 'PHOTO'))`
+
+## tb_holiday
+
+- 영역: 기타 · 모델: `Holiday`
+- 국가 공휴일 (0096): 운영사 공통, 공공데이터포털 특일 정보 API로만 채운다 (연도 단위로 통째로 바꿈)
+
+| No | 칼럼 | 한글명 | 설명 | 타입 | NULL | 기본값 | 키 |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| 1 | `holiday_id` | holiday ID |  | BIGINT | N | 자동 증가 | PK |
+| 2 | `holiday_dt` | holiday 일자 |  | DATE | N |  | UK |
+| 3 | `holiday_nm` | holiday 명 |  | VARCHAR(100) | N |  | UK |
+| 4 | `created_at` | 등록 일시 | 등록 일시 (자동) | TIMESTAMP(3) | N | CURRENT_TIMESTAMP |  |
+
+**고유 인덱스**
+
+- `tb_holiday_holiday_dt_holiday_nm_key`: `CREATE UNIQUE INDEX tb_holiday_holiday_dt_holiday_nm_key ON tb_holiday (holiday_dt, holiday_nm)`
+
+## tb_holiday_year
+
+- 영역: 기타 · 모델: `HolidayYear`
+- 국가 공휴일 연도별 가져오기 결과 (0096): 화면을 열 때 자동으로 가져올지 판단
+
+| No | 칼럼 | 한글명 | 설명 | 타입 | NULL | 기본값 | 키 |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| 1 | `holiday_year` | holiday year |  | INTEGER | N |  | PK |
+| 2 | `status_cd` | 상태 코드 | OK 가져옴 / EMPTY 아직 발표 전(0건) / FAILED 실패(키 없음·연결 오류) | VARCHAR(20) | N |  |  |
+| 3 | `holiday_cnt` | holiday 수 |  | INTEGER | N | 0 |  |
+| 4 | `result_msg` | 결과 메시지 |  | VARCHAR(500) | Y |  |  |
+| 5 | `synced_at` | synced 일시 |  | TIMESTAMP(3) | N | CURRENT_TIMESTAMP |  |
+| 6 | `synced_by` | synced 자 |  | VARCHAR(50) | N | system |  |
+
+**검사 조건**
+
+- `tb_holiday_year_status_cd_check`: `CHECK ((status_cd) IN ('OK', 'EMPTY', 'FAILED'))`
 
 ## tb_login_hist
 
