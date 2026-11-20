@@ -15,6 +15,7 @@ import {
   type FieldSpan,
   FormGrid,
   type MasterFormHeader,
+  type MasterFormSection,
   MasterFormPage,
   useMasterForm,
 } from '@/components/master-form'
@@ -68,6 +69,7 @@ export function OperatorForm({
   version,
   readOnly,
   canEditType,
+  extraSections = [],
   ...saveProps
 }: SaveProps & {
   header: MasterFormHeader
@@ -78,6 +80,8 @@ export function OperatorForm({
   version: number
   readOnly: boolean
   canEditType: boolean
+  // 폼 뒤에 붙일 따로 처리하는 섹션 (로고·직인처럼 바로 저장되는 것, 0091)
+  extraSections?: MasterFormSection[]
 }) {
   const form = useMasterForm({
     initial,
@@ -322,6 +326,7 @@ export function OperatorForm({
             />
           ),
         },
+        ...extraSections,
       ]}
     />
   )

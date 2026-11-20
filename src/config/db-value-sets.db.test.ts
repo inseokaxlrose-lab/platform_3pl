@@ -1,4 +1,5 @@
 import { afterAll, describe, expect, it } from 'vitest'
+import { FILE_ENTITY, FILE_PURPOSE } from '@/lib/files/file-codes'
 import {
   API_ITEM_RESULT_VALUES,
   API_KEY_EVENT_VALUES,
@@ -164,6 +165,8 @@ const VALUE_SETS: Record<string, readonly string[]> = {
   'tb_customer.source_cd': DATA_SOURCE.values,
   'tb_customer.order_addr_mode_cd': ORDER_ADDR_MODE.values,
   'tb_customer.customer_role_cd': CUSTOMER_ROLE.values,
+  'tb_file_link.entity_type_cd': FILE_ENTITY.values,
+  'tb_file_link.purpose_cd': FILE_PURPOSE.values,
   'tb_ship_to.status_cd': SHIP_TO_STATUS.values,
   'tb_ship_to.source_cd': DATA_SOURCE.values,
   'tb_ship_to.center_assign_type_cd': CENTER_ASSIGN_TYPE.values,

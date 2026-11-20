@@ -7,6 +7,7 @@ import { toOperatorInput } from '@/lib/operator/operator-input'
 import { getCurrentScope, hasPermission } from '@/lib/session'
 import { actorLabel } from '@/lib/users/actor-label'
 import { saveOperatorAction } from './actions'
+import { OperatorImages } from './operator-images'
 
 export const metadata: Metadata = { title: '운영사' }
 
@@ -44,6 +45,22 @@ export default async function OperatorPage() {
       readOnly={!canUpdate}
       canEditType={false}
       saveAction={saveOperatorAction}
+      extraSections={[
+        {
+          id: 'images',
+          title: '로고·직인',
+          description:
+            '출력물(라벨·거래명세서 등)에 쓰는 이미지입니다. PNG·JPEG·WEBP·GIF, 10MB까지.',
+          standalone: true,
+          content: (
+            <OperatorImages
+              logoFileId={operator.logoFileId ? String(operator.logoFileId) : null}
+              stampFileId={operator.stampFileId ? String(operator.stampFileId) : null}
+              canEdit={canUpdate}
+            />
+          ),
+        },
+      ]}
     />
   )
 }

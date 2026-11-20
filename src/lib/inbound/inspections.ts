@@ -5,6 +5,7 @@ import { ActionError } from '@/lib/actions/action-error'
 import { currentActor, requireOperatorId } from '@/lib/actor'
 import { prisma } from '@/lib/prisma'
 import { parseQty } from '@/lib/units/convert'
+import { removeAttachmentsOf } from '@/lib/files/files'
 import { asnItemSelect, entryToBase, itemLotOptions, resolveItemDates } from './asns'
 import type { InspectionData } from './inspection-schema'
 
@@ -84,7 +85,7 @@ export async function addInspection(data: InspectionData) {
 
 // 지우기: 확정하지 않은 검수만, 마감된 ASN은 불가. 남은 검수·확정이 없으면 ASN은 다시 예정
 export async function deleteInspection(id: bigint) {
-  return prisma.$transaction(async (tx) => {
+  const result = await prisma.$transaction(async (tx) => {
     const found = await tx.inboundInspection.findUnique({
       where: { id },
       select: { asnId: true, confirmedQty: true, asn: { select: { status: true } } },
@@ -111,6 +112,9 @@ export async function deleteInspection(id: bigint) {
     }
     return { count: 1 }
   })
+  // 검수 사진도 지운다 (저장소 파일까지, 0091)
+  await removeAttachmentsOf('INSPECTION', [id])
+  return result
 }
 
 // 검수 기록이 범위 안의 ASN 것인지 (서버 액션에서 먼저 확인)

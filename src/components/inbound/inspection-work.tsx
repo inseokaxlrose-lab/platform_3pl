@@ -1,10 +1,18 @@
 'use client'
 
-import { PlusIcon, Trash2Icon } from 'lucide-react'
+import { CameraIcon, PlusIcon, Trash2Icon } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { useMemo, useState, useTransition } from 'react'
 import { ConfirmDialog } from '@/components/common'
 import { LocalDataGrid, type DataGridColumn } from '@/components/data-grid'
+import { AttachmentGallery } from '@/components/files'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
 import { useCodeOptions } from '@/components/common-code'
 import { CodeSelect, DateInput, QtyInput } from '@/components/inputs'
 import { codeName } from '@/lib/common-code'
@@ -116,6 +124,8 @@ export function InspectionWorkPanel({
   const [errors, setErrors] = useState<Record<string, string>>({})
   const [message, setMessage] = useState<string | null>(null)
   const [pending, startTransition] = useTransition()
+  // 사진 대화상자를 연 검수 기록
+  const [photoTarget, setPhotoTarget] = useState<string | null>(null)
   const set = (patch: Partial<InspectionInput>) => setValue((v) => ({ ...v, ...patch }))
   const line = work.lines.find((l) => l.id === value.asnLineId)
   // 제조일 입력 품목: 유통기한 = 제조일 + 총 기한 일수 (화면에서 미리 계산해 보여 준다, 0089)
@@ -207,6 +217,23 @@ export function InspectionWorkPanel({
     { id: 'inspectedBy', header: '검수자', accessor: 'inspectedBy' },
     { id: 'inspectedAt', header: '검수 일시', accessor: 'inspectedAt', format: 'datetime' },
     {
+      id: 'photos',
+      header: '사진',
+      accessor: () => '',
+      hideable: false,
+      cell: (r) => (
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          onClick={() => setPhotoTarget(r.id)}
+          aria-label="검수 사진"
+        >
+          <CameraIcon />
+        </Button>
+      ),
+    },
+    {
       id: 'actions',
       header: '',
       accessor: () => '',
@@ -234,6 +261,25 @@ export function InspectionWorkPanel({
 
   return (
     <div className="space-y-8">
+      {/* 검수 사진 (파손 증빙 등, 0091): 올리면 바로 저장 */}
+      <Dialog open={photoTarget !== null} onOpenChange={(open) => !open && setPhotoTarget(null)}>
+        <DialogContent className="sm:max-w-3xl">
+          <DialogHeader>
+            <DialogTitle>검수 사진</DialogTitle>
+            <DialogDescription>
+              파손·불량 증빙 사진을 붙입니다. 올리면 바로 저장됩니다.
+            </DialogDescription>
+          </DialogHeader>
+          {photoTarget && (
+            <AttachmentGallery
+              entity="INSPECTION"
+              id={photoTarget}
+              canEdit={canUpdate}
+              emptyText="붙인 사진이 없습니다."
+            />
+          )}
+        </DialogContent>
+      </Dialog>
       <section className="space-y-3">
         <h2 className="text-base font-semibold">입고 품목</h2>
         <LocalDataGrid

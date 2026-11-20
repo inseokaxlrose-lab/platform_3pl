@@ -102,6 +102,9 @@ export const TENANT_MODELS: ReadonlySet<string> = new Set([
   'ApiClient',
   'ApiClientEvent',
   'ApiRequestLog',
+  // 첨부파일 (0091)
+  'File',
+  'FileLink',
 ])
 
 type Data = Record<string, unknown>

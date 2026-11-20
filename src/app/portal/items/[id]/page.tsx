@@ -1,5 +1,6 @@
 import type { Metadata } from 'next'
 import { notFound } from 'next/navigation'
+import { AttachmentGallery } from '@/components/files'
 import { ItemForm } from '@/components/item'
 import { BackToListButton } from '@/components/master-list'
 import { AccessDenied } from '@/components/permission'
@@ -43,6 +44,15 @@ export default async function PortalItemPage({ params }: PageProps<'/portal/item
       createAction={createPortalItemAction}
       updateAction={updatePortalItemAction}
       setActiveAction={setPortalItemsActiveAction}
+      extraSections={[
+        {
+          id: 'images',
+          title: '이미지',
+          description: '품목 사진·포장 사진 등. 올리면 바로 저장됩니다.',
+          standalone: true,
+          content: <AttachmentGallery entity="ITEM" id={item.id} canEdit={canUpdate} />,
+        },
+      ]}
     />
   )
 }

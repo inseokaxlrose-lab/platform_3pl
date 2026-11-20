@@ -75,6 +75,8 @@ export type ItemFormItem = {
 
 type ItemFormProps = {
   header: MasterFormHeader
+  // 폼 뒤에 붙일 따로 처리하는 섹션 (이미지처럼 바로 저장되는 것, 0091)
+  extraSections?: MasterFormSection[]
   options: ItemFormOptions
   // 없으면 등록
   item?: ItemFormItem
@@ -104,6 +106,7 @@ export function ItemForm({
   createAction,
   updateAction,
   setActiveAction,
+  extraSections = [],
 }: ItemFormProps) {
   const router = useRouter()
   // 새 품목: 화주사 설정을 기본값으로 복사 (기한·LOT·시리얼 — 이후 화주 설정이 바뀌어도 그대로, 0083)
@@ -778,7 +781,7 @@ export function ItemForm({
       }}
       form={form}
       readOnly={readOnly}
-      sections={sections}
+      sections={[...sections, ...extraSections]}
     />
   )
 }

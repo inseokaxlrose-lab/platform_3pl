@@ -896,8 +896,11 @@ model Operator {
 
   // ── ⑥ 출력 설정 [2차] (파일 표가 생기면 로고·직인에 외래 키를 건다)
   printCompanyName String? @map("print_company_nm") @db.VarChar(100)
+  // 로고·직인 이미지 (첨부파일, 0091)
   logoFileId       BigInt? @map("logo_file_id")
+  logoFile         File?   @relation("OperatorLogo", fields: [logoFileId], references: [id], onDelete: SetNull)
   stampFileId      BigInt? @map("stamp_file_id")
+  stampFile        File?   @relation("OperatorStamp", fields: [stampFileId], references: [id], onDelete: SetNull)
 
   // ── ⑦ 확장·시스템
   extAttr Json?   @map("ext_attr")
@@ -951,6 +954,8 @@ model Operator {
   regionBatches   RegionChangeBatch[]
   apiClients      ApiClient[]
   shipTos         ShipTo[]
+  files           File[]
+  fileLinks       FileLink[]
 
   // 운영사코드는 삭제 안 된 것끼리만 겹치면 안 된다 (0038)
   @@unique([code], where: raw("del_yn = 'N'"), map: "tb_operator_operator_cd_key")
@@ -2435,4 +2440,47 @@ model NumberingSeq {
 
   @@id([operatorId, target, scopeId, periodKey])
   @@map("tb_numbering_seq")
+}
+
+// 첨부파일 (docs/decisions/0091): 파일 정보. 바이트는 저장소(src/lib/files/storage.ts)에 storage_key로 있다
+// 지우지 않는 기록이 아니라 실제로 지운다 (대상에서 떼면 파일도 지운다) — 공통 칸(버전·논리 삭제) 없음
+model File {
+  id           BigInt   @id @default(autoincrement()) @map("file_id")
+  operatorId   BigInt   @map("operator_id")
+  operator     Operator @relation(fields: [operatorId], references: [id], onDelete: Restrict)
+  // 저장소 안의 위치 ({운영사}/{연}/{월}/{무작위}) — 원래 이름은 경로에 쓰지 않는다
+  storageKey   String   @unique @map("storage_key") @db.VarChar(300)
+  originalName String   @map("original_nm") @db.VarChar(255)
+  mimeType     String   @map("mime_type") @db.VarChar(100)
+  sizeBytes    BigInt   @map("size_bytes")
+  // 내용 확인값 (같은 파일인지·손상 확인)
+  sha256       String   @db.Char(64)
+  createdAt    DateTime @default(now()) @map("created_at")
+  createdBy    String   @default("system") @map("created_by") @db.VarChar(50)
+
+  link           FileLink?
+  operatorLogos  Operator[] @relation("OperatorLogo")
+  operatorStamps Operator[] @relation("OperatorStamp")
+
+  @@index([operatorId])
+  @@map("tb_file")
+}
+
+// 첨부파일 대상 연결 (0091): 여러 장 붙는 곳 — ITEM 품목(IMAGE 이미지) · INSPECTION 검수(PHOTO 사진). 파일 하나는 한 곳에만
+model FileLink {
+  id         BigInt   @id @default(autoincrement()) @map("file_link_id")
+  operatorId BigInt   @map("operator_id")
+  operator   Operator @relation(fields: [operatorId], references: [id], onDelete: Restrict)
+  fileId     BigInt   @unique @map("file_id")
+  file       File     @relation(fields: [fileId], references: [id], onDelete: Cascade)
+  entityType String   @map("entity_type_cd") @db.VarChar(20)
+  entityId   BigInt   @map("entity_id")
+  purpose    String   @map("purpose_cd") @db.VarChar(20)
+  sortOrder  Int      @default(0) @map("sort_seq")
+  createdAt  DateTime @default(now()) @map("created_at")
+  createdBy  String   @default("system") @map("created_by") @db.VarChar(50)
+
+  @@index([entityType, entityId], map: "tb_file_link_entity_idx")
+  @@index([operatorId])
+  @@map("tb_file_link")
 }
