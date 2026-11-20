@@ -1,4 +1,7 @@
 import 'server-only'
+import { addDays } from '@/lib/items/expiry-dates'
+import { getOperatorSetting } from '@/lib/settings/operator-settings'
+import { kstToday } from '@/lib/stock/expiry'
 import { ActionError } from '@/lib/actions/action-error'
 import { currentActor, requireOperatorId } from '@/lib/actor'
 import { prisma, type Db } from '@/lib/prisma'
@@ -55,6 +58,20 @@ export async function issueApiKey(data: ApiKeyIssueData) {
     }
     if (data.expiresOn && endOfKstDay(data.expiresOn) < new Date()) {
       throw new ActionError('VALIDATION', '만료일이 이미 지났습니다.')
+    }
+    // 운영 설정의 최대 유효기간 (0092): 정해져 있으면 만료일 필수, 오늘부터 그 일수 안
+    const maxDays = await getOperatorSetting(requireOperatorId(), 'apiKeyMaxDays', tx)
+    if (maxDays !== null) {
+      const limit = addDays(kstToday(), maxDays)
+      if (!data.expiresOn) {
+        throw new ActionError('VALIDATION', `만료일을 넣어 주세요 (운영 설정: 최대 ${maxDays}일).`)
+      }
+      if (data.expiresOn > limit) {
+        throw new ActionError(
+          'VALIDATION',
+          `만료일은 ${limit}까지입니다 (운영 설정: 최대 ${maxDays}일).`,
+        )
+      }
     }
     await expireDueKeys(tx, { shipperId: shipper.id })
     const active = await tx.apiClient.count({

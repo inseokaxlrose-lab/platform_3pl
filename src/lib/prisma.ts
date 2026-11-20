@@ -105,6 +105,8 @@ export const TENANT_MODELS: ReadonlySet<string> = new Set([
   // 첨부파일 (0091)
   'File',
   'FileLink',
+  // 운영사 설정 (0092)
+  'OperatorSetting',
 ])
 
 type Data = Record<string, unknown>

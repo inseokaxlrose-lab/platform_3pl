@@ -956,6 +956,7 @@ model Operator {
   shipTos         ShipTo[]
   files           File[]
   fileLinks       FileLink[]
+  settings        OperatorSetting[]
 
   // 운영사코드는 삭제 안 된 것끼리만 겹치면 안 된다 (0038)
   @@unique([code], where: raw("del_yn = 'N'"), map: "tb_operator_operator_cd_key")
@@ -2483,4 +2484,18 @@ model FileLink {
   @@index([entityType, entityId], map: "tb_file_link_entity_idx")
   @@index([operatorId])
   @@map("tb_file_link")
+}
+
+// 운영사 설정 (docs/decisions/0092): 키-값. 키 목록·기본값·검사 규칙은 src/config/operator-settings.ts
+// 행이 없으면 기본값을 쓴다. 값은 JSON (숫자·글자·예/아니오·비움)
+model OperatorSetting {
+  operatorId BigInt   @map("operator_id")
+  operator   Operator @relation(fields: [operatorId], references: [id], onDelete: Cascade)
+  key        String   @map("setting_key") @db.VarChar(50)
+  value      Json     @map("setting_value")
+  updatedAt  DateTime @default(now()) @updatedAt @map("updated_at")
+  updatedBy  String   @default("system") @map("updated_by") @db.VarChar(50)
+
+  @@id([operatorId, key])
+  @@map("tb_operator_setting")
 }

@@ -217,6 +217,17 @@ const SHOTS: Shot[] = [
   // ── 시스템
   list('/admin/system/users'),
   list('/admin/system/roles'),
+  // 운영 설정 (0092): ① 재고 ② API 연동 ③ 화면 버튼
+  {
+    src: '/help/admin/system/settings/main.png',
+    url: '/admin/system/settings',
+    account: 'admin',
+    markers: [
+      { label: '1', target: (page) => page.locator('section[data-section-id="stock"]') },
+      { label: '2', target: (page) => page.locator('section[data-section-id="api"]') },
+      { label: '3', target: pageActions },
+    ],
+  },
   // 체번 규칙: 목록(검색 조건 없음) + 입고예정 번호 수정 화면(미리보기)
   {
     src: '/help/admin/system/numbering/list.png',
