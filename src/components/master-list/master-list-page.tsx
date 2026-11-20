@@ -88,12 +88,15 @@ export function MasterListPage<TRow extends RowData>({
   return (
     // 공통 페이지 틀: 화면 전체 폭 (검색 영역·그리드는 카드, 사이 간격은 section 토큰)
     <AppPage title={title} description={description} meta={meta} actions={actions}>
-      <SearchPanel
-        fields={searchFields}
-        values={list.values}
-        onSearch={list.search}
-        onReset={list.reset}
-      />
+      {/* 검색 조건이 없는 목록(대상이 고정된 설정 목록 등)은 검색 상자를 그리지 않는다 */}
+      {searchFields.length > 0 && (
+        <SearchPanel
+          fields={searchFields}
+          values={list.values}
+          onSearch={list.search}
+          onReset={list.reset}
+        />
+      )}
       <DataGrid
         key={selectionKey}
         id={gridId}
