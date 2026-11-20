@@ -36,6 +36,7 @@ import { assertInScope, scopeFilter, type DataScope } from '@/lib/scope/data-sco
 import { resolveLocationOps } from '@/lib/settings/effective-setting'
 import { DELETED_ONLY, withIsActive } from '@/lib/status'
 import { isYes } from '@/lib/yn'
+import { buildLocationBarcode } from '@/lib/locations/location-barcode'
 
 // 로케이션 관리 서버 액션 (docs/decisions/0028, 0075)
 // 데이터 범위: 센터 직원은 소속 센터의 로케이션만 (로케이션이 센터 키를 갖는다)
@@ -209,6 +210,7 @@ export const listLocationsAction = createAction({
           isActive: row.isActive,
           center: `${center.name} (${center.code})`,
           warehouse: `${warehouse.name} (${warehouse.code})`,
+          barcode: buildLocationBarcode(warehouse.code, row.code),
           warehouseId: row.warehouseId,
           zone: zone?.code ?? null,
           rowNo: row.rowNo,

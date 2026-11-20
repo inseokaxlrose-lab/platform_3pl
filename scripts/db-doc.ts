@@ -27,12 +27,14 @@ function parseSchema(text: string) {
   for (const raw of lines) {
     const line = raw.trim()
     if (line.startsWith('//')) {
-      pending.push(
-        line
-          .replace(/^\/\/+\s?/, '')
-          .replace(/^──\s*/, '')
-          .replace(/\s*──$/, ''),
-      )
+      const text = line
+        .replace(/^\/\/+\s?/, '')
+        .replace(/^──\s*/, '')
+        .replace(/\s*──$/, '')
+      // 앞줄이 이 줄의 앞부분과 같으면(같은 설명을 고쳐 쓴 흔적) 하나만 남긴다
+      const last = pending[pending.length - 1]
+      if (last && text.startsWith(last)) pending[pending.length - 1] = text
+      else pending.push(text)
       continue
     }
     const modelStart = /^model (\w+) \{/.exec(line)

@@ -116,8 +116,8 @@ describe('적치', () => {
     const work = await getPutawayWork(BigInt(asnId), ALL)
     expect(work?.pending).toEqual([])
     expect(work?.history.map((h) => [h.qty, h.toLocation])).toEqual([
-      ['60', 'GEN / A-01'],
-      ['40', 'GEN / A-02'],
+      ['60', 'GEN.A-01'],
+      ['40', 'GEN.A-02'],
     ])
   })
 

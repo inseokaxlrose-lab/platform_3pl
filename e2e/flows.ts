@@ -90,6 +90,6 @@ export async function putawayAsn(
   await worker.getByRole('alertdialog').getByRole('button', { name: '적치 등록' }).click()
   await expect(worker.getByText(/건을 적치했습니다/)).toBeVisible()
   await expect(
-    worker.getByRole('cell', { name: `${E2E_LOCATION.warehouse} / ${E2E_LOCATION.code}` }),
+    worker.getByRole('cell', { name: `${E2E_LOCATION.warehouse}.${E2E_LOCATION.code}` }),
   ).toBeVisible()
 }

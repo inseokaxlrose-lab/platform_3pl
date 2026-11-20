@@ -68,10 +68,10 @@ describe('재고 이력', () => {
   it('최근 것부터: 유형·로케이션·변동·변동 후·원본 문서·사유·처리자', async () => {
     const rows = await list()
     expect(rows.map((r) => [r.typeLabel, r.location, r.qtyChange, r.qtyAfter, r.ref])).toEqual([
-      ['조정', 'GEN / A-01', '-2', '58', '실사·조정 AJ-1'],
-      ['이동(들어옴)', 'GEN / A-01', '60', '60', '적치 AS-1'],
-      ['이동(나감)', 'INBOUND / DEFAULT', '-60', '40', '적치 AS-1'],
-      ['입고', 'INBOUND / DEFAULT', '100', '100', '입고확정 RC-1'],
+      ['조정', 'GEN.A-01', '-2', '58', '실사·조정 AJ-1'],
+      ['이동(들어옴)', 'GEN.A-01', '60', '60', '적치 AS-1'],
+      ['이동(나감)', 'INBOUND.DEFAULT', '-60', '40', '적치 AS-1'],
+      ['입고', 'INBOUND.DEFAULT', '100', '100', '입고확정 RC-1'],
     ])
     expect(rows[0]).toMatchObject({ reason: '파손', createdBy: 'kim', itemCode: 'WATER' })
     expect(rows[1].groupId).toBe(rows[2].groupId)

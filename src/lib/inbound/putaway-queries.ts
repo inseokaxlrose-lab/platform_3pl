@@ -6,6 +6,7 @@ import { isInScope, type DataScope } from '@/lib/scope/data-scope'
 import { ACTIVE_ONLY } from '@/lib/status'
 import { parseQty, qtyText } from '@/lib/units/convert'
 import { ASN_SCOPE } from './asns'
+import { buildLocationBarcode } from '@/lib/locations/location-barcode'
 
 // 적치 화면 조회 (docs/decisions/0058) — 서버 액션 밖이라 데이터 범위를 직접 건다
 
@@ -69,7 +70,10 @@ export async function getPutawayWork(asnId: bigint, scope: DataScope) {
     },
     orderBy: [{ warehouse: { sortOrder: 'asc' } }, { warehouse: { code: 'asc' } }, { code: 'asc' }],
   })
-  const locationLabel = new Map(locations.map((l) => [l.id, `${l.warehouse.code} / ${l.code}`]))
+  // 표시는 스캔용 바코드 모양 (창고코드.로케이션코드, 0084 ⑤) — 스캐너로 찍으면 검색칸에서 바로 찾아진다
+  const locationLabel = new Map(
+    locations.map((l) => [l.id, buildLocationBarcode(l.warehouse.code, l.code)]),
+  )
   const otherIds = asn.receipts
     .flatMap((r) => r.lines.flatMap((l) => l.putaways.map((p) => p.toLocationId)))
     .filter((id) => !locationLabel.has(id))
@@ -78,7 +82,7 @@ export async function getPutawayWork(asnId: bigint, scope: DataScope) {
       where: { id: { in: otherIds } },
       select: { id: true, code: true, warehouse: { select: { code: true } } },
     })
-    for (const l of others) locationLabel.set(l.id, `${l.warehouse.code} / ${l.code}`)
+    for (const l of others) locationLabel.set(l.id, buildLocationBarcode(l.warehouse.code, l.code))
   }
 
   const receiptLines = asn.receipts.flatMap((r) =>
@@ -105,7 +109,7 @@ export async function getPutawayWork(asnId: bigint, scope: DataScope) {
     center: `${asn.center.name} (${asn.center.code})`,
     locations: locations.map((l) => ({
       id: l.id,
-      label: `${l.warehouse.code} / ${l.code}`,
+      label: buildLocationBarcode(l.warehouse.code, l.code),
       description: [l.warehouse.name, l.zone ? `구역 ${l.zone.code}` : null]
         .filter(Boolean)
         .join(' · '),

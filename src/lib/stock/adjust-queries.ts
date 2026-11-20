@@ -7,6 +7,7 @@ import { prisma } from '@/lib/prisma'
 import { isInScope, scopeFilter, type DataScope } from '@/lib/scope/data-scope'
 import { parseQty, qtyText } from '@/lib/units/convert'
 import { ADJUST_SCOPE } from './adjusts'
+import { buildLocationBarcode } from '@/lib/locations/location-barcode'
 
 // 재고 실사·조정 조회 (docs/decisions/0061)
 
@@ -126,7 +127,10 @@ export async function getAdjustDetail(id: bigint, scope: DataScope) {
       return {
         id: line.id,
         lineNo: line.lineNo,
-        location: `${line.stock.location.warehouse.code} / ${line.stock.location.code}`,
+        location: buildLocationBarcode(
+          line.stock.location.warehouse.code,
+          line.stock.location.code,
+        ),
         shipper: line.stock.shipper.name,
         item: `${line.stock.item.name} (${line.stock.item.code})`,
         lotNo: line.stock.lotNo,
