@@ -28,6 +28,8 @@ import {
   KeyRoundIcon,
   LayersIcon,
   ActivityIcon,
+  TruckIcon,
+  SignatureIcon,
 } from 'lucide-react'
 import type { PermissionCode } from './permissions'
 
@@ -148,6 +150,21 @@ const adminNavigation: NavArea = {
           icon: MapPinnedIcon,
           ready: true,
           permission: 'master.customers.read',
+        },
+        {
+          // 운송사·운송 계약 (0094)
+          title: '운송사',
+          href: '/admin/master/carriers',
+          icon: TruckIcon,
+          ready: true,
+          permission: 'master.carriers.read',
+        },
+        {
+          title: '운송 계약',
+          href: '/admin/master/carrier-contracts',
+          icon: SignatureIcon,
+          ready: true,
+          permission: 'master.carrier-contracts.read',
         },
         {
           title: '외부코드 매핑',
