@@ -57,6 +57,7 @@ const EMPTY: CenterCreateInput = {
   name: '',
   nameEn: '',
   shortName: '',
+  custCode: '',
   type: 'LEASE',
   openedOn: '',
   businessNumber: '',
@@ -103,7 +104,8 @@ type CenterFormProps = {
   canViewRegions?: boolean
 }
 
-type TextKey = 'code' | 'name' | 'nameEn' | 'shortName' | 'subBizNo' | 'addressJibun' | 'regionName'
+type TextKey =
+  'code' | 'name' | 'nameEn' | 'shortName' | 'custCode' | 'subBizNo' | 'addressJibun' | 'regionName'
 type TimeKey = 'workStartTime' | 'workEndTime' | 'inboundCutoffTime'
 type LocationKey = 'defaultInboundLocId' | 'defaultOutboundLocId' | 'defaultReturnLocId'
 
@@ -253,6 +255,10 @@ export function CenterForm({
           {text('name', '센터명', 8, { required: true, maxLength: 100 })}
           {text('nameEn', '영문명', 4, { hint: '해외 화주·서류용', maxLength: 100 })}
           {text('shortName', '약칭', 4, { hint: '목록·라벨에 짧게', maxLength: 30 })}
+          {text('custCode', '사용자 정의 코드', 4, {
+            hint: 'ERP의 플랜트 코드 등 (선택, 수정 가능)',
+            maxLength: 50,
+          })}
           <Field label="센터 유형" span={4} required error={errors.type} htmlFor={id('type')}>
             <Select value={value.type} onValueChange={(type) => set({ type })} disabled={disabled}>
               <SelectTrigger id={id('type')} className="w-full">

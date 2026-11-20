@@ -77,6 +77,7 @@ export async function getCenterForEdit(id: bigint, scope: DataScope) {
     name: center.name,
     nameEn: text(center.nameEn),
     shortName: text(center.shortName),
+    custCode: text(center.custCode),
     type: center.type,
     openedOn: center.openedOn ? center.openedOn.toISOString().slice(0, 10) : '',
     businessNumber: text(center.businessNumber),

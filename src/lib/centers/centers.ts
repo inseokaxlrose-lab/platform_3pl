@@ -44,6 +44,18 @@ async function assertCenterLimit(db: Db) {
 }
 
 // DB 칸으로 옮길 값 (담당자·온도대·기본 로케이션은 따로). 2차 칸은 보낸 것만 (undefined = 그대로)
+// 사용자 정의 코드: 운영사 안에서 겹치지 않게 (지운 센터 제외, 0093)
+async function assertCenterCustCode(db: Db, custCode: string | null, exceptId?: bigint) {
+  if (!custCode) return
+  const owner = await db.center.findFirst({ where: { custCode }, select: { id: true, code: true } })
+  if (owner && owner.id !== exceptId) {
+    throw new ActionError(
+      'CONFLICT',
+      `다른 센터(${owner.code})가 쓰는 사용자 정의 코드입니다: ${custCode}`,
+    )
+  }
+}
+
 function centerFields(data: CenterData) {
   const ynOrUndefined = (value: boolean | undefined) =>
     value === undefined ? undefined : toYn(value)
@@ -53,6 +65,7 @@ function centerFields(data: CenterData) {
     name: data.name,
     nameEn: data.nameEn,
     shortName: data.shortName,
+    custCode: data.custCode,
     type: data.type,
     openedOn: data.openedOn ? new Date(`${data.openedOn}T00:00:00.000Z`) : null,
     businessNumber: data.businessNumber,
@@ -221,6 +234,7 @@ export async function createCenter(data: CenterCreateData) {
   return prisma.$transaction(async (tx) => {
     await assertCenterLimit(tx)
     await assertCenterCode(tx, data.code)
+    await assertCenterCustCode(tx, data.custCode)
     const center = await tx.center.create({
       data: {
         operatorId: requireOperatorId(),
@@ -250,6 +264,7 @@ export async function updateCenter(id: bigint, rowVersion: number, data: CenterD
       select: { code: true, rowVersion: true },
     })
     assertRowVersion(current, rowVersion, '센터를 찾을 수 없습니다.')
+    await assertCenterCustCode(tx, data.custCode, id)
     await assertDefaultLocations(tx, id, data)
     const saved = await withVersionGuard(() =>
       tx.center.update({

@@ -78,6 +78,7 @@ export async function getWarehouseForEdit(id: bigint, scope: DataScope) {
     centerId: warehouse.centerId.toString(),
     code: warehouse.code,
     name: warehouse.name,
+    custCode: warehouse.custCode ?? '',
     type: warehouse.type,
     tempZone: warehouse.tempZone,
     description: text(warehouse.description),
