@@ -1,4 +1,5 @@
 import 'server-only'
+import { SUPPLIER_ROLES } from '@/lib/customers/customer-codes'
 import { resolveExpiryDates, type ExpiryRule } from '@/lib/items/expiry-dates'
 import { assertCodeValues } from '@/lib/common-code/common-codes'
 import {
@@ -220,6 +221,26 @@ async function lineRows(db: Db, shipperId: bigint, lines: AsnData['lines']) {
 const toDate = (value: string) => new Date(`${value}T00:00:00.000Z`)
 
 // 등록: 화주사는 사용 중이고 범위 안이어야 한다 (서버 액션이 범위를 먼저 검사)
+// 공급처 (0090): 같은 화주사의 매입처·둘 다 거래처, 거래중이어야 한다 (이미 저장된 공급처는 거래중지여도 그대로 둘 수 있다)
+async function assertSupplier(
+  db: Db,
+  shipperId: bigint,
+  supplierId: bigint | null,
+  keepId: bigint | null = null,
+) {
+  if (supplierId === null) return
+  const supplier = await db.customer.findFirst({
+    where: { id: supplierId, shipperId },
+    select: { role: true, status: true },
+  })
+  if (!supplier || !SUPPLIER_ROLES.includes(supplier.role)) {
+    throw new ActionError('VALIDATION', '이 화주사의 공급처(매입처) 거래처를 골라 주세요.')
+  }
+  if (supplier.status !== 'ACTIVE' && supplierId !== keepId) {
+    throw new ActionError('VALIDATION', '거래중지된 공급처입니다.')
+  }
+}
+
 export async function createAsn(data: AsnCreateData, channel: AsnChannelValue, scope: DataScope) {
   return prisma.$transaction((tx) => createAsnInTx(tx, data, channel, scope))
 }
@@ -242,6 +263,7 @@ export async function createAsnInTx(
       '운영중인 화주사를 골라 주세요. (준비중·일시정지 화주사는 입고를 받지 않습니다)',
     )
   await assertCenter(tx, data.shipperId, data.centerId, scope)
+  await assertSupplier(tx, data.shipperId, data.supplierId)
   const lines = await lineRows(tx, data.shipperId, data.lines)
   const asn = await tx.asn.create({
     data: {
@@ -252,6 +274,7 @@ export async function createAsnInTx(
       channel,
       expectedOn: toDate(data.expectedOn),
       shipperRefNo: data.shipperRefNo,
+      supplierId: data.supplierId,
       remark: data.remark,
     },
     select: { id: true, asnNo: true, rowVersion: true },
@@ -268,7 +291,7 @@ export async function updateAsn(id: bigint, rowVersion: number, data: AsnData, s
   return prisma.$transaction(async (tx) => {
     const found = await tx.asn.findUnique({
       where: { id },
-      select: { rowVersion: true, status: true, shipperId: true },
+      select: { rowVersion: true, status: true, shipperId: true, supplierId: true },
     })
     assertRowVersion(found, rowVersion, 'ASN을 찾을 수 없습니다.')
     const current = found!
@@ -276,6 +299,7 @@ export async function updateAsn(id: bigint, rowVersion: number, data: AsnData, s
       throw new ActionError('CONFLICT', '검수가 시작된 ASN은 고칠 수 없습니다.')
     }
     await assertCenter(tx, current.shipperId, data.centerId, scope)
+    await assertSupplier(tx, current.shipperId, data.supplierId, current.supplierId)
     const lines = await lineRows(tx, current.shipperId, data.lines)
     const saved = await withVersionGuard(() =>
       tx.asn.update({
@@ -284,6 +308,7 @@ export async function updateAsn(id: bigint, rowVersion: number, data: AsnData, s
           centerId: data.centerId,
           expectedOn: toDate(data.expectedOn),
           shipperRefNo: data.shipperRefNo,
+          supplierId: data.supplierId,
           remark: data.remark,
         },
         select: { id: true, asnNo: true, rowVersion: true },

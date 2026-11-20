@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import { idField } from '@/lib/id'
+import { idField, idSchema } from '@/lib/id'
 import { optionalText } from '@/lib/validation/common-fields'
 
 // ASN 입력 규칙 — 화면·서버 공용 (docs/decisions/0047·0048)
@@ -45,6 +45,11 @@ const asnShape = {
   centerId: idField('센터를 골라 주세요.'),
   expectedOn: requiredDate('입고 예정일을 입력해 주세요.'),
   shipperRefNo: optionalText(50),
+  // 공급처 (0090): 같은 화주사의 매입처·둘 다 거래처 (선택, 비우면 없음)
+  supplierId: z
+    .union([z.literal(''), idSchema])
+    .default('')
+    .transform((value) => value || null),
   remark: optionalText(1000),
   lines: z
     .array(asnLineSchema)
