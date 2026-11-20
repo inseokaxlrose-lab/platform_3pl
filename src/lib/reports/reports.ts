@@ -1,4 +1,6 @@
 import 'server-only'
+import { labelOf } from '@/lib/db-value'
+import { STOCK_STATUS } from '@/config/operator-codes'
 import type { ExportCell, ExportSheet } from '@/components/data-grid/export-rows'
 import { EXPORT_LIMIT } from '@/lib/grid/grid-query'
 import { ASN_SCOPE } from '@/lib/inbound/asns'
@@ -243,6 +245,7 @@ async function stockReport(input: ReportData, scope: DataScope) {
         '품목명',
         '로트번호',
         '유통기한',
+        '재고상태',
         '재고',
         '할당',
         '가용',
@@ -258,6 +261,7 @@ async function stockReport(input: ReportData, scope: DataScope) {
         r.itemName,
         r.lotNo,
         r.expiryOn,
+        labelOf(STOCK_STATUS.labels, r.status),
         num(parseQty(r.qty)),
         num(parseQty(r.allocatedQty)),
         num(parseQty(r.availableQty)),

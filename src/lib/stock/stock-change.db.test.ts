@@ -6,7 +6,7 @@ import { findUsedLocationIds } from '@/lib/locations/locations'
 import { prisma, type Tx } from '@/lib/prisma'
 import { createTestCenter, createTestShipper, systemUnit } from '@/test/factories'
 import { createTestOperator, resetDatabase, TEST_OPERATOR_ID } from '@/test/reset-database'
-import { adjustStock, moveStock, receiveStock } from './stock-change'
+import { adjustStock, changeStockStatus, moveStock, receiveStock } from './stock-change'
 import { withStockWrite } from './stock-write-guard'
 import { MILK_OPTIONS } from '@/test/item-input'
 
@@ -372,5 +372,113 @@ describe('재고가 있는 로케이션·품목은 쓰인 것 (지울 수 없다
     expect(await findUsedLocationIds([ids.staging, ids.a01])).toEqual([ids.staging])
     expect(await findUsedItemIds([ids.water, ids.milk])).toEqual([ids.water])
     expect(await findUsedItemIds([])).toEqual([])
+  })
+})
+
+describe('재고상태 (0088)', () => {
+  const water = (locationId: bigint, status?: 'NORMAL' | 'HOLD' | 'DAMAGED' | 'QUARANTINE') => ({
+    locationId,
+    itemId: ids.water,
+    status,
+  })
+  const statusesAt = async (locationId: bigint) =>
+    (
+      await prisma.stock.findMany({
+        where: { locationId, itemId: ids.water },
+        orderBy: { status: 'asc' },
+      })
+    ).map((r) => [r.status, r.qty.toString()])
+
+  it('상태 변경: 일부만 보류 → 같은 자리에 상태별 두 줄, STATUS_CHANGE 이력 두 줄(같은 묶음, 사유 코드)', async () => {
+    await run((tx) => receiveStock(tx, { address: water(ids.a01), qty: '10' }))
+    const result = await run((tx) =>
+      changeStockStatus(tx, {
+        address: water(ids.a01),
+        toStatus: 'HOLD',
+        qty: '4',
+        reasonCd: 'QUALITY_CHECK',
+        reason: '품질팀 확인 대기',
+      }),
+    )
+    expect(await statusesAt(ids.a01)).toEqual([
+      ['HOLD', '4'],
+      ['NORMAL', '6'],
+    ])
+    const txns = await prisma.stockTxn.findMany({
+      where: { groupId: result.groupId },
+      orderBy: { id: 'asc' },
+    })
+    expect(txns.map((t) => [t.type, t.status, t.qtyChange.toString(), t.reasonCd])).toEqual([
+      ['STATUS_CHANGE', 'NORMAL', '-4', 'QUALITY_CHECK'],
+      ['STATUS_CHANGE', 'HOLD', '4', 'QUALITY_CHECK'],
+    ])
+    // 보류를 풀 때는 사유가 없어도 된다
+    await run((tx) =>
+      changeStockStatus(tx, { address: water(ids.a01, 'HOLD'), toStatus: 'NORMAL', qty: '4' }),
+    )
+    expect(await statusesAt(ids.a01)).toEqual([
+      ['HOLD', '0'],
+      ['NORMAL', '10'],
+    ])
+  })
+
+  it('같은 상태·사유 없는 보류는 거부, 할당된 수량은 바꿀 수 없다', async () => {
+    const { stockId } = await run((tx) => receiveStock(tx, { address: water(ids.a01), qty: '10' }))
+    await expect(
+      run((tx) => changeStockStatus(tx, { address: water(ids.a01), toStatus: 'NORMAL', qty: '1' })),
+    ).rejects.toThrow('같은 재고상태')
+    await expect(
+      run((tx) => changeStockStatus(tx, { address: water(ids.a01), toStatus: 'HOLD', qty: '1' })),
+    ).rejects.toThrow('사유')
+    await withStockWrite(() =>
+      prisma.stock.update({ where: { id: stockId }, data: { allocatedQty: '7' } }),
+    )
+    await expect(
+      run((tx) =>
+        changeStockStatus(tx, {
+          address: water(ids.a01),
+          toStatus: 'DAMAGED',
+          qty: '4',
+          reasonCd: 'DAMAGE_SUSPECT',
+        }),
+      ),
+    ).rejects.toThrow('뺄 수 있는 수량 3')
+  })
+
+  it('입고는 창고 기본 재고상태, 이동은 도착 창고가 정상이면 상태 유지·아니면 그 창고 상태', async () => {
+    const general = await prisma.location.findUniqueOrThrow({
+      where: { id: ids.a01 },
+      select: { warehouse: { select: { centerId: true } } },
+    })
+    const quarantine = await prisma.warehouse.create({
+      data: {
+        operatorId: TEST_OPERATOR_ID,
+        centerId: general.warehouse.centerId,
+        code: 'QRT',
+        name: '격리창고',
+        tempZone: 'AMBIENT',
+        defaultStockStatus: 'QUARANTINE',
+      },
+    })
+    const q01 = await prisma.location.create({
+      data: {
+        operatorId: TEST_OPERATOR_ID,
+        warehouseId: quarantine.id,
+        centerId: general.warehouse.centerId,
+        code: 'Q-01',
+      },
+    })
+    // 격리 창고로 바로 입고하면 격리
+    await run((tx) => receiveStock(tx, { address: water(q01.id), qty: '5' }))
+    expect(await statusesAt(q01.id)).toEqual([['QUARANTINE', '5']])
+    // 정상 재고를 격리 창고로 옮기면 격리
+    await run((tx) => receiveStock(tx, { address: water(ids.a01), qty: '3' }))
+    await run((tx) => moveStock(tx, { from: water(ids.a01), toLocationId: q01.id, qty: '3' }))
+    expect(await statusesAt(q01.id)).toEqual([['QUARANTINE', '8']])
+    // 격리 재고를 정상 창고로 옮겨도 격리 그대로 (풀 때는 상태 변경)
+    await run((tx) =>
+      moveStock(tx, { from: water(q01.id, 'QUARANTINE'), toLocationId: ids.a02, qty: '2' }),
+    )
+    expect(await statusesAt(ids.a02)).toEqual([['QUARANTINE', '2']])
   })
 })

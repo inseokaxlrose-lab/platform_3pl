@@ -3,7 +3,7 @@
 > 이 문서는 `npm run db:doc`가 실제 DB 구조와 `prisma/schema.prisma`의 주석으로 만든다. **손으로 고치지 않는다** — 마이그레이션을 적용한 뒤 명령을 다시 돌린다.
 > 엑셀 판: `docs/db/DB_테이블정의서.xlsx` · 이름 규칙: `docs/db-conventions.md`
 
-테이블 67개 · 칼럼 1079개
+테이블 67개 · 칼럼 1081개
 
 ## 목차
 
@@ -2175,10 +2175,11 @@
 | 12 | `created_at` | 등록 일시 | 등록 일시 (자동) | TIMESTAMP(3) | N | CURRENT_TIMESTAMP |  |
 | 13 | `updated_at` | 수정 일시 | 수정 일시 (자동) | TIMESTAMP(3) | N |  |  |
 | 14 | `row_version` | 행버전 | 동시 처리 안전: 재고 변경 함수가 줄을 잠그고 바꾼다. 버전은 화면 확인용 | INTEGER | N | 1 |  |
+| 15 | `stock_status_cd` | 재고 상태 코드 | 재고상태 (재고 주소의 일부, 0088): NORMAL 정상 / HOLD 보류 / DAMAGED 불량 / QUARANTINE 격리 — 정상만 가용 | VARCHAR(20) | N | NORMAL | UK |
 
 **고유 인덱스**
 
-- `tb_stock_address_key`: `CREATE UNIQUE INDEX tb_stock_address_key ON tb_stock (location_id, item_id, lot_no, expiry_dt) NULLS NOT DISTINCT`
+- `tb_stock_address_key`: `CREATE UNIQUE INDEX tb_stock_address_key ON tb_stock (location_id, item_id, lot_no, expiry_dt, stock_status_cd) NULLS NOT DISTINCT`
 
 **인덱스**
 
@@ -2191,6 +2192,7 @@
 - `tb_stock_alloc_qty_check`: `CHECK ((alloc_qty >= 0) AND (alloc_qty <= stock_qty))`
 - `tb_stock_lot_no_check`: `CHECK ((lot_no IS NULL) OR ((lot_no) <> ''))`
 - `tb_stock_qty_check`: `CHECK (stock_qty >= 0)`
+- `tb_stock_stock_status_cd_check`: `CHECK ((stock_status_cd) IN ('NORMAL', 'HOLD', 'DAMAGED', 'QUARANTINE'))`
 
 ## tb_stock_adjust
 
@@ -2290,6 +2292,7 @@
 | 19 | `txn_at` | 거래 일시 |  | TIMESTAMP(3) | N | CURRENT_TIMESTAMP |  |
 | 20 | `created_by` | 등록 자 | 처리한 사람 아이디 (재고 변경 함수가 지금 작업자로 채운다) | VARCHAR(50) | N | system |  |
 | 21 | `reason_cd` | 사유 코드 | 사유 (조정은 필수) 사유 코드 (조정은 ADJUST_REASON, 상태 변경은 HOLD_REASON — 공통코드, 0087) + 사유 메모 | VARCHAR(20) | Y |  |  |
+| 22 | `stock_status_cd` | 재고 상태 코드 | 그때의 재고상태 (0088) | VARCHAR(20) | N | NORMAL |  |
 
 **인덱스**
 
@@ -2305,8 +2308,9 @@
 - `tb_stock_txn_after_qty_check`: `CHECK (after_qty >= 0)`
 - `tb_stock_txn_chg_qty_check`: `CHECK (chg_qty <> 0)`
 - `tb_stock_txn_lot_no_check`: `CHECK ((lot_no IS NULL) OR ((lot_no) <> ''))`
-- `tb_stock_txn_reason_check`: `CHECK (((txn_type_cd) <> 'ADJUST') OR ((reason IS NOT NULL) AND ((reason) <> '')))`
-- `tb_stock_txn_txn_type_cd_check`: `CHECK ((txn_type_cd) IN ('RECEIVE', 'MOVE_OUT', 'MOVE_IN', 'ADJUST'))`
+- `tb_stock_txn_reason_check`: `CHECK (((txn_type_cd) <> 'ADJUST') OR ((reason IS NOT NULL) AND ((reason) <> '')) OR (reason_cd IS NOT NULL))`
+- `tb_stock_txn_stock_status_cd_check`: `CHECK ((stock_status_cd) IN ('NORMAL', 'HOLD', 'DAMAGED', 'QUARANTINE'))`
+- `tb_stock_txn_txn_type_cd_check`: `CHECK ((txn_type_cd) IN ('RECEIVE', 'MOVE_OUT', 'MOVE_IN', 'ADJUST', 'STATUS_CHANGE'))`
 
 ## tb_code_group
 

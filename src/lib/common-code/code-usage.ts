@@ -43,6 +43,9 @@ const CODE_USAGES: Record<string, CountUsage> = {
   ADJUST_REASON: async (db, operatorId, code) =>
     (await db.stockAdjust.count({ where: { operatorId, reasonCd: code } })) +
     (await db.stockTxn.count({ where: { operatorId, type: 'ADJUST', reasonCd: code } })),
+  // 재고 보류 사유: 재고상태 변경 이력 (0088)
+  HOLD_REASON: async (db, operatorId, code) =>
+    db.stockTxn.count({ where: { operatorId, type: 'STATUS_CHANGE', reasonCd: code } }),
   ASN_CLOSE_REASON: async (db, operatorId, code) =>
     db.asn.count({ where: { operatorId, closeReasonCd: code } }),
   // 제공 서비스: 운영사 (0040)

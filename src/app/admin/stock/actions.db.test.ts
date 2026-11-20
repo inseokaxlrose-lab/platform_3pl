@@ -9,7 +9,7 @@ import { stockTransaction } from '@/lib/stock/stock-transaction'
 import { createInboundFixture, type InboundFixture } from '@/test/inbound-fixtures'
 import { signInAs } from '@/test/inbound-session'
 import { resetDatabase, TEST_OPERATOR_ID } from '@/test/reset-database'
-import { listStockAction } from './actions'
+import { changeStockStatusAction, listStockAction } from './actions'
 
 // 재고 조회 (docs/decisions/0060)
 
@@ -125,6 +125,82 @@ describe('재고 조회', () => {
     signInAs(ALL, ['stock.inventory.read'])
     expect(
       await listStockAction({ ...createDataGridState(), filters: {}, exportAll: true }),
+    ).toMatchObject({ ok: false, error: { code: 'FORBIDDEN' } })
+  })
+})
+
+describe('재고상태 변경 (0088)', () => {
+  const stockOf = async (locationId: bigint, itemId: bigint) =>
+    prisma.stock.findFirstOrThrow({ where: { locationId, itemId, status: 'NORMAL' } })
+
+  it('일부를 보류: 목록은 상태별 줄, 가용은 정상만, 품목별 합계도 상태별로 나뉜다', async () => {
+    const water = await stockOf(f.a01, f.water)
+    expect(
+      await changeStockStatusAction({
+        stockId: String(water.id),
+        toStatus: 'HOLD',
+        qty: '1000',
+        reasonCd: 'SHIPPER_REQUEST',
+      }),
+    ).toMatchObject({ ok: true, data: { qty: '1000' } })
+
+    const byLocation = await list({ status: 'HOLD' })
+    expect(byLocation.rows.map((r) => [r.itemCode, r.status, r.qty, r.availableQty])).toEqual([
+      ['WATER', 'HOLD', '1000', '0'],
+    ])
+    const byItem = await list({ view: 'item' })
+    expect(
+      byItem.rows
+        .filter((r) => r.itemCode === 'WATER')
+        .map((r) => [r.status, r.qty, r.availableQty]),
+    ).toEqual([
+      ['HOLD', '1000', '0'],
+      ['NORMAL', '2030', '2030'],
+    ])
+  })
+
+  it('수량을 비우면 가용 전부, 보류는 사유 필수(공통코드 검사), 권한·범위 검사', async () => {
+    const water = await stockOf(f.a02, f.water)
+    expect(
+      await changeStockStatusAction({ stockId: String(water.id), toStatus: 'DAMAGED', qty: '' }),
+    ).toMatchObject({ ok: false, error: { fieldErrors: { reasonCd: [expect.any(String)] } } })
+    expect(
+      await changeStockStatusAction({
+        stockId: String(water.id),
+        toStatus: 'DAMAGED',
+        qty: '',
+        reasonCd: 'NO_SUCH',
+      }),
+    ).toMatchObject({ ok: false, error: { message: expect.stringContaining('보류 사유') } })
+    expect(
+      await changeStockStatusAction({
+        stockId: String(water.id),
+        toStatus: 'DAMAGED',
+        qty: '',
+        reasonCd: 'DAMAGE_SUSPECT',
+      }),
+    ).toMatchObject({ ok: true, data: { qty: '30' } })
+
+    // 다른 센터 직원에게는 보이지 않는다
+    signInAs({ kind: 'CENTERS', operatorId: TEST_OPERATOR_ID, centerIds: [f.gmh] })
+    const milk = await stockOf(f.a01, f.milk)
+    expect(
+      await changeStockStatusAction({
+        stockId: String(milk.id),
+        toStatus: 'HOLD',
+        qty: '1',
+        reasonCd: 'ETC',
+      }),
+    ).toMatchObject({ ok: false, error: { code: 'NOT_FOUND' } })
+    // 조회 권한만 있으면 거부
+    signInAs(ALL, ['stock.inventory.read'])
+    expect(
+      await changeStockStatusAction({
+        stockId: String(milk.id),
+        toStatus: 'HOLD',
+        qty: '1',
+        reasonCd: 'ETC',
+      }),
     ).toMatchObject({ ok: false, error: { code: 'FORBIDDEN' } })
   })
 })

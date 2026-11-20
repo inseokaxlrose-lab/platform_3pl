@@ -6,10 +6,11 @@ import { effectiveItemOptions } from '@/lib/items/item-schema'
 import type { Tx } from '@/lib/prisma'
 import { isActiveStatus } from '@/lib/status'
 import { checkQtyDecimals, formatQty, parseQty, qtyText } from '@/lib/units/convert'
+import { STOCK_STATUS } from '@/config/operator-codes'
 import { withStockWrite } from './stock-write-guard'
 
 // 재고 변경 공통 함수 (docs/decisions/0045, CLAUDE.md "재고는 직접 수정 금지")
-// 재고 수량은 이 파일의 세 함수로만 바꾼다: 입고(receiveStock)·이동(moveStock)·조정(adjustStock)
+// 재고 수량은 이 파일의 네 함수로만 바꾼다: 입고(receiveStock)·이동(moveStock)·조정(adjustStock)·상태 변경(changeStockStatus, 0088)
 //
 // 함수마다 하는 일 (모두 부르는 쪽의 트랜잭션 tx 안에서):
 // 1. 로케이션·품목을 읽고 규칙 검사 (운영사, 수량 소수 자리, 로트·유통기한, 사용 중지)
@@ -19,12 +20,15 @@ import { withStockWrite } from './stock-write-guard'
 // 부르는 법: prisma.$transaction((tx) => receiveStock(tx, { ... }))
 // 운영사 출입증(createAction 또는 runInContext) 안에서 불러야 한다
 
-// 재고 주소: 로케이션 + 품목 + 로트 + 유통기한 (유통기한은 'YYYY-MM-DD' 글자)
+// 재고 주소: 로케이션 + 품목 + 로트 + 유통기한 + 재고상태 (유통기한은 'YYYY-MM-DD' 글자)
+// 재고상태를 비우면 정상(NORMAL). 입고는 창고의 기본 재고상태를 따른다 (0088)
+export type StockStatus = (typeof STOCK_STATUS.values)[number]
 export type StockAddress = {
   locationId: bigint
   itemId: bigint
   lotNo?: string | null
   expiryOn?: string | null
+  status?: StockStatus | null
 }
 
 // 원본 문서 (예: RECEIPT 입고확정 / 키 / 화면 번호)
@@ -50,7 +54,18 @@ type ResolvedAddress = {
   itemCode: string
   lotNo: string | null
   expiryOn: string | null
+  status: StockStatus
+  // 이 로케이션 창고의 기본 재고상태 (입고·이동으로 들어올 때, 0088)
+  warehouseStatus: StockStatus
   baseUnit: { code: string; decimals: number }
+}
+
+// 재고상태 글자 검사 (비우면 정상)
+function normalizeStatus(value: string | null | undefined): StockStatus {
+  if (!value) return 'NORMAL'
+  if (!STOCK_STATUS.has(value))
+    throw new ActionError('VALIDATION', `알 수 없는 재고상태입니다: ${value}`)
+  return value as StockStatus
 }
 
 // 유통기한 글자 검사 ('YYYY-MM-DD', 실제 있는 날짜)
@@ -84,7 +99,7 @@ async function resolveAddress(
       code: true,
       status: true,
       warehouseId: true,
-      warehouse: { select: { centerId: true } },
+      warehouse: { select: { centerId: true, defaultStockStatus: true } },
     },
   })
   if (!location) throw new ActionError('NOT_FOUND', '로케이션을 찾을 수 없습니다.')
@@ -172,6 +187,8 @@ async function resolveAddress(
     itemCode: item.code,
     lotNo,
     expiryOn,
+    status: normalizeStatus(address.status),
+    warehouseStatus: normalizeStatus(location.warehouse.defaultStockStatus),
     baseUnit: item.baseUnit,
   }
 }
@@ -207,15 +224,16 @@ async function findStockId(tx: Tx, a: ResolvedAddress): Promise<bigint | null> {
     SELECT stock_id FROM tb_stock
     WHERE location_id = ${a.locationId} AND item_id = ${a.itemId}
       AND lot_no IS NOT DISTINCT FROM ${a.lotNo}::varchar
-      AND expiry_dt IS NOT DISTINCT FROM ${a.expiryOn}::date`
+      AND expiry_dt IS NOT DISTINCT FROM ${a.expiryOn}::date
+      AND stock_status_cd = ${a.status}`
   return rows[0]?.stock_id ?? null
 }
 
 async function ensureStockId(tx: Tx, a: ResolvedAddress): Promise<bigint> {
   await tx.$executeRaw`
-    INSERT INTO tb_stock (operator_id, center_id, warehouse_id, location_id, shipper_id, item_id, lot_no, expiry_dt, updated_at)
+    INSERT INTO tb_stock (operator_id, center_id, warehouse_id, location_id, shipper_id, item_id, lot_no, expiry_dt, stock_status_cd, updated_at)
     VALUES (${a.operatorId}, ${a.centerId}, ${a.warehouseId}, ${a.locationId}, ${a.shipperId}, ${a.itemId},
-            ${a.lotNo}::varchar, ${a.expiryOn}::date, CURRENT_TIMESTAMP)
+            ${a.lotNo}::varchar, ${a.expiryOn}::date, ${a.status}, CURRENT_TIMESTAMP)
     ON CONFLICT DO NOTHING`
   const id = await findStockId(tx, a)
   if (id === null) throw new Error('재고 줄을 만들지 못했습니다.')
@@ -240,7 +258,7 @@ async function lockStocks(tx: Tx, ids: bigint[]): Promise<Map<bigint, LockedStoc
 // ─── 수량 바꾸기 + 이력 ──────────────────────────────────────
 
 type TxnFields = {
-  type: 'RECEIVE' | 'MOVE_OUT' | 'MOVE_IN' | 'ADJUST'
+  type: 'RECEIVE' | 'MOVE_OUT' | 'MOVE_IN' | 'ADJUST' | 'STATUS_CHANGE'
   ref?: StockRef
   // 사유 코드 (공통코드 글자, 0087) + 사유 메모
   reasonCd?: string | null
@@ -288,6 +306,7 @@ async function applyChange(
       itemId: a.itemId,
       lotNo: a.lotNo,
       expiryOn: toDate(a.expiryOn),
+      status: a.status,
       type: fields.type,
       qtyChange: qtyText(change),
       qtyAfter: qtyText(after),
@@ -314,7 +333,9 @@ export async function receiveStock(
   input: { address: StockAddress; qty: string; ref?: StockRef; reason?: string },
 ): Promise<StockChangeResult> {
   return withStockWrite(async () => {
-    const a = await resolveAddress(tx, input.address, 'IN')
+    const resolved = await resolveAddress(tx, input.address, 'IN')
+    // 상태를 정하지 않았으면 창고의 기본 재고상태 (예: 격리 창고로 입고하면 격리, 0088)
+    const a = input.address.status ? resolved : { ...resolved, status: resolved.warehouseStatus }
     const change = parseChange(input.qty, a.baseUnit)
     if (change <= 0n) throw new ActionError('VALIDATION', '입고 수량은 0보다 커야 합니다.')
     const id = await ensureStockId(tx, a)
@@ -352,7 +373,15 @@ export async function moveStock(
     if (target && target.warehouse.centerId !== from.centerId) {
       throw new ActionError('VALIDATION', '다른 센터의 로케이션으로는 옮길 수 없습니다.')
     }
-    const to = await resolveAddress(tx, { ...input.from, locationId: input.toLocationId }, 'IN')
+    const arrive = await resolveAddress(
+      tx,
+      { ...input.from, status: from.status, locationId: input.toLocationId },
+      'IN',
+    )
+    // 재고상태: 도착 창고의 기본이 정상이 아니면(보류·불량·격리 창고) 그 상태로, 정상 창고면 출발 상태 그대로 (0088)
+    // (보류 재고를 정상 창고로 옮긴다고 풀리지 않는다 — 풀 때는 상태 변경으로)
+    const to =
+      arrive.warehouseStatus === 'NORMAL' ? arrive : { ...arrive, status: arrive.warehouseStatus }
     const qty = parseChange(input.qty, from.baseUnit)
     if (qty <= 0n) throw new ActionError('VALIDATION', '이동 수량은 0보다 커야 합니다.')
 
@@ -424,5 +453,55 @@ export async function adjustStock(
     }
     const stock = (await lockStocks(tx, [id])).get(id)!
     return applyChange(tx, a, stock, change, { type: 'ADJUST', ref: input.ref, reasonCd, reason })
+  })
+}
+
+// 상태 변경 (0088): 같은 자리의 재고 일부(또는 전부)를 다른 재고상태로 — 정상 ↔ 보류·불량·격리
+// 나감(옛 상태) + 들어옴(새 상태) 두 줄, 같은 묶음 번호, 거래 유형 STATUS_CHANGE
+// 할당된 수량은 바꿀 수 없다(가용 수량까지). 정상이 아닌 상태로 바꿀 때는 사유 코드(HOLD_REASON) 필수 — 코드 검사는 부르는 쪽
+export async function changeStockStatus(
+  tx: Tx,
+  input: {
+    address: StockAddress
+    toStatus: StockStatus
+    qty: string
+    reasonCd?: string | null
+    reason?: string
+    ref?: StockRef
+  },
+): Promise<{ groupId: bigint; out: StockChangeResult; in: StockChangeResult }> {
+  return withStockWrite(async () => {
+    const from = await resolveAddress(tx, input.address, 'OUT')
+    const toStatus = normalizeStatus(input.toStatus)
+    if (from.status === toStatus) {
+      throw new ActionError('VALIDATION', '지금과 같은 재고상태로는 바꿀 수 없습니다.')
+    }
+    const reasonCd = input.reasonCd?.trim() || null
+    const reason = input.reason?.trim() || null
+    if (toStatus !== 'NORMAL' && !reasonCd) {
+      throw new ActionError('VALIDATION', '보류·불량·격리로 바꿀 때는 사유를 골라 주세요.')
+    }
+    if (reason && reason.length > 200) {
+      throw new ActionError('VALIDATION', '사유 메모는 200자까지입니다.')
+    }
+    const qty = parseChange(input.qty, from.baseUnit)
+    if (qty <= 0n) throw new ActionError('VALIDATION', '바꿀 수량은 0보다 커야 합니다.')
+
+    const fromId = await findStockId(tx, from)
+    if (fromId === null) throw shortage(from, null, -qty)
+    // 같은 자리·같은 품목이므로 들어오는 줄은 늘리기 검사(사용 중지 등)를 하지 않는다
+    const to = { ...from, status: toStatus }
+    const toId = await ensureStockId(tx, to)
+    const locked = await lockStocks(tx, [fromId, toId])
+    const [{ id: groupId }] = await tx.$queryRaw<{ id: bigint }[]>`
+      SELECT nextval(pg_get_serial_sequence('tb_stock_txn', 'stock_txn_id')) AS id`
+    const fields = { type: 'STATUS_CHANGE' as const, ref: input.ref, reasonCd, reason }
+    const out = await applyChange(tx, from, locked.get(fromId)!, -qty, {
+      ...fields,
+      id: groupId,
+      groupId,
+    })
+    const moved = await applyChange(tx, to, locked.get(toId)!, qty, { ...fields, groupId })
+    return { groupId, out, in: moved }
   })
 }

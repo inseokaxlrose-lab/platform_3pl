@@ -3,16 +3,17 @@ import { AccessDenied } from '@/components/permission'
 import { StockList } from '@/components/stock'
 import { getStockFilterOptions } from '@/lib/stock/stock-queries'
 import { getCurrentScope, hasPermission } from '@/lib/session'
-import { listStockAction } from './actions'
+import { changeStockStatusAction, listStockAction } from './actions'
 
 export const metadata: Metadata = { title: '재고 조회' }
 
 // 재고 조회 (0060): 위치별 / 품목별 / 로트·유통기한별
 export default async function StockPage() {
   if (!(await hasPermission('stock.inventory.read'))) return <AccessDenied />
-  const [options, canExport] = await Promise.all([
+  const [options, canExport, canUpdate] = await Promise.all([
     getStockFilterOptions(await getCurrentScope()),
     hasPermission('stock.inventory.export'),
+    hasPermission('stock.inventory.update'),
   ])
   return (
     <StockList
@@ -22,6 +23,7 @@ export default async function StockPage() {
       options={options}
       canExport={canExport}
       listAction={listStockAction}
+      statusAction={canUpdate ? changeStockStatusAction : undefined}
     />
   )
 }
