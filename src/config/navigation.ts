@@ -29,6 +29,7 @@ import {
   LayersIcon,
   ActivityIcon,
   TruckIcon,
+  RouteIcon,
   SignatureIcon,
 } from 'lucide-react'
 import type { PermissionCode } from './permissions'
@@ -165,6 +166,14 @@ const adminNavigation: NavArea = {
           icon: SignatureIcon,
           ready: true,
           permission: 'master.carrier-contracts.read',
+        },
+        {
+          // 배송 코스 (0095)
+          title: '배송 코스',
+          href: '/admin/master/routes',
+          icon: RouteIcon,
+          ready: true,
+          permission: 'master.routes.read',
         },
         {
           title: '외부코드 매핑',
