@@ -132,6 +132,35 @@ describe('검수 등록', () => {
     })
   })
 
+  it('제조일 입력 품목: 유통기한 = 제조일 + 총 기한 일수, 둘 다 입력 품목은 둘 다 필수 (0089)', async () => {
+    await prisma.item.update({
+      where: { id: f.milk },
+      data: { expiryInput: 'MFG', shelfLifeDays: 30 },
+    })
+    const milk = { asnLineId: lines.milk, lotNo: 'M1' }
+    expect(await inspect({ ...milk, expiryOn: '2027-01-31' })).toMatchObject({
+      ok: false,
+      error: { message: expect.stringContaining('제조일을 넣어 주세요') },
+    })
+    expect(await inspect({ ...milk, mfgOn: '2026-11-20' })).toMatchObject({ ok: true })
+    const saved = await prisma.inboundInspection.findFirstOrThrow({ where: { lotNo: 'M1' } })
+    expect([
+      saved.mfgOn?.toISOString().slice(0, 10),
+      saved.expiryOn?.toISOString().slice(0, 10),
+    ]).toEqual(['2026-11-20', '2026-12-20'])
+
+    await prisma.item.update({ where: { id: f.milk }, data: { expiryInput: 'BOTH' } })
+    expect(await inspect({ ...milk, lotNo: 'M2', expiryOn: '2027-01-31' })).toMatchObject({
+      ok: false,
+      error: { message: expect.stringContaining('제조일') },
+    })
+    expect(
+      await inspect({ ...milk, lotNo: 'M2', expiryOn: '2027-01-31', mfgOn: '2027-02-01' }),
+    ).toMatchObject({ ok: false, error: { message: expect.stringContaining('늦습니다') } })
+    // 제조일은 유통기한을 관리하지 않는 품목에는 넣을 수 없다
+    expect(await inspect({ mfgOn: '2026-11-20' })).toMatchObject({ ok: false })
+  })
+
   it('마감된 ASN은 검수할 수 없다, 범위 밖이면 찾을 수 없다', async () => {
     signInAs({ kind: 'CENTERS', operatorId: TEST_OPERATOR_ID, centerIds: [f.gmh] })
     expect(await inspect({})).toMatchObject({ ok: false, error: { code: 'NOT_FOUND' } })

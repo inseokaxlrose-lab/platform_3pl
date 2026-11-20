@@ -482,3 +482,29 @@ describe('재고상태 (0088)', () => {
     expect(await statusesAt(ids.a02)).toEqual([['QUARANTINE', '2']])
   })
 })
+
+describe('제조일 (0089)', () => {
+  it('새 재고 줄에 첫 제조일이 남고(같은 유통기한이면 같은 줄), 이동하면 새 줄로 옮겨 간다, 이력에도 남는다', async () => {
+    const milk = { locationId: ids.a01, itemId: ids.milk, lotNo: 'M1', expiryOn: '2027-01-31' }
+    await run((tx) => receiveStock(tx, { address: milk, qty: '5', mfgOn: '2026-01-31' }))
+    // 같은 로트·유통기한, 다른 제조일 → 같은 재고 줄 (제조일은 처음 값 그대로)
+    await run((tx) => receiveStock(tx, { address: milk, qty: '3', mfgOn: '2026-02-01' }))
+    const stock = await prisma.stock.findFirstOrThrow({
+      where: { locationId: ids.a01, itemId: ids.milk },
+    })
+    expect([stock.qty.toString(), stock.mfgOn?.toISOString().slice(0, 10)]).toEqual([
+      '8',
+      '2026-01-31',
+    ])
+
+    await run((tx) => moveStock(tx, { from: milk, toLocationId: ids.a02, qty: '2' }))
+    const moved = await prisma.stock.findFirstOrThrow({
+      where: { locationId: ids.a02, itemId: ids.milk },
+    })
+    expect(moved.mfgOn?.toISOString().slice(0, 10)).toBe('2026-01-31')
+    const txns = await prisma.stockTxn.findMany({ where: { itemId: ids.milk } })
+    expect(new Set(txns.map((t) => t.mfgOn?.toISOString().slice(0, 10)))).toEqual(
+      new Set(['2026-01-31']),
+    )
+  })
+})

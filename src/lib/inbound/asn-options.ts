@@ -23,6 +23,9 @@ export type AsnItemOption = {
   units: AsnItemUnitOption[]
   useLot: boolean
   useExpiry: boolean
+  // 제조일 입력 품목: 유통기한 = 제조일 + 총 기한 일수 (0089)
+  mfgInput: boolean
+  shelfLifeDays: number | null
 }
 
 export type AsnFormOptions = {

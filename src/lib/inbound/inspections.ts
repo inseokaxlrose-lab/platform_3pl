@@ -5,7 +5,7 @@ import { ActionError } from '@/lib/actions/action-error'
 import { currentActor, requireOperatorId } from '@/lib/actor'
 import { prisma } from '@/lib/prisma'
 import { parseQty } from '@/lib/units/convert'
-import { asnItemSelect, entryToBase, itemLotOptions } from './asns'
+import { asnItemSelect, entryToBase, itemLotOptions, resolveItemDates } from './asns'
 import type { InspectionData } from './inspection-schema'
 
 // 입고 검수 (docs/decisions/0053) — 도착한 물건의 수량·불량·로트·유통기한을 적는다
@@ -45,15 +45,8 @@ export async function addInspection(data: InspectionData) {
     if (!options.useLot && data.lotNo) {
       throw new ActionError('VALIDATION', `로트를 관리하지 않는 품목입니다 (${item.code}).`)
     }
-    if (options.useExpiry && !data.expiryOn) {
-      throw new ActionError(
-        'VALIDATION',
-        `유통기한을 넣어 주세요 (유통기한 관리 품목: ${item.code}).`,
-      )
-    }
-    if (!options.useExpiry && data.expiryOn) {
-      throw new ActionError('VALIDATION', `유통기한을 관리하지 않는 품목입니다 (${item.code}).`)
-    }
+    // 제조일·유통기한: 품목의 기한 입력 방식대로 (제조일 입력이면 유통기한을 계산, 0089)
+    const dates = resolveItemDates(item, data, true)
 
     // 불량 사유: 불량이 있을 때만 남긴다 (공통코드 검사, 0087)
     const defectReasonCd =
@@ -69,7 +62,8 @@ export async function addInspection(data: InspectionData) {
         asnLineId: line.id,
         itemId: item.id,
         lotNo: data.lotNo,
-        expiryOn: data.expiryOn ? new Date(`${data.expiryOn}T00:00:00.000Z`) : null,
+        expiryOn: dates.expiryOn,
+        mfgOn: dates.mfgOn,
         inspectedQty: good.baseQty,
         defectQty: defect.baseQty,
         defectReasonCd,

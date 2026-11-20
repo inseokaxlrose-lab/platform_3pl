@@ -1,4 +1,5 @@
 import 'server-only'
+import { resolveExpiryDates, type ExpiryRule } from '@/lib/items/expiry-dates'
 import { assertCodeValues } from '@/lib/common-code/common-codes'
 import {
   shipperDefaultsSelect,
@@ -64,6 +65,9 @@ export const asnItemSelect = (operatorId: bigint) =>
     status: true,
     useLot: true,
     useExpiry: true,
+    // 기한 입력 방식·총 기한 일수: 제조일로 유통기한 계산 (0089)
+    expiryInput: true,
+    shelfLifeDays: true,
     labelUnit: true,
     baseUnit: { select: { code: true, ...unitDecimalsSelect(operatorId) } },
     // 환산단위 (기본단위 행은 빼고, 0083)
@@ -83,6 +87,8 @@ export type AsnLineItem = {
   status: string
   useLot: string | null
   useExpiry: string | null
+  expiryInput: string | null
+  shelfLifeDays: number | null
   // DB 값 목록 칸 — itemLotOptions에서 정해진 값으로 좁힌다
   labelUnit: string | null
   baseUnit: { code: string; decimals: number }
@@ -129,6 +135,31 @@ export function itemLotOptions(item: AsnLineItem) {
   )
 }
 
+// 품목의 제조일·유통기한 규칙 (0089) — 관리 여부는 화주사 기본값까지 본 실제 값
+export function itemExpiryRule(item: AsnLineItem): ExpiryRule {
+  return {
+    useExpiry: itemLotOptions(item).useExpiry,
+    expiryInput: item.expiryInput,
+    shelfLifeDays: item.shelfLifeDays,
+  }
+}
+
+// 제조일·유통기한 → 저장할 날짜 (규칙에 안 맞으면 ActionError, 0089)
+export function resolveItemDates(
+  item: AsnLineItem,
+  input: { expiryOn?: string | null; mfgOn?: string | null },
+  required: boolean,
+) {
+  const result = resolveExpiryDates(itemExpiryRule(item), input, required)
+  if (result.issue) throw new ActionError('VALIDATION', `${result.issue.message} (${item.code})`)
+  const toDate = (value: string | null) => (value ? new Date(`${value}T00:00:00.000Z`) : null)
+  return {
+    expiryOn: toDate(result.dates.expiryOn),
+    mfgOn: toDate(result.dates.mfgOn),
+    text: result.dates,
+  }
+}
+
 // 라인 하나 → 저장할 값 (문제가 있으면 그 문구로 ActionError — 줄 번호는 부르는 쪽이 붙인다)
 // 품목은 그 화주사의 사용 중인 품목, 단위는 기본단위 또는 품목의 환산단위
 // 기본단위로 바꾼 수량이 기본단위 소수 자리를 넘으면 거부 (예: EA 정수인데 BOX 0.3 × 24 = 7.2)
@@ -150,9 +181,8 @@ export function resolveAsnLine(item: AsnLineItem | undefined, line: AsnLineValue
   // 로트·유통기한: 관리하지 않는 품목은 비워야 한다 (관리 품목은 ASN에서는 선택 — 실제 값은 검수에서)
   const options = itemLotOptions(item)
   if (!options.useLot && line.lotNo) fail(`로트를 관리하지 않는 품목입니다 (${item.code}).`)
-  if (!options.useExpiry && line.expiryOn) {
-    fail(`유통기한을 관리하지 않는 품목입니다 (${item.code}).`)
-  }
+  // 제조일·유통기한: ASN에서는 선택. 제조일 입력 품목은 제조일로 유통기한을 계산한다 (0089)
+  const dates = resolveItemDates(item, line, false)
 
   return {
     itemId: item.id,
@@ -160,7 +190,8 @@ export function resolveAsnLine(item: AsnLineItem | undefined, line: AsnLineValue
     entryUnit,
     entryQty,
     lotNo: line.lotNo,
-    expiryOn: line.expiryOn ? new Date(`${line.expiryOn}T00:00:00.000Z`) : null,
+    expiryOn: dates.expiryOn,
+    mfgOn: dates.mfgOn,
     remark: line.remark,
   }
 }

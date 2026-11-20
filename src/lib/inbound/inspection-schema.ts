@@ -22,6 +22,8 @@ export const inspectionSchema = z
     defectQty: qtyText('불량 수량은 0 이상의 숫자로 넣어 주세요.'),
     lotNo: optionalText(50),
     expiryOn: optionalDate,
+    // 제조일 (품목 기한 입력 방식이 제조일·둘 다면 필수, 0089)
+    mfgOn: optionalDate.default(''),
     // 불량 사유 (공통코드 DEFECT_REASON): 불량 수량이 있으면 필수 (0087)
     defectReasonCd: z.string().trim().max(20).default(''),
     remark: optionalText(200),
@@ -45,6 +47,7 @@ export const EMPTY_INSPECTION: InspectionInput = {
   defectQty: '',
   lotNo: '',
   expiryOn: '',
+  mfgOn: '',
   defectReasonCd: '',
   remark: '',
 }

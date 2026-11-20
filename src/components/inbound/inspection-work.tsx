@@ -8,6 +8,7 @@ import { LocalDataGrid, type DataGridColumn } from '@/components/data-grid'
 import { useCodeOptions } from '@/components/common-code'
 import { CodeSelect, DateInput, QtyInput } from '@/components/inputs'
 import { codeName } from '@/lib/common-code'
+import { addDays, isMfgInput } from '@/lib/items/expiry-dates'
 import { Field, FormGrid } from '@/components/master-form'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -117,6 +118,17 @@ export function InspectionWorkPanel({
   const [pending, startTransition] = useTransition()
   const set = (patch: Partial<InspectionInput>) => setValue((v) => ({ ...v, ...patch }))
   const line = work.lines.find((l) => l.id === value.asnLineId)
+  // 제조일 입력 품목: 유통기한 = 제조일 + 총 기한 일수 (화면에서 미리 계산해 보여 준다, 0089)
+  const mfgMode = Boolean(
+    line &&
+    isMfgInput({
+      useExpiry: line.useExpiry,
+      expiryInput: line.expiryInput,
+      shelfLifeDays: line.shelfLifeDays,
+    }),
+  )
+  const computedExpiry =
+    mfgMode && value.mfgOn && line?.shelfLifeDays ? addDays(value.mfgOn, line.shelfLifeDays) : ''
   // 불량 수량이 있으면 불량 사유를 고른다 (0087)
   const hasDefect = /[1-9]/.test(value.defectQty ?? '')
   const defectReasons = useCodeOptions('DEFECT_REASON')
@@ -162,6 +174,7 @@ export function InspectionWorkPanel({
     { id: 'lineNo', header: '줄', accessor: 'lineNo', format: 'number', width: 56 },
     { id: 'item', header: '품목', accessor: 'item' },
     { id: 'lotNo', header: '로트번호', accessor: 'lotNo' },
+    { id: 'mfgOn', header: '제조일', accessor: 'mfgOn', format: 'date' },
     { id: 'expiryOn', header: '유통기한', accessor: 'expiryOn', format: 'date' },
     {
       id: 'inspectedQty',
@@ -256,6 +269,7 @@ export function InspectionWorkPanel({
                         // 화주사가 알려 준 로트·유통기한을 기본값으로
                         lotNo: next?.useLot ? (next.plannedLotNo ?? '') : '',
                         expiryOn: next?.useExpiry ? (next.plannedExpiryOn ?? '') : '',
+                        mfgOn: next?.useExpiry ? (next.plannedMfgOn ?? '') : '',
                       })
                     }}
                     disabled={disabled}
@@ -336,18 +350,47 @@ export function InspectionWorkPanel({
                   />
                 </Field>
                 <Field
+                  label="제조일"
+                  span={3}
+                  required={
+                    line?.useExpiry && line.expiryInput !== null && line.expiryInput !== 'EXPIRY'
+                  }
+                  error={errors.mfgOn}
+                  htmlFor="insp-mfg"
+                  hint={
+                    !line?.useExpiry
+                      ? undefined
+                      : mfgMode
+                        ? `유통기한 = 제조일 + ${line.shelfLifeDays}일`
+                        : '알면 넣습니다'
+                  }
+                >
+                  <DateInput
+                    id="insp-mfg"
+                    value={value.mfgOn ?? ''}
+                    onChange={(mfgOn) => set({ mfgOn })}
+                    disabled={disabled || !line?.useExpiry}
+                  />
+                </Field>
+                <Field
                   label="유통기한"
                   span={3}
-                  required={line?.useExpiry}
+                  required={line?.useExpiry && !mfgMode}
                   error={errors.expiryOn}
                   htmlFor="insp-expiry"
-                  hint={line && !line.useExpiry ? '유통기한을 관리하지 않는 품목' : undefined}
+                  hint={
+                    line && !line.useExpiry
+                      ? '유통기한을 관리하지 않는 품목'
+                      : mfgMode
+                        ? '제조일로 계산됩니다'
+                        : undefined
+                  }
                 >
                   <DateInput
                     id="insp-expiry"
-                    value={value.expiryOn}
+                    value={mfgMode ? computedExpiry : value.expiryOn}
                     onChange={(expiryOn) => set({ expiryOn })}
-                    disabled={disabled || !line?.useExpiry}
+                    disabled={disabled || !line?.useExpiry || mfgMode}
                   />
                 </Field>
                 <Field
@@ -367,7 +410,7 @@ export function InspectionWorkPanel({
                     invalid={Boolean(errors.defectReasonCd)}
                   />
                 </Field>
-                <Field label="비고" span={3} error={errors.remark} htmlFor="insp-remark">
+                <Field label="비고" span={6} error={errors.remark} htmlFor="insp-remark">
                   <Input
                     id="insp-remark"
                     value={value.remark}

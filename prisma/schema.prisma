@@ -1647,6 +1647,8 @@ model Stock {
   item        Item      @relation(fields: [itemId], references: [id], onDelete: Restrict)
   lotNo       String?   @map("lot_no") @db.VarChar(50)
   expiryOn    DateTime? @map("expiry_dt") @db.Date
+  // 제조일: 이 재고 줄이 처음 생길 때의 값 — 재고 주소에는 넣지 않는다 (0089)
+  mfgOn       DateTime? @map("mfg_dt") @db.Date
   // 재고상태 (재고 주소의 일부, 0088): NORMAL 정상 / HOLD 보류 / DAMAGED 불량 / QUARANTINE 격리 — 정상만 가용
   status      String    @default("NORMAL") @map("stock_status_cd") @db.VarChar(20)
 
@@ -1686,6 +1688,8 @@ model StockTxn {
   itemId      BigInt    @map("item_id")
   lotNo       String?   @map("lot_no") @db.VarChar(50)
   expiryOn    DateTime? @map("expiry_dt") @db.Date
+  // 그때의 제조일 (0089)
+  mfgOn       DateTime? @map("mfg_dt") @db.Date
   // 그때의 재고상태 (0088)
   status      String    @default("NORMAL") @map("stock_status_cd") @db.VarChar(20)
   type        String    @map("txn_type_cd") @db.VarChar(20)
@@ -1794,6 +1798,8 @@ model AsnLine {
   // 화주사가 알려 준 로트·유통기한 (참고용, 검수에서 실제 값을 넣는다)
   lotNo       String?   @map("lot_no") @db.VarChar(50)
   expiryOn    DateTime? @map("expiry_dt") @db.Date
+  // 화주가 알려 준 제조일 (선택, 0089)
+  mfgOn       DateTime? @map("mfg_dt") @db.Date
 
   // 누적 수량 (입고 확정·적치·마감 때 함께 바뀐다)
   confirmedQty Decimal @default(0) @map("confirmed_qty") @db.Decimal(18, 3)
@@ -1852,6 +1858,8 @@ model InboundReceiptLine {
   stockTxn     StockTxn          @relation(fields: [stockTxnId], references: [id], onDelete: Restrict)
   lotNo        String?           @map("lot_no") @db.VarChar(50)
   expiryOn     DateTime?         @map("expiry_dt") @db.Date
+  // 제조일 (검수 값, 0089)
+  mfgOn        DateTime?         @map("mfg_dt") @db.Date
 
   // 확정 수량 (기본단위)과 그중 적치한 수량
   qty        Decimal @map("confirmed_qty") @db.Decimal(18, 3)
@@ -1883,6 +1891,8 @@ model InboundInspection {
   // 로트·유통기한: 품목 설정에 따라 필수 또는 null
   lotNo    String?   @map("lot_no") @db.VarChar(50)
   expiryOn DateTime? @map("expiry_dt") @db.Date
+  // 제조일 (품목 기한 입력 방식이 제조일·둘 다면 필수, 0089)
+  mfgOn    DateTime? @map("mfg_dt") @db.Date
 
   // 검수 수량(정상, 확정 가능) · 불량 수량 · 그중 확정한 수량
   inspectedQty   Decimal  @map("inspect_qty") @db.Decimal(18, 3)

@@ -47,9 +47,13 @@ export async function getInspectionWork(asnId: bigint, scope: DataScope) {
       })),
       useLot: options.useLot,
       useExpiry: options.useExpiry,
-      // 화주사가 알려 준 로트·유통기한 (검수 입력의 기본값으로)
+      // 기한 입력 방식·총 기한 일수 (제조일로 유통기한 계산, 0089)
+      expiryInput: line.item.expiryInput,
+      shelfLifeDays: line.item.shelfLifeDays,
+      // 화주사가 알려 준 로트·유통기한·제조일 (검수 입력의 기본값으로)
       plannedLotNo: line.lotNo,
       plannedExpiryOn: line.expiryOn?.toISOString().slice(0, 10) ?? null,
+      plannedMfgOn: line.mfgOn?.toISOString().slice(0, 10) ?? null,
       ...lineProgress(line),
       inspectedQty: sum(line.inspections.map((i) => i.inspectedQty)),
       defectQty: sum(line.inspections.map((i) => i.defectQty)),
@@ -67,6 +71,7 @@ export async function getInspectionWork(asnId: bigint, scope: DataScope) {
       defectQty: qty(i.defectQty),
       confirmedQty: qty(i.confirmedQty),
       entry: i.entryUnit && i.entryQty ? `${qty(i.entryQty)} ${i.entryUnit}` : null,
+      mfgOn: i.mfgOn?.toISOString().slice(0, 10) ?? null,
       defectReasonCd: i.defectReasonCd,
       remark: i.remark,
       inspectedAt: i.inspectedAt,

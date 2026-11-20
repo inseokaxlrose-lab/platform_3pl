@@ -135,12 +135,20 @@ export async function checkAsnUpload(
         add(row, 'expiryOn', '날짜 형식이 아닙니다 (예: 2027-01-31).')
         continue
       }
+      // 제조일 (선택, 0089)
+      const mfgText = row.values.mfgOn ?? ''
+      const mfg = mfgText ? normalizeDate(mfgText) : ''
+      if (mfg === null) {
+        add(row, 'mfgOn', '날짜 형식이 아닙니다 (예: 2026-01-31).')
+        continue
+      }
       const parsed = asnLineSchema.safeParse({
         itemId: String(item.id),
         unit: row.values.unit || item.baseUnit.code,
         qty: row.values.qty ?? '',
         lotNo: row.values.lotNo ?? '',
         expiryOn: expiry,
+        mfgOn: mfg,
         remark: row.values.remark ?? '',
       })
       if (!parsed.success) {

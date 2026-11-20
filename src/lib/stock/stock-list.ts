@@ -155,6 +155,8 @@ export async function listStock(input: ListQuery, scope: DataScope) {
           spec: s.item.spec,
           lotNo: s.lotNo,
           expiryOn: s.expiryOn?.toISOString().slice(0, 10) ?? null,
+          // 제조일: 재고 줄이 처음 생길 때의 값 (0089)
+          mfgOn: s.mfgOn?.toISOString().slice(0, 10) ?? null,
           ...expiry,
           status: s.status,
           baseUnit: s.item.baseUnit.code,
@@ -232,6 +234,7 @@ export async function listStock(input: ListQuery, scope: DataScope) {
         spec: item.spec,
         lotNo: lot,
         expiryOn: expiryOn?.toISOString().slice(0, 10) ?? null,
+        mfgOn: null,
         ...expiry,
         status: g.status,
         baseUnit: item.baseUnit.code,

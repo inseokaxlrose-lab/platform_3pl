@@ -72,6 +72,12 @@ export function asnUploadTemplate(withShipper: boolean): UploadTemplate {
         example: '2027-01-31',
         note: '유통기한 관리 품목만 (선택)',
       },
+      {
+        key: 'mfgOn',
+        header: '제조일',
+        example: '2026-01-31',
+        note: '유통기한 관리 품목만 (선택). 제조일 입력 품목은 이 값으로 유통기한을 계산합니다',
+      },
       { key: 'remark', header: '비고', note: '줄 비고 (선택)' },
     ],
   }

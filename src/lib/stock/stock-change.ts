@@ -229,28 +229,45 @@ async function findStockId(tx: Tx, a: ResolvedAddress): Promise<bigint | null> {
   return rows[0]?.stock_id ?? null
 }
 
-async function ensureStockId(tx: Tx, a: ResolvedAddress): Promise<bigint> {
+// mfgOn: 새로 생기는 줄의 제조일 (이미 있는 줄은 그대로 — 재고 주소에 넣지 않으므로 처음 값, 0089)
+async function ensureStockId(
+  tx: Tx,
+  a: ResolvedAddress,
+  mfgOn: string | null = null,
+): Promise<bigint> {
   await tx.$executeRaw`
-    INSERT INTO tb_stock (operator_id, center_id, warehouse_id, location_id, shipper_id, item_id, lot_no, expiry_dt, stock_status_cd, updated_at)
+    INSERT INTO tb_stock (operator_id, center_id, warehouse_id, location_id, shipper_id, item_id, lot_no, expiry_dt, stock_status_cd, mfg_dt, updated_at)
     VALUES (${a.operatorId}, ${a.centerId}, ${a.warehouseId}, ${a.locationId}, ${a.shipperId}, ${a.itemId},
-            ${a.lotNo}::varchar, ${a.expiryOn}::date, ${a.status}, CURRENT_TIMESTAMP)
+            ${a.lotNo}::varchar, ${a.expiryOn}::date, ${a.status}, ${mfgOn}::date, CURRENT_TIMESTAMP)
     ON CONFLICT DO NOTHING`
   const id = await findStockId(tx, a)
   if (id === null) throw new Error('재고 줄을 만들지 못했습니다.')
   return id
 }
 
-type LockedStock = { id: bigint; qty: bigint; allocated: bigint }
+// 재고 줄의 제조일 (이동·상태 변경으로 새 줄이 생길 때 그대로 옮긴다, 0089)
+async function stockMfg(tx: Tx, stockId: bigint): Promise<string | null> {
+  const [row] = await tx.$queryRaw<{ mfg: string | null }[]>`
+    SELECT mfg_dt::text AS mfg FROM tb_stock WHERE stock_id = ${stockId}`
+  return row?.mfg ?? null
+}
+
+type LockedStock = { id: bigint; qty: bigint; allocated: bigint; mfgOn: string | null }
 
 // 줄 잠금: 트랜잭션이 끝날 때까지 다른 요청은 이 줄을 바꾸지 못하고 기다린다
 // 여러 줄은 항상 키 순서로 잠근다 → 두 요청이 서로를 기다리는 교착(데드락)을 막는다
 async function lockStocks(tx: Tx, ids: bigint[]): Promise<Map<bigint, LockedStock>> {
   const locked = new Map<bigint, LockedStock>()
   for (const id of [...new Set(ids)].sort((a, b) => (a < b ? -1 : a > b ? 1 : 0))) {
-    const [row] = await tx.$queryRaw<{ qty: string; allocated: string }[]>`
-      SELECT stock_qty::text AS qty, alloc_qty::text AS allocated
+    const [row] = await tx.$queryRaw<{ qty: string; allocated: string; mfg: string | null }[]>`
+      SELECT stock_qty::text AS qty, alloc_qty::text AS allocated, mfg_dt::text AS mfg
       FROM tb_stock WHERE stock_id = ${id} FOR UPDATE`
-    locked.set(id, { id, qty: parseQty(row.qty), allocated: parseQty(row.allocated) })
+    locked.set(id, {
+      id,
+      qty: parseQty(row.qty),
+      allocated: parseQty(row.allocated),
+      mfgOn: row.mfg,
+    })
   }
   return locked
 }
@@ -307,6 +324,8 @@ async function applyChange(
       lotNo: a.lotNo,
       expiryOn: toDate(a.expiryOn),
       status: a.status,
+      // 그 재고 줄의 제조일 (0089)
+      mfgOn: toDate(stock.mfgOn),
       type: fields.type,
       qtyChange: qtyText(change),
       qtyAfter: qtyText(after),
@@ -330,7 +349,14 @@ async function applyChange(
 // 입고: 재고를 늘린다 (입고 확정 → 입고대기 창고)
 export async function receiveStock(
   tx: Tx,
-  input: { address: StockAddress; qty: string; ref?: StockRef; reason?: string },
+  input: {
+    address: StockAddress
+    qty: string
+    ref?: StockRef
+    reason?: string
+    // 제조일 'YYYY-MM-DD' (새 재고 줄에만 남는다, 0089)
+    mfgOn?: string | null
+  },
 ): Promise<StockChangeResult> {
   return withStockWrite(async () => {
     const resolved = await resolveAddress(tx, input.address, 'IN')
@@ -338,7 +364,7 @@ export async function receiveStock(
     const a = input.address.status ? resolved : { ...resolved, status: resolved.warehouseStatus }
     const change = parseChange(input.qty, a.baseUnit)
     if (change <= 0n) throw new ActionError('VALIDATION', '입고 수량은 0보다 커야 합니다.')
-    const id = await ensureStockId(tx, a)
+    const id = await ensureStockId(tx, a, normalizeExpiry(input.mfgOn))
     const stock = (await lockStocks(tx, [id])).get(id)!
     return applyChange(tx, a, stock, change, {
       type: 'RECEIVE',
@@ -388,7 +414,7 @@ export async function moveStock(
     // 출발 재고가 아예 없으면 부족 (빈 줄을 만들지 않는다)
     const fromId = await findStockId(tx, from)
     if (fromId === null) throw shortage(from, null, -qty)
-    const toId = await ensureStockId(tx, to)
+    const toId = await ensureStockId(tx, to, await stockMfg(tx, fromId))
     const locked = await lockStocks(tx, [fromId, toId])
 
     // 이력은 고칠 수 없어(트리거) 나중에 묶음 번호를 채울 수 없다 → 키를 미리 받아 첫 줄에 쓴다
@@ -491,7 +517,7 @@ export async function changeStockStatus(
     if (fromId === null) throw shortage(from, null, -qty)
     // 같은 자리·같은 품목이므로 들어오는 줄은 늘리기 검사(사용 중지 등)를 하지 않는다
     const to = { ...from, status: toStatus }
-    const toId = await ensureStockId(tx, to)
+    const toId = await ensureStockId(tx, to, await stockMfg(tx, fromId))
     const locked = await lockStocks(tx, [fromId, toId])
     const [{ id: groupId }] = await tx.$queryRaw<{ id: bigint }[]>`
       SELECT nextval(pg_get_serial_sequence('tb_stock_txn', 'stock_txn_id')) AS id`
