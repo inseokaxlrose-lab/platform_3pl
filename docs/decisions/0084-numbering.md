@@ -1,7 +1,7 @@
 # 0084. 코드 체계(체번) — 체번 규칙·현재값 표, 운영사·날짜별 문서번호
 
 - 날짜: 2026-11-20
-- 상태: 채택 (① 체번 기반 · ② 코드 3층 · ③ 용어·타입 완료 — ④ 중간 항목부터는 다음 단계)
+- 상태: 채택 (① 체번 기반 · ② 코드 3층 · ③ 용어·타입 · ④-1 칼럼 이름 완료 — ④-2 타입·검사부터는 다음 단계)
 - 관련: 0025 (기준정보 코드 3층 — ②에서 갱신), 0047 (문서 번호 — 대체), 0039 (멀티테넌트)
 - 정의서: `docs/specs/system_code.md` (테이블 정의서 검토 + 체번 반영안)
 - 코드: `src/lib/numbering/` (`numbering-codes.ts` 값·번호 모양, `numbering.ts` 발급), `src/lib/documents/doc-no.ts`
@@ -82,6 +82,25 @@
 - **거래처 조회 키**: 화주 연동 조회 키가 `CUST_CD`면 거래처는 `customerCustCd`, 납품처는 `shipToCustCd`로 찾는다(API·엑셀). 새 거래처·납품처의 우리 코드는 보낸 값 또는 자동 체번이고, 다른 우리 코드를 보내면 `CUSTOMER_CD_INVALID`·`SHIP_TO_CD_INVALID`. 경로 `{customerCd}`도 조회 키 값. 응답은 우리 코드·사용자 정의 코드를 함께 준다.
 - **H4 화주사 타입**: `tb_shipper`·`tb_shipper_contact`의 TEXT 칼럼을 운영사·거래처와 같은 길이의 VARCHAR로(코드 20, 이름 100, 주소 200, 전화·팩스 15, 이메일 100, 사업자번호 CHAR(10)), 사업자번호 10자리·전화·팩스 8~15자리 숫자 검사 추가.
 - **H6 운영사 표시 단위**: `weight_unit_cd`·`length_unit_cd`(코드 글자) → `weight_unit_id`·`length_unit_id`(FK `tb_unit`). 기본값은 DB 함수 `system_unit_id('KG'/'CM')`(시스템 단위 id). 유형(중량·길이)과 범위(시스템 또는 그 운영사 단위)는 FK로 표현되지 않아 트리거로 검사한다. 단위 코드가 운영사마다 겹칠 수 있어 코드로는 어떤 단위인지 확정되지 않기 때문.
+
+## ④ 중간 항목 (정의서 3장 M1~M18)
+
+사용자 결정(2026-11-20): 세 번 나눠 병합(④-1 이름 · ④-2 타입·검사 · ④-3 구조), M18 센터 옛 담당자 칸은 삭제(값은 담당자 표로), M4 담당자 표는 화면에도 부서·직책·알림 칸, M17 그리드 설정·개인 설정 표는 둘 다 유지(용도가 다름)하고 설명만 고친다.
+
+### ④-1 칼럼 이름
+
+DB 칼럼 이름만 바꾸고(RENAME — 데이터 유지) 프로그램의 Prisma 필드 이름(`locType`·`palletBoxQty` 등)은 그대로 둔다. 화면·API 이름까지 바꾸면 변경 범위만 커지고 얻는 것이 없다.
+
+| # | 전 | 후 |
+| - | - | - |
+| M1 | `tb_perm_group_perm`·`tb_user_perm_group`.`group_id` | `perm_group_id` |
+| M2 | `tb_code_group`·`tb_code_item`.`group_id` | `code_group_id` |
+| M3 | `code_item_cd`·`code_item_nm` | `code_cd`·`code_nm` |
+| M8 | `expiry_alert_day_cnt` | `expiry_alert_days` (일수는 `_days`) |
+| M9 | `conv_cnt`·`pallet_box_qty`·`max_stack_box`·`confirm_qty` | `conv_qty`·`pallet_box_cnt`·`max_stack_box_cnt`·`confirmed_qty` (수량 `_qty`, 개수 `_cnt`) |
+| M10 | `loc_type_cd`·`default_*_loc_id`·`default_loc_id`·`loc_cd_prefix`·`loc_cd_separator` | `location_*` (PK가 `location_id`라 `loc` 약어를 쓰지 않는다) |
+| M12 | `tb_customer.region_cd`(법정동코드)·`tb_center.region_nm`(시군구) | `bjd_cd`·`sigungu_nm` (납품처와 같은 이름) |
+| M16 | `tb_api_rate_bucket.window_start` | `window_start_at` (일시는 `_at`) |
 
 ## 버린 안
 

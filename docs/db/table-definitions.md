@@ -136,7 +136,7 @@
 
 | No | 칼럼 | 한글명 | 설명 | 타입 | NULL | 기본값 | 키 |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| 1 | `group_id` | 그룹 ID |  | BIGINT | N |  | PK FK → tb_perm_group.perm_group_id |
+| 1 | `perm_group_id` | 권한그룹 ID |  | BIGINT | N |  | PK FK → tb_perm_group.perm_group_id |
 | 2 | `perm_cd` | 권한 코드 |  | TEXT | N |  | PK |
 
 ## tb_session
@@ -246,12 +246,12 @@
 | No | 칼럼 | 한글명 | 설명 | 타입 | NULL | 기본값 | 키 |
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | 1 | `user_id` | 사용자 ID |  | BIGINT | N |  | PK FK → tb_user.user_id |
-| 2 | `group_id` | 그룹 ID |  | BIGINT | N |  | PK FK → tb_perm_group.perm_group_id |
+| 2 | `perm_group_id` | 권한그룹 ID |  | BIGINT | N |  | PK FK → tb_perm_group.perm_group_id |
 | 3 | `created_at` | 등록 일시 | 등록 일시 (자동) | TIMESTAMP(3) | N | CURRENT_TIMESTAMP |  |
 
 **인덱스**
 
-- `tb_user_perm_group_group_id_idx`: `CREATE INDEX tb_user_perm_group_group_id_idx ON tb_user_perm_group (group_id)`
+- `tb_user_perm_group_perm_group_id_idx`: `CREATE INDEX tb_user_perm_group_perm_group_id_idx ON tb_user_perm_group (perm_group_id)`
 
 ## tb_user_perm_override
 
@@ -512,9 +512,9 @@
 | 30 | `close_dt` | 마감 일자 |  | DATE | Y |  |  |
 | 31 | `country_cd` | 국가 코드 | ② 위치·연락처 (전화번호는 하이픈 없이 숫자만, 0029) | CHAR(2) | N | KR |  |
 | 32 | `customs_office_cd` | 세관 사무실 코드 |  | VARCHAR(10) | Y |  |  |
-| 33 | `default_inbound_loc_id` | 기본 입고 로케이션 ID | 기본 로케이션 3개: 센터 생성·보정 때 입고대기·출고대기·반품대기 창고의 DEFAULT를 연결 (ensureCenterDefaults) | BIGINT | Y |  | FK → tb_location.location_id |
-| 34 | `default_outbound_loc_id` | 기본 출고 로케이션 ID |  | BIGINT | Y |  | FK → tb_location.location_id |
-| 35 | `default_return_loc_id` | 기본 반품 로케이션 ID |  | BIGINT | Y |  | FK → tb_location.location_id |
+| 33 | `default_inbound_location_id` | 기본 입고 로케이션 ID | 기본 로케이션 3개: 센터 생성·보정 때 입고대기·출고대기·반품대기 창고의 DEFAULT를 연결 (ensureCenterDefaults) | BIGINT | Y |  | FK → tb_location.location_id |
+| 34 | `default_outbound_location_id` | 기본 출고 로케이션 ID |  | BIGINT | Y |  | FK → tb_location.location_id |
+| 35 | `default_return_location_id` | 기본 반품 로케이션 ID |  | BIGINT | Y |  | FK → tb_location.location_id |
 | 36 | `directions` | 오시는길 |  | VARCHAR(1000) | Y |  |  |
 | 37 | `dock_cnt` | 도크 수 |  | INTEGER | Y |  |  |
 | 38 | `email` | 이메일 |  | VARCHAR(100) | Y |  |  |
@@ -533,7 +533,7 @@
 | 51 | `open_dt` | 열림 일자 |  | DATE | Y |  |  |
 | 52 | `pallet_capa_cnt` | 팔레트 용량 수 |  | INTEGER | Y |  |  |
 | 53 | `pharma_yn` | 의약품 여부 |  | CHAR(1) | N | N |  |
-| 54 | `region_nm` | 권역 명 |  | VARCHAR(50) | Y |  |  |
+| 54 | `sigungu_nm` | 시군구 명 |  | VARCHAR(50) | Y |  |  |
 | 55 | `remark` | 비고 | 비고 | VARCHAR(1000) | Y |  |  |
 | 56 | `serial_mgmt_yn` | 시리얼 관리 여부 |  | CHAR(1) | Y |  |  |
 | 57 | `ship_cutoff_time` | 출고 마감 시각 |  | TIME WITHOUT TIME ZONE | Y |  |  |
@@ -650,7 +650,7 @@
 | 15 | `remark` | 비고 | 비고 | VARCHAR(1000) | Y |  |  |
 | 16 | `center_id` | 센터 ID | 센터·창고는 등록 후 불변 (센터는 창고의 센터, 조회·범위용) | BIGINT | N |  | FK → tb_center.center_id |
 | 17 | `zone_id` | 구역 ID | 같은 창고의 구역만 (시스템 기본 로케이션 등은 비움) | BIGINT | Y |  | FK → tb_zone.zone_id |
-| 18 | `loc_type_cd` | 로케이션 유형 코드 | 공통코드 LOC_TYPE | VARCHAR(20) | N | RACK |  |
+| 18 | `location_type_cd` | 로케이션 유형 코드 | 공통코드 LOC_TYPE | VARCHAR(20) | N | RACK |  |
 | 19 | `system_yn` | 시스템 여부 | 시스템 기본 로케이션 (시스템 기본 창고의 DEFAULT): 사용 중지·삭제 불가 | CHAR(1) | N | N |  |
 | 20 | `bay_no` | 베이 번호 |  | VARCHAR(10) | Y |  |  |
 | 21 | `cell_no` | 셀 번호 |  | VARCHAR(10) | Y |  |  |
@@ -739,11 +739,11 @@
 | 28 | `allocatable_yn` | 할당가능 여부 | 이 창고 재고를 주문에 할당할 수 있는지 (가용재고 포함 여부) | CHAR(1) | N | Y |  |
 | 29 | `default_stock_status_cd` | 기본 재고 상태 코드 | 이 창고에 적치될 때 기본 재고상태 (STOCK_STATUS) | VARCHAR(20) | N | NORMAL |  |
 | 30 | `alloc_priority` | 할당 우선순위 | 여러 창고에 재고가 있을 때 작은 값 먼저 (1~999) | INTEGER | N | 100 |  |
-| 31 | `default_loc_id` | 기본 로케이션 ID | 로케이션을 정하지 않고 적치할 때 쓰는 곳 (시스템 기본 창고는 DEFAULT 로케이션) | BIGINT | Y |  | FK → tb_location.location_id |
+| 31 | `default_location_id` | 기본 로케이션 ID | 로케이션을 정하지 않고 적치할 때 쓰는 곳 (시스템 기본 창고는 DEFAULT 로케이션) | BIGINT | Y |  | FK → tb_location.location_id |
 | 32 | `manager_user_id` | 관리자 사용자 ID | ④ 관리·담당 [2차] | BIGINT | Y |  | FK → tb_user.user_id |
 | 33 | `dedicated_shipper_id` | 전용 화주사 ID | 전용 화주사 (NULL = 공용 창고) | BIGINT | Y |  | FK → tb_shipper.shipper_id |
-| 34 | `loc_cd_prefix` | 로케이션 코드 접두 | 로케이션 일괄 생성 때 쓰는 접두어·구분자 (구분자가 없으면 '-') | VARCHAR(10) | Y |  |  |
-| 35 | `loc_cd_separator` | 로케이션 코드 구분자 |  | CHAR(1) | Y |  |  |
+| 34 | `location_cd_prefix` | 로케이션 코드 접두 | 로케이션 일괄 생성 때 쓰는 접두어·구분자 (구분자가 없으면 '-') | VARCHAR(10) | Y |  |  |
+| 35 | `location_cd_separator` | 로케이션 코드 구분자 |  | CHAR(1) | Y |  |  |
 | 36 | `remark` | 비고 | ⑤ 확장 | VARCHAR(1000) | Y |  |  |
 | 37 | `ext_attr` | 확장속성 | 확장 속성 (JSON) | JSONB | Y |  |  |
 
@@ -755,7 +755,7 @@
 **인덱스**
 
 - `tb_warehouse_center_id_idx`: `CREATE INDEX tb_warehouse_center_id_idx ON tb_warehouse (center_id)`
-- `tb_warehouse_default_loc_id_idx`: `CREATE INDEX tb_warehouse_default_loc_id_idx ON tb_warehouse (default_loc_id)`
+- `tb_warehouse_default_location_id_idx`: `CREATE INDEX tb_warehouse_default_location_id_idx ON tb_warehouse (default_location_id)`
 - `tb_warehouse_operator_id_idx`: `CREATE INDEX tb_warehouse_operator_id_idx ON tb_warehouse (operator_id)`
 
 **검사 조건**
@@ -1419,7 +1419,7 @@
 | No | 칼럼 | 한글명 | 설명 | 타입 | NULL | 기본값 | 키 |
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | 1 | `api_client_id` | API키 ID |  | BIGINT | N |  | PK |
-| 2 | `window_start` | 시간대 시작 |  | TIMESTAMP(3) | N |  | PK |
+| 2 | `window_start_at` | 시간대 시작 일시 |  | TIMESTAMP(3) | N |  | PK |
 | 3 | `req_cnt` | 요청 수 |  | INTEGER | N | 0 |  |
 
 ## tb_api_request_item
@@ -1498,7 +1498,7 @@
 | 10 | `zip_cd` | 우편번호 |  | VARCHAR(10) | Y |  |  |
 | 11 | `addr1` | 주소 |  | VARCHAR(200) | Y |  |  |
 | 12 | `addr2` | 상세주소 |  | VARCHAR(200) | Y |  |  |
-| 13 | `region_cd` | 권역 코드 | 법정동코드 10자리 (정제 결과) | CHAR(10) | Y |  |  |
+| 13 | `bjd_cd` | 법정동 코드 | 법정동코드 10자리 (정제 결과) | CHAR(10) | Y |  |  |
 | 14 | `remark` | 비고 | 비고 | VARCHAR(1000) | Y |  |  |
 | 15 | `status_cd` | 상태 코드 | 상태 (상수 CUSTOMER_STATUS): ACTIVE 거래중 / SUSPENDED 거래중지 (신규 출고요청만 막는다) | VARCHAR(20) | N | ACTIVE |  |
 | 16 | `created_at` | 등록 일시 | 등록 일시 (자동) | TIMESTAMP(3) | N | CURRENT_TIMESTAMP |  |
@@ -1533,17 +1533,17 @@
 **인덱스**
 
 - `tb_customer_biz_reg_no_idx`: `CREATE INDEX tb_customer_biz_reg_no_idx ON tb_customer (biz_reg_no)`
+- `tb_customer_bjd_cd_idx`: `CREATE INDEX tb_customer_bjd_cd_idx ON tb_customer (bjd_cd)`
 - `tb_customer_operator_id_shipper_id_status_cd_idx`: `CREATE INDEX tb_customer_operator_id_shipper_id_status_cd_idx ON tb_customer (operator_id, shipper_id, status_cd)`
-- `tb_customer_region_cd_idx`: `CREATE INDEX tb_customer_region_cd_idx ON tb_customer (region_cd)`
 - `tb_customer_shipper_id_customer_nm_idx`: `CREATE INDEX tb_customer_shipper_id_customer_nm_idx ON tb_customer (shipper_id, customer_nm)`
 
 **검사 조건**
 
 - `tb_customer_addr_grade_check`: `CHECK (addr_grade IN ('A', 'B', 'C', 'D', 'F')`
+- `tb_customer_bjd_cd_check`: `CHECK ((bjd_cd IS NULL) OR (bjd_cd ~ '^[0-9]{10}$'))`
 - `tb_customer_customer_cd_check`: `CHECK ((customer_cd) ~ '^[A-Z0-9_-]{1,30}$')`
 - `tb_customer_del_yn_check`: `CHECK (del_yn IN ('Y', 'N')`
 - `tb_customer_order_addr_mode_cd_check`: `CHECK ((order_addr_mode_cd) IN ('SHIP_TO', 'ORDER_ADDR'))`
-- `tb_customer_region_cd_check`: `CHECK ((region_cd IS NULL) OR (region_cd ~ '^[0-9]{10}$'))`
 - `tb_customer_shelf_check`: `CHECK (((COALESCE(min_shelf_days, 0) >= 0) AND (COALESCE(min_shelf_days, 0) <= 9999)) AND ((COALESCE(min_shelf_ratio, 0) >= 0) AND (COALESCE(min_shelf_ratio, 0) <= 100)))`
 - `tb_customer_source_cd_check`: `CHECK ((source_cd) IN ('SCREEN', 'PORTAL', 'API', 'UPLOAD', 'ORDER_AUTO'))`
 - `tb_customer_status_cd_check`: `CHECK ((status_cd) IN ('ACTIVE', 'SUSPENDED'))`
@@ -1673,7 +1673,7 @@
 | 8 | `lot_mgmt_yn` | LOT 관리 여부 |  | CHAR(1) | N | N |  |
 | 9 | `expiry_mgmt_yn` | 기한 관리 여부 | ⑤ 소비기한·LOT: 관리 여부 3개는 상속하지 않는 명시값 (신규 때 화주 실제 값을 복사, 이후 화주 설정 변경에 영향 없음) | CHAR(1) | N | N |  |
 | 10 | `label_unit_cd` | 라벨 단위 코드 | 라벨 단위 (입고 라벨 출력, 0041) (값: PLT, BOX) | ENUM LabelUnit | Y |  |  |
-| 11 | `expiry_alert_day_cnt` | 기한 알림 일 수 | 임박 알림 기준일 (잔여일이 이보다 짧으면 "임박") | INTEGER | Y |  |  |
+| 11 | `expiry_alert_days` | 기한 알림 일수 | 임박 알림 기준일 (잔여일이 이보다 짧으면 "임박") | INTEGER | Y |  |  |
 | 12 | `remark` | 비고 | 비고 | VARCHAR(1000) | Y |  |  |
 | 13 | `status_cd` | 상태 코드 | ACTIVE 사용 / INACTIVE 사용중지 / DISCONTINUED 단종 (신규 입고 불가, 재고 출고는 가능) | VARCHAR(20) | N | ACTIVE |  |
 | 14 | `created_at` | 등록 일시 | 등록 일시 (자동) | TIMESTAMP(3) | N | CURRENT_TIMESTAMP |  |
@@ -1707,12 +1707,12 @@
 | 42 | `last_request_id` | 마지막 요청 ID | 마지막 연동 요청 ID | VARCHAR(40) | Y |  |  |
 | 43 | `lot_source_cd` | LOT 출처 코드 |  | VARCHAR(20) | Y |  |  |
 | 44 | `maker_nm` | 제조사 명 |  | VARCHAR(100) | Y |  |  |
-| 45 | `max_stack_box` | 최대 적층 박스 |  | INTEGER | Y |  |  |
+| 45 | `max_stack_box_cnt` | 최대 적층 박스 수 |  | INTEGER | Y |  |  |
 | 46 | `min_inbound_shelf_days` | 최소 입고 잔여유통일수 | NULL = 화주 값 (상속) | INTEGER | Y |  |  |
 | 47 | `min_order_qty` | 최소 주문 수량 |  | DECIMAL(15,3) | Y |  |  |
 | 48 | `min_outbound_shelf_days` | 최소 출고 잔여유통일수 |  | INTEGER | Y |  |  |
 | 49 | `origin_country_cd` | 원산지 국가 코드 | 원산지 (ISO 3166 두 글자) | CHAR(2) | Y |  |  |
-| 50 | `pallet_box_qty` | 팔레트 박스 수량 |  | INTEGER | Y |  |  |
+| 50 | `pallet_box_cnt` | 팔레트 박스 수 |  | INTEGER | Y |  |  |
 | 51 | `pallet_hi` | 팔레트 단수(HI) |  | INTEGER | Y |  |  |
 | 52 | `pallet_ti` | 팔레트 단당박스수(TI) |  | INTEGER | Y |  |  |
 | 53 | `pallet_type_cd` | 팔레트 유형 코드 | ③ 팔레트 적재: 종류 + 단당 박스 수(TI) × 단수(HI) → PLT 행 자동 계산. TI·HI 없이 팔레트당 박스 수만 넣어도 된다 | VARCHAR(20) | Y |  |  |
@@ -1745,14 +1745,14 @@
 - `tb_item_alloc_rule_cd_check`: `CHECK ((alloc_rule_cd IS NULL) OR ((alloc_rule_cd) IN ('FIFO', 'FEFO', 'LIFO')))`
 - `tb_item_days_check`: `CHECK (((shelf_life_days IS NULL) OR ((shelf_life_days >= 1) AND (shelf_life_days <= 36500))) AND ((min_inbound_shelf_days IS NULL) OR (min_inbound_shelf_days >= 0)) AND ((min_outbound_shelf_days IS NULL) OR (min_outbound_shelf_days >= 0)))`
 - `tb_item_del_yn_check`: `CHECK (del_yn IN ('Y', 'N')`
-- `tb_item_expiry_alert_day_cnt_check`: `CHECK ((expiry_alert_day_cnt IS NULL) OR ((expiry_alert_day_cnt >= 1) AND (expiry_alert_day_cnt <= 3650)))`
+- `tb_item_expiry_alert_days_check`: `CHECK ((expiry_alert_days IS NULL) OR ((expiry_alert_days >= 1) AND (expiry_alert_days <= 3650)))`
 - `tb_item_expiry_input_cd_check`: `CHECK ((expiry_input_cd IS NULL) OR ((expiry_input_cd) IN ('EXPIRY', 'MFG', 'BOTH')))`
 - `tb_item_expiry_required_check`: `CHECK ((expiry_mgmt_yn = 'N') OR ((expiry_type_cd IS NOT NULL) AND (expiry_input_cd IS NOT NULL)))`
 - `tb_item_expiry_type_cd_check`: `CHECK ((expiry_type_cd IS NULL) OR ((expiry_type_cd) IN ('CONSUME', 'SELL', 'USE', 'VALID')))`
 - `tb_item_item_type_cd_check`: `CHECK ((item_type_cd) IN ('GOODS', 'PRODUCT', 'SEMI', 'RAW', 'SUB', 'SET', 'SUPPLY', 'ETC'))`
 - `tb_item_lot_source_cd_check`: `CHECK ((lot_source_cd IS NULL) OR ((lot_source_cd) IN ('INPUT', 'MFG_DATE', 'EXPIRY_DATE', 'SYSTEM')))`
 - `tb_item_lot_source_required_check`: `CHECK ((lot_mgmt_yn = 'N') OR (lot_source_cd IS NOT NULL))`
-- `tb_item_pallet_check`: `CHECK (((pallet_ti IS NULL) OR (pallet_ti > 0)) AND ((pallet_hi IS NULL) OR (pallet_hi > 0)) AND ((pallet_box_qty IS NULL) OR (pallet_box_qty > 0)) AND ((max_stack_box IS NULL) OR (max_stack_box > 0)))`
+- `tb_item_pallet_check`: `CHECK (((pallet_ti IS NULL) OR (pallet_ti > 0)) AND ((pallet_hi IS NULL) OR (pallet_hi > 0)) AND ((pallet_box_cnt IS NULL) OR (pallet_box_cnt > 0)) AND ((max_stack_box_cnt IS NULL) OR (max_stack_box_cnt > 0)))`
 - `tb_item_set_yn_check`: `CHECK ((set_yn = 'Y') = ((item_type_cd) = 'SET'))`
 - `tb_item_shelf_life_required_check`: `CHECK ((expiry_mgmt_yn = 'N') OR ((expiry_input_cd) = 'EXPIRY') OR (shelf_life_days IS NOT NULL))`
 - `tb_item_source_cd_check`: `CHECK ((source_cd) IN ('SCREEN', 'PORTAL', 'API', 'UPLOAD', 'ORDER_AUTO'))`
@@ -1809,7 +1809,7 @@
 | 1 | `item_unit_id` | 품목 단위 ID |  | BIGINT | N | 자동 증가 | PK |
 | 2 | `item_id` | 품목 ID |  | BIGINT | N |  | UK FK → tb_item.item_id |
 | 3 | `unit_id` | 단위 ID | 단위 (기본단위 행은 품목의 기본단위, 나머지는 환산단위) | BIGINT | N |  | UK FK → tb_unit.unit_id |
-| 4 | `conv_cnt` | 환산수량 | 기본단위 환산수량: 이 단위 1개 = 기본단위 n개 (BASE는 1) | DECIMAL(18,3) | N |  |  |
+| 4 | `conv_qty` | 환산수량 | 기본단위 환산수량: 이 단위 1개 = 기본단위 n개 (BASE는 1) | DECIMAL(18,3) | N |  |  |
 | 5 | `sort_seq` | 정렬순서 | 정렬 순서 | INTEGER | N | 0 |  |
 | 6 | `auto_calc_yn` | 자동 계산 여부 | 자동 계산 행 (PLT: 팔레트 적재 정보로 다시 계산, 화면에서 고칠 수 없음) | CHAR(1) | N | N |  |
 | 7 | `cbm` | CBM |  | DECIMAL(12,6) | Y |  |  |
@@ -1837,8 +1837,8 @@
 **검사 조건**
 
 - `tb_item_unit_auto_calc_yn_check`: `CHECK (auto_calc_yn IN ('Y', 'N')`
-- `tb_item_unit_base_conv_check`: `CHECK (((unit_level_cd) <> 'BASE') OR (conv_cnt = 1))`
-- `tb_item_unit_conv_cnt_check`: `CHECK (conv_cnt > 0)`
+- `tb_item_unit_base_conv_check`: `CHECK (((unit_level_cd) <> 'BASE') OR (conv_qty = 1))`
+- `tb_item_unit_conv_qty_check`: `CHECK (conv_qty > 0)`
 - `tb_item_unit_level_cd_check`: `CHECK ((unit_level_cd) IN ('BASE', 'INNER', 'BOX', 'PLT'))`
 - `tb_item_unit_size_check`: `CHECK (((width_cm IS NULL) OR (width_cm > 0)) AND ((depth_cm IS NULL) OR (depth_cm > 0)) AND ((height_cm IS NULL) OR (height_cm > 0)) AND ((gross_weight_kg IS NULL) OR (gross_weight_kg > 0)) AND ((net_weight_kg IS NULL) OR (net_weight_kg > 0)))`
 
@@ -1853,8 +1853,8 @@
 | 2 | `item_id` | 품목 ID |  | BIGINT | N |  | FK → tb_item.item_id |
 | 3 | `unit_cd` | 단위 코드 |  | VARCHAR(20) | N |  |  |
 | 4 | `unit_level_cd` | 단위 레벨 코드 |  | VARCHAR(10) | N |  |  |
-| 5 | `before_conv_cnt` | 전 환산수량 | 바뀌기 전·후 환산수량 (추가는 before null, 삭제는 after null) | DECIMAL(18,3) | Y |  |  |
-| 6 | `after_conv_cnt` | 후 환산수량 |  | DECIMAL(18,3) | Y |  |  |
+| 5 | `before_conv_cnt` | 전 환산 수 | 바뀌기 전·후 환산수량 (추가는 before null, 삭제는 after null) | DECIMAL(18,3) | Y |  |  |
+| 6 | `after_conv_cnt` | 후 환산 수 |  | DECIMAL(18,3) | Y |  |  |
 | 7 | `changed_at` | 변경 일시 |  | TIMESTAMP(3) | N | CURRENT_TIMESTAMP |  |
 | 8 | `changed_by` | 변경 자 |  | VARCHAR(50) | N |  |  |
 
@@ -2052,7 +2052,7 @@
 | 6 | `stock_txn_id` | 재고 거래 ID |  | BIGINT | N |  |  |
 | 7 | `lot_no` | LOT 번호 |  | VARCHAR(50) | Y |  |  |
 | 8 | `expiry_dt` | 유통기한 |  | DATE | Y |  |  |
-| 9 | `confirm_qty` | 확인 수량 | 확정 수량 (기본단위)과 그중 적치한 수량 | DECIMAL(18,3) | N |  |  |
+| 9 | `confirmed_qty` | 확정 수량 | 확정 수량 (기본단위)과 그중 적치한 수량 | DECIMAL(18,3) | N |  |  |
 | 10 | `putaway_qty` | 적치 수량 |  | DECIMAL(18,3) | N | 0 |  |
 | 11 | `inspection_id` | 검수 ID | 어느 검수 결과를 확정했는지 (확정은 검수된 수량에서만) | BIGINT | N |  | FK → tb_inbound_inspection.inspection_id |
 
@@ -2067,7 +2067,7 @@
 **검사 조건**
 
 - `tb_inbound_receipt_line_lot_check`: `CHECK ((lot_no IS NULL) OR ((lot_no) <> ''))`
-- `tb_inbound_receipt_line_qty_check`: `CHECK ((confirm_qty > 0) AND (putaway_qty >= 0) AND (putaway_qty <= confirm_qty))`
+- `tb_inbound_receipt_line_qty_check`: `CHECK ((confirmed_qty > 0) AND (putaway_qty >= 0) AND (putaway_qty <= confirmed_qty))`
 
 ## tb_putaway
 
@@ -2254,7 +2254,7 @@
 
 | No | 칼럼 | 한글명 | 설명 | 타입 | NULL | 기본값 | 키 |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| 1 | `group_id` | 그룹 ID |  | BIGINT | N | 자동 증가 | PK |
+| 1 | `code_group_id` | 코드 그룹 ID |  | BIGINT | N | 자동 증가 | PK |
 | 2 | `group_cd` | 그룹 코드 | 그룹 코드: 영문 대문자·숫자·밑줄 (예: CONTACT_DUTY), 등록 후 변경 불가 | TEXT | N |  | UK |
 | 3 | `group_nm` | 그룹 명 |  | TEXT | N |  |  |
 | 4 | `description` | 설명 |  | TEXT | Y |  |  |
@@ -2286,9 +2286,9 @@
 | No | 칼럼 | 한글명 | 설명 | 타입 | NULL | 기본값 | 키 |
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | 1 | `code_item_id` | 코드 품목 ID |  | BIGINT | N | 자동 증가 | PK |
-| 2 | `group_id` | 그룹 ID |  | BIGINT | N |  | UK FK → tb_code_group.group_id |
-| 3 | `code_item_cd` | 코드 품목 코드 | 코드: 그룹 안에서 중복 금지, 등록 후 변경 불가 (업무 표에 이 글자가 저장되므로) | TEXT | N |  | UK |
-| 4 | `code_item_nm` | 코드 품목 명 |  | TEXT | N |  |  |
+| 2 | `code_group_id` | 코드 그룹 ID |  | BIGINT | N |  | UK FK → tb_code_group.code_group_id |
+| 3 | `code_cd` | 코드 코드 | 코드: 그룹 안에서 중복 금지, 등록 후 변경 불가 (업무 표에 이 글자가 저장되므로) | TEXT | N |  | UK |
+| 4 | `code_nm` | 코드 명 |  | TEXT | N |  |  |
 | 5 | `description` | 설명 |  | TEXT | Y |  |  |
 | 6 | `sort_seq` | 정렬순서 | 정렬 순서 | INTEGER | N | 0 |  |
 | 7 | `created_at` | 등록 일시 | 등록 일시 (자동) | TIMESTAMP(3) | N | CURRENT_TIMESTAMP |  |
@@ -2302,11 +2302,11 @@
 
 **고유 인덱스**
 
-- `tb_code_item_group_id_code_item_cd_key`: `CREATE UNIQUE INDEX tb_code_item_group_id_code_item_cd_key ON tb_code_item (group_id, code_item_cd) WHERE (del_yn = 'N'::bpchar)`
+- `tb_code_item_code_group_id_code_cd_key`: `CREATE UNIQUE INDEX tb_code_item_code_group_id_code_cd_key ON tb_code_item (code_group_id, code_cd) WHERE (del_yn = 'N'::bpchar)`
 
 **인덱스**
 
-- `tb_code_item_group_id_sort_seq_idx`: `CREATE INDEX tb_code_item_group_id_sort_seq_idx ON tb_code_item (group_id, sort_seq)`
+- `tb_code_item_code_group_id_sort_seq_idx`: `CREATE INDEX tb_code_item_code_group_id_sort_seq_idx ON tb_code_item (code_group_id, sort_seq)`
 - `tb_code_item_operator_id_idx`: `CREATE INDEX tb_code_item_operator_id_idx ON tb_code_item (operator_id)`
 
 **검사 조건**

@@ -33,17 +33,17 @@
 | `uoms[]` | 단위·규격 표 | INNER·BOX·PLT 칸들 | `tb_item_unit` | 아래 표 |
 | `pallet.type` | 팔레트 종류 | 팔레트종류 | `pallet_type_cd` | 팔레트 종류 코드 (T11·T12·운영사 추가) |
 | `pallet.ti` · `pallet.hi` | 단당 박스 수 · 단수 | TI · HI | `pallet_ti` · `pallet_hi` | 둘 다 있으면 박스 수 = TI × HI |
-| `pallet.boxQty` | 팔레트당 박스 수 | 팔레트당박스수 | `pallet_box_qty` | TI·HI를 모를 때. `pallet: null`이면 적재 정보를 모두 지움 |
+| `pallet.boxQty` | 팔레트당 박스 수 | 팔레트당박스수 | `pallet_box_cnt` | TI·HI를 모를 때. `pallet: null`이면 적재 정보를 모두 지움 |
 | `tempZone` | 보관 온도대 | 온도대 | `temp_zone_cd` | `AMBIENT`·`CHILLED`·`FROZEN`·`CONSTANT` |
 | `storageTempMin` · `Max` | 보관 최저·최고온도 | — | `storage_temp_min` · `max` | ℃, 소수 1자리 |
 | `hazmat` · `fragile` · `upright` | 위험물 · 파손 주의 · 세워서 보관 | 위험물 · 파손주의 · 세워서보관 | `hazmat_yn` · `fragile_yn` · `upright_yn` | true / false |
-| `maxStackBox` | 최대 적층 박스 단수 | 최대적층단수 | `max_stack_box` | HI보다 작으면 경고 |
+| `maxStackBox` | 최대 적층 박스 단수 | 최대적층단수 | `max_stack_box_cnt` | HI보다 작으면 경고 |
 | `expiryMgmt` | 기한 관리 | 기한관리 | `expiry_mgmt_yn` | 새 품목에서 안 보내면 화주 설정. 재고가 있으면 바꿀 수 없음 |
 | `expiryType` | 기한 종류 | 기한종류 | `expiry_type_cd` | `CONSUME`·`SELL`·`USE`·`VALID` (기한 관리면 필수) |
 | `expiryInput` | 기한 입력 방식 | 기한입력방식 | `expiry_input_cd` | `EXPIRY`·`MFG`·`BOTH` (기한 관리면 필수) |
 | `shelfLifeDays` | 총 기한 일수 | 총기한일수 | `shelf_life_days` | `MFG`·`BOTH`면 필수 |
 | `minInboundShelfDays` · `minOutboundShelfDays` | 최소 입고·출고 잔여일 | 최소입고잔여일 · 최소출고잔여일 | `min_inbound_shelf_days` · `min_outbound_shelf_days` | |
-| `expiryAlertDays` | 임박 기준 일수 | 임박기준일수 | `expiry_alert_day_cnt` | |
+| `expiryAlertDays` | 임박 기준 일수 | 임박기준일수 | `expiry_alert_days` | |
 | `lotMgmt` | LOT 관리 | LOT관리 | `lot_mgmt_yn` | 새 품목에서 안 보내면 화주 설정. 재고가 있으면 바꿀 수 없음 |
 | `lotSource` | LOT 생성 방식 | LOT생성방식 | `lot_source_cd` | `INPUT`·`MFG_DATE`·`EXPIRY_DATE`·`SYSTEM` (LOT 관리면 필수) |
 | `serialMgmt` | 시리얼 관리 | — | `serial_mgmt_yn` | 값만 저장 (시리얼 기능은 2차) |
@@ -62,7 +62,7 @@
 | --- | --- | --- | --- | --- |
 | `uom` | 단위 | INNER단위 · BOX단위 | `unit_id` | 포장 단위만 |
 | `level` | 레벨 | (칸 이름) | `unit_level_cd` | `INNER`·`BOX`·`PLT`. 새 행은 필수, 이미 있는 같은 단위면 생략 가능. 기본단위(`BASE`)는 `baseUom`으로 |
-| `qtyInBase` | 환산수량 | INNER입수 · BOX입수 · PLT입수 | `conv_cnt` | 1 이 단위 = 기본단위 n개. 레벨 순서대로 커야 함 (`UOM_QTY_INVALID`) |
+| `qtyInBase` | 환산수량 | INNER입수 · BOX입수 · PLT입수 | `conv_qty` | 1 이 단위 = 기본단위 n개. 레벨 순서대로 커야 함 (`UOM_QTY_INVALID`) |
 | `widthCm` · `depthCm` · `heightCm` | 가로 · 세로 · 높이 | BOX가로·세로·높이(cm) | `width_cm` · `depth_cm` · `height_cm` | CBM(`cbm`)은 자동 계산 |
 | `grossWeightKg` · `netWeightKg` | 총중량 · 순중량 | BOX총중량(kg) | `gross_weight_kg` · `net_weight_kg` | |
 | `delete` | (행 빼기) | — | — | true면 그 레벨 행을 지움 |

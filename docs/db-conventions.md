@@ -193,7 +193,7 @@
 | `extAttr` | `ext_attr` | JSONB | 2차 | 확장 속성 |
 | `countryCode` | `country_cd` | CHAR(2) | 2차 | 기본 KR |
 | `zipCode` / `address` / `addressDetail` | `zip_cd` / `addr1` / `addr2` | VARCHAR(10/200/200) | 1차 | 주소 필수(화면·서버) |
-| `addressJibun` / `regionName` | `addr_jibun` / `region_nm` | VARCHAR(200/50) | 1차 | 주소 검색으로 자동 |
+| `addressJibun` / `regionName` | `addr_jibun` / `sigungu_nm` | VARCHAR(200/50) | 1차 | 주소 검색으로 자동 |
 | `latitude` / `longitude` | `latitude` / `longitude` | DECIMAL(10,7) | 2차 | 아직 비움 |
 | `phone` / `fax` | `tel_no` / `fax_no` | VARCHAR(15) | 1차 | 숫자만 |
 | `email` / `directions` | `email` / `directions` | VARCHAR(100/1000) | 1차 | |
@@ -209,7 +209,7 @@
 | `workDays` | `work_days` | CHAR(7) | 1차 | 월~일 Y/N, 기본 `YYYYYNN` |
 | `inboundCutoffTime` | `inbound_cutoff_time` | TIME(0) | 1차 | |
 | `shipCutoffTime` | `ship_cutoff_time` | TIME(0) | 1차·상속 | |
-| `defaultInboundLocId` / `defaultOutboundLocId` / `defaultReturnLocId` | `default_inbound_loc_id` / `default_outbound_loc_id` / `default_return_loc_id` | BIGINT → `tb_location` | 1차 | 대기 창고 DEFAULT로 자동, 이 센터 로케이션만, 입고 필수 |
+| `defaultInboundLocId` / `defaultOutboundLocId` / `defaultReturnLocId` | `default_inbound_location_id` / `default_outbound_location_id` / `default_return_location_id` | BIGINT → `tb_location` | 1차 | 대기 창고 DEFAULT로 자동, 이 센터 로케이션만, 입고 필수 |
 | `timezone` / `allocRule` | `timezone` / `alloc_rule_cd` | VARCHAR(50/10) | 2차·상속 | |
 | `useLot` / `useExpiry` / `useSerial` | `lot_mgmt_yn` / `expiry_mgmt_yn` / `serial_mgmt_yn` | CHAR(1) NULL | 2차·상속 | |
 | 공통 칸 | `created_at`·`updated_at`·`created_by`·`updated_by`·`row_version`·`del_yn` | | | 0038 |
@@ -260,10 +260,10 @@
 | `inboundYn` / `outboundYn` / `allocatableYn` | `inbound_yn` / `outbound_yn` / `allocatable_yn` | CHAR(1) | 1차 | 유형별 기본값 (0074 표) |
 | `defaultStockStatus` | `default_stock_status_cd` | VARCHAR(20) | 1차 | NORMAL·HOLD·DAMAGED·QUARANTINE |
 | `allocPriority` | `alloc_priority` | INT | 1차 | 1~999, 작을수록 먼저, 기본 100 |
-| `defaultLocId` | `default_loc_id` | BIGINT → `tb_location` | 1차 | 이 창고의 사용 중 로케이션 (기본 창고는 DEFAULT) |
+| `defaultLocId` | `default_location_id` | BIGINT → `tb_location` | 1차 | 이 창고의 사용 중 로케이션 (기본 창고는 DEFAULT) |
 | `managerUserId` | `manager_user_id` | BIGINT → `tb_user` | 2차 | 지우면 NULL |
 | `dedicatedShipperId` | `dedicated_shipper_id` | BIGINT → `tb_shipper` | 2차 | NULL = 공용 창고 |
-| `locCodePrefix` / `locCodeSeparator` | `loc_cd_prefix` / `loc_cd_separator` | VARCHAR(10) / CHAR(1) | 2차 | 로케이션 일괄 생성용 (구분자 없으면 '-') |
+| `locCodePrefix` / `locCodeSeparator` | `location_cd_prefix` / `location_cd_separator` | VARCHAR(10) / CHAR(1) | 2차 | 로케이션 일괄 생성용 (구분자 없으면 '-') |
 | `remark` / `extAttr` | `remark` / `ext_attr` | VARCHAR(1000) / JSONB | 1차 / 2차 | |
 | 공통 칸 | `created_at`·`updated_at`·`created_by`·`updated_by`·`row_version`·`del_yn` | | | 0038 |
 
@@ -294,7 +294,7 @@
 | `zoneId` | `zone_id` | BIGINT → `tb_zone` | 1차 | 같은 창고의 구역, 시스템 기본 로케이션 등은 NULL |
 | `code` | `location_cd` | VARCHAR(30) **COLLATE "C"** | 1차 | 영문 대문자·숫자·하이픈, **창고 안 고유**(사용자 결정), 불변. C 정렬이라 앞부분·범위 검색이 인덱스 `(center_id, location_cd)`를 쓴다 |
 | `description` | `description` | VARCHAR(200) | 1차 | 예전 명칭 `location_nm`(0071) — 코드와 같던 값은 비움 |
-| `locType` | `loc_type_cd` | VARCHAR(20) | 1차 | 공통코드 `LOC_TYPE`, 기본 RACK (시스템 기본은 STAGING) |
+| `locType` | `location_type_cd` | VARCHAR(20) | 1차 | 공통코드 `LOC_TYPE`, 기본 RACK (시스템 기본은 STAGING) |
 | `status` / `systemYn` | `status_cd` / `system_yn` | VARCHAR(20) / CHAR(1) | 1차 | 시스템 기본 로케이션은 사용 중만 |
 | `rowNo` / `levelNo` | `row_no` / `level_no` | VARCHAR(10) | 1차 | 예전 `aisle_cd`·`level_cd`. 일괄 생성은 0을 채워 글자 순서 = 숫자 순서 |
 | `bayNo` / `cellNo` / `posX` / `posY` | `bay_no` / `cell_no` / `pos_x` / `pos_y` | VARCHAR(10) / DECIMAL(10,2) | 2차 | |
@@ -467,8 +467,8 @@
 | --- | --- | --- | --- |
 | `id` | `id` | `code_item_id` | TEXT(cuid) → BIGINT |
 | `groupId` | `groupId` | `group_id` | TEXT(cuid) → BIGINT |
-| `code` | `code` | `code_item_cd` |  |
-| `name` | `name` | `code_item_nm` |  |
+| `code` | `code` | `code_cd` |  |
+| `name` | `name` | `code_nm` |  |
 | `description` | `description` | `description` |  |
 | `sortOrder` | `sortOrder` | `sort_seq` |  |
 | `isActive` | `isActive` | `status_cd` | Boolean → status_cd (2단계, ACTIVE/INACTIVE) |
