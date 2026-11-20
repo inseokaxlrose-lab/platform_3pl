@@ -1,7 +1,7 @@
 # 0084. 코드 체계(체번) — 체번 규칙·현재값 표, 운영사·날짜별 문서번호
 
 - 날짜: 2026-11-20
-- 상태: 채택 (① 체번 기반 · ② 코드 3층 · ③ 용어·타입 · ④-1 칼럼 이름 · ④-2 타입·검사 완료 — ④-3 구조부터는 다음 단계)
+- 상태: 채택 (① 체번 기반 · ② 코드 3층 · ③ 용어·타입 · ④ 중간 항목 완료 — ⑤ 로케이션 바코드·정의서 한글명·규칙 문서는 다음 단계)
 - 관련: 0025 (기준정보 코드 3층 — ②에서 갱신), 0047 (문서 번호 — 대체), 0039 (멀티테넌트)
 - 정의서: `docs/specs/system_code.md` (테이블 정의서 검토 + 체번 반영안)
 - 코드: `src/lib/numbering/` (`numbering-codes.ts` 값·번호 모양, `numbering.ts` 발급), `src/lib/documents/doc-no.ts`
@@ -114,6 +114,16 @@ DB 칼럼 이름만 바꾸고(RENAME — 데이터 유지) 프로그램의 Prism
 - **M15**: 빠진 FK 9개(`tb_putaway` 4, `tb_stock_adjust.center_id`, 입고확정·조정 줄의 `stock_txn_id`, API 멱등·호출 한도의 `api_client_id`). 이력·로그 표에서 나가는 FK는 일부러 두지 않는다(db-conventions).
 - **M5**: 운영사·화주사·거래처 담당자에도 "대표 1명" 부분 UNIQUE.
 - **M18**: `tb_center.manager_nm`·`manager_tel_no` 삭제. 값이 있고 담당자가 없는 센터는 대표 담당자(센터장, `MANAGER`)로 옮겼다.
+
+### ④-3 구조
+
+- **M4 담당자 표 4개 같은 모양**(운영사·센터·화주사·거래처): PK `{표}_id`(RENAME — 키 값 그대로), 부서·직책·알림 수신(`dept_nm`·`position_nm`·`notify_yn`), 감사 칸(등록·수정 일시·자). 화주사만 `if_contact_yn`(연동 담당)이 더 있다.
+  - 등록·수정자는 `prisma.ts`의 `STAMPED_MODELS`(버전 칸 없는 표)가 채운다. 버전은 부모 표에서 검사한다.
+  - 운영사·화주사·거래처 담당자는 저장 때 "지우고 다시 넣기"라 감사 칸은 마지막 저장 기준이다(센터만 줄을 유지). 줄 유지가 필요해지면 센터처럼 담당자 id를 화면에 둔다.
+  - 화면: 공용 입력 규칙 `contactSchema`에 `deptName`·`positionName`·`notify`(안 보내면 빈 칸·받음), 공용 열 `contactExtraColumns()`, 표 부품 `EditableSubTable`에 `input: 'checkbox'` 추가.
+- **M13**: 거래처에도 납품처와 같은 주소 정제 결과 칸(`sigungu_nm`·`bd_mgt_sn`·`addr_norm_method_cd`). 기존 거래처는 다음 주소 저장 때 채운다.
+- **M17**: `tb_user_grid_setting`(그리드별 열 설정)과 `tb_user_pref`(그 밖의 고르기 기억)는 용도가 달라 둘 다 둔다. 그리드 설명 주석이 개인 설정 모델 위에 붙어 정의서에서 섞여 보였던 것을 바로잡았다.
+- 함께 고친 것: 정제하지 못한 납품처의 원본 우편번호가 5자리가 아니면(옛 6자리) `zip_cd`를 비운다 — ④-2의 CHAR(5) 검사로 저장이 실패하던 문제.
 
 ## 버린 안
 

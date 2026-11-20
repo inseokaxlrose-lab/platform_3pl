@@ -179,7 +179,8 @@ return (
     { key: 'name', label: '담당자명', required: true, width: '8rem' },
     { key: 'phone', label: '연락처', width: '10rem', input: 'phone' },
     { key: 'email', label: '이메일', input: 'email' },
-    // 그 밖의 입력은 render: (cell) => <NumberInput … />
+    ...contactExtraColumns(), // 담당자 표 공통 칸: 부서·직책·알림 수신 (0084)
+    // 참/거짓 칸은 input: 'checkbox' (옆 글자 checkLabel), 그 밖의 입력은 render: (cell) => <NumberInput … />
   ]}
   createRow={() => ({ ...EMPTY_CONTACT })}
   maxRows={5}
@@ -194,6 +195,7 @@ return (
 - 삭제는 확인 없이 바로. 저장 전이면 화면 [취소]로 되돌릴 수 있다.
 - `primary`: 처음 추가한 행이 자동으로 대표, 대표 행을 지우면 남은 첫 행이 대표. 규칙은 `exactlyOne`으로도 검사한다.
 - 넓은 화면은 한 행 한 줄, 좁은 화면은 행마다 세로 블록(칸마다 이름표)으로 바뀐다.
+- **담당자 표**(운영사·센터·화주사·거래처)는 같은 칸을 쓴다: 담당 업무·이름·연락처·이메일 + `contactExtraColumns()`(부서·직책·알림) + 대표. 입력 규칙은 공용 `contactSchema`, DB에 쓸 때 `contactFields`.
 
 ## 4. 하지 말 것
 
