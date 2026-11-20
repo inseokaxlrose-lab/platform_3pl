@@ -3,7 +3,7 @@
 > 이 문서는 `npm run db:doc`가 실제 DB 구조와 `prisma/schema.prisma`의 주석으로 만든다. **손으로 고치지 않는다** — 마이그레이션을 적용한 뒤 명령을 다시 돌린다.
 > 엑셀 판: `docs/db/DB_테이블정의서.xlsx` · 이름 규칙: `docs/db-conventions.md`
 
-테이블 67개 · 칼럼 1088개
+테이블 69개 · 칼럼 1106개
 
 ## 목차
 
@@ -74,6 +74,8 @@
 | 공통·설정 | [`tb_code_group`](#tb_code_group) | CodeGroup | 공통코드 (docs/decisions/0030): 코드 그룹(서랍) → 코드(서랍 속 물건) 2단계 분류·표시용 값만 공통코드로 관리한다. 프로그램이 값에 따라 동작을 바꾸는 값(창고 유형 등)은 상수 + VARCHAR + CHECK로 둔다 (0084) 업무 표에는 코드 글자(CodeItem.code)를 그대로 저장한다 (예: 담당자 업무 'INBOUND') |
 | 공통·설정 | [`tb_code_item`](#tb_code_item) | CodeItem | 공통코드 항목: 그룹 안의 코드·이름 (docs/decisions/0030) |
 | 공통·설정 | [`tb_ext_code`](#tb_ext_code) | ExternalCode | 외부 코드 매핑 (docs/decisions/0025): 우리 기준정보 ↔ SAP·ERP 등 외부 시스템 코드 한 줄 = 연동 상대 + 대상 종류 + 대상 id + 외부 코드 - 같은 운영사·같은 연동 상대·같은 종류 안에서 외부 코드 중복 금지 - 한 대상은 연동 상대마다 외부 코드 1개 |
+| 기타 | [`tb_file`](#tb_file) | File | 첨부파일 (docs/decisions/0091): 파일 정보. 바이트는 저장소(src/lib/files/storage.ts)에 storage_key로 있다 지우지 않는 기록이 아니라 실제로 지운다 (대상에서 떼면 파일도 지운다) — 공통 칸(버전·논리 삭제) 없음 |
+| 기타 | [`tb_file_link`](#tb_file_link) | FileLink | 첨부파일 대상 연결 (0091): 여러 장 붙는 곳 — ITEM 품목(IMAGE 이미지) · INSPECTION 검수(PHOTO 사진). 파일 하나는 한 곳에만 |
 | 기타 | [`tb_numbering_rule`](#tb_numbering_rule) | NumberingRule | 체번 규칙 (docs/decisions/0084): 대상별 코드·문서번호 모양 operator_id NULL = 시스템 기본 규칙, 값이 있으면 그 운영사의 재정의 (같은 대상이면 운영사 행이 이긴다) 번호 = 접두어(고정 문자 / 화주 code_prefix / 상위 코드) + 구분 문자 + 날짜 + 구분자 + 일련번호 |
 | 기타 | [`tb_numbering_seq`](#tb_numbering_seq) | NumberingSeq | 체번 현재값 (docs/decisions/0084): 운영사 × 대상 × 범위 × 주기마다 마지막 번호 발급은 한 문장으로 원자적 증가 (INSERT … ON CONFLICT DO UPDATE … RETURNING) — MAX()+1 금지 이력이 아니라 카운터라 FK를 두지 않는다 (scope_id는 범위에 따라 운영사 0·화주사·거래처 키) |
 
@@ -353,7 +355,7 @@
 | 38 | `homepage_url` | 홈페이지 URL |  | VARCHAR(200) | Y |  |  |
 | 39 | `lang_cd` | 언어 코드 |  | VARCHAR(5) | N | ko-KR |  |
 | 40 | `latitude` | 위도 | 좌표 (주소 검색이 주지 않아 지금은 비어 있다) | DECIMAL(10,7) | Y |  |  |
-| 41 | `logo_file_id` | 로고 파일 ID |  | BIGINT | Y |  |  |
+| 41 | `logo_file_id` | 로고 파일 ID | 로고·직인 이미지 (첨부파일, 0091) | BIGINT | Y |  | FK → tb_file.file_id |
 | 42 | `longitude` | 경도 |  | DECIMAL(10,7) | Y |  |  |
 | 43 | `lot_mgmt_yn` | LOT 관리 여부 |  | CHAR(1) | N | N |  |
 | 44 | `max_center_cnt` | 최대 센터 수 |  | INTEGER | Y |  |  |
@@ -369,7 +371,7 @@
 | 54 | `sales_channel_cd` | 영업 채널 코드 | 유입 경로 (플랫폼 관리자만 표시, 값 목록은 아직 정하지 않음) | VARCHAR(20) | Y |  |  |
 | 55 | `serial_mgmt_yn` | 시리얼 관리 여부 |  | CHAR(1) | N | N |  |
 | 56 | `ship_cutoff_time` | 출고 마감 시각 |  | TIME WITHOUT TIME ZONE | Y |  |  |
-| 57 | `stamp_file_id` | 도장 파일 ID |  | BIGINT | Y |  |  |
+| 57 | `stamp_file_id` | 도장 파일 ID |  | BIGINT | Y |  | FK → tb_file.file_id |
 | 58 | `status_reason` | 상태 사유 | 상태변경 사유 (정지·해지로 바꿀 때 필수) | VARCHAR(200) | Y |  |  |
 | 59 | `sub_biz_no` | 종 사업자 번호 |  | CHAR(4) | Y |  |  |
 | 60 | `tax_invoice_email` | 세금계산서 이메일 |  | VARCHAR(100) | Y |  |  |
@@ -2421,6 +2423,66 @@
 **검사 조건**
 
 - `tb_ext_code_entity_type_cd_check`: `CHECK ((entity_type_cd) IN ('CENTER', 'WAREHOUSE', 'LOCATION', 'SHIPPER', 'ITEM', 'CUSTOMER', 'UNIT'))`
+
+## tb_file
+
+- 영역: 기타 · 모델: `File`
+- 첨부파일 (docs/decisions/0091): 파일 정보. 바이트는 저장소(src/lib/files/storage.ts)에 storage_key로 있다 지우지 않는 기록이 아니라 실제로 지운다 (대상에서 떼면 파일도 지운다) — 공통 칸(버전·논리 삭제) 없음
+
+| No | 칼럼 | 한글명 | 설명 | 타입 | NULL | 기본값 | 키 |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| 1 | `file_id` | 파일 ID |  | BIGINT | N | 자동 증가 | PK |
+| 2 | `operator_id` | 운영사 ID | 운영사 (멀티테넌트 키 — 다른 운영사 데이터는 보이지 않는다, 0039) | BIGINT | N |  | FK → tb_operator.operator_id |
+| 3 | `storage_key` | 보관 키 | 저장소 안의 위치 ({운영사}/{연}/{월}/{무작위}) — 원래 이름은 경로에 쓰지 않는다 | VARCHAR(300) | N |  | UK |
+| 4 | `original_nm` | original 명 |  | VARCHAR(255) | N |  |  |
+| 5 | `mime_type` | mime 유형 |  | VARCHAR(100) | N |  |  |
+| 6 | `size_bytes` | size bytes |  | BIGINT | N |  |  |
+| 7 | `sha256` | sha256 | 내용 확인값 (같은 파일인지·손상 확인) | CHAR(64) | N |  |  |
+| 8 | `created_at` | 등록 일시 | 등록 일시 (자동) | TIMESTAMP(3) | N | CURRENT_TIMESTAMP |  |
+| 9 | `created_by` | 등록 자 | 등록자 아이디 (자동: 작업자 / seed / system) | VARCHAR(50) | N | system |  |
+
+**고유 인덱스**
+
+- `tb_file_storage_key_key`: `CREATE UNIQUE INDEX tb_file_storage_key_key ON tb_file (storage_key)`
+
+**인덱스**
+
+- `tb_file_operator_id_idx`: `CREATE INDEX tb_file_operator_id_idx ON tb_file (operator_id)`
+
+**검사 조건**
+
+- `tb_file_size_bytes_check`: `CHECK (size_bytes >= 0)`
+
+## tb_file_link
+
+- 영역: 기타 · 모델: `FileLink`
+- 첨부파일 대상 연결 (0091): 여러 장 붙는 곳 — ITEM 품목(IMAGE 이미지) · INSPECTION 검수(PHOTO 사진). 파일 하나는 한 곳에만
+
+| No | 칼럼 | 한글명 | 설명 | 타입 | NULL | 기본값 | 키 |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| 1 | `file_link_id` | 파일 link ID |  | BIGINT | N | 자동 증가 | PK |
+| 2 | `operator_id` | 운영사 ID | 운영사 (멀티테넌트 키 — 다른 운영사 데이터는 보이지 않는다, 0039) | BIGINT | N |  | FK → tb_operator.operator_id |
+| 3 | `file_id` | 파일 ID |  | BIGINT | N |  | UK FK → tb_file.file_id |
+| 4 | `entity_type_cd` | 대상 유형 코드 |  | VARCHAR(20) | N |  |  |
+| 5 | `entity_id` | 대상 ID |  | BIGINT | N |  |  |
+| 6 | `purpose_cd` | purpose 코드 |  | VARCHAR(20) | N |  |  |
+| 7 | `sort_seq` | 정렬순서 | 정렬 순서 | INTEGER | N | 0 |  |
+| 8 | `created_at` | 등록 일시 | 등록 일시 (자동) | TIMESTAMP(3) | N | CURRENT_TIMESTAMP |  |
+| 9 | `created_by` | 등록 자 | 등록자 아이디 (자동: 작업자 / seed / system) | VARCHAR(50) | N | system |  |
+
+**고유 인덱스**
+
+- `tb_file_link_file_id_key`: `CREATE UNIQUE INDEX tb_file_link_file_id_key ON tb_file_link (file_id)`
+
+**인덱스**
+
+- `tb_file_link_entity_idx`: `CREATE INDEX tb_file_link_entity_idx ON tb_file_link (entity_type_cd, entity_id)`
+- `tb_file_link_operator_id_idx`: `CREATE INDEX tb_file_link_operator_id_idx ON tb_file_link (operator_id)`
+
+**검사 조건**
+
+- `tb_file_link_entity_type_cd_check`: `CHECK ((entity_type_cd) IN ('ITEM', 'INSPECTION'))`
+- `tb_file_link_purpose_cd_check`: `CHECK ((purpose_cd) IN ('IMAGE', 'PHOTO'))`
 
 ## tb_numbering_rule
 
