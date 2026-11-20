@@ -1,5 +1,6 @@
 'use client'
 
+import { useState } from 'react'
 import type { z } from 'zod'
 import { StatusBadge } from '@/components/common'
 import { CheckboxList, EmailInput } from '@/components/inputs'
@@ -12,6 +13,8 @@ import {
   type MasterFormHeader,
 } from '@/components/master-form'
 import { usePermission } from '@/components/permission'
+import { PasswordModeField } from '@/components/users/password-mode-field'
+import { TempPasswordDialog } from '@/components/users/temp-password-dialog'
 import { Input } from '@/components/ui/input'
 import {
   Select,
@@ -22,10 +25,12 @@ import {
 } from '@/components/ui/select'
 import {
   createUserSchema,
+  PASSWORD_RULE_TEXT,
   updateUserFormSchema,
   USER_TYPES,
   type UserFormValue,
 } from '@/lib/users/user-schema'
+import type { ActionResult } from '@/lib/actions'
 import { createUserAction, updateUserAction } from './actions'
 import { USER_TYPE_LABELS, type UserTypeKey } from './labels'
 import type { UserForEdit, UserFormOptions } from './queries'
@@ -56,6 +61,8 @@ export function UserForm({ options, user, extraSections = [], header }: UserForm
   const { can } = usePermission()
   const isNew = !user
   const readOnly = isNew ? !can('system.users.create') : !can('system.users.update')
+  // 등록 직후 한 번만 보여 줄 임시 비밀번호 (자동 생성일 때, 0086)
+  const [issued, setIssued] = useState<{ username: string; password: string } | null>(null)
 
   const form = useMasterForm({
     initial: {
@@ -63,6 +70,7 @@ export function UserForm({ options, user, extraSections = [], header }: UserForm
       name: user?.name ?? '',
       userType: user?.userType ?? 'CENTER',
       email: user?.email ?? '',
+      passwordMode: 'AUTO',
       password: '',
       passwordConfirm: '',
       centerIds: user?.centerIds ?? [],
@@ -75,7 +83,11 @@ export function UserForm({ options, user, extraSections = [], header }: UserForm
       UserFormValue
     >,
     version: user?.rowVersion,
-    save: (value: UserFormValue, version) => {
+    // 등록 결과(임시 비밀번호)와 수정 결과(버전) 모양이 달라 함께 받는 모양으로 적는다
+    save: async (
+      value: UserFormValue,
+      version,
+    ): Promise<ActionResult<{ id: string; rowVersion?: number; tempPassword?: string | null }>> => {
       // 유형에 맞지 않는 소속은 보내지 않는다
       const affiliation = {
         centerIds: value.userType === 'CENTER' ? value.centerIds : [],
@@ -90,7 +102,12 @@ export function UserForm({ options, user, extraSections = [], header }: UserForm
             email: value.email,
             ...affiliation,
           })
-        : createUserAction({ ...value, ...affiliation })
+        : createUserAction({ ...value, ...affiliation }).then((result) => {
+            if (result.ok && result.data.tempPassword) {
+              setIssued({ username: value.username.trim(), password: result.data.tempPassword })
+            }
+            return result
+          })
     },
     createdHref: user
       ? undefined
@@ -118,7 +135,7 @@ export function UserForm({ options, user, extraSections = [], header }: UserForm
         onChange={(e) => set({ [key]: e.target.value })}
         disabled={disabled}
         autoComplete="new-password"
-        placeholder={key === 'password' ? '8자 이상' : undefined}
+        placeholder={key === 'password' ? PASSWORD_RULE_TEXT : undefined}
         aria-invalid={Boolean(errors[key])}
       />
     </Field>
@@ -194,8 +211,20 @@ export function UserForm({ options, user, extraSections = [], header }: UserForm
           </Field>
           {isNew && (
             <>
-              {password('password', '초기 비밀번호')}
-              {password('passwordConfirm', '비밀번호 확인')}
+              <PasswordModeField
+                id="user-passwordMode"
+                value={value.passwordMode}
+                onChange={(passwordMode) =>
+                  set({ passwordMode, password: '', passwordConfirm: '' })
+                }
+                disabled={disabled}
+              />
+              {value.passwordMode === 'MANUAL' && (
+                <>
+                  {password('password', '처음 비밀번호')}
+                  {password('passwordConfirm', '비밀번호 확인')}
+                </>
+              )}
             </>
           )}
         </FormGrid>
@@ -280,11 +309,18 @@ export function UserForm({ options, user, extraSections = [], header }: UserForm
   })
 
   return (
-    <MasterFormPage
-      header={header}
-      form={form}
-      readOnly={readOnly}
-      sections={[...sections, ...extraSections]}
-    />
+    <>
+      <MasterFormPage
+        header={header}
+        form={form}
+        readOnly={readOnly}
+        sections={[...sections, ...extraSections]}
+      />
+      <TempPasswordDialog
+        username={issued?.username ?? ''}
+        password={issued?.password ?? null}
+        onClose={() => setIssued(null)}
+      />
+    </>
   )
 }
