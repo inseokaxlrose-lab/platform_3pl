@@ -40,7 +40,7 @@ export async function createPortalAsn(
   const asnNo = (await shipper.getByRole('heading', { level: 1 }).textContent())!
     .replace('ASN ', '')
     .trim()
-  expect(asnNo).toMatch(/^AS\d{6}-\d{5}$/)
+  expect(asnNo).toMatch(/^AS\d{6}-\d{4}$/)
   return { asnId, asnNo }
 }
 

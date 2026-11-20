@@ -73,7 +73,7 @@ describe('입고 확정', () => {
     const result = await confirm([{ inspectionId: water, qty: '60' }])
     expect(result).toMatchObject({
       ok: true,
-      data: { receiptNo: expect.stringMatching(/^RC\d{6}-\d{5}$/), status: 'PARTIAL' },
+      data: { receiptNo: expect.stringMatching(/^RC\d{6}-\d{4}$/), status: 'PARTIAL' },
     })
 
     const stock = await prisma.stock.findFirstOrThrow({ where: { itemId: f.water } })

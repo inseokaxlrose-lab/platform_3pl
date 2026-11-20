@@ -6,10 +6,12 @@ export const TEST_OPERATOR_ID = 1n
 // 시스템 기준 행 (마이그레이션이 넣은 operator_id NULL 줄) — 표를 비워도 되살린다
 // - tb_unit: 시스템 기본 단위 (0078)
 // - tb_pallet_type: 시스템 팔레트 종류 T11·T12 (0083)
+// - tb_numbering_rule: 시스템 기본 체번 규칙 (0084)
 // 처음 한 번 읽어 두고, 비운 뒤 같은 번호로 다시 넣는다 (마이그레이션이 유일한 출처)
 const SYSTEM_TABLES = [
   { table: 'tb_unit', idColumn: 'unit_id' },
   { table: 'tb_pallet_type', idColumn: 'pallet_type_id' },
+  { table: 'tb_numbering_rule', idColumn: 'numbering_rule_id' },
 ] as const
 
 let systemRows: Map<string, string> | null = null

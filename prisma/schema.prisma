@@ -928,6 +928,7 @@ model Operator {
   items            Item[]
   itemBarcodes     ItemBarcode[]
   palletTypes      PalletType[]
+  numberingRules   NumberingRule[]
   customers        Customer[]
   stocks           Stock[]
   stockTxns        StockTxn[]
@@ -1747,7 +1748,7 @@ model Asn {
   shipperId  BigInt   @map("shipper_id")
   shipper    Shipper  @relation(fields: [shipperId], references: [id], onDelete: Restrict)
   // ASN 번호 (자동: AS + 등록일 YYMMDD + '-' + 일련번호, 운영사 전체에서 하나)
-  asnNo      String   @unique @map("asn_no") @db.VarChar(20)
+  asnNo      String   @map("asn_no") @db.VarChar(20)
 
   type         InboundType @default(SHIPPER) @map("inbound_type_cd")
   channel      AsnChannel  @map("reg_channel_cd")
@@ -1777,6 +1778,8 @@ model Asn {
   // 논리 삭제: 예정(PLANNED) 상태에서만 지울 수 있다
   delYn String @default("N") @map("del_yn") @db.Char(1)
 
+  // 번호는 운영사 안에서 하나 (체번이 운영사별, 0084)
+  @@unique([operatorId, asnNo])
   @@index([operatorId])
   @@index([centerId, status])
   @@index([shipperId, expectedOn])
@@ -1828,13 +1831,15 @@ model InboundReceipt {
   asnId       BigInt   @map("asn_id")
   asn         Asn      @relation(fields: [asnId], references: [id], onDelete: Restrict)
   // 확정 번호 (자동: RC + YYMMDD + '-' + 일련번호)
-  receiptNo   String   @unique @map("receipt_no") @db.VarChar(20)
+  receiptNo   String   @map("receipt_no") @db.VarChar(20)
   confirmedAt DateTime @default(now()) @map("confirmed_at")
   confirmedBy String   @default("system") @map("confirmed_by") @db.VarChar(50)
   remark      String?  @db.VarChar(200)
 
   lines InboundReceiptLine[]
 
+  // 번호는 운영사 안에서 하나 (체번이 운영사별, 0084)
+  @@unique([operatorId, receiptNo])
   @@index([asnId])
   @@index([operatorId, confirmedAt])
   @@map("tb_inbound_receipt")
@@ -1918,7 +1923,7 @@ model InboundLabel {
   operatorId    BigInt            @map("operator_id")
   operator      Operator          @relation(fields: [operatorId], references: [id], onDelete: Restrict)
   // 라벨 번호 (자동: LB + YYMMDD + '-' + 일련번호)
-  labelNo       String            @unique @map("label_no") @db.VarChar(20)
+  labelNo       String            @map("label_no") @db.VarChar(20)
   inspectionId  BigInt            @map("inspection_id")
   inspection    InboundInspection @relation(fields: [inspectionId], references: [id], onDelete: Restrict)
   // 몇 번째 장 / 모두 몇 장 (예: 2 / 3)
@@ -1938,6 +1943,8 @@ model InboundLabel {
   createdBy     String    @default("system") @map("created_by") @db.VarChar(50)
 
   @@unique([inspectionId, seq])
+  // 번호는 운영사 안에서 하나 (체번이 운영사별, 0084)
+  @@unique([operatorId, labelNo])
   @@index([operatorId])
   @@map("tb_inbound_label")
 }
@@ -1988,7 +1995,7 @@ model StockAdjust {
   operatorId BigInt            @map("operator_id")
   operator   Operator          @relation(fields: [operatorId], references: [id], onDelete: Restrict)
   // 번호 (자동: AJ + YYMMDD + '-' + 일련번호)
-  adjustNo   String            @unique @map("adjust_no") @db.VarChar(20)
+  adjustNo   String            @map("adjust_no") @db.VarChar(20)
   type       StockAdjustType   @map("adjust_type_cd")
   centerId   BigInt            @map("center_id")
   status     StockAdjustStatus @default(DRAFT) @map("adjust_status_cd")
@@ -2005,6 +2012,8 @@ model StockAdjust {
 
   lines StockAdjustLine[]
 
+  // 번호는 운영사 안에서 하나 (체번이 운영사별, 0084)
+  @@unique([operatorId, adjustNo])
   @@index([operatorId, createdAt])
   @@index([centerId, status])
   @@map("tb_stock_adjust")
@@ -2362,4 +2371,58 @@ model ApiRateBucket {
 
   @@id([apiClientId, windowStart])
   @@map("tb_api_rate_bucket")
+}
+
+// 체번 규칙 (docs/decisions/0084): 대상별 코드·문서번호 모양
+// operator_id NULL = 시스템 기본 규칙, 값이 있으면 그 운영사의 재정의 (같은 대상이면 운영사 행이 이긴다)
+// 번호 = 접두어(고정 문자 / 화주 code_prefix / 상위 코드) + 구분 문자 + 날짜 + 구분자 + 일련번호
+model NumberingRule {
+  id           BigInt    @id @default(autoincrement()) @map("numbering_rule_id")
+  operatorId   BigInt?   @map("operator_id")
+  operator     Operator? @relation(fields: [operatorId], references: [id], onDelete: Restrict)
+  // 대상: SHIPPER·CUSTOMER·SHIP_TO·ITEM·ASN·RECEIPT·LABEL·ADJUST (src/lib/numbering/numbering-codes.ts)
+  target       String    @map("target_cd") @db.VarChar(20)
+  // 번호가 하나인 범위: OPERATOR / SHIPPER / CUSTOMER
+  scope        String    @map("scope_cd") @db.VarChar(20)
+  // 접두어 출처: FIXED(고정 문자) / SHIPPER_PREFIX(화주 code_prefix) / PARENT_CD(상위 코드 — 납품처)
+  prefixSource String    @map("prefix_src_cd") @db.VarChar(20)
+  fixedPrefix  String?   @map("fixed_prefix") @db.VarChar(5)
+  // 엔티티 구분 문자 (거래처 C, 품목 S)
+  typeChar     String?   @map("type_char") @db.Char(1)
+  // 일련번호 앞 구분자 (전표·납품처 '-')
+  separator    String?   @map("separator") @db.VarChar(1)
+  // 날짜: NONE / YYMMDD (운영사 타임존 기준 등록일)
+  dateFormat   String    @default("NONE") @map("date_fmt_cd") @db.VarChar(10)
+  // 일련번호 자리수 (2~8)
+  seqLength    Int       @map("seq_len") @db.SmallInt
+  // 일련번호 초기화 주기: NONE / DAY / MONTH / YEAR
+  resetCycle   String    @default("NONE") @map("reset_cycle_cd") @db.VarChar(10)
+  createdAt    DateTime  @default(now()) @map("created_at")
+  updatedAt    DateTime  @updatedAt @map("updated_at")
+  createdBy    String    @default("system") @map("created_by") @db.VarChar(50)
+  updatedBy    String    @default("system") @map("updated_by") @db.VarChar(50)
+  rowVersion   Int       @default(1) @map("row_version")
+
+  // 대상마다 하나: 운영사 재정의 1개 + 시스템 기본 1개
+  @@unique([operatorId, target], where: raw("operator_id IS NOT NULL"), map: "tb_numbering_rule_operator_target_key")
+  @@unique([target], where: raw("operator_id IS NULL"), map: "tb_numbering_rule_system_target_key")
+  @@index([operatorId])
+  @@map("tb_numbering_rule")
+}
+
+// 체번 현재값 (docs/decisions/0084): 운영사 × 대상 × 범위 × 주기마다 마지막 번호
+// 발급은 한 문장으로 원자적 증가 (INSERT … ON CONFLICT DO UPDATE … RETURNING) — MAX()+1 금지
+// 이력이 아니라 카운터라 FK를 두지 않는다 (scope_id는 범위에 따라 운영사 0·화주사·거래처 키)
+model NumberingSeq {
+  operatorId BigInt   @map("operator_id")
+  target     String   @map("target_cd") @db.VarChar(20)
+  // 범위 키: OPERATOR = 0, SHIPPER = shipper_id, CUSTOMER = customer_id
+  scopeId    BigInt   @map("scope_id")
+  // 주기 키: NONE = '-', DAY = 'YYMMDD', MONTH = 'YYMM', YEAR = 'YY'
+  periodKey  String   @map("period_key") @db.VarChar(8)
+  lastSeq    BigInt   @map("last_seq")
+  updatedAt  DateTime @default(now()) @map("updated_at") @db.Timestamp(3)
+
+  @@id([operatorId, target, scopeId, periodKey])
+  @@map("tb_numbering_seq")
 }
