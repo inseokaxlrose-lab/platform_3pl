@@ -73,7 +73,7 @@ describe('라벨 발행', () => {
         [3, 3, 'PLT', '120', 'kim'],
       ],
     )
-    expect(labels[0].labelNo).toMatch(/^LB\d{6}-\d{5}$/)
+    expect(labels[0].labelNo).toMatch(/^LB\d{6}-\d{6}$/)
     expect(parseLabelPayload(labels[2].payload)).toMatchObject({
       labelNo: labels[2].labelNo,
       centerCode: 'ICN',

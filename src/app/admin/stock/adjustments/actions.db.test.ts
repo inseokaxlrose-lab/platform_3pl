@@ -67,7 +67,7 @@ describe('실사·조정', () => {
         ],
       }),
     )
-    expect(created.adjustNo).toMatch(/^AJ\d{6}-\d{5}$/)
+    expect(created.adjustNo).toMatch(/^AJ\d{6}-\d{4}$/)
     expect(await qtyOf(water)).toBe('100')
 
     // 등록 뒤 재고가 바뀌어도(입고 +5) 확정 때 재고 기준으로 차이를 계산한다

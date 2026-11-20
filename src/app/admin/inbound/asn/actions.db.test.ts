@@ -137,7 +137,7 @@ describe('대리 등록 (운영사 화면)', () => {
         line({ itemId: String(ids.rice), unit: 'KG', qty: '2.5' }),
       ],
     })
-    expect(created.asnNo).toMatch(/^AS\d{6}-\d{5}$/)
+    expect(created.asnNo).toMatch(/^AS\d{6}-\d{4}$/)
     const saved = await prisma.asn.findUniqueOrThrow({
       where: { id: BigInt(created.id) },
       include: { lines: { orderBy: { lineNo: 'asc' } } },

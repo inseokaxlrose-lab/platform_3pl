@@ -57,16 +57,22 @@ const line = (asnId: bigint, data: Record<string, unknown> = {}) =>
   })
 
 describe('ASN 번호', () => {
-  it('AS + 한국 날짜 + 일련번호, 동시에 받아도 겹치지 않는다', async () => {
-    const numbers = await Promise.all(Array.from({ length: 10 }, () => nextDocumentNumber('ASN')))
+  it('AS + 운영사 날짜 + 일련번호 4자리, 동시에 받아도 겹치지 않는다 (체번 0084)', async () => {
+    const numbers = await runInContext({ actor: 'test', operatorId: TEST_OPERATOR_ID }, () =>
+      Promise.all(Array.from({ length: 10 }, () => nextDocumentNumber('ASN'))),
+    )
     expect(new Set(numbers).size).toBe(10)
-    for (const n of numbers) expect(n).toMatch(/^AS\d{6}-\d{5,}$/)
-    expect(await nextDocumentNumber('RECEIPT')).toMatch(/^RC\d{6}-\d{5,}$/)
+    for (const n of numbers) expect(n).toMatch(/^AS\d{6}-\d{4}$/)
+    expect(
+      await runInContext({ actor: 'test', operatorId: TEST_OPERATOR_ID }, () =>
+        nextDocumentNumber('RECEIPT'),
+      ),
+    ).toMatch(/^RC\d{6}-0001$/)
   })
 
-  it('ASN 번호는 하나뿐', async () => {
-    await asn({ asnNo: 'AS261116-00001' })
-    await expect(asn({ asnNo: 'AS261116-00001' })).rejects.toThrow()
+  it('ASN 번호는 운영사 안에서 하나뿐 (다른 운영사는 같은 번호 가능 — H1)', async () => {
+    await asn({ asnNo: 'AS261116-0001' })
+    await expect(asn({ asnNo: 'AS261116-0001' })).rejects.toThrow()
   })
 })
 

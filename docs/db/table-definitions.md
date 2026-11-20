@@ -3,7 +3,7 @@
 > 이 문서는 `npm run db:doc`가 실제 DB 구조와 `prisma/schema.prisma`의 주석으로 만든다. **손으로 고치지 않는다** — 마이그레이션을 적용한 뒤 명령을 다시 돌린다.
 > 엑셀 판: `docs/db/DB_테이블정의서.xlsx` · 이름 규칙: `docs/db-conventions.md`
 
-테이블 65개 · 칼럼 1030개
+테이블 67개 · 칼럼 1052개
 
 ## 목차
 
@@ -74,6 +74,8 @@
 | 공통·설정 | [`tb_code_group`](#tb_code_group) | CodeGroup |  |
 | 공통·설정 | [`tb_code_item`](#tb_code_item) | CodeItem |  |
 | 공통·설정 | [`tb_ext_code`](#tb_ext_code) | ExternalCode | 외부 코드 매핑 (docs/decisions/0025): 우리 기준정보 ↔ SAP·ERP 등 외부 시스템 코드 한 줄 = 연동 상대 + 대상 종류 + 대상 id + 외부 코드 - 같은 운영사·같은 연동 상대·같은 종류 안에서 외부 코드 중복 금지 - 한 대상은 연동 상대마다 외부 코드 1개 |
+| 기타 | [`tb_numbering_rule`](#tb_numbering_rule) | NumberingRule | 체번 규칙 (docs/decisions/0084): 대상별 코드·문서번호 모양 operator_id NULL = 시스템 기본 규칙, 값이 있으면 그 운영사의 재정의 (같은 대상이면 운영사 행이 이긴다) 번호 = 접두어(고정 문자 / 화주 code_prefix / 상위 코드) + 구분 문자 + 날짜 + 구분자 + 일련번호 |
+| 기타 | [`tb_numbering_seq`](#tb_numbering_seq) | NumberingSeq | 체번 현재값 (docs/decisions/0084): 운영사 × 대상 × 범위 × 주기마다 마지막 번호 발급은 한 문장으로 원자적 증가 (INSERT … ON CONFLICT DO UPDATE … RETURNING) — MAX()+1 금지 이력이 아니라 카운터라 FK를 두지 않는다 (scope_id는 범위에 따라 운영사 0·화주사·거래처 키) |
 
 ## tb_account
 
@@ -1863,7 +1865,7 @@
 | No | 칼럼 | 한글명 | 설명 | 타입 | NULL | 기본값 | 키 |
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | 1 | `asn_id` | ASN ID |  | BIGINT | N | 자동 증가 | PK |
-| 2 | `operator_id` | 운영사 ID | 운영사 (멀티테넌트 키 — 다른 운영사 데이터는 보이지 않는다, 0039) | BIGINT | N |  | FK → tb_operator.operator_id |
+| 2 | `operator_id` | 운영사 ID | 운영사 (멀티테넌트 키 — 다른 운영사 데이터는 보이지 않는다, 0039) | BIGINT | N |  | UK FK → tb_operator.operator_id |
 | 3 | `center_id` | 센터 ID |  | BIGINT | N |  | FK → tb_center.center_id |
 | 4 | `shipper_id` | 화주사 ID |  | BIGINT | N |  | FK → tb_shipper.shipper_id |
 | 5 | `asn_no` | ASN 번호 | ASN 번호 (자동: AS + 등록일 YYMMDD + '-' + 일련번호, 운영사 전체에서 하나) | VARCHAR(20) | N |  | UK |
@@ -1886,7 +1888,7 @@
 
 **고유 인덱스**
 
-- `tb_asn_asn_no_key`: `CREATE UNIQUE INDEX tb_asn_asn_no_key ON tb_asn (asn_no)`
+- `tb_asn_operator_id_asn_no_key`: `CREATE UNIQUE INDEX tb_asn_operator_id_asn_no_key ON tb_asn (operator_id, asn_no)`
 
 **인덱스**
 
@@ -1978,7 +1980,7 @@
 | No | 칼럼 | 한글명 | 설명 | 타입 | NULL | 기본값 | 키 |
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | 1 | `label_id` | 라벨 ID |  | BIGINT | N | 자동 증가 | PK |
-| 2 | `operator_id` | 운영사 ID | 운영사 (멀티테넌트 키 — 다른 운영사 데이터는 보이지 않는다, 0039) | BIGINT | N |  | FK → tb_operator.operator_id |
+| 2 | `operator_id` | 운영사 ID | 운영사 (멀티테넌트 키 — 다른 운영사 데이터는 보이지 않는다, 0039) | BIGINT | N |  | UK FK → tb_operator.operator_id |
 | 3 | `label_no` | 라벨 번호 | 라벨 번호 (자동: LB + YYMMDD + '-' + 일련번호) | VARCHAR(20) | N |  | UK |
 | 4 | `inspection_id` | 검수 ID |  | BIGINT | N |  | UK FK → tb_inbound_inspection.inspection_id |
 | 5 | `label_seq` | 라벨 순서 | 몇 번째 장 / 모두 몇 장 (예: 2 / 3) | INTEGER | N |  | UK |
@@ -1996,7 +1998,7 @@
 **고유 인덱스**
 
 - `tb_inbound_label_inspection_id_label_seq_key`: `CREATE UNIQUE INDEX tb_inbound_label_inspection_id_label_seq_key ON tb_inbound_label (inspection_id, label_seq)`
-- `tb_inbound_label_label_no_key`: `CREATE UNIQUE INDEX tb_inbound_label_label_no_key ON tb_inbound_label (label_no)`
+- `tb_inbound_label_operator_id_label_no_key`: `CREATE UNIQUE INDEX tb_inbound_label_operator_id_label_no_key ON tb_inbound_label (operator_id, label_no)`
 
 **인덱스**
 
@@ -2014,7 +2016,7 @@
 | No | 칼럼 | 한글명 | 설명 | 타입 | NULL | 기본값 | 키 |
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | 1 | `receipt_id` | 입고확정 ID |  | BIGINT | N | 자동 증가 | PK |
-| 2 | `operator_id` | 운영사 ID | 운영사 (멀티테넌트 키 — 다른 운영사 데이터는 보이지 않는다, 0039) | BIGINT | N |  | FK → tb_operator.operator_id |
+| 2 | `operator_id` | 운영사 ID | 운영사 (멀티테넌트 키 — 다른 운영사 데이터는 보이지 않는다, 0039) | BIGINT | N |  | UK FK → tb_operator.operator_id |
 | 3 | `asn_id` | ASN ID |  | BIGINT | N |  | FK → tb_asn.asn_id |
 | 4 | `receipt_no` | 입고확정 번호 | 확정 번호 (자동: RC + YYMMDD + '-' + 일련번호) | VARCHAR(20) | N |  | UK |
 | 5 | `confirmed_at` | 확정 일시 |  | TIMESTAMP(3) | N | CURRENT_TIMESTAMP |  |
@@ -2023,7 +2025,7 @@
 
 **고유 인덱스**
 
-- `tb_inbound_receipt_receipt_no_key`: `CREATE UNIQUE INDEX tb_inbound_receipt_receipt_no_key ON tb_inbound_receipt (receipt_no)`
+- `tb_inbound_receipt_operator_id_receipt_no_key`: `CREATE UNIQUE INDEX tb_inbound_receipt_operator_id_receipt_no_key ON tb_inbound_receipt (operator_id, receipt_no)`
 
 **인덱스**
 
@@ -2138,7 +2140,7 @@
 | No | 칼럼 | 한글명 | 설명 | 타입 | NULL | 기본값 | 키 |
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | 1 | `adjust_id` | 조정 ID |  | BIGINT | N | 자동 증가 | PK |
-| 2 | `operator_id` | 운영사 ID | 운영사 (멀티테넌트 키 — 다른 운영사 데이터는 보이지 않는다, 0039) | BIGINT | N |  | FK → tb_operator.operator_id |
+| 2 | `operator_id` | 운영사 ID | 운영사 (멀티테넌트 키 — 다른 운영사 데이터는 보이지 않는다, 0039) | BIGINT | N |  | UK FK → tb_operator.operator_id |
 | 3 | `adjust_no` | 조정 번호 | 번호 (자동: AJ + YYMMDD + '-' + 일련번호) | VARCHAR(20) | N |  | UK |
 | 4 | `adjust_type_cd` | 조정 유형 코드 | (값: COUNT, ADJUST) | ENUM StockAdjustType | N |  |  |
 | 5 | `center_id` | 센터 ID |  | BIGINT | N |  |  |
@@ -2154,7 +2156,7 @@
 
 **고유 인덱스**
 
-- `tb_stock_adjust_adjust_no_key`: `CREATE UNIQUE INDEX tb_stock_adjust_adjust_no_key ON tb_stock_adjust (adjust_no)`
+- `tb_stock_adjust_operator_id_adjust_no_key`: `CREATE UNIQUE INDEX tb_stock_adjust_operator_id_adjust_no_key ON tb_stock_adjust (operator_id, adjust_no)`
 
 **인덱스**
 
@@ -2331,3 +2333,66 @@
 **인덱스**
 
 - `tb_ext_code_entity_type_cd_entity_id_idx`: `CREATE INDEX tb_ext_code_entity_type_cd_entity_id_idx ON tb_ext_code (entity_type_cd, entity_id)`
+
+## tb_numbering_rule
+
+- 영역: 기타 · 모델: `NumberingRule`
+- 체번 규칙 (docs/decisions/0084): 대상별 코드·문서번호 모양 operator_id NULL = 시스템 기본 규칙, 값이 있으면 그 운영사의 재정의 (같은 대상이면 운영사 행이 이긴다) 번호 = 접두어(고정 문자 / 화주 code_prefix / 상위 코드) + 구분 문자 + 날짜 + 구분자 + 일련번호
+
+| No | 칼럼 | 한글명 | 설명 | 타입 | NULL | 기본값 | 키 |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| 1 | `numbering_rule_id` | 체번규칙 ID |  | BIGINT | N | 자동 증가 | PK |
+| 2 | `operator_id` | 운영사 ID | 운영사 (멀티테넌트 키 — 다른 운영사 데이터는 보이지 않는다, 0039) | BIGINT | Y |  | UK FK → tb_operator.operator_id |
+| 3 | `target_cd` | 대상 코드 | 대상: SHIPPER·CUSTOMER·SHIP_TO·ITEM·ASN·RECEIPT·LABEL·ADJUST (src/lib/numbering/numbering-codes.ts) | VARCHAR(20) | N |  | UK |
+| 4 | `scope_cd` | 권한범위 코드 | 번호가 하나인 범위: OPERATOR / SHIPPER / CUSTOMER | VARCHAR(20) | N |  |  |
+| 5 | `prefix_src_cd` | 접두어출처 코드 | 접두어 출처: FIXED(고정 문자) / SHIPPER_PREFIX(화주 code_prefix) / PARENT_CD(상위 코드 — 납품처) | VARCHAR(20) | N |  |  |
+| 6 | `fixed_prefix` | 고정접두어 |  | VARCHAR(5) | Y |  |  |
+| 7 | `type_char` | 구분문자 | 엔티티 구분 문자 (거래처 C, 품목 S) | CHAR(1) | Y |  |  |
+| 8 | `separator` | 구분자 | 일련번호 앞 구분자 (전표·납품처 '-') | VARCHAR(1) | Y |  |  |
+| 9 | `date_fmt_cd` | 날짜형식 코드 | 날짜: NONE / YYMMDD (운영사 타임존 기준 등록일) | VARCHAR(10) | N | NONE |  |
+| 10 | `seq_len` | 일련번호자리수 | 일련번호 자리수 (2~8) | SMALLINT | N |  |  |
+| 11 | `reset_cycle_cd` | 초기화주기 코드 | 일련번호 초기화 주기: NONE / DAY / MONTH / YEAR | VARCHAR(10) | N | NONE |  |
+| 12 | `created_at` | 등록 일시 | 등록 일시 (자동) | TIMESTAMP(3) | N | CURRENT_TIMESTAMP |  |
+| 13 | `updated_at` | 수정 일시 | 수정 일시 (자동) | TIMESTAMP(3) | N |  |  |
+| 14 | `created_by` | 등록 자 | 등록자 아이디 (자동: 작업자 / seed / system) | VARCHAR(50) | N | system |  |
+| 15 | `updated_by` | 수정 자 | 수정자 아이디 (자동) | VARCHAR(50) | N | system |  |
+| 16 | `row_version` | 행버전 | 동시 수정 막기용 버전 (수정할 때마다 +1, 0038) | INTEGER | N | 1 |  |
+
+**고유 인덱스**
+
+- `tb_numbering_rule_operator_target_key`: `CREATE UNIQUE INDEX tb_numbering_rule_operator_target_key ON tb_numbering_rule (operator_id, target_cd) WHERE (operator_id IS NOT NULL)`
+- `tb_numbering_rule_system_target_key`: `CREATE UNIQUE INDEX tb_numbering_rule_system_target_key ON tb_numbering_rule (target_cd) WHERE (operator_id IS NULL)`
+
+**인덱스**
+
+- `tb_numbering_rule_operator_id_idx`: `CREATE INDEX tb_numbering_rule_operator_id_idx ON tb_numbering_rule (operator_id)`
+
+**검사 조건**
+
+- `tb_numbering_rule_date_fmt_cd_check`: `CHECK ((date_fmt_cd) IN ('NONE', 'YYMMDD'))`
+- `tb_numbering_rule_fixed_prefix_check`: `CHECK ((((prefix_src_cd) = 'FIXED') = (fixed_prefix IS NOT NULL)) AND ((fixed_prefix IS NULL) OR ((fixed_prefix) ~ '^[A-Z]{1,5}$')))`
+- `tb_numbering_rule_prefix_src_cd_check`: `CHECK ((prefix_src_cd) IN ('FIXED', 'SHIPPER_PREFIX', 'PARENT_CD'))`
+- `tb_numbering_rule_reset_cycle_cd_check`: `CHECK ((reset_cycle_cd) IN ('NONE', 'DAY', 'MONTH', 'YEAR'))`
+- `tb_numbering_rule_scope_cd_check`: `CHECK ((scope_cd) IN ('OPERATOR', 'SHIPPER', 'CUSTOMER'))`
+- `tb_numbering_rule_separator_check`: `CHECK ((separator IS NULL) OR ((separator) IN ('-', '_')))`
+- `tb_numbering_rule_seq_len_check`: `CHECK ((seq_len >= 2) AND (seq_len <= 8))`
+- `tb_numbering_rule_target_cd_check`: `CHECK ((target_cd) IN ('SHIPPER', 'CUSTOMER', 'SHIP_TO', 'ITEM', 'ASN', 'RECEIPT', 'LABEL', 'ADJUST'))`
+- `tb_numbering_rule_type_char_check`: `CHECK ((type_char IS NULL) OR (type_char ~ '^[A-Z]$'))`
+
+## tb_numbering_seq
+
+- 영역: 기타 · 모델: `NumberingSeq`
+- 체번 현재값 (docs/decisions/0084): 운영사 × 대상 × 범위 × 주기마다 마지막 번호 발급은 한 문장으로 원자적 증가 (INSERT … ON CONFLICT DO UPDATE … RETURNING) — MAX()+1 금지 이력이 아니라 카운터라 FK를 두지 않는다 (scope_id는 범위에 따라 운영사 0·화주사·거래처 키)
+
+| No | 칼럼 | 한글명 | 설명 | 타입 | NULL | 기본값 | 키 |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| 1 | `operator_id` | 운영사 ID | 운영사 (멀티테넌트 키 — 다른 운영사 데이터는 보이지 않는다, 0039) | BIGINT | N |  | PK |
+| 2 | `target_cd` | 대상 코드 |  | VARCHAR(20) | N |  | PK |
+| 3 | `scope_id` | 권한범위 ID | 범위 키: OPERATOR = 0, SHIPPER = shipper_id, CUSTOMER = customer_id | BIGINT | N |  | PK |
+| 4 | `period_key` | 주기키 | 주기 키: NONE = '-', DAY = 'YYMMDD', MONTH = 'YYMM', YEAR = 'YY' | VARCHAR(8) | N |  | PK |
+| 5 | `last_seq` | 마지막일련번호 |  | BIGINT | N |  |  |
+| 6 | `updated_at` | 수정 일시 | 수정 일시 (자동) | TIMESTAMP(3) | N | CURRENT_TIMESTAMP |  |
+
+**검사 조건**
+
+- `tb_numbering_seq_last_seq_check`: `CHECK (last_seq >= 0)`
