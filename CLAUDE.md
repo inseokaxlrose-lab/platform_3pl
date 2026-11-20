@@ -41,6 +41,7 @@ Next.js (App Router) · TypeScript · PostgreSQL · Prisma · Tailwind + shadcn/
 - **로케이션 스캔은 `창고코드.로케이션코드`**: 로케이션 코드는 창고 안에서만 유일하다. 바코드·표시는 `buildLocationBarcode`, 스캔한 값은 `parseLocationScan`으로만 해석한다 (`src/lib/locations/`, `docs/decisions/0084`).
 - **로트번호·유통기한은 품목 설정에 따름**: 사용하는 품목은 필수 입력, 사용하지 않는 품목은 null.
 - **재고 조정은 사유 필수**.
+- **계정 비밀번호**: 새 계정·관리자 초기화는 임시 비밀번호(`password_change_req_yn='Y'`)로 만들고 처음 로그인 때 바꾸게 한다(`requireUser`·`createAction`이 막음). 그 상태에서도 돌아야 하는 액션만 `allowWhilePasswordChange` (`docs/decisions/0086`).
 - 용어는 `docs/PRD.md`의 용어 정리를 따른다.
 
 ## UI 규칙
