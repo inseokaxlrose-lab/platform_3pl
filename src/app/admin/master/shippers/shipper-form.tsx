@@ -38,6 +38,7 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { Textarea } from '@/components/ui/textarea'
+import { SENDER_ADDR_TYPE } from '@/lib/carriers/carrier-codes'
 import { ALLOC_RULE, BIZ_ENTITY, TAX_TYPE } from '@/config/operator-codes'
 import { CONTACT_ROLE_GROUP, EMPTY_CONTACT } from '@/lib/contacts/contact-schema'
 import {
@@ -117,6 +118,13 @@ const EMPTY: ShipperInput = {
   orderNoScope: 'SHIPPER',
   ifMethod: 'PORTAL',
   apiEnabled: false,
+  senderName: '',
+  senderPhone: '',
+  senderAddrType: 'CENTER',
+  senderZipCode: '',
+  senderAddress: '',
+  senderAddressDetail: '',
+  defaultCarrierId: '',
   centers: [],
   contacts: [],
 }
@@ -138,6 +146,8 @@ type ShipperFormProps = {
 }
 
 const LIST_HREF = '/admin/master/shippers'
+// 기본 택배사 "정하지 않음" (고르기 칸은 빈 값을 못 쓴다)
+const NO_CARRIER = 'NONE'
 type TextKey =
   | 'name'
   | 'code'
@@ -150,6 +160,7 @@ type TextKey =
   | 'businessType'
   | 'businessItem'
   | 'homepageUrl'
+  | 'senderName'
 type YnKey = 'autoRenew' | 'partialShip' | 'autoCreateShipTo' | 'autoCreateItem' | 'apiEnabled'
 type InheritYnKey = 'useLot' | 'useExpiry' | 'useSerial'
 type CountKey = 'paymentTermsDays' | 'minInboundShelfDays' | 'minOutboundShelfDays'
@@ -161,6 +172,7 @@ type ConstKey =
   | 'orderNoScope'
   | 'ifMethod'
   | 'ifKeyType'
+  | 'senderAddrType'
 type CodeKey = 'shipperType' | 'industry' | 'settleCycle'
 type Option = { value: string; label: string }
 
@@ -845,6 +857,92 @@ export function ShipperForm({
               readOnly
             />
           </Field>
+        </FormGrid>
+      ),
+    },
+    {
+      id: 'shipping',
+      title: '출고 설정',
+      description:
+        '택배 송장의 보내는 사람과 기본 택배사입니다. 기본 택배사는 이 화주·센터의 운송 계약이 없을 때 씁니다.',
+      content: (
+        <FormGrid>
+          {text('senderName', '발송인명', 4, {
+            placeholder: value.name || '비우면 화주사명',
+            hint: '비우면 화주사명',
+          })}
+          <Field
+            label="발송 전화"
+            span={4}
+            error={errors.senderPhone}
+            htmlFor={id('senderPhone')}
+            hint="비우면 대표 전화"
+          >
+            <PhoneInput
+              {...props('senderPhone')}
+              value={value.senderPhone}
+              onChange={(senderPhone) => set({ senderPhone })}
+            />
+          </Field>
+          <Field
+            label="기본 택배사"
+            span={4}
+            error={errors.defaultCarrierId}
+            htmlFor={id('defaultCarrierId')}
+          >
+            <Select
+              value={value.defaultCarrierId || NO_CARRIER}
+              onValueChange={(v) => set({ defaultCarrierId: v === NO_CARRIER ? '' : v })}
+              disabled={disabled}
+            >
+              <SelectTrigger id={id('defaultCarrierId')} className="w-full">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value={NO_CARRIER}>정하지 않음</SelectItem>
+                {(operator?.carriers ?? [])
+                  .filter((c) => c.status === 'ACTIVE' || c.id === value.defaultCarrierId)
+                  .map((c) => (
+                    <SelectItem key={c.id} value={c.id}>
+                      {c.name}
+                      {c.status === 'ACTIVE' ? '' : ' (사용 중지)'}
+                    </SelectItem>
+                  ))}
+              </SelectContent>
+            </Select>
+          </Field>
+          {select(
+            'senderAddrType',
+            '보내는 주소',
+            [...SENDER_ADDR_TYPE.options],
+            4,
+            '직접 입력은 반품 회수지로도 씁니다',
+          )}
+          {value.senderAddrType === 'CUSTOM' && (
+            <Field label="주소" span={12} required htmlFor={id('sender-address')}>
+              <AddressInput
+                idPrefix={id('sender')}
+                value={{
+                  zipCode: value.senderZipCode,
+                  address: value.senderAddress,
+                  addressDetail: value.senderAddressDetail,
+                }}
+                onChange={(address) =>
+                  set({
+                    senderZipCode: address.zipCode,
+                    senderAddress: address.address,
+                    senderAddressDetail: address.addressDetail,
+                  })
+                }
+                disabled={disabled}
+                errors={{
+                  zipCode: errors.senderZipCode,
+                  address: errors.senderAddress,
+                  addressDetail: errors.senderAddressDetail,
+                }}
+              />
+            </Field>
+          )}
         </FormGrid>
       ),
     },

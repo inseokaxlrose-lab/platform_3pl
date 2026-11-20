@@ -294,17 +294,19 @@ model Center {
   updatedBy            String    @default("system") @map("updated_by") @db.VarChar(50)
   rowVersion           Int       @default(1) @map("row_version")
 
-  users         UserCenter[]
-  warehouses    Warehouse[]
-  shippers      ShipperCenter[]
-  stocks        Stock[]
-  asns          Asn[]
+  users            UserCenter[]
+  warehouses       Warehouse[]
+  shippers         ShipperCenter[]
+  stocks           Stock[]
+  asns             Asn[]
   // 이 센터를 배송 센터로 지정한 거래처 (0072)
   // 납품처 배송센터·권역 기준 센터 (0082)
-  shipTos       ShipTo[]         @relation("ShipToDeliveryCenter")
-  regionShipTos ShipTo[]         @relation("ShipToRegionCenter")
-  contacts      CenterContact[]
-  tempZones     CenterTempZone[]
+  shipTos          ShipTo[]          @relation("ShipToDeliveryCenter")
+  regionShipTos    ShipTo[]          @relation("ShipToRegionCenter")
+  contacts         CenterContact[]
+  tempZones        CenterTempZone[]
+  // 운송 계약 (0094)
+  carrierContracts CarrierContract[]
 
   // 논리 삭제: 'Y'면 지운 것 (목록·조회에서 빠지고 되살릴 수 있다, 0038)
   delYn         String              @default("N") @map("del_yn") @db.Char(1)
@@ -665,6 +667,18 @@ model Shipper {
   // 연동 방식: PORTAL·API·FILE·EDI
   ifMethod             String    @default("PORTAL") @map("if_method_cd") @db.VarChar(20)
   apiEnabledYn         String    @default("N") @map("api_enabled_yn") @db.Char(1)
+  // ── ⑦ 출고 설정 (0094): 송장의 보내는 사람·기본 택배사
+  // 발송인명 (비우면 화주명)·발송 전화 (비우면 화주 대표전화)
+  senderName           String?   @map("sender_nm") @db.VarChar(100)
+  senderPhone          String?   @map("sender_tel_no") @db.VarChar(15)
+  // 보내는 주소: 상수 SENDER_ADDR_TYPE (CENTER 출고 센터·SHIPPER 화주 주소·CUSTOM 직접 입력 — 반품 회수지 겸용)
+  senderAddrType       String    @default("CENTER") @map("sender_addr_type_cd") @db.VarChar(20)
+  senderZipCode        String?   @map("sender_zip_cd") @db.VarChar(10)
+  senderAddress        String?   @map("sender_addr1") @db.VarChar(200)
+  senderAddressDetail  String?   @map("sender_addr2") @db.VarChar(200)
+  // 기본 택배사: 운송 계약이 없을 때 쓴다
+  defaultCarrierId     BigInt?   @map("default_carrier_id")
+  defaultCarrier       Carrier?  @relation("ShipperDefaultCarrier", fields: [defaultCarrierId], references: [id], onDelete: Restrict)
   // 상태 (상수 SHIPPER_STATUS, 0080): 준비중 → 운영중 → 일시정지 → 해지. 일시정지·해지는 사유 필수
   // 해지만 데이터 범위에서 빠진다 (소속 사용자 로그인 불가)
   status               String    @default("PREPARING") @map("status_cd") @db.VarChar(20)
@@ -686,7 +700,7 @@ model Shipper {
   asns         Asn[]
 
   // 논리 삭제: 'Y'면 지운 것 (목록·조회에서 빠지고 되살릴 수 있다, 0038)
-  delYn               String      @default("N") @map("del_yn") @db.Char(1)
+  delYn               String            @default("N") @map("del_yn") @db.Char(1)
   // 전용 창고 (0074)
   dedicatedWarehouses Warehouse[]
   // 전용 로케이션 (0075)
@@ -694,6 +708,8 @@ model Shipper {
   // 연동 API 키 (0081)
   apiClients          ApiClient[]
   shipTos             ShipTo[]
+  // 운송 계약 (0094)
+  carrierContracts    CarrierContract[]
 
   // 코드는 삭제 안 된 것끼리만 겹치면 안 된다 (지운 것은 다시 쓸 수 있다, 0038)
   @@unique([operatorId, code], where: raw("del_yn = 'N'"), map: "tb_shipper_operator_id_shipper_cd_key")
@@ -961,17 +977,20 @@ model Operator {
   stockAdjustLines StockAdjustLine[]
 
   // 논리 삭제: 'Y'면 지운 것 (목록·조회에서 빠지고 되살릴 수 있다, 0038)
-  delYn           String              @default("N") @map("del_yn") @db.Char(1)
-  zones           Zone[]
+  delYn            String              @default("N") @map("del_yn") @db.Char(1)
+  zones            Zone[]
   // 권역설정 (0076): 자동 지정을 허용할 주소 정제 등급 (기본 D = D 이상 자동)
-  regionAutoGrade String              @default("D") @map("region_auto_grade") @db.Char(1)
-  regionMaps      RegionCenterMap[]
-  regionBatches   RegionChangeBatch[]
-  apiClients      ApiClient[]
-  shipTos         ShipTo[]
-  files           File[]
-  fileLinks       FileLink[]
-  settings        OperatorSetting[]
+  regionAutoGrade  String              @default("D") @map("region_auto_grade") @db.Char(1)
+  regionMaps       RegionCenterMap[]
+  regionBatches    RegionChangeBatch[]
+  apiClients       ApiClient[]
+  shipTos          ShipTo[]
+  files            File[]
+  fileLinks        FileLink[]
+  settings         OperatorSetting[]
+  // 운송사·운송 계약 (0094)
+  carriers         Carrier[]
+  carrierContracts CarrierContract[]
 
   // 운영사코드는 삭제 안 된 것끼리만 겹치면 안 된다 (0038)
   @@unique([code], where: raw("del_yn = 'N'"), map: "tb_operator_operator_cd_key")
@@ -1445,6 +1464,80 @@ model PalletType {
   @@unique([code], where: raw("operator_id IS NULL AND del_yn = 'N'"), map: "tb_pallet_type_system_cd_key")
   @@index([operatorId])
   @@map("tb_pallet_type")
+}
+
+// 운송사 (0094): 택배사·화물·자차·용차. 운영사마다 한 벌 — 새 운영사에 기본 7곳을 복사한다 (src/config/defaults/carriers.ts)
+model Carrier {
+  id            BigInt   @id @default(autoincrement()) @map("carrier_id")
+  operatorId    BigInt   @map("operator_id")
+  operator      Operator @relation(fields: [operatorId], references: [id], onDelete: Restrict)
+  // 우리 코드 (필수·등록 후 불변, 예: CJ) + 사용자 정의 코드 (화주 시스템의 택배사 코드)
+  code          String   @map("carrier_cd") @db.VarChar(20)
+  custCode      String?  @map("carrier_cust_cd") @db.VarChar(50)
+  name          String   @map("carrier_nm") @db.VarChar(50)
+  // 운송 유형: 상수 CARRIER_TYPE (PARCEL 택배·FREIGHT 화물·OWN 자차·CHARTER 용차)
+  carrierType   String   @default("PARCEL") @map("carrier_type_cd") @db.VarChar(20)
+  // 송장번호 자릿수 (체크디지트 포함, 비우면 검사 안 함)·체크디지트 규칙 (상수 INVOICE_CHECK_RULE)
+  invoiceDigits Int?     @map("invoice_digits") @db.SmallInt
+  invoiceCheck  String   @default("NONE") @map("invoice_check_cd") @db.VarChar(20)
+  // 배송 조회 주소: {invoiceNo} 자리에 송장번호
+  trackingUrl   String?  @map("tracking_url") @db.VarChar(300)
+  tel           String?  @map("tel_no") @db.VarChar(15)
+  status        String   @default("ACTIVE") @map("status_cd") @db.VarChar(20)
+  sortOrder     Int      @default(0) @map("sort_seq")
+  remark        String?  @db.VarChar(1000)
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+  createdBy     String   @default("system") @map("created_by") @db.VarChar(50)
+  updatedBy     String   @default("system") @map("updated_by") @db.VarChar(50)
+  rowVersion    Int      @default(1) @map("row_version")
+  delYn         String   @default("N") @map("del_yn") @db.Char(1)
+
+  contracts       CarrierContract[]
+  defaultShippers Shipper[]         @relation("ShipperDefaultCarrier")
+
+  @@unique([operatorId, code], where: raw("del_yn = 'N'"), map: "tb_carrier_operator_id_carrier_cd_key")
+  @@unique([operatorId, custCode], where: raw("carrier_cust_cd IS NOT NULL AND del_yn = 'N'"), map: "tb_carrier_operator_id_cust_cd_key")
+  @@index([operatorId])
+  @@map("tb_carrier")
+}
+
+// 운송 계약 (0094): 센터(·화주)별 택배사 계약 — 고객코드·집하 점소·송장번호 대역
+// 화주를 비우면 센터 공용 계약. 출고 때 고르는 순서: 화주×센터 계약 → 센터 공용 계약 → 화주 기본 택배사
+model CarrierContract {
+  id           BigInt    @id @default(autoincrement()) @map("contract_id")
+  operatorId   BigInt    @map("operator_id")
+  operator     Operator  @relation(fields: [operatorId], references: [id], onDelete: Restrict)
+  carrierId    BigInt    @map("carrier_id")
+  carrier      Carrier   @relation(fields: [carrierId], references: [id], onDelete: Restrict)
+  centerId     BigInt    @map("center_id")
+  center       Center    @relation(fields: [centerId], references: [id], onDelete: Restrict)
+  shipperId    BigInt?   @map("shipper_id")
+  shipper      Shipper?  @relation(fields: [shipperId], references: [id], onDelete: Restrict)
+  // 택배사가 준 고객코드(계약번호)·집하 점소
+  custNo       String    @map("carrier_cust_no") @db.VarChar(30)
+  pickupBranch String?   @map("pickup_branch_nm") @db.VarChar(50)
+  // 송장번호 대역: 체크디지트를 뺀 본번호 (시작·끝·다음에 쓸 번호). 실제 발번은 출고 작업에서
+  invoiceStart String?   @map("invoice_start_no") @db.VarChar(20)
+  invoiceEnd   String?   @map("invoice_end_no") @db.VarChar(20)
+  invoiceNext  String?   @map("invoice_next_no") @db.VarChar(20)
+  // 같은 센터·화주 범위 안의 기본 계약 (택배사가 여럿일 때 먼저 쓰는 것)
+  defaultYn    String    @default("N") @map("default_yn") @db.Char(1)
+  validFrom    DateTime? @map("valid_from_dt") @db.Date
+  validTo      DateTime? @map("valid_to_dt") @db.Date
+  status       String    @default("ACTIVE") @map("status_cd") @db.VarChar(20)
+  remark       String?   @db.VarChar(1000)
+  createdAt    DateTime  @default(now()) @map("created_at")
+  updatedAt    DateTime  @updatedAt @map("updated_at")
+  createdBy    String    @default("system") @map("created_by") @db.VarChar(50)
+  updatedBy    String    @default("system") @map("updated_by") @db.VarChar(50)
+  rowVersion   Int       @default(1) @map("row_version")
+  delYn        String    @default("N") @map("del_yn") @db.Char(1)
+
+  @@index([operatorId])
+  @@index([centerId, shipperId])
+  @@index([carrierId])
+  @@map("tb_carrier_contract")
 }
 
 // ── 거래처 (docs/decisions/0043): 화주사의 고객사 — 출고(MVP 이후) 때 물건을 받는 곳

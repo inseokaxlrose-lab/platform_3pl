@@ -25,6 +25,7 @@ function targetScope(target: ExternalTarget, scope: DataScope): Where {
     case 'CUSTOMER':
       return scopeFilter(scope, { center: 'shipper.centers.some.centerId', shipper: 'shipperId' })
     case 'UNIT':
+    case 'CARRIER':
       return operatorFilter(scope)
   }
 }
@@ -88,6 +89,13 @@ async function findTargets(
       const [rows, rowCount] = await prisma.$transaction([
         prisma.unit.findMany({ ...args, select: BASE }),
         prisma.unit.count({ where }),
+      ])
+      return { rows: rows.map((r) => ({ ...r, owner: null })), rowCount }
+    }
+    case 'CARRIER': {
+      const [rows, rowCount] = await prisma.$transaction([
+        prisma.carrier.findMany({ ...args, select: BASE }),
+        prisma.carrier.count({ where }),
       ])
       return { rows: rows.map((r) => ({ ...r, owner: null })), rowCount }
     }

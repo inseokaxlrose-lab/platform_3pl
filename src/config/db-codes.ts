@@ -16,6 +16,8 @@ export const EXTERNAL_ENTITY_TYPE_VALUES = [
   'ITEM',
   'CUSTOMER',
   'UNIT',
+  // 운송사 (0094)
+  'CARRIER',
 ] as const
 export type ExternalEntityType = (typeof EXTERNAL_ENTITY_TYPE_VALUES)[number]
 

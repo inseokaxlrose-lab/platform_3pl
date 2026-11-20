@@ -2,7 +2,8 @@ import { z } from 'zod'
 import { ALLOC_RULE, BIZ_ENTITY, TAX_TYPE } from '@/config/operator-codes'
 import { contactSchema } from '@/lib/contacts/contact-schema'
 import { digitsOnly, isValidBusinessNumber, isValidCorpRegNumber } from '@/lib/format'
-import { idSchema } from '@/lib/id'
+import { idSchema, optionalIdSchema } from '@/lib/id'
+import { SENDER_ADDR_TYPE } from '@/lib/carriers/carrier-codes'
 import {
   addressShape,
   oneOf,
@@ -226,6 +227,14 @@ export const shipperShape = {
   // ⑥ 연동
   ifMethod: oneOf(IF_METHOD.values, '연동 방식을 골라 주세요.'),
   apiEnabled: z.boolean(),
+  // ⑦ 출고 설정 (0094): 송장의 보내는 사람·기본 택배사
+  senderName: optionalText(100),
+  senderPhone: optionalPhone,
+  senderAddrType: oneOf(SENDER_ADDR_TYPE.values, '보내는 주소를 골라 주세요.'),
+  senderZipCode: addressShape.zipCode,
+  senderAddress: addressShape.address,
+  senderAddressDetail: addressShape.addressDetail,
+  defaultCarrierId: optionalIdSchema,
   centers: shipperCentersSchema,
   contacts: shipperContactsSchema,
 }
@@ -241,7 +250,21 @@ export const shipperSchema = z
         message: '계약종료일이 계약시작일보다 빠릅니다.',
       })
     }
+    // 보내는 주소를 직접 넣기로 했으면 주소 필수 (반품 회수지로도 쓴다)
+    if (value.senderAddrType === 'CUSTOM' && !value.senderAddress) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['senderAddress'],
+        message: '보내는 주소를 입력해 주세요.',
+      })
+    }
   })
+  // 직접 입력이 아니면 따로 넣은 주소는 지운다
+  .transform((value) =>
+    value.senderAddrType === 'CUSTOM'
+      ? value
+      : { ...value, senderZipCode: null, senderAddress: null, senderAddressDetail: null },
+  )
   .transform((value) => (value.bizEntity === 'CORP' ? value : { ...value, corpRegNo: null }))
 
 export type ShipperInput = z.input<typeof shipperSchema>

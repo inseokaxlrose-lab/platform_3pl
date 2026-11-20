@@ -131,6 +131,19 @@ async function assertCentersRemovable(db: Db, shipperId: bigint, centerIds: bigi
   }
 }
 
+// 기본 택배사 (0094): 이 운영사의 사용 중인 운송사 (이미 정해 둔 운송사는 사용 중지돼도 그대로 둘 수 있다)
+async function assertDefaultCarrier(db: Db, carrierId: bigint | null, keep: bigint | null = null) {
+  if (carrierId === null || carrierId === keep) return
+  const carrier = await db.carrier.findUnique({
+    where: { id: carrierId },
+    select: { status: true, code: true },
+  })
+  if (!carrier) throw new ActionError('NOT_FOUND', '기본 택배사를 찾을 수 없습니다.')
+  if (carrier.status !== 'ACTIVE') {
+    throw new ActionError('CONFLICT', `사용 중지한 운송사입니다: ${carrier.code}`)
+  }
+}
+
 // 공통코드 칸 검사 (화주 유형·업종·정산 주기·담당 업무)
 async function assertShipperCodes(db: Db, data: ShipperData, keep?: KeepCodes) {
   await assertCodeValues(db, SHIPPER_TYPE_GROUP, data.shipperType ? [data.shipperType] : [], {
@@ -245,6 +258,7 @@ export async function createShipper(data: ShipperData) {
       data.centers.map((c) => c.centerId),
     )
     await assertShipperCodes(tx, data)
+    await assertDefaultCarrier(tx, data.defaultCarrierId)
     const notice = await businessNumberNotice(tx, data.businessNumber)
     const shipper = await tx.shipper.create({
       data: {
@@ -274,6 +288,7 @@ export async function updateShipper(id: bigint, rowVersion: number, data: Shippe
         shipperType: true,
         industry: true,
         settleCycle: true,
+        defaultCarrierId: true,
         centers: { select: { centerId: true, status: true } },
         contacts: { select: { duty: true } },
       },
@@ -313,6 +328,7 @@ export async function updateShipper(id: bigint, rowVersion: number, data: Shippe
       settleCycle: current.settleCycle,
       duties: current.contacts.map((c) => c.duty),
     })
+    await assertDefaultCarrier(tx, data.defaultCarrierId, current.defaultCarrierId)
     const notice = await businessNumberNotice(tx, data.businessNumber, id)
     const saved = await withVersionGuard(() =>
       tx.shipper.update({

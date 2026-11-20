@@ -124,6 +124,13 @@ const input = (overrides: Partial<ShipperInput> = {}): ShipperInput => ({
   orderNoScope: 'SHIPPER',
   ifMethod: 'PORTAL',
   apiEnabled: false,
+  senderName: '',
+  senderPhone: '',
+  senderAddrType: 'CENTER',
+  senderZipCode: '',
+  senderAddress: '',
+  senderAddressDetail: '',
+  defaultCarrierId: '',
   centers: [center(icnId)],
   contacts: [
     {
@@ -346,6 +353,51 @@ describe('화주사 등록·수정 (0080)', () => {
       operatorId: TEST_OPERATOR_ID,
     })
     expect(edit?.input).toMatchObject({ useLot: true, useExpiry: null, shipCutoffTime: '15:30' })
+  })
+})
+
+describe('출고 설정: 발송인·기본 택배사 (0094)', () => {
+  const carrier = (code: string, status = 'ACTIVE') =>
+    prisma.carrier.create({ data: { operatorId: TEST_OPERATOR_ID, code, name: code, status } })
+
+  it('직접 입력 주소는 필수, 센터·화주 주소를 고르면 따로 넣은 주소는 지운다', async () => {
+    expect(await createShipperAction(input({ senderAddrType: 'CUSTOM' }))).toMatchObject({
+      ok: false,
+      error: { fieldErrors: { senderAddress: [expect.any(String)] } },
+    })
+    const cj = await carrier('CJ')
+    const { id } = await create({
+      senderName: '가나 물류팀',
+      senderPhone: '02-123-4567',
+      senderAddrType: 'SHIPPER',
+      senderAddress: '남는 주소',
+      defaultCarrierId: String(cj.id),
+    })
+    expect(await prisma.shipper.findUniqueOrThrow({ where: { id: BigInt(id) } })).toMatchObject({
+      senderName: '가나 물류팀',
+      senderPhone: '021234567',
+      senderAddrType: 'SHIPPER',
+      senderAddress: null,
+      defaultCarrierId: cj.id,
+    })
+  })
+
+  it('사용 중지한 운송사는 새로 고를 수 없지만, 이미 정해 둔 것은 그대로 저장된다', async () => {
+    const stopped = await carrier('OLD', 'INACTIVE')
+    expect(
+      await createShipperAction(input({ defaultCarrierId: String(stopped.id) })),
+    ).toMatchObject({ ok: false, error: { code: 'CONFLICT' } })
+    const cj = await carrier('CJ')
+    const { id } = await create({ defaultCarrierId: String(cj.id) })
+    await prisma.carrier.update({ where: { id: cj.id }, data: { status: 'INACTIVE' } })
+    const saved = await getShipperForEdit(BigInt(id), { kind: 'ALL', operatorId: TEST_OPERATOR_ID })
+    expect(
+      await updateShipperAction({
+        ...saved!.input,
+        id,
+        rowVersion: await versionOf('shipper', id),
+      }),
+    ).toMatchObject({ ok: true })
   })
 })
 

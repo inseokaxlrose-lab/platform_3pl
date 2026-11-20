@@ -1,4 +1,5 @@
 import 'server-only'
+import { SENDER_ADDR_TYPE } from '@/lib/carriers/carrier-codes'
 import { toContactInput } from '@/lib/contacts/contact-schema'
 import { dateToTime } from '@/lib/format/time'
 import { textIds } from '@/lib/id'
@@ -86,6 +87,13 @@ export async function getShipperForEdit(id: bigint, scope: DataScope) {
     orderNoScope: shipper.orderNoScope,
     ifMethod: shipper.ifMethod,
     apiEnabled: isYes(shipper.apiEnabledYn),
+    senderName: text(shipper.senderName),
+    senderPhone: text(shipper.senderPhone),
+    senderAddrType: toValue(SENDER_ADDR_TYPE.values, shipper.senderAddrType),
+    senderZipCode: text(shipper.senderZipCode),
+    senderAddress: text(shipper.senderAddress),
+    senderAddressDetail: text(shipper.senderAddressDetail),
+    defaultCarrierId: shipper.defaultCarrierId === null ? '' : String(shipper.defaultCarrierId),
     centers: shipper.centers.map((c) => ({
       centerId: String(c.centerId),
       isDefault: isYes(c.isDefault),
@@ -139,6 +147,12 @@ export type CenterChoice = Awaited<ReturnType<typeof getCenterChoices>>[number]
 // 상속 칸의 위 단계 값 (운영사 기본값 — 화면에 "운영사 값: …"으로 보인다)
 export async function getOperatorDefaults(scope: DataScope) {
   if (!scope.operatorId) return null
+  // 기본 택배사 고르기 (0094): 지운 것은 빼고, 사용 중지는 표시
+  const carriers = await prisma.carrier.findMany({
+    where: { operatorId: scope.operatorId },
+    orderBy: [{ sortOrder: 'asc' }, { code: 'asc' }],
+    select: { id: true, code: true, name: true, status: true },
+  })
   const operator = await prisma.operator.findUnique({
     where: { id: scope.operatorId },
     select: {
@@ -158,6 +172,7 @@ export async function getOperatorDefaults(scope: DataScope) {
     useSerial: isYes(operator.useSerial),
     shipCutoffTime: dateToTime(operator.shipCutoffTime),
     closingDay: operator.closingDay,
+    carriers: carriers.map((c) => ({ ...c, id: String(c.id) })),
   }
 }
 

@@ -3,7 +3,7 @@
 > 이 문서는 `npm run db:doc`가 실제 DB 구조와 `prisma/schema.prisma`의 주석으로 만든다. **손으로 고치지 않는다** — 마이그레이션을 적용한 뒤 명령을 다시 돌린다.
 > 엑셀 판: `docs/db/DB_테이블정의서.xlsx` · 이름 규칙: `docs/db-conventions.md`
 
-테이블 71개 · 칼럼 1129개
+테이블 73개 · 칼럼 1176개
 
 ## 목차
 
@@ -75,6 +75,8 @@
 | 공통·설정 | [`tb_code_group`](#tb_code_group) | CodeGroup | 공통코드 (docs/decisions/0030): 코드 그룹(서랍) → 코드(서랍 속 물건) 2단계 분류·표시용 값만 공통코드로 관리한다. 프로그램이 값에 따라 동작을 바꾸는 값(창고 유형 등)은 상수 + VARCHAR + CHECK로 둔다 (0084) 업무 표에는 코드 글자(CodeItem.code)를 그대로 저장한다 (예: 담당자 업무 'INBOUND') |
 | 공통·설정 | [`tb_code_item`](#tb_code_item) | CodeItem | 공통코드 항목: 그룹 안의 코드·이름 (docs/decisions/0030) |
 | 공통·설정 | [`tb_ext_code`](#tb_ext_code) | ExternalCode | 외부 코드 매핑 (docs/decisions/0025): 우리 기준정보 ↔ SAP·ERP 등 외부 시스템 코드 한 줄 = 연동 상대 + 대상 종류 + 대상 id + 외부 코드 - 같은 운영사·같은 연동 상대·같은 종류 안에서 외부 코드 중복 금지 - 한 대상은 연동 상대마다 외부 코드 1개 |
+| 기타 | [`tb_carrier`](#tb_carrier) | Carrier | 운송사 (0094): 택배사·화물·자차·용차. 운영사마다 한 벌 — 새 운영사에 기본 7곳을 복사한다 (src/config/defaults/carriers.ts) |
+| 기타 | [`tb_carrier_contract`](#tb_carrier_contract) | CarrierContract | 운송 계약 (0094): 센터(·화주)별 택배사 계약 — 고객코드·집하 점소·송장번호 대역 화주를 비우면 센터 공용 계약. 출고 때 고르는 순서: 화주×센터 계약 → 센터 공용 계약 → 화주 기본 택배사 |
 | 기타 | [`tb_file`](#tb_file) | File | 첨부파일 (docs/decisions/0091): 파일 정보. 바이트는 저장소(src/lib/files/storage.ts)에 storage_key로 있다 지우지 않는 기록이 아니라 실제로 지운다 (대상에서 떼면 파일도 지운다) — 공통 칸(버전·논리 삭제) 없음 |
 | 기타 | [`tb_file_link`](#tb_file_link) | FileLink | 첨부파일 대상 연결 (0091): 여러 장 붙는 곳 — ITEM 품목(IMAGE 이미지) · INSPECTION 검수(PHOTO 사진). 파일 하나는 한 곳에만 |
 | 기타 | [`tb_login_hist`](#tb_login_hist) | LoginHist | 로그인 이력 (docs/decisions/0093): 시도마다 한 줄 — SUCCESS 성공 / FAIL 실패 / LOCKED 잠김 / DISABLED 사용 중지·운영사 정지 없는 아이디로 시도하면 user_id 없이 아이디 글자만. 운영사는 그 사용자의 운영사 (플랫폼 관리자·없는 아이디는 비움) |
@@ -1239,6 +1241,13 @@
 | 60 | `code_prefix` | 코드접두어 | 거래처·품목 자동 체번 접두어 2글자 (I·O·0·1 제외), 운영사 안에서 고유. 하위 코드가 발행되면 바꿀 수 없다 (0084) | CHAR(2) | N |  | UK |
 | 61 | `if_key_type_cd` | 연동조회키 | 연동(API·엑셀)에서 거래처·납품처·품목을 찾는 키: CODE(우리 코드) / CUST_CD(사용자 정의 코드) | VARCHAR(20) | N | CODE |  |
 | 62 | `shipper_cust_cd` | 화주사 사용자정의코드 | 사용자 정의 코드 (운영사 ERP 코드 등), 운영사 안에서 고유 (값이 있을 때) | VARCHAR(50) | Y |  | UK |
+| 63 | `default_carrier_id` | 기본 carrier ID | 기본 택배사: 운송 계약이 없을 때 쓴다 | BIGINT | Y |  | FK → tb_carrier.carrier_id |
+| 64 | `sender_addr1` | sender 주소 |  | VARCHAR(200) | Y |  |  |
+| 65 | `sender_addr2` | sender 상세주소 |  | VARCHAR(200) | Y |  |  |
+| 66 | `sender_addr_type_cd` | sender 주소 유형 코드 | 보내는 주소: 상수 SENDER_ADDR_TYPE (CENTER 출고 센터·SHIPPER 화주 주소·CUSTOM 직접 입력 — 반품 회수지 겸용) | VARCHAR(20) | N | CENTER |  |
+| 67 | `sender_nm` | sender 명 | ⑦ 출고 설정 (0094): 송장의 보내는 사람·기본 택배사 발송인명 (비우면 화주명)·발송 전화 (비우면 화주 대표전화) | VARCHAR(100) | Y |  |  |
+| 68 | `sender_tel_no` | sender 전화 번호 |  | VARCHAR(15) | Y |  |  |
+| 69 | `sender_zip_cd` | sender 우편번호 |  | VARCHAR(10) | Y |  |  |
 
 **고유 인덱스**
 
@@ -1263,6 +1272,7 @@
 - `tb_shipper_lot_mgmt_yn_check`: `CHECK (lot_mgmt_yn IN ('Y', 'N')`
 - `tb_shipper_number_digits_check`: `CHECK (((biz_reg_no IS NULL) OR (biz_reg_no ~ '^[0-9]{10}$')) AND ((tel_no IS NULL) OR ((tel_no) ~ '^[0-9]{8,15}$')) AND ((fax_no IS NULL) OR ((fax_no) ~ '^[0-9]{8,15}$')))`
 - `tb_shipper_order_no_scope_cd_check`: `CHECK ((order_no_unique_scope_cd) IN ('SHIPPER', 'SHIPPER_DAY'))`
+- `tb_shipper_sender_addr_type_cd_check`: `CHECK ((sender_addr_type_cd) IN ('CENTER', 'SHIPPER', 'CUSTOM'))`
 - `tb_shipper_ship_to_center_policy_cd_check`: `CHECK ((ship_to_center_policy_cd) IN ('AUTO_HOLD', 'AUTO_REJECT', 'REQUIRED'))`
 - `tb_shipper_shortage_policy_cd_check`: `CHECK ((shortage_policy_cd) IN ('HOLD', 'PARTIAL', 'CANCEL_SHORT'))`
 - `tb_shipper_status_cd_check`: `CHECK ((status_cd) IN ('PREPARING', 'ACTIVE', 'SUSPENDED', 'TERMINATED'))`
@@ -2448,7 +2458,93 @@
 
 **검사 조건**
 
-- `tb_ext_code_entity_type_cd_check`: `CHECK ((entity_type_cd) IN ('CENTER', 'WAREHOUSE', 'LOCATION', 'SHIPPER', 'ITEM', 'CUSTOMER', 'UNIT'))`
+- `tb_ext_code_entity_type_cd_check`: `CHECK ((entity_type_cd) IN ('CENTER', 'WAREHOUSE', 'LOCATION', 'SHIPPER', 'ITEM', 'CUSTOMER', 'UNIT', 'CARRIER'))`
+
+## tb_carrier
+
+- 영역: 기타 · 모델: `Carrier`
+- 운송사 (0094): 택배사·화물·자차·용차. 운영사마다 한 벌 — 새 운영사에 기본 7곳을 복사한다 (src/config/defaults/carriers.ts)
+
+| No | 칼럼 | 한글명 | 설명 | 타입 | NULL | 기본값 | 키 |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| 1 | `carrier_id` | carrier ID |  | BIGINT | N | 자동 증가 | PK |
+| 2 | `operator_id` | 운영사 ID | 운영사 (멀티테넌트 키 — 다른 운영사 데이터는 보이지 않는다, 0039) | BIGINT | N |  | UK FK → tb_operator.operator_id |
+| 3 | `carrier_cd` | carrier 코드 | 우리 코드 (필수·등록 후 불변, 예: CJ) + 사용자 정의 코드 (화주 시스템의 택배사 코드) | VARCHAR(20) | N |  | UK |
+| 4 | `carrier_cust_cd` | carrier 사용자정의코드 |  | VARCHAR(50) | Y |  | UK |
+| 5 | `carrier_nm` | carrier 명 |  | VARCHAR(50) | N |  |  |
+| 6 | `carrier_type_cd` | carrier 유형 코드 | 운송 유형: 상수 CARRIER_TYPE (PARCEL 택배·FREIGHT 화물·OWN 자차·CHARTER 용차) | VARCHAR(20) | N | PARCEL |  |
+| 7 | `invoice_digits` | 송장 digits | 송장번호 자릿수 (체크디지트 포함, 비우면 검사 안 함)·체크디지트 규칙 (상수 INVOICE_CHECK_RULE) | SMALLINT | Y |  |  |
+| 8 | `invoice_check_cd` | 송장 검사 코드 |  | VARCHAR(20) | N | NONE |  |
+| 9 | `tracking_url` | tracking URL | 배송 조회 주소: {invoiceNo} 자리에 송장번호 | VARCHAR(300) | Y |  |  |
+| 10 | `tel_no` | 전화 번호 |  | VARCHAR(15) | Y |  |  |
+| 11 | `status_cd` | 상태 코드 | 상태 | VARCHAR(20) | N | ACTIVE |  |
+| 12 | `sort_seq` | 정렬순서 | 정렬 순서 | INTEGER | N | 0 |  |
+| 13 | `remark` | 비고 | 비고 | VARCHAR(1000) | Y |  |  |
+| 14 | `created_at` | 등록 일시 | 등록 일시 (자동) | TIMESTAMP(3) | N | CURRENT_TIMESTAMP |  |
+| 15 | `updated_at` | 수정 일시 | 수정 일시 (자동) | TIMESTAMP(3) | N |  |  |
+| 16 | `created_by` | 등록 자 | 등록자 아이디 (자동: 작업자 / seed / system) | VARCHAR(50) | N | system |  |
+| 17 | `updated_by` | 수정 자 | 수정자 아이디 (자동) | VARCHAR(50) | N | system |  |
+| 18 | `row_version` | 행버전 | 동시 수정 막기용 버전 (수정할 때마다 +1, 0038) | INTEGER | N | 1 |  |
+| 19 | `del_yn` | 삭제여부 | 논리 삭제 여부 ('Y' = 지움, 목록에서 빠지고 되살릴 수 있다, 0038) | CHAR(1) | N | N |  |
+
+**고유 인덱스**
+
+- `tb_carrier_operator_id_carrier_cd_key`: `CREATE UNIQUE INDEX tb_carrier_operator_id_carrier_cd_key ON tb_carrier (operator_id, carrier_cd) WHERE (del_yn = 'N'::bpchar)`
+- `tb_carrier_operator_id_cust_cd_key`: `CREATE UNIQUE INDEX tb_carrier_operator_id_cust_cd_key ON tb_carrier (operator_id, carrier_cust_cd) WHERE ((carrier_cust_cd IS NOT NULL) AND (del_yn = 'N'::bpchar))`
+
+**인덱스**
+
+- `tb_carrier_operator_id_idx`: `CREATE INDEX tb_carrier_operator_id_idx ON tb_carrier (operator_id)`
+
+**검사 조건**
+
+- `tb_carrier_carrier_type_cd_check`: `CHECK ((carrier_type_cd) IN ('PARCEL', 'FREIGHT', 'OWN', 'CHARTER'))`
+- `tb_carrier_del_yn_check`: `CHECK (del_yn IN ('Y', 'N')`
+- `tb_carrier_invoice_check_cd_check`: `CHECK ((invoice_check_cd) IN ('NONE', 'MOD7'))`
+- `tb_carrier_invoice_digits_check`: `CHECK ((invoice_digits IS NULL) OR ((invoice_digits >= 4) AND (invoice_digits <= 20)))`
+- `tb_carrier_status_cd_check`: `CHECK ((status_cd) IN ('ACTIVE', 'INACTIVE'))`
+
+## tb_carrier_contract
+
+- 영역: 기타 · 모델: `CarrierContract`
+- 운송 계약 (0094): 센터(·화주)별 택배사 계약 — 고객코드·집하 점소·송장번호 대역 화주를 비우면 센터 공용 계약. 출고 때 고르는 순서: 화주×센터 계약 → 센터 공용 계약 → 화주 기본 택배사
+
+| No | 칼럼 | 한글명 | 설명 | 타입 | NULL | 기본값 | 키 |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| 1 | `contract_id` | 계약 ID |  | BIGINT | N | 자동 증가 | PK |
+| 2 | `operator_id` | 운영사 ID | 운영사 (멀티테넌트 키 — 다른 운영사 데이터는 보이지 않는다, 0039) | BIGINT | N |  | FK → tb_operator.operator_id |
+| 3 | `carrier_id` | carrier ID |  | BIGINT | N |  | FK → tb_carrier.carrier_id |
+| 4 | `center_id` | 센터 ID |  | BIGINT | N |  | FK → tb_center.center_id |
+| 5 | `shipper_id` | 화주사 ID |  | BIGINT | Y |  | FK → tb_shipper.shipper_id |
+| 6 | `carrier_cust_no` | carrier cust 번호 | 택배사가 준 고객코드(계약번호)·집하 점소 | VARCHAR(30) | N |  |  |
+| 7 | `pickup_branch_nm` | pickup branch 명 |  | VARCHAR(50) | Y |  |  |
+| 8 | `invoice_start_no` | 송장 시작 번호 | 송장번호 대역: 체크디지트를 뺀 본번호 (시작·끝·다음에 쓸 번호). 실제 발번은 출고 작업에서 | VARCHAR(20) | Y |  |  |
+| 9 | `invoice_end_no` | 송장 종료 번호 |  | VARCHAR(20) | Y |  |  |
+| 10 | `invoice_next_no` | 송장 next 번호 |  | VARCHAR(20) | Y |  |  |
+| 11 | `default_yn` | 기본 여부 | 같은 센터·화주 범위 안의 기본 계약 (택배사가 여럿일 때 먼저 쓰는 것) | CHAR(1) | N | N |  |
+| 12 | `valid_from_dt` | valid 시작 일자 |  | DATE | Y |  |  |
+| 13 | `valid_to_dt` | valid 대상 일자 |  | DATE | Y |  |  |
+| 14 | `status_cd` | 상태 코드 | 상태 | VARCHAR(20) | N | ACTIVE |  |
+| 15 | `remark` | 비고 | 비고 | VARCHAR(1000) | Y |  |  |
+| 16 | `created_at` | 등록 일시 | 등록 일시 (자동) | TIMESTAMP(3) | N | CURRENT_TIMESTAMP |  |
+| 17 | `updated_at` | 수정 일시 | 수정 일시 (자동) | TIMESTAMP(3) | N |  |  |
+| 18 | `created_by` | 등록 자 | 등록자 아이디 (자동: 작업자 / seed / system) | VARCHAR(50) | N | system |  |
+| 19 | `updated_by` | 수정 자 | 수정자 아이디 (자동) | VARCHAR(50) | N | system |  |
+| 20 | `row_version` | 행버전 | 동시 수정 막기용 버전 (수정할 때마다 +1, 0038) | INTEGER | N | 1 |  |
+| 21 | `del_yn` | 삭제여부 | 논리 삭제 여부 ('Y' = 지움, 목록에서 빠지고 되살릴 수 있다, 0038) | CHAR(1) | N | N |  |
+
+**인덱스**
+
+- `tb_carrier_contract_carrier_id_idx`: `CREATE INDEX tb_carrier_contract_carrier_id_idx ON tb_carrier_contract (carrier_id)`
+- `tb_carrier_contract_center_id_shipper_id_idx`: `CREATE INDEX tb_carrier_contract_center_id_shipper_id_idx ON tb_carrier_contract (center_id, shipper_id)`
+- `tb_carrier_contract_operator_id_idx`: `CREATE INDEX tb_carrier_contract_operator_id_idx ON tb_carrier_contract (operator_id)`
+
+**검사 조건**
+
+- `tb_carrier_contract_default_yn_check`: `CHECK (default_yn IN ('Y', 'N')`
+- `tb_carrier_contract_del_yn_check`: `CHECK (del_yn IN ('Y', 'N')`
+- `tb_carrier_contract_status_cd_check`: `CHECK ((status_cd) IN ('ACTIVE', 'INACTIVE'))`
+- `tb_carrier_contract_valid_check`: `CHECK ((valid_to_dt IS NULL) OR (valid_from_dt IS NULL) OR (valid_from_dt <= valid_to_dt))`
 
 ## tb_file
 

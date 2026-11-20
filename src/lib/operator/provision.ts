@@ -1,11 +1,12 @@
 import 'server-only'
+import { DEFAULT_CARRIERS } from '@/config/defaults/carriers'
 import { DEFAULT_CODE_GROUPS } from '@/config/defaults/codes'
 import { toYn } from '@/lib/yn'
 import { DEFAULT_GROUPS } from '@/config/defaults/roles'
 import type { Db } from '@/lib/prisma'
 
 // 운영사 기본값 넣기 (docs/decisions/0039 3c)
-// 새 운영사에 기본 공통코드·권한그룹을 복사한다. 단위는 복사하지 않는다 (시스템 기본 단위는 모든 운영사가 함께 보는 한 벌, 0078). 플랫폼의 운영사 등록과 개발 시드가 같이 쓴다
+// 새 운영사에 기본 공통코드·운송사·권한그룹을 복사한다. 단위는 복사하지 않는다 (시스템 기본 단위는 모든 운영사가 함께 보는 한 벌, 0078). 플랫폼의 운영사 등록과 개발 시드가 같이 쓴다
 // - "없으면 만들기": 여러 번 불러도 안전하고, 운영사가 화면에서 고친 이름·순서·사용 여부를 되돌리지 않는다
 // - 운영사 키는 직접 받는다 (플랫폼·시드는 운영사 출입증 밖에서 부른다)
 // - 같은 트랜잭션(db)에서 부르면 운영사 등록과 함께 만들어지거나 함께 취소된다
@@ -37,6 +38,18 @@ async function provisionCodes(db: Db, operatorId: bigint) {
         update: {},
       })
     }
+  }
+}
+
+// 운송사 (0094): 같은 코드가 없을 때만 만든다 (운영사가 지운 것도 있는 것으로 보고 되살리지 않는다)
+async function provisionCarriers(db: Db, operatorId: bigint) {
+  for (const [index, carrier] of DEFAULT_CARRIERS.entries()) {
+    const existing = await db.carrier.findFirst({
+      where: { operatorId, code: carrier.code, delYn: { in: ['Y', 'N'] } },
+      select: { id: true },
+    })
+    if (existing) continue
+    await db.carrier.create({ data: { ...carrier, operatorId, sortOrder: (index + 1) * 10 } })
   }
 }
 
@@ -79,5 +92,6 @@ export async function provisionOperator(
   { syncGroupPermissions = false }: ProvisionOptions = {},
 ) {
   await provisionCodes(db, operatorId)
+  await provisionCarriers(db, operatorId)
   return provisionGroups(db, operatorId, syncGroupPermissions)
 }
