@@ -38,6 +38,7 @@ Next.js (App Router) · TypeScript · PostgreSQL · Prisma · Tailwind + shadcn/
 - **번호는 숫자만 저장**: 사업자·법인등록번호, 전화·팩스는 하이픈 없이 저장하고, 화면 표시·입력에서만 `src/lib/format/`의 함수로 하이픈을 붙인다 (`docs/decisions/0029`).
 - **재고는 직접 수정 금지**: 재고 수량은 반드시 재고 변경 공통 함수(`src/lib/stock/stock-change.ts`: `receiveStock`·`moveStock`·`adjustStock`, 이력 기록 포함)로만 바꾼다. 업무 저장과 같은 트랜잭션 `tx`를 넘기고, 그 트랜잭션은 `stockTransaction`(교착 시 자동 다시 시도, 0046)으로 연다. 함수 밖에서 재고 표를 바꾸면 `prisma.ts`가 오류를 낸다(직접 SQL·안쪽 관계 쓰기도 금지) (`docs/decisions/0045`).
 - **재고는 기본단위로 저장**: 환산단위(BOX, CARTON, PLT)는 화면 표시·입력용이며, 환산은 공통 함수(`src/lib/units/convert.ts`: `toBaseQty`·`splitBaseQty`·`labelQuantities`·`formatQty` 등)에서만 한다. 수량은 DB Decimal, 코드에서는 글자로 주고받고 `Number`로 바꿔 계산하지 않는다 (`docs/decisions/0042`).
+- **로케이션 스캔은 `창고코드.로케이션코드`**: 로케이션 코드는 창고 안에서만 유일하다. 바코드·표시는 `buildLocationBarcode`, 스캔한 값은 `parseLocationScan`으로만 해석한다 (`src/lib/locations/`, `docs/decisions/0084`).
 - **로트번호·유통기한은 품목 설정에 따름**: 사용하는 품목은 필수 입력, 사용하지 않는 품목은 null.
 - **재고 조정은 사유 필수**.
 - 용어는 `docs/PRD.md`의 용어 정리를 따른다.
