@@ -47,6 +47,18 @@
 | `ADDRESS_NOT_RESOLVED` | 422 | 정책 위반 | 주소를 확인하지 못함(정제 실패·자동 지정 등급 미만) — 정책이 자동 반려일 때 납품처 건별 |
 | `REGION_UNASSIGNED` | 422 | 정책 위반 | 권역설정에 배정되지 않은 지역 — 정책이 자동 반려일 때 납품처 건별 |
 | `REGION_MIXED` | 422 | 정책 위반 | 여러 센터가 섞인 지역 → `centerCd`를 보내세요 — 정책이 자동 반려일 때 납품처 건별 |
+| `ITEM_CD_INVALID` | 400 | 형식 | `itemCd`가 영문·숫자·`.`·`-`·`_` 50자를 벗어남 — 품목 건별 |
+| `BASE_UOM_INVALID` | 422 | 정책 위반 | `baseUom`이 포장 단위·사용 중지 단위, 또는 `uoms`로 기본단위를 보냄 — 품목 건별 |
+| `UOM_NOT_FOUND` | 404 | 참조 없음 | 없는 단위 코드(우리 코드·외부코드 매핑 모두 없음), 포장 단위가 아닌 `uoms`, 품목에 없는 단위의 바코드 — 품목 건별 |
+| `UOM_QTY_INVALID` | 422 | 정책 위반 | 환산수량 순서(BASE < INNER < BOX < PLT) 위반, 기본단위 소수 자리 초과 — 품목 건별 |
+| `PALLET_TYPE_NOT_FOUND` | 404 | 참조 없음 | 없는 팔레트 종류(`pallet.type`) — 품목 건별 |
+| `BARCODE_DUPLICATE` | 409 | 중복 | 같은 화주사의 다른 품목이 쓰는 바코드, 또는 한 품목에 같은 바코드 두 번 — 품목 건별 |
+| `BARCODE_CHECKDIGIT` | 400 | 형식 | EAN-13·EAN-8·UPC-A·ITF-14의 자리수·체크디지트가 틀림 — 품목 건별 |
+| `EXPIRY_INFO_REQUIRED` | 422 | 정책 위반 | `expiryMgmt: true`인데 `expiryType`·`expiryInput`이 없음 — 품목 건별 |
+| `SHELF_LIFE_REQUIRED` | 422 | 정책 위반 | `expiryInput`이 `MFG`·`BOTH`인데 `shelfLifeDays`가 없음 — 품목 건별 |
+| `LOT_SOURCE_REQUIRED` | 422 | 정책 위반 | `lotMgmt: true`인데 `lotSource`가 없음 — 품목 건별 |
+| `ITEM_STOCK_EXISTS` | 409 | 상태 불가 | 재고가 있는 품목의 `baseUom`·`expiryMgmt`·`lotMgmt`·`serialMgmt` 변경 — 품목 건별 |
+| `ITEM_OPEN_DOC_EXISTS` | 409 | 상태 불가 | 미완료 입고예정이 있는 품목의 관리 여부 변경, 또는 그 단위로 입력된 ASN이 있는데 환산수량 변경 — 품목 건별 |
 | `IDEMPOTENCY_CONFLICT` | 409 | 중복 | 같은 `Idempotency-Key`로 다른 본문을 보냄 |
 | `TOO_MANY_ITEMS` | 413 | 한도 | 한 번에 보낼 수 있는 건수(500) 초과 |
 | `RATE_LIMITED` | 429 | 한도 | 분당 호출 한도 초과 → `Retry-After`초 뒤 다시 |

@@ -35,9 +35,24 @@ export type ItemUpsertInput = {
   status?: ItemStatus
 }
 
-// 입력 규칙 오류 → 첫 문구 (업로드·API가 행·건별 오류로 보여 준다)
-function validationError(error: z.ZodError): ActionError {
-  return new ActionError('VALIDATION', error.issues[0]?.message ?? '입력값을 확인해 주세요.')
+// 입력 규칙 오류: 첫 문구 + 연동 오류코드 + 칸 위치 (업로드·API가 행·건별 오류로 보여 준다)
+export class ItemInputError extends ActionError {
+  constructor(
+    message: string,
+    apiCode: string,
+    // 입력 규칙의 칸 경로 (예: 'units.1.convQty', 'expiryType')
+    readonly path: string,
+  ) {
+    super('VALIDATION', message, apiCode)
+  }
+}
+
+function validationError(error: z.ZodError): ItemInputError {
+  const issue = error.issues[0]
+  const params = (issue as { params?: { apiCode?: string } } | undefined)?.params
+  const path = issue?.path.join('.') ?? ''
+  const apiCode = params?.apiCode ?? (path === 'code' ? 'ITEM_CD_INVALID' : 'VALIDATION_FAILED')
+  return new ItemInputError(issue?.message ?? '입력값을 확인해 주세요.', apiCode, path)
 }
 
 // 정리한 값 비교용 글자 (bigint 포함)

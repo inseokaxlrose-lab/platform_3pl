@@ -2,6 +2,7 @@ import { z } from 'zod'
 import { API_SCOPE, MAX_ITEMS_PER_REQUEST } from './api-codes'
 import { API_ERRORS } from './api-errors'
 import { partnerSchema, partnerShipToSchema } from '@/lib/customers/customer-upsert'
+import { apiItemSchema } from '@/lib/items/item-api-schema'
 import { meResponseSchema } from './endpoints/me'
 
 // 화주 연동 API OpenAPI 명세 (docs/decisions/0081) — /api/v1/openapi.json
@@ -175,12 +176,171 @@ export function buildOpenApi(serverUrl: string) {
           }),
         },
       },
+      // ── 품목 (0083 ③, 필드 대응: docs/api-item-fields.md)
+      '/items': {
+        post: {
+          summary: '품목 등록·수정 (upsert)',
+          description: [
+            '업무 키는 `itemCd`(화주 안에서 고유, 바꿀 수 없음). 없으면 만들고, 있으면 **보낸 칸만** 고칩니다 (안 보낸 칸은 그대로, `null`은 값 지우기).',
+            '`uoms`·`barcodes`는 **보낸 행만** 추가·수정합니다 (빠진 행은 그대로, 지우려면 `delete: true`). 기본단위는 `baseUom`으로만 정합니다.',
+            '단위 코드는 우리 단위 코드 또는 외부코드 매핑(대상 단위)의 코드. `pallet`(종류·ti·hi 또는 boxQty)이 있으면 PLT를 계산하고, 보낸 PLT와 다르면 경고 `PLT_RECALCULATED`.',
+            '새 품목에서 `expiryMgmt`·`lotMgmt`를 안 보내면 화주 설정을 따릅니다. 재고가 있으면 기본단위·관리 여부를 바꿀 수 없습니다(`ITEM_STOCK_EXISTS`).',
+            '응답 건마다 계산값(BOX CBM, PLT 수량·높이·CBM·중량, 체적 상태)과 경고(저장은 됨)를 돌려줍니다. 내용이 같으면 `UNCHANGED`.',
+          ].join('\n\n'),
+          operationId: 'upsertItems',
+          tags: ['품목'],
+          parameters: [idempotencyHeader()],
+          requestBody: arrayBody(schema(apiItemSchema)),
+          responses: itemsResponses(ITEM_COMPUTED.properties),
+        },
+        get: {
+          summary: '품목 목록',
+          description:
+            '수정일시가 `updatedAfter`보다 뒤인 품목을 키 순서로. 다음 쪽은 응답의 `nextCursor`를 `cursor`로 보내세요.',
+          operationId: 'listItems',
+          tags: ['품목'],
+          parameters: [
+            { name: 'updatedAfter', in: 'query', schema: { type: 'string', format: 'date-time' } },
+            { name: 'cursor', in: 'query', schema: { type: 'string' } },
+            {
+              name: 'limit',
+              in: 'query',
+              schema: { type: 'integer', minimum: 1, maximum: 500, default: 100 },
+            },
+          ],
+          responses: dataResponses({
+            type: 'object',
+            properties: {
+              items: { type: 'array', items: ITEM },
+              nextCursor: { type: 'string', nullable: true },
+            },
+          }),
+        },
+      },
+      '/items/{itemCd}': {
+        get: {
+          summary: '품목 상세 (단위·바코드·PLT 계산값 포함)',
+          operationId: 'getItem',
+          tags: ['품목'],
+          parameters: [{ name: 'itemCd', in: 'path', required: true, schema: { type: 'string' } }],
+          responses: dataResponses({
+            allOf: [
+              ITEM,
+              { type: 'object', properties: { barcodes: { type: 'array', items: ITEM_BARCODE } } },
+            ],
+          }),
+        },
+      },
     },
   }
 }
 
-// ── 거래처 응답 모양 (조회)
+// ── 품목·거래처 응답 모양 공용
 const nullableText = { type: 'string', nullable: true }
+
+// ── 품목 응답 모양 (계산값·조회)
+const nullableNumber = { type: 'number', nullable: true }
+const WARNING = {
+  type: 'object',
+  properties: {
+    code: {
+      type: 'string',
+      description:
+        'VOLUME_MISSING · DENSITY_SUSPICIOUS · PLT_RECALCULATED · PALLET_HEIGHT_EXCEEDED · PALLET_WEIGHT_EXCEEDED · UOM_NOT_MULTIPLE · STACK_LIMIT_CONFLICT',
+    },
+    message: { type: 'string' },
+  },
+}
+const ITEM_COMPUTED = {
+  type: 'object',
+  properties: {
+    volumeStatus: {
+      type: 'string',
+      enum: ['OK', 'MISSING'],
+      description: 'BOX 규격 기준 체적 등록 여부',
+    },
+    box: {
+      type: 'object',
+      nullable: true,
+      properties: {
+        qtyInBase: { type: 'number' },
+        cbm: nullableNumber,
+        grossWeightKg: nullableNumber,
+      },
+    },
+    plt: {
+      type: 'object',
+      nullable: true,
+      properties: {
+        qtyInBase: { type: 'number' },
+        boxQty: { type: 'integer', nullable: true },
+        heightCm: nullableNumber,
+        cbm: nullableNumber,
+        grossWeightKg: nullableNumber,
+        calculated: { type: 'boolean', description: '팔레트 적재로 계산한 값이면 true' },
+      },
+    },
+    warnings: {
+      type: 'array',
+      items: WARNING,
+      description: '저장은 됐지만 확인할 것 (POST 응답만)',
+    },
+  },
+}
+const ITEM = {
+  type: 'object',
+  properties: {
+    itemCd: { type: 'string' },
+    itemNm: { type: 'string' },
+    itemType: { type: 'string' },
+    baseUom: { type: 'string' },
+    uoms: {
+      type: 'array',
+      items: {
+        type: 'object',
+        properties: {
+          uom: { type: 'string' },
+          level: { type: 'string', enum: ['INNER', 'BOX', 'PLT'] },
+          qtyInBase: { type: 'number' },
+          widthCm: nullableNumber,
+          depthCm: nullableNumber,
+          heightCm: nullableNumber,
+          cbm: nullableNumber,
+          grossWeightKg: nullableNumber,
+          netWeightKg: nullableNumber,
+          calculated: { type: 'boolean' },
+        },
+      },
+    },
+    pallet: {
+      type: 'object',
+      properties: {
+        type: nullableText,
+        ti: { type: 'integer', nullable: true },
+        hi: { type: 'integer', nullable: true },
+        boxQty: { type: 'integer', nullable: true },
+      },
+    },
+    tempZone: { type: 'string' },
+    expiryMgmt: { type: 'boolean' },
+    lotMgmt: { type: 'boolean' },
+    status: { type: 'string', enum: ['ACTIVE', 'INACTIVE', 'DISCONTINUED'] },
+    ...ITEM_COMPUTED.properties,
+    updatedAt: { type: 'string', format: 'date-time' },
+  },
+  description: '전체 칸은 docs/api-item-fields.md (요청과 같은 이름 + 계산값)',
+}
+const ITEM_BARCODE = {
+  type: 'object',
+  properties: {
+    uom: { type: 'string' },
+    barcode: { type: 'string' },
+    type: { type: 'string' },
+    primary: { type: 'boolean' },
+  },
+}
+
+// ── 거래처 응답 모양 (조회)
 const PARTNER = {
   type: 'object',
   properties: {

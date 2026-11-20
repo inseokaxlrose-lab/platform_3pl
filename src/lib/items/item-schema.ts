@@ -169,33 +169,42 @@ type ItemShapeOut = z.output<z.ZodObject<typeof itemShape>>
 
 // 칸 사이 규칙 (조건부 필수·단위 레벨·바코드) — 화면 즉시 검사와 서버가 같이 쓴다
 function crossRules(value: ItemShapeOut, ctx: z.RefinementCtx) {
-  const issue = (path: (string | number)[], message: string) =>
-    ctx.addIssue({ code: 'custom', path, message })
+  // apiCode: 연동 API가 돌려줄 오류코드 (docs/api-error-codes.md)
+  const issue = (path: (string | number)[], message: string, apiCode = 'VALIDATION_FAILED') =>
+    ctx.addIssue({ code: 'custom', path, message, params: { apiCode } })
   if (value.useExpiry) {
     if (
       !value.expiryType ||
       !(EXPIRY_TYPE.values as readonly string[]).includes(value.expiryType)
     ) {
-      issue(['expiryType'], '기한 관리 품목은 기한 종류를 골라 주세요.')
+      issue(['expiryType'], '기한 관리 품목은 기한 종류를 골라 주세요.', 'EXPIRY_INFO_REQUIRED')
     }
     if (
       !value.expiryInput ||
       !(EXPIRY_INPUT.values as readonly string[]).includes(value.expiryInput)
     ) {
-      issue(['expiryInput'], '기한 관리 품목은 기한 입력 방식을 골라 주세요.')
+      issue(
+        ['expiryInput'],
+        '기한 관리 품목은 기한 입력 방식을 골라 주세요.',
+        'EXPIRY_INFO_REQUIRED',
+      )
     }
     if (
       (value.expiryInput === 'MFG' || value.expiryInput === 'BOTH') &&
       value.shelfLifeDays === null
     ) {
-      issue(['shelfLifeDays'], '제조일로 기한을 계산하려면 총 기한 일수가 필요합니다.')
+      issue(
+        ['shelfLifeDays'],
+        '제조일로 기한을 계산하려면 총 기한 일수가 필요합니다.',
+        'SHELF_LIFE_REQUIRED',
+      )
     }
   }
   if (
     value.useLot &&
     (!value.lotSource || !(LOT_SOURCE.values as readonly string[]).includes(value.lotSource))
   ) {
-    issue(['lotSource'], 'LOT 관리 품목은 LOT 생성 방식을 골라 주세요.')
+    issue(['lotSource'], 'LOT 관리 품목은 LOT 생성 방식을 골라 주세요.', 'LOT_SOURCE_REQUIRED')
   }
   if (
     value.storageTempMin !== null &&
@@ -207,10 +216,10 @@ function crossRules(value: ItemShapeOut, ctx: z.RefinementCtx) {
   // 단위: BASE 1행 필수, 레벨별 1행, BASE 행 = 기본단위·환산수량 1, 같은 단위를 두 레벨에 쓸 수 없음
   const levels = value.units.map((u) => u.level)
   const base = value.units.find((u) => u.level === 'BASE')
-  if (!base) issue(['units'], '기본단위 행이 필요합니다.')
+  if (!base) issue(['units'], '기본단위 행이 필요합니다.', 'BASE_UOM_INVALID')
   else {
     if (base.unitId !== value.baseUnitId)
-      issue(['units'], '기본단위 행의 단위는 기본단위와 같아야 합니다.')
+      issue(['units'], '기본단위 행의 단위는 기본단위와 같아야 합니다.', 'BASE_UOM_INVALID')
     if (Number(base.convQty) !== 1) issue(['units'], '기본단위 행의 환산수량은 1입니다.')
   }
   value.units.forEach((u, index) => {
@@ -224,9 +233,10 @@ function crossRules(value: ItemShapeOut, ctx: z.RefinementCtx) {
   const unitIds = new Set(value.units.map((u) => u.unitId))
   value.barcodes.forEach((b, index) => {
     if (value.barcodes.findIndex((x) => x.barcode === b.barcode) !== index) {
-      issue(['barcodes', index, 'barcode'], '같은 바코드가 두 번 있습니다.')
+      issue(['barcodes', index, 'barcode'], '같은 바코드가 두 번 있습니다.', 'BARCODE_DUPLICATE')
     }
-    if (!unitIds.has(b.unitId)) issue(['barcodes', index, 'unitId'], '이 품목의 단위가 아닙니다.')
+    if (!unitIds.has(b.unitId))
+      issue(['barcodes', index, 'unitId'], '이 품목의 단위가 아닙니다.', 'UOM_NOT_FOUND')
   })
   for (const unitId of unitIds) {
     if (value.barcodes.filter((b) => b.unitId === unitId && b.isPrimary).length > 1) {
