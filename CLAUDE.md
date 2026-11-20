@@ -40,7 +40,7 @@ Next.js (App Router) · TypeScript · PostgreSQL · Prisma · Tailwind + shadcn/
 - **재고는 기본단위로 저장**: 환산단위(BOX, CARTON, PLT)는 화면 표시·입력용이며, 환산은 공통 함수(`src/lib/units/convert.ts`: `toBaseQty`·`splitBaseQty`·`labelQuantities`·`formatQty` 등)에서만 한다. 수량은 DB Decimal, 코드에서는 글자로 주고받고 `Number`로 바꿔 계산하지 않는다 (`docs/decisions/0042`).
 - **로케이션 스캔은 `창고코드.로케이션코드`**: 로케이션 코드는 창고 안에서만 유일하다. 바코드·표시는 `buildLocationBarcode`, 스캔한 값은 `parseLocationScan`으로만 해석한다 (`src/lib/locations/`, `docs/decisions/0084`).
 - **로트번호·유통기한은 품목 설정에 따름**: 사용하는 품목은 필수 입력, 사용하지 않는 품목은 null.
-- **재고 조정은 사유 필수**.
+- **재고 조정은 사유 필수**. 사유는 공통코드 사유 그룹(`ADJUST_REASON`·`DEFECT_REASON`·`HOLD_REASON`·`ASN_CLOSE_REASON` 등)에서 고르는 코드(`*_reason_cd`) + 자유 메모로 둔다. 사유 그룹은 코드마다 귀책(`fault_party_cd`)을 갖는다 (`docs/decisions/0087`).
 - **계정 비밀번호**: 새 계정·관리자 초기화는 임시 비밀번호(`password_change_req_yn='Y'`)로 만들고 처음 로그인 때 바꾸게 한다(`requireUser`·`createAction`이 막음). 그 상태에서도 돌아야 하는 액션만 `allowWhilePasswordChange` (`docs/decisions/0086`).
 - 용어는 `docs/PRD.md`의 용어 정리를 따른다.
 

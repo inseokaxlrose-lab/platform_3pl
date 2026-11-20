@@ -49,3 +49,13 @@ export const REGION_LOAD_STATUS_VALUES = ['RUNNING', 'DONE', 'FAILED'] as const
 
 // 납품처 배송센터를 찾은 단계 (tb_ship_to.resolve_level_cd)
 export const RESOLVE_LEVEL_VALUES = ['ZIP', 'BJD', 'SIGUNGU'] as const
+
+// 사유 코드의 귀책 (tb_code_item.fault_party_cd) — 표시·집계용, 공통코드 그룹이 fault_party_yn='Y'일 때만 (0087)
+export const FAULT_PARTY_LABELS = {
+  SHIPPER: '화주',
+  CENTER: '센터',
+  CARRIER: '운송사',
+  ETC: '기타',
+} as const
+export type FaultParty = keyof typeof FAULT_PARTY_LABELS
+export const FAULT_PARTY_VALUES = Object.keys(FAULT_PARTY_LABELS) as FaultParty[]

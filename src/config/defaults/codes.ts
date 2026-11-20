@@ -1,3 +1,5 @@
+import type { FaultParty } from '@/config/db-codes'
+
 // 운영사 기본 공통코드 (docs/decisions/0030, 0039)
 // 운영사를 만들 때(플랫폼 등록·시드) 그 운영사에 복사한다 (src/lib/operator/provision.ts)
 // 시스템 그룹: 프로그램이 쓰는 그룹이라 운영에서도 항상 만든다 (견본 데이터 아님)
@@ -7,7 +9,9 @@ type DefaultCodeGroup = {
   code: string
   name: string
   description: string
-  items: readonly { code: string; name: string }[]
+  // 사유 코드 그룹: 코드마다 귀책(FAULT_PARTY)을 둔다 (0087)
+  faultParty?: boolean
+  items: readonly { code: string; name: string; faultParty?: FaultParty }[]
 }
 
 export const DEFAULT_CODE_GROUPS: readonly DefaultCodeGroup[] = [
@@ -170,6 +174,91 @@ export const DEFAULT_CODE_GROUPS: readonly DefaultCodeGroup[] = [
       { code: 'CORPORATE', name: '기업·기관' },
       { code: 'INTERNAL', name: '자사·계열사' },
       { code: 'ETC', name: '기타' },
+    ],
+  },
+  // ── 사유 코드 (0087): 귀책별로 집계한다. 기존 운영사에는 마이그레이션 20261120080000_reason_codes가 넣었다
+  {
+    code: 'DEFECT_REASON',
+    name: '검수 불량 사유',
+    description: '입고 검수에서 불량으로 잡은 이유 (귀책별 집계)',
+    faultParty: true,
+    items: [
+      { code: 'OUTER_DAMAGE', name: '외박스 파손', faultParty: 'CARRIER' },
+      { code: 'PRODUCT_DAMAGE', name: '제품 파손', faultParty: 'SHIPPER' },
+      { code: 'CONTAMINATION', name: '오염·변질', faultParty: 'SHIPPER' },
+      { code: 'WRONG_ITEM', name: '오품·혼입', faultParty: 'SHIPPER' },
+      { code: 'EXPIRY_SHORT', name: '유통기한 부족', faultParty: 'SHIPPER' },
+      { code: 'LABEL_ERROR', name: '표시·라벨 불량', faultParty: 'SHIPPER' },
+      { code: 'ETC', name: '기타', faultParty: 'ETC' },
+    ],
+  },
+  {
+    code: 'ADJUST_REASON',
+    name: '재고 조정 사유',
+    description: '재고 실사·조정을 한 이유 (귀책별 집계)',
+    faultParty: true,
+    items: [
+      { code: 'COUNT_DIFF', name: '실사 차이', faultParty: 'CENTER' },
+      { code: 'STORAGE_DAMAGE', name: '보관 중 파손', faultParty: 'CENTER' },
+      { code: 'LOSS', name: '분실', faultParty: 'CENTER' },
+      { code: 'EXPIRED_DISPOSAL', name: '기한 경과 폐기', faultParty: 'SHIPPER' },
+      { code: 'SHIPPER_REQUEST', name: '화주 요청', faultParty: 'SHIPPER' },
+      { code: 'INPUT_ERROR', name: '입력 오류 정정', faultParty: 'CENTER' },
+      { code: 'ETC', name: '기타', faultParty: 'ETC' },
+    ],
+  },
+  {
+    code: 'HOLD_REASON',
+    name: '재고 보류 사유',
+    description: '재고를 보류·불량·격리로 바꾼 이유',
+    faultParty: true,
+    items: [
+      { code: 'QUALITY_CHECK', name: '품질 검사', faultParty: 'SHIPPER' },
+      { code: 'SHIPPER_REQUEST', name: '화주 요청', faultParty: 'SHIPPER' },
+      { code: 'DAMAGE_SUSPECT', name: '파손 의심', faultParty: 'CENTER' },
+      { code: 'RECALL', name: '리콜', faultParty: 'SHIPPER' },
+      { code: 'EXPIRY_NEAR', name: '기한 임박', faultParty: 'SHIPPER' },
+      { code: 'ETC', name: '기타', faultParty: 'ETC' },
+    ],
+  },
+  {
+    code: 'ASN_CLOSE_REASON',
+    name: '입고 잔량 마감 사유',
+    description: 'ASN 남은 수량을 마감한 이유',
+    faultParty: true,
+    items: [
+      { code: 'NOT_SHIPPED', name: '공급처 미발송', faultParty: 'SHIPPER' },
+      { code: 'SHIPPER_CANCEL', name: '화주 취소', faultParty: 'SHIPPER' },
+      { code: 'DEFECT_RETURN', name: '불량 반송', faultParty: 'SHIPPER' },
+      { code: 'SHORT_DELIVERY', name: '운송 중 누락', faultParty: 'CARRIER' },
+      { code: 'ETC', name: '기타', faultParty: 'ETC' },
+    ],
+  },
+  {
+    code: 'CANCEL_REASON',
+    name: '출고 취소 사유',
+    description: '출고 주문을 취소한 이유 (출고 기능에서 사용)',
+    faultParty: true,
+    items: [
+      { code: 'CUSTOMER_REQUEST', name: '고객 요청', faultParty: 'SHIPPER' },
+      { code: 'SHIPPER_REQUEST', name: '화주 요청', faultParty: 'SHIPPER' },
+      { code: 'STOCK_SHORT', name: '재고 부족', faultParty: 'CENTER' },
+      { code: 'ADDRESS_ERROR', name: '주소 오류', faultParty: 'SHIPPER' },
+      { code: 'ETC', name: '기타', faultParty: 'ETC' },
+    ],
+  },
+  {
+    code: 'RETURN_REASON',
+    name: '반품 사유',
+    description: '반품을 받은 이유 (반품 기능에서 사용)',
+    faultParty: true,
+    items: [
+      { code: 'CHANGE_MIND', name: '단순 변심', faultParty: 'ETC' },
+      { code: 'PRODUCT_DEFECT', name: '제품 불량', faultParty: 'SHIPPER' },
+      { code: 'WRONG_SHIP', name: '오배송', faultParty: 'CENTER' },
+      { code: 'DELIVERY_DAMAGE', name: '배송 중 파손', faultParty: 'CARRIER' },
+      { code: 'DELAY', name: '배송 지연', faultParty: 'CARRIER' },
+      { code: 'ETC', name: '기타', faultParty: 'ETC' },
     ],
   },
 ]

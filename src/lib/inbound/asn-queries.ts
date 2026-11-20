@@ -151,6 +151,7 @@ export async function getAsnForEdit(id: bigint, scope: DataScope) {
     shipperId: asn.shipperId,
     shipper: `${asn.shipper.name} (${asn.shipper.code})`,
     center: `${asn.center.name} (${asn.center.code})`,
+    closeReasonCd: asn.closeReasonCd,
     closeReason: asn.closeReason,
     closedAt: asn.closedAt,
     closedBy: asn.closedBy,

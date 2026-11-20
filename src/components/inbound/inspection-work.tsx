@@ -5,7 +5,9 @@ import { useRouter } from 'next/navigation'
 import { useMemo, useState, useTransition } from 'react'
 import { ConfirmDialog } from '@/components/common'
 import { LocalDataGrid, type DataGridColumn } from '@/components/data-grid'
-import { DateInput, QtyInput } from '@/components/inputs'
+import { useCodeOptions } from '@/components/common-code'
+import { CodeSelect, DateInput, QtyInput } from '@/components/inputs'
+import { codeName } from '@/lib/common-code'
 import { Field, FormGrid } from '@/components/master-form'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -115,6 +117,9 @@ export function InspectionWorkPanel({
   const [pending, startTransition] = useTransition()
   const set = (patch: Partial<InspectionInput>) => setValue((v) => ({ ...v, ...patch }))
   const line = work.lines.find((l) => l.id === value.asnLineId)
+  // 불량 수량이 있으면 불량 사유를 고른다 (0087)
+  const hasDefect = /[1-9]/.test(value.defectQty ?? '')
+  const defectReasons = useCodeOptions('DEFECT_REASON')
   const units = line ? [line.baseUnit.code, ...line.units.map((u) => u.code)] : []
   const decimals =
     line && value.unit !== line.baseUnit.code
@@ -179,6 +184,11 @@ export function InspectionWorkPanel({
       accessor: 'confirmedQty',
       align: 'right',
       cell: (r) => qtyCell(r.confirmedQty, r.baseUnit),
+    },
+    {
+      id: 'defectReason',
+      header: '불량 사유',
+      accessor: (r) => codeName(defectReasons, r.defectReasonCd),
     },
     { id: 'remark', header: '비고', accessor: 'remark' },
     { id: 'inspectedBy', header: '검수자', accessor: 'inspectedBy' },
@@ -340,7 +350,24 @@ export function InspectionWorkPanel({
                     disabled={disabled || !line?.useExpiry}
                   />
                 </Field>
-                <Field label="비고" span={6} error={errors.remark} htmlFor="insp-remark">
+                <Field
+                  label="불량 사유"
+                  span={3}
+                  required={hasDefect}
+                  error={errors.defectReasonCd}
+                  htmlFor="insp-defect-reason"
+                  hint={hasDefect ? undefined : '불량 수량을 넣으면 고릅니다'}
+                >
+                  <CodeSelect
+                    id="insp-defect-reason"
+                    group="DEFECT_REASON"
+                    value={value.defectReasonCd ?? ''}
+                    onChange={(defectReasonCd) => set({ defectReasonCd })}
+                    disabled={disabled || !hasDefect}
+                    invalid={Boolean(errors.defectReasonCd)}
+                  />
+                </Field>
+                <Field label="비고" span={3} error={errors.remark} htmlFor="insp-remark">
                   <Input
                     id="insp-remark"
                     value={value.remark}

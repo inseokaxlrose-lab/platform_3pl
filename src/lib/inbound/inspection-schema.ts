@@ -22,11 +22,17 @@ export const inspectionSchema = z
     defectQty: qtyText('불량 수량은 0 이상의 숫자로 넣어 주세요.'),
     lotNo: optionalText(50),
     expiryOn: optionalDate,
+    // 불량 사유 (공통코드 DEFECT_REASON): 불량 수량이 있으면 필수 (0087)
+    defectReasonCd: z.string().trim().max(20).default(''),
     remark: optionalText(200),
   })
   .refine((v) => /[1-9]/.test(v.qty) || /[1-9]/.test(v.defectQty), {
     message: '검수 수량이나 불량 수량을 넣어 주세요.',
     path: ['qty'],
+  })
+  .refine((v) => !/[1-9]/.test(v.defectQty) || v.defectReasonCd !== '', {
+    message: '불량 사유를 골라 주세요.',
+    path: ['defectReasonCd'],
   })
 
 export type InspectionInput = z.input<typeof inspectionSchema>
@@ -39,6 +45,7 @@ export const EMPTY_INSPECTION: InspectionInput = {
   defectQty: '',
   lotNo: '',
   expiryOn: '',
+  defectReasonCd: '',
   remark: '',
 }
 

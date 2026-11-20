@@ -16,15 +16,27 @@ import {
 } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
+import { FAULT_PARTY_LABELS } from '@/config/db-codes'
 import { unwrap, type ActionResult } from '@/lib/actions'
 
-// 그룹·코드 공용 입력 값 (두 표의 칸이 같다)
+// 그룹·코드 공용 입력 값 (두 표의 칸이 같다. 귀책 칸만 그룹·코드가 다르다 — 0087)
 export type CodeFormValue = {
   code: string
   name: string
   description: string
   sortOrder: number
   isActive: boolean
+  // 그룹: 코드마다 귀책을 둘지
+  usesFaultParty: boolean
+  // 코드: 귀책 (비우면 없음)
+  faultParty: string
 }
 
 export const EMPTY_CODE_FORM: CodeFormValue = {
@@ -33,7 +45,11 @@ export const EMPTY_CODE_FORM: CodeFormValue = {
   description: '',
   sortOrder: 0,
   isActive: true,
+  usesFaultParty: false,
+  faultParty: '',
 }
+
+const NO_FAULT = '__none__'
 
 type CodeEditDialogProps = {
   open: boolean
@@ -46,6 +62,8 @@ type CodeEditDialogProps = {
   initial: CodeFormValue
   // 시스템 그룹처럼 사용 중지·삭제를 막을 때 안내 문구
   lockedNote?: string
+  // 'group': [귀책 구분 사용] 체크 / 'item': [귀책] 고르기 (그룹이 귀책을 쓸 때만)
+  faultField?: 'group' | 'item'
   onSave: (value: CodeFormValue) => Promise<ActionResult<unknown>>
   // 주면 [삭제] 버튼이 생긴다 (수정 화면에서만)
   onDelete?: () => Promise<ActionResult<unknown>>
@@ -63,6 +81,7 @@ export function CodeEditDialog({
   codePlaceholder,
   initial,
   lockedNote,
+  faultField,
   onSave,
   onDelete,
   deleteDescription,
@@ -160,6 +179,46 @@ export function CodeEditDialog({
               disabled={pending}
             />
           </Field>
+          {faultField === 'item' && (
+            <Field
+              span={12}
+              label="귀책"
+              htmlFor={id('faultParty')}
+              hint="사유를 귀책별로 집계할 때 씁니다"
+            >
+              <Select
+                value={value.faultParty || NO_FAULT}
+                onValueChange={(v) => set({ faultParty: v === NO_FAULT ? '' : v })}
+                disabled={pending}
+              >
+                <SelectTrigger id={id('faultParty')} className="w-full">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value={NO_FAULT}>정하지 않음</SelectItem>
+                  {Object.entries(FAULT_PARTY_LABELS).map(([code, label]) => (
+                    <SelectItem key={code} value={code}>
+                      {label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </Field>
+          )}
+          {faultField === 'group' && (
+            <div className="flex items-center gap-2">
+              <Checkbox
+                id={id('usesFaultParty')}
+                checked={value.usesFaultParty}
+                onCheckedChange={(checked) => set({ usesFaultParty: checked === true })}
+                disabled={pending}
+              />
+              <Label htmlFor={id('usesFaultParty')}>귀책 구분 사용</Label>
+              <span className="text-xs text-muted-foreground">
+                사유 코드처럼 코드마다 귀책(화주·센터·운송사·기타)을 둡니다.
+              </span>
+            </div>
+          )}
           <div className="flex items-center gap-2">
             <Checkbox
               id={id('isActive')}

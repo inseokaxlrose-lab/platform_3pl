@@ -242,6 +242,8 @@ async function lockStocks(tx: Tx, ids: bigint[]): Promise<Map<bigint, LockedStoc
 type TxnFields = {
   type: 'RECEIVE' | 'MOVE_OUT' | 'MOVE_IN' | 'ADJUST'
   ref?: StockRef
+  // 사유 코드 (공통코드 글자, 0087) + 사유 메모
+  reasonCd?: string | null
   reason?: string | null
   // 이동처럼 두 줄이 한 작업이면 첫 줄의 이력 키를 미리 받아 와서 둘 다에 쓴다
   id?: bigint
@@ -293,6 +295,7 @@ async function applyChange(
       refType: fields.ref?.refType,
       refId: fields.ref?.refId,
       refNo: fields.ref?.refNo,
+      reasonCd: fields.reasonCd ?? null,
       reason: fields.reason,
       createdBy: currentActor(),
     },
@@ -380,15 +383,25 @@ export async function moveStock(
   })
 }
 
-// 조정: 늘리거나(+) 줄인다(−), 사유 필수 (CLAUDE.md)
+// 조정: 늘리거나(+) 줄인다(−), 사유 필수 (CLAUDE.md) — 사유 코드(ADJUST_REASON, 0087)나 사유 글자 중 하나는 있어야 한다
+// 사유 코드가 맞는 공통코드인지는 부르는 쪽(실사·조정 등록)이 검사한다
 export async function adjustStock(
   tx: Tx,
-  input: { address: StockAddress; qty: string; reason: string; ref?: StockRef },
+  input: {
+    address: StockAddress
+    qty: string
+    reason?: string
+    reasonCd?: string | null
+    ref?: StockRef
+  },
 ): Promise<StockChangeResult> {
   return withStockWrite(async () => {
-    const reason = input.reason?.trim()
-    if (!reason) throw new ActionError('VALIDATION', '재고 조정은 사유를 넣어 주세요.')
-    if (reason.length > 200) throw new ActionError('VALIDATION', '사유는 200자까지입니다.')
+    const reason = input.reason?.trim() || null
+    const reasonCd = input.reasonCd?.trim() || null
+    if (!reason && !reasonCd) throw new ActionError('VALIDATION', '재고 조정은 사유를 넣어 주세요.')
+    if (reason && reason.length > 200) {
+      throw new ActionError('VALIDATION', '사유는 200자까지입니다.')
+    }
 
     // 늘리는지 줄이는지는 수량 부호로 정해진다 → 먼저 부호만 본다
     let sign: bigint
@@ -410,6 +423,6 @@ export async function adjustStock(
       if (id === null) throw shortage(a, null, change)
     }
     const stock = (await lockStocks(tx, [id])).get(id)!
-    return applyChange(tx, a, stock, change, { type: 'ADJUST', ref: input.ref, reason })
+    return applyChange(tx, a, stock, change, { type: 'ADJUST', ref: input.ref, reasonCd, reason })
   })
 }

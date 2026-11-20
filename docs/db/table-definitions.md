@@ -3,7 +3,7 @@
 > 이 문서는 `npm run db:doc`가 실제 DB 구조와 `prisma/schema.prisma`의 주석으로 만든다. **손으로 고치지 않는다** — 마이그레이션을 적용한 뒤 명령을 다시 돌린다.
 > 엑셀 판: `docs/db/DB_테이블정의서.xlsx` · 이름 규칙: `docs/db-conventions.md`
 
-테이블 67개 · 칼럼 1073개
+테이블 67개 · 칼럼 1079개
 
 ## 목차
 
@@ -1928,7 +1928,7 @@
 | 10 | `remark` | 비고 | 비고 | VARCHAR(1000) | Y |  |  |
 | 11 | `asn_status_cd` | ASN 상태 코드 |  | VARCHAR(20) | N | PLANNED |  |
 | 12 | `putaway_status_cd` | 적치 상태 코드 |  | VARCHAR(20) | N | WAITING |  |
-| 13 | `close_reason` | 마감 사유 | 잔량 마감 (사유 필수, 마감자·일시) | VARCHAR(200) | Y |  |  |
+| 13 | `close_reason` | 마감 사유 |  | VARCHAR(200) | Y |  |  |
 | 14 | `closed_at` | 마감 일시 |  | TIMESTAMP(3) | Y |  |  |
 | 15 | `closed_by` | 마감 자 |  | VARCHAR(50) | Y |  |  |
 | 16 | `created_at` | 등록 일시 | 등록 일시 (자동) | TIMESTAMP(3) | N | CURRENT_TIMESTAMP |  |
@@ -1937,6 +1937,7 @@
 | 19 | `updated_by` | 수정 자 | 수정자 아이디 (자동) | VARCHAR(50) | N | system |  |
 | 20 | `row_version` | 행버전 | 동시 수정 막기용 버전 (수정할 때마다 +1, 0038) | INTEGER | N | 1 |  |
 | 21 | `del_yn` | 삭제여부 | 논리 삭제: 예정(PLANNED) 상태에서만 지울 수 있다 | CHAR(1) | N | N |  |
+| 22 | `close_reason_cd` | 마감 사유 코드 | 잔량 마감 (사유 필수, 마감자·일시) 잔량 마감 사유 코드 (공통코드 ASN_CLOSE_REASON, 0087) + 사유 메모 | VARCHAR(20) | Y |  |  |
 
 **고유 인덱스**
 
@@ -2016,6 +2017,7 @@
 | 13 | `remark` | 비고 | 비고 | VARCHAR(200) | Y |  |  |
 | 14 | `inspected_at` | 검수 일시 |  | TIMESTAMP(3) | N | CURRENT_TIMESTAMP |  |
 | 15 | `inspected_by` | 검수 자 |  | VARCHAR(50) | N | system |  |
+| 16 | `defect_reason_cd` | 불량 사유 코드 | 불량 사유 코드 (공통코드 DEFECT_REASON, 불량 수량이 있으면 필수 — 0087) | VARCHAR(20) | Y |  |  |
 
 **인덱스**
 
@@ -2203,7 +2205,7 @@
 | 4 | `adjust_type_cd` | 조정 유형 코드 |  | VARCHAR(20) | N |  |  |
 | 5 | `center_id` | 센터 ID |  | BIGINT | N |  | FK → tb_center.center_id |
 | 6 | `adjust_status_cd` | 조정 상태 코드 |  | VARCHAR(20) | N | DRAFT |  |
-| 7 | `reason` | 사유 | 사유 (필수) | VARCHAR(200) | N |  |  |
+| 7 | `reason` | 사유 |  | VARCHAR(200) | Y |  |  |
 | 8 | `remark` | 비고 | 비고 | VARCHAR(500) | Y |  |  |
 | 9 | `created_at` | 등록 일시 | 등록 일시 (자동) | TIMESTAMP(3) | N | CURRENT_TIMESTAMP |  |
 | 10 | `created_by` | 등록 자 | 등록자 아이디 (자동: 작업자 / seed / system) | VARCHAR(50) | N | system |  |
@@ -2211,6 +2213,7 @@
 | 12 | `confirmed_by` | 확정 자 |  | VARCHAR(50) | Y |  |  |
 | 13 | `canceled_at` | 취소 일시 |  | TIMESTAMP(3) | Y |  |  |
 | 14 | `canceled_by` | 취소 자 |  | VARCHAR(50) | Y |  |  |
+| 15 | `reason_cd` | 사유 코드 | 사유 코드 (공통코드 ADJUST_REASON, 필수 — 0087 이전 줄은 비어 있을 수 있다) + 사유 메모 | VARCHAR(20) | Y |  |  |
 
 **고유 인덱스**
 
@@ -2283,9 +2286,10 @@
 | 15 | `ref_type_cd` | 참조 유형 코드 | 원본 문서: 종류(예: RECEIPT 입고확정, ADJUSTMENT 조정) + 키 + 화면에 보일 번호 | VARCHAR(20) | Y |  |  |
 | 16 | `ref_id` | 참조 ID |  | BIGINT | Y |  |  |
 | 17 | `ref_no` | 참조 번호 |  | VARCHAR(50) | Y |  |  |
-| 18 | `reason` | 사유 | 사유 (조정은 필수) | VARCHAR(200) | Y |  |  |
+| 18 | `reason` | 사유 |  | VARCHAR(200) | Y |  |  |
 | 19 | `txn_at` | 거래 일시 |  | TIMESTAMP(3) | N | CURRENT_TIMESTAMP |  |
 | 20 | `created_by` | 등록 자 | 처리한 사람 아이디 (재고 변경 함수가 지금 작업자로 채운다) | VARCHAR(50) | N | system |  |
+| 21 | `reason_cd` | 사유 코드 | 사유 (조정은 필수) 사유 코드 (조정은 ADJUST_REASON, 상태 변경은 HOLD_REASON — 공통코드, 0087) + 사유 메모 | VARCHAR(20) | Y |  |  |
 
 **인덱스**
 
@@ -2325,6 +2329,7 @@
 | 12 | `status_cd` | 상태 코드 | 상태 | VARCHAR(20) | N | ACTIVE |  |
 | 13 | `del_yn` | 삭제여부 | 논리 삭제: 'Y'면 지운 것 (목록·조회에서 빠지고 되살릴 수 있다, 0038) | CHAR(1) | N | N |  |
 | 14 | `operator_id` | 운영사 ID | 운영사 (멀티테넌트: 같은 운영사 사람만 보고 고친다, docs/decisions/0039) | BIGINT | N |  | UK FK → tb_operator.operator_id |
+| 15 | `fault_party_yn` | fault party 여부 | 'Y'면 이 그룹의 코드마다 귀책(화주·센터·운송사·기타)을 둔다 — 사유 코드 그룹 (0087) | CHAR(1) | N | N |  |
 
 **고유 인덱스**
 
@@ -2333,6 +2338,7 @@
 **검사 조건**
 
 - `tb_code_group_del_yn_check`: `CHECK (del_yn IN ('Y', 'N')`
+- `tb_code_group_fault_party_yn_check`: `CHECK (fault_party_yn IN ('Y', 'N')`
 - `tb_code_group_status_cd_check`: `CHECK ((status_cd) IN (('ACTIVE'), ('INACTIVE'))`
 - `tb_code_group_system_yn_check`: `CHECK (system_yn IN ('Y', 'N')`
 
@@ -2357,6 +2363,7 @@
 | 12 | `status_cd` | 상태 코드 | 사용 중지: 새로 고를 때만 숨기고, 이미 저장된 값은 이름으로 계속 보여준다 | VARCHAR(20) | N | ACTIVE |  |
 | 13 | `del_yn` | 삭제여부 | 코드는 삭제 안 된 것끼리만 겹치면 안 된다 (지운 코드는 다시 쓸 수 있다, 0038) 논리 삭제: 'Y'면 지운 것 (목록·조회에서 빠지고 되살릴 수 있다, 0038) | CHAR(1) | N | N |  |
 | 14 | `operator_id` | 운영사 ID | 운영사 (멀티테넌트: 같은 운영사 사람만 보고 고친다, docs/decisions/0039) | BIGINT | N |  | FK → tb_operator.operator_id |
+| 15 | `fault_party_cd` | fault party 코드 | 귀책: 그룹이 귀책을 쓸 때만 (SHIPPER·CENTER·CARRIER·ETC, 상수 FAULT_PARTY + DB 검사, 0087). 표시·집계용 | VARCHAR(20) | Y |  |  |
 
 **고유 인덱스**
 
@@ -2370,6 +2377,7 @@
 **검사 조건**
 
 - `tb_code_item_del_yn_check`: `CHECK (del_yn IN ('Y', 'N')`
+- `tb_code_item_fault_party_cd_check`: `CHECK ((fault_party_cd) IN ('SHIPPER', 'CENTER', 'CARRIER', 'ETC'))`
 - `tb_code_item_status_cd_check`: `CHECK ((status_cd) IN (('ACTIVE'), ('INACTIVE'))`
 
 ## tb_ext_code

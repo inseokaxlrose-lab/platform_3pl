@@ -1,7 +1,7 @@
 import { ensureCenterDefaults } from '@/lib/centers/center-defaults'
 import { prisma } from '@/lib/prisma'
 import { systemUnit } from '@/test/factories'
-import { createTestCenter, createTestShipper } from './factories'
+import { createReasonCodes, createTestCenter, createTestShipper } from './factories'
 import { TEST_OPERATOR_ID } from './reset-database'
 import { MILK_OPTIONS } from '@/test/item-input'
 
@@ -9,6 +9,8 @@ import { MILK_OPTIONS } from '@/test/item-input'
 // 이천센터(ICN)·김해센터(GMH) (각각 입고대기 창고) / 화주사 가나(이천 이용)·다라(김해 이용)
 // 가나 품목: WATER(EA 정수, BOX 24) · MILK(로트·유통기한 관리) · RICE(KG 소수 3자리) / 다라 품목: DARA1
 export async function createInboundFixture() {
+  // 검수 불량·조정·마감 사유 코드 (0087)
+  await createReasonCodes()
   const icn = await createTestCenter('ICN', { name: '이천센터' })
   const gmh = await createTestCenter('GMH', { name: '김해센터' })
   // 센터마다 입고대기 창고 + 기본 로케이션 (입고 확정 재고가 들어가는 곳)

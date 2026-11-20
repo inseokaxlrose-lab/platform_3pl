@@ -104,7 +104,7 @@ describe('입고 한 바퀴', () => {
           }),
         ).id,
       )
-    const water1 = await inspect(0, '2000', { defectQty: '10' })
+    const water1 = await inspect(0, '2000', { defectQty: '10', defectReasonCd: 'PRODUCT_DAMAGE' })
     const milkA = await inspect(1, '30', { lotNo: 'MA', expiryOn: '2027-01-31' })
     const milkB = await inspect(1, '20', { lotNo: 'MB', expiryOn: '2027-02-28' })
     expect((await prisma.asn.findFirstOrThrow()).status).toBe('INSPECTING')

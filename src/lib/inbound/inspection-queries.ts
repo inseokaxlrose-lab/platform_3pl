@@ -67,6 +67,7 @@ export async function getInspectionWork(asnId: bigint, scope: DataScope) {
       defectQty: qty(i.defectQty),
       confirmedQty: qty(i.confirmedQty),
       entry: i.entryUnit && i.entryQty ? `${qty(i.entryQty)} ${i.entryUnit}` : null,
+      defectReasonCd: i.defectReasonCd,
       remark: i.remark,
       inspectedAt: i.inspectedAt,
       inspectedBy: i.inspectedBy,

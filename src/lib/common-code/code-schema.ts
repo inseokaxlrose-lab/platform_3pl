@@ -2,6 +2,7 @@ import { z } from 'zod'
 import { optionalText, requiredText } from '@/lib/validation/common-fields'
 import { idField, idSchema } from '@/lib/id'
 import { rowVersionField } from '@/lib/row-version'
+import { FAULT_PARTY_VALUES } from '@/config/db-codes'
 
 // 공통코드 입력 규칙 — 화면·서버 공용 (docs/decisions/0030)
 // 그룹 코드·코드는 등록 후 바꿀 수 없다 (업무 표에 코드 글자가 저장되므로) → 수정 규칙에는 code가 없다
@@ -36,23 +37,33 @@ export const itemCodeField = z
   .toUpperCase()
   .regex(/^[A-Z0-9_-]{1,20}$/, '코드는 영문 대문자·숫자·밑줄·하이픈 1~20자입니다.')
 
-export const codeGroupCreateSchema = z.object({ code: groupCodeField, ...common })
+// 사유 코드 그룹: 코드마다 귀책을 둘지 (0087)
+const groupExtra = { usesFaultParty: z.boolean().default(false) }
+// 귀책: 비우면 없음 (그룹이 귀책을 쓰지 않으면 서버가 비운다)
+const itemExtra = {
+  faultParty: z.union([z.literal(''), z.enum(FAULT_PARTY_VALUES)]).default(''),
+}
+
+export const codeGroupCreateSchema = z.object({ code: groupCodeField, ...common, ...groupExtra })
 // rowVersion: 팝업을 열 때의 버전 (동시 수정 막기)
 export const codeGroupUpdateSchema = z.object({
   id: idSchema,
   rowVersion: rowVersionField,
   ...common,
+  ...groupExtra,
 })
 
 export const codeItemCreateSchema = z.object({
   groupId: idField('그룹을 골라 주세요.'),
   code: itemCodeField,
   ...common,
+  ...itemExtra,
 })
 export const codeItemUpdateSchema = z.object({
   id: idSchema,
   rowVersion: rowVersionField,
   ...common,
+  ...itemExtra,
 })
 
 export type CodeGroupCreateInput = z.input<typeof codeGroupCreateSchema>

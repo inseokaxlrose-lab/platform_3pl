@@ -97,6 +97,7 @@ export async function listStockHistory(input: ListQuery, scope: DataScope) {
         ? `${REF_TYPE_LABELS[t.refType] ?? t.refType}${t.refNo ? ` ${t.refNo}` : ''}`
         : null,
       groupId: t.groupId ? String(t.groupId) : null,
+      reasonCd: t.reasonCd,
       reason: t.reason,
       createdBy: t.createdBy,
     })),

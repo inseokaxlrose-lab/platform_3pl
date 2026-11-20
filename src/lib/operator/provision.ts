@@ -1,5 +1,6 @@
 import 'server-only'
 import { DEFAULT_CODE_GROUPS } from '@/config/defaults/codes'
+import { toYn } from '@/lib/yn'
 import { DEFAULT_GROUPS } from '@/config/defaults/roles'
 import type { Db } from '@/lib/prisma'
 
@@ -17,16 +18,22 @@ type ProvisionOptions = {
 
 // 공통코드: 시스템 그룹 (이미 있으면 시스템 표시만 맞춘다)
 async function provisionCodes(db: Db, operatorId: bigint) {
-  for (const { items, ...group } of DEFAULT_CODE_GROUPS) {
+  for (const { items, faultParty = false, ...group } of DEFAULT_CODE_GROUPS) {
     const saved = await db.codeGroup.upsert({
       where: { operatorId_code: { operatorId, code: group.code } },
-      create: { ...group, operatorId, isSystem: 'Y' },
+      create: { ...group, operatorId, isSystem: 'Y', faultPartyYn: toYn(faultParty) },
       update: { isSystem: 'Y' },
     })
-    for (const [index, item] of items.entries()) {
+    for (const [index, { faultParty: party, ...item }] of items.entries()) {
       await db.codeItem.upsert({
         where: { groupId_code: { groupId: saved.id, code: item.code } },
-        create: { ...item, operatorId, groupId: saved.id, sortOrder: (index + 1) * 10 },
+        create: {
+          ...item,
+          faultParty: party ?? null,
+          operatorId,
+          groupId: saved.id,
+          sortOrder: (index + 1) * 10,
+        },
         update: {},
       })
     }

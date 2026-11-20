@@ -54,6 +54,7 @@ export const listCodeGroupsAction = createAction({
           status: true,
           rowVersion: true,
           isSystem: true,
+          faultPartyYn: true,
           _count: { select: { items: { where: NOT_DELETED } } },
         },
       }),
@@ -61,9 +62,10 @@ export const listCodeGroupsAction = createAction({
     ])
     return {
       // 예/아니오 칸은 화면에서 true/false로
-      rows: rows.map(withIsActive).map(({ _count, ...row }) => ({
+      rows: rows.map(withIsActive).map(({ _count, faultPartyYn, ...row }) => ({
         ...row,
         isSystem: isYes(row.isSystem),
+        usesFaultParty: isYes(faultPartyYn),
         itemCount: _count.items,
       })),
       rowCount,
@@ -95,6 +97,7 @@ export const listCodeItemsAction = createAction({
           status: true,
           rowVersion: true,
           updatedAt: true,
+          faultParty: true,
         },
       }),
       prisma.codeItem.count({ where }),

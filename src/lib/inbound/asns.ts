@@ -1,4 +1,5 @@
 import 'server-only'
+import { assertCodeValues } from '@/lib/common-code/common-codes'
 import {
   shipperDefaultsSelect,
   shipperItemDefaults,
@@ -283,11 +284,13 @@ export async function deleteAsns(ids: bigint[]) {
 // - 마감할 수 있는 상태: 예정·검수중·부분확정 (확정완료·마감은 불가), 잔량이 하나라도 있어야 한다
 // - 줄마다 지금 잔량(예정 − 누적 확정, 0 이상)을 마감 수량으로 남긴다 (보고서용)
 // - 마감 후에는 검수·확정 불가, 이미 확정된 재고의 적치는 계속 가능 (0003 결정 5)
-export async function closeAsn(id: bigint, rowVersion: number, reason: string) {
+// 사유는 공통코드 ASN_CLOSE_REASON에서 고르고(필수), 글자는 메모(선택) — 0087
+export async function closeAsn(id: bigint, rowVersion: number, reasonCd: string, reason = '') {
   const text = reason.trim()
-  if (!text) throw new ActionError('VALIDATION', '마감 사유를 입력해 주세요.')
-  if (text.length > 200) throw new ActionError('VALIDATION', '마감 사유는 200자까지입니다.')
+  if (!reasonCd) throw new ActionError('VALIDATION', '마감 사유를 골라 주세요.')
+  if (text.length > 200) throw new ActionError('VALIDATION', '마감 메모는 200자까지입니다.')
   return prisma.$transaction(async (tx) => {
+    await assertCodeValues(tx, 'ASN_CLOSE_REASON', [reasonCd], { label: '마감 사유' })
     const found = await tx.asn.findUnique({
       where: { id },
       select: {
@@ -314,7 +317,8 @@ export async function closeAsn(id: bigint, rowVersion: number, reason: string) {
         where: { id, rowVersion },
         data: {
           status: 'CLOSED',
-          closeReason: text,
+          closeReasonCd: reasonCd,
+          closeReason: text || null,
           closedAt: new Date(),
           closedBy: currentActor(),
         },

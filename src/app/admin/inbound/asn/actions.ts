@@ -81,12 +81,17 @@ export const commitAsnUploadAction = createAction({
   handler: async ({ input, scope }) => commitAsnUpload(input, scope),
 })
 
-// 잔량 마감 (0052): 사유 필수, 권한 inbound.asn.close
+// 잔량 마감 (0052): 사유 코드 필수(0087) + 메모, 권한 inbound.asn.close
 export const closeAsnAction = createAction({
   permission: 'inbound.asn.close',
-  input: z.object({ id: idSchema, rowVersion: rowVersionField, reason: z.string().max(200) }),
+  input: z.object({
+    id: idSchema,
+    rowVersion: rowVersionField,
+    reasonCd: z.string().trim().min(1, '마감 사유를 골라 주세요.').max(20),
+    reason: z.string().max(200).default(''),
+  }),
   handler: async ({ input, scope }) => {
     await assertAsnsInScope([input.id], scope)
-    return closeAsn(input.id, input.rowVersion, input.reason)
+    return closeAsn(input.id, input.rowVersion, input.reasonCd, input.reason)
   },
 })

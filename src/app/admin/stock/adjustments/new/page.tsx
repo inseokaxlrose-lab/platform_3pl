@@ -16,7 +16,7 @@ export default async function NewAdjustmentPage() {
     <AdjustForm
       header={{
         title: '실사·조정 등록',
-        description: '등록한 뒤 관리자가 확정하면 재고가 바뀝니다. 사유는 꼭 적습니다.',
+        description: '등록한 뒤 관리자가 확정하면 재고가 바뀝니다. 사유는 꼭 고릅니다.',
         actions: <BackToListButton listPath="/admin/stock/adjustments" />,
       }}
       centers={options.centers}

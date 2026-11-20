@@ -1,3 +1,4 @@
+import { DEFAULT_CODE_GROUPS } from '@/config/defaults/codes'
 import { prisma } from '@/lib/prisma'
 import { toStatus } from '@/lib/status'
 import { TEST_OPERATOR_ID } from './reset-database'
@@ -112,6 +113,30 @@ export function createTestCodeGroup(
       },
     },
   })
+}
+
+// 사유 코드 그룹 (0087): 기본 공통코드의 귀책 그룹들을 그대로 만든다 (입고·재고 테스트 준비에서 부른다)
+export async function createReasonCodes(operatorId: bigint = TEST_OPERATOR_ID) {
+  for (const group of DEFAULT_CODE_GROUPS.filter((g) => g.faultParty)) {
+    await prisma.codeGroup.create({
+      data: {
+        operatorId,
+        code: group.code,
+        name: group.name,
+        isSystem: 'Y',
+        faultPartyYn: 'Y',
+        items: {
+          create: group.items.map((item, index) => ({
+            operatorId,
+            code: item.code,
+            name: item.name,
+            faultParty: item.faultParty ?? null,
+            sortOrder: (index + 1) * 10,
+          })),
+        },
+      },
+    })
+  }
 }
 
 // 공통 칸(row_version)이 있는 표의 지금 버전 — 수정 액션 테스트에서 "화면이 불러온 버전" 대신 쓴다
