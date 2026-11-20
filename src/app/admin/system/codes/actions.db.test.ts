@@ -190,6 +190,39 @@ describe('공통코드 코드', () => {
     expect(await deleteCodeItemAction({ id: item.id })).toMatchObject({ ok: true })
   })
 
+  it('귀책: 귀책을 쓰는 그룹의 코드만 저장되고, 아니면 비운다. 목록 값 밖은 거부 (0087)', async () => {
+    const reasons = await createGroup({ code: 'MY_REASON', usesFaultParty: true })
+    const plain = await createGroup({ code: 'PLAIN' })
+    const a = await createItem(BigInt(reasons.id), 'A', { faultParty: 'CENTER' })
+    const b = await createItem(BigInt(plain.id), 'B', { faultParty: 'CENTER' })
+    const saved = await prisma.codeItem.findMany({
+      where: { id: { in: [BigInt(a.id), BigInt(b.id)] } },
+      orderBy: { code: 'asc' },
+      select: { code: true, faultParty: true },
+    })
+    expect(saved).toEqual([
+      { code: 'A', faultParty: 'CENTER' },
+      { code: 'B', faultParty: null },
+    ])
+    expect(
+      await createCodeItemAction({
+        groupId: reasons.id,
+        code: 'C',
+        name: 'C',
+        description: '',
+        sortOrder: 0,
+        isActive: true,
+        faultParty: 'NOBODY' as never,
+      }),
+    ).toMatchObject({ ok: false, error: { code: 'VALIDATION' } })
+    const rows = await listCodeItemsAction({ ...createDataGridState(), groupId: reasons.id })
+    expect(rows.ok && rows.data.rows[0]).toMatchObject({ code: 'A', faultParty: 'CENTER' })
+    const groups = await listCodeGroupsAction(createDataGridState())
+    expect(groups.ok && groups.data.rows.find((g) => g.code === 'MY_REASON')).toMatchObject({
+      usesFaultParty: true,
+    })
+  })
+
   it('삭제 권한이 없으면 거부', async () => {
     const g = await createGroup()
     const item = await createItem(BigInt(g.id), 'X')

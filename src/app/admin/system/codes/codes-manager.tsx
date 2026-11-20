@@ -7,6 +7,8 @@ import { ACTIVE_STATUS, EmptyState, StatusBadge } from '@/components/common'
 import { DataGrid, type DataGridColumn, useDataGridState } from '@/components/data-grid'
 import { usePermission } from '@/components/permission'
 import { Button } from '@/components/ui/button'
+import { FAULT_PARTY_LABELS, type FaultParty } from '@/config/db-codes'
+import { labelOf } from '@/lib/db-value'
 import { DeletedCodesDialog } from './deleted-codes-dialog'
 import {
   createCodeGroupAction,
@@ -28,6 +30,8 @@ type GroupRow = {
   sortOrder: number
   isActive: boolean
   isSystem: boolean
+  // 사유 코드 그룹: 코드마다 귀책 (0087)
+  usesFaultParty: boolean
   // 동시 수정 막기: 팝업을 연 목록의 버전
   rowVersion: number
   itemCount: number
@@ -42,6 +46,7 @@ type ItemRow = {
   isActive: boolean
   rowVersion: number
   updatedAt: Date
+  faultParty: string | null
 }
 
 const statusColumn = {
@@ -87,6 +92,12 @@ const itemColumns: DataGridColumn<ItemRow>[] = [
   },
   { id: 'name', header: '코드명', accessor: 'name', sortable: true },
   { id: 'description', header: '설명', accessor: 'description' },
+  // 귀책: 사유 코드 그룹에서만 값이 있다 (0087)
+  {
+    id: 'faultParty',
+    header: '귀책',
+    accessor: (row) => (row.faultParty ? labelOf(FAULT_PARTY_LABELS, row.faultParty) : ''),
+  },
   statusColumn,
   { id: 'updatedAt', header: '수정일시', accessor: 'updatedAt', format: 'datetime' },
 ]
@@ -97,6 +108,8 @@ const toForm = (row: GroupRow | ItemRow): CodeFormValue => ({
   description: row.description ?? '',
   sortOrder: row.sortOrder,
   isActive: row.isActive,
+  usesFaultParty: 'usesFaultParty' in row ? row.usesFaultParty : false,
+  faultParty: 'faultParty' in row ? (row.faultParty ?? '') : '',
 })
 
 type DialogState =
@@ -320,6 +333,10 @@ export function CodesManager() {
           codePlaceholder={dialog.kind === 'group' ? '예: CONTACT_ROLE' : '예: INBOUND'}
           initial={dialog.initial}
           lockedNote={lockedNote}
+          // 그룹: [귀책 구분 사용] / 코드: 그 그룹이 귀책을 쓰면 [귀책] 고르기 (0087)
+          faultField={
+            dialog.kind === 'group' ? 'group' : activeGroup?.usesFaultParty ? 'item' : undefined
+          }
           onSave={async ({ code, ...rest }) => {
             if (dialog.kind === 'group') {
               return dialog.mode === 'create'
@@ -330,12 +347,14 @@ export function CodesManager() {
                     ...rest,
                   })
             }
+            // 귀책 값은 서버가 FAULT_PARTY 목록으로 다시 검사한다
+            const item = { ...rest, faultParty: rest.faultParty as FaultParty | '' }
             return dialog.mode === 'create'
-              ? createCodeItemAction({ groupId: activeGroupId!, code, ...rest })
+              ? createCodeItemAction({ groupId: activeGroupId!, code, ...item })
               : updateCodeItemAction({
                   id: dialog.row.id,
                   rowVersion: dialog.row.rowVersion,
-                  ...rest,
+                  ...item,
                 })
           }}
           onDelete={

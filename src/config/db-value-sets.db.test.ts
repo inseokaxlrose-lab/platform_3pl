@@ -4,6 +4,7 @@ import {
   API_KEY_EVENT_VALUES,
   BONDED_TYPE_VALUES,
   EXTERNAL_ENTITY_TYPE_VALUES,
+  FAULT_PARTY_VALUES,
   NUMBERING_SEPARATOR_VALUES,
   PERMISSION_EFFECT_VALUES,
   REGION_LOAD_STATUS_VALUES,
@@ -119,6 +120,7 @@ const VALUE_SETS: Record<string, readonly string[]> = {
   // 공통코드·단위·팔레트·외부 코드·체번
   'tb_code_group.status_cd': STATUS_VALUES,
   'tb_code_item.status_cd': STATUS_VALUES,
+  'tb_code_item.fault_party_cd': FAULT_PARTY_VALUES,
   'tb_unit.status_cd': STATUS_VALUES,
   'tb_unit.unit_type_cd': UNIT_TYPES,
   'tb_pallet_type.status_cd': STATUS_VALUES,

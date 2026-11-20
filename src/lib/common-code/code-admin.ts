@@ -6,7 +6,7 @@ import { requireOperatorId } from '@/lib/actor'
 import { prisma } from '@/lib/prisma'
 import { assertRowVersion, withVersionGuard } from '@/lib/row-version'
 import { DELETED_ONLY, NOT_DELETED, withStatus } from '@/lib/status'
-import { isYes } from '@/lib/yn'
+import { isYes, toYn } from '@/lib/yn'
 import type {
   codeGroupCreateSchema,
   codeGroupUpdateSchema,
@@ -25,13 +25,31 @@ type GroupUpdate = z.output<typeof codeGroupUpdateSchema>
 type ItemCreate = z.output<typeof codeItemCreateSchema>
 type ItemUpdate = z.output<typeof codeItemUpdateSchema>
 
+// 화면 입력(true/false·빈 글자) → DB 칸 (0087 귀책)
+function groupData<T extends { usesFaultParty: boolean; isActive: boolean }>({
+  usesFaultParty,
+  ...data
+}: T) {
+  return { ...withStatus(data), faultPartyYn: toYn(usesFaultParty) }
+}
+// 그룹이 귀책을 쓰지 않으면 귀책을 비운다
+function itemData<T extends { faultParty: string; isActive: boolean }>(
+  { faultParty, ...data }: T,
+  usesFaultParty: boolean,
+) {
+  return {
+    ...withStatus(data),
+    faultParty: usesFaultParty && faultParty ? faultParty : null,
+  }
+}
+
 // 공통코드는 운영사마다 따로 (같은 그룹 코드를 운영사마다 쓸 수 있다, 0039)
 export async function createCodeGroup(data: GroupCreate) {
   const operatorId = requireOperatorId()
   const exists = await prisma.codeGroup.findFirst({ where: { operatorId, code: data.code } })
   if (exists) throw new ActionError('CONFLICT', `이미 있는 그룹 코드입니다: ${data.code}`)
   return prisma.codeGroup.create({
-    data: { ...withStatus(data), operatorId },
+    data: { ...groupData(data), operatorId },
     select: { id: true, code: true },
   })
 }
@@ -50,7 +68,7 @@ export async function updateCodeGroup({ id, rowVersion, ...data }: GroupUpdate) 
   return withVersionGuard(() =>
     prisma.codeGroup.update({
       where: { id, rowVersion },
-      data: withStatus(data),
+      data: groupData(data),
       select: { id: true, rowVersion: true },
     }),
   )
@@ -90,19 +108,22 @@ export async function createCodeItem(data: ItemCreate) {
     throw new ActionError('CONFLICT', `이 그룹에 이미 있는 코드입니다: ${data.code}`)
   }
   return prisma.codeItem.create({
-    data: { ...withStatus(data), operatorId: group.operatorId },
+    data: { ...itemData(data, isYes(group.faultPartyYn)), operatorId: group.operatorId },
     select: { id: true, code: true },
   })
 }
 
 // rowVersion: 팝업을 열 때의 버전 (그 사이 다른 사람이 저장했으면 충돌)
 export async function updateCodeItem({ id, rowVersion, ...data }: ItemUpdate) {
-  const item = await prisma.codeItem.findUnique({ where: { id }, select: { rowVersion: true } })
+  const item = await prisma.codeItem.findUnique({
+    where: { id },
+    select: { rowVersion: true, group: { select: { faultPartyYn: true } } },
+  })
   assertRowVersion(item, rowVersion, '코드를 찾을 수 없습니다.')
   return withVersionGuard(() =>
     prisma.codeItem.update({
       where: { id, rowVersion },
-      data: withStatus(data),
+      data: itemData(data, isYes(item!.group.faultPartyYn)),
       select: { id: true, rowVersion: true },
     }),
   )

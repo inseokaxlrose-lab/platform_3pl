@@ -37,6 +37,14 @@ const CODE_USAGES: Record<string, CountUsage> = {
   // 거래처 유형 (0082)
   CUSTOMER_TYPE: async (db, operatorId, code) =>
     db.customer.count({ where: { operatorId, customerType: code } }),
+  // 사유 코드 (0087): 검수 불량·재고 조정(조정 문서·재고 이력)·ASN 잔량 마감
+  DEFECT_REASON: async (db, operatorId, code) =>
+    db.inboundInspection.count({ where: { operatorId, defectReasonCd: code } }),
+  ADJUST_REASON: async (db, operatorId, code) =>
+    (await db.stockAdjust.count({ where: { operatorId, reasonCd: code } })) +
+    (await db.stockTxn.count({ where: { operatorId, type: 'ADJUST', reasonCd: code } })),
+  ASN_CLOSE_REASON: async (db, operatorId, code) =>
+    db.asn.count({ where: { operatorId, closeReasonCd: code } }),
   // 제공 서비스: 운영사 (0040)
   SERVICE_TYPE: async (db, operatorId, code) =>
     db.operatorService.count({ where: { operatorId, serviceCd: code } }),
