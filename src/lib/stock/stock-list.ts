@@ -4,6 +4,7 @@ import { idFilter } from '@/lib/grid/list-filters'
 import { prisma } from '@/lib/prisma'
 import { scopeFilter, type DataScope } from '@/lib/scope/data-scope'
 import { breakdownQty, formatQty, parseQty, qtyText } from '@/lib/units/convert'
+import { STOCK_STATUS } from '@/config/operator-codes'
 import { expiryState, kstToday } from './expiry'
 
 // 재고 조회 (docs/decisions/0060) — 운영사 화면·화주 포털 공용, 서버 액션에서 부른다
@@ -12,7 +13,8 @@ import { expiryState, kstToday } from './expiry'
 // - item: 소유별 — 화주사 + 품목으로 합계 (여러 로케이션·로트를 더한다), 환산단위로 나눠 보여 준다
 // - lot: 로트·유통기한별 — 화주사 + 품목 + 로트 + 유통기한으로 합계, 유통기한 임박·만료 표시
 // 수량은 모두 기본단위. 수량 0인 줄은 기본으로 뺀다 (조건 zero=Y면 함께)
-// 조건 키: view · keyword · center · warehouse · shipper · expiry(SOON·EXPIRED) · zero
+// 재고상태(0088): 합계 보기도 상태별로 나눈다. 가용 수량(수량 − 할당)은 정상 재고만 — 보류·불량·격리는 0
+// 조건 키: view · keyword · center · warehouse · shipper · status · expiry(SOON·EXPIRED) · zero
 
 export const STOCK_SCOPE = { center: 'centerId', shipper: 'shipperId' }
 export type StockView = 'location' | 'item' | 'lot'
@@ -56,6 +58,11 @@ function packText(total: string, item: ItemInfo) {
     .join(' · ')
 }
 
+// 가용 수량: 정상 재고만 (보류·불량·격리는 출고·할당할 수 없다, 0088)
+function availableOf(status: string, total: string, allocated: string) {
+  return status === 'NORMAL' ? qtyText(parseQty(total) - parseQty(allocated)) : '0'
+}
+
 export function parseView(value: string | undefined): StockView {
   return value === 'item' || value === 'lot' ? value : 'location'
 }
@@ -82,6 +89,7 @@ export async function listStock(input: ListQuery, scope: DataScope) {
       item: 'item.code',
       lotNo: 'lotNo',
       expiryOn: 'expiryOn',
+      status: 'status',
       qty: 'qty',
       updatedAt: 'updatedAt',
     },
@@ -100,6 +108,7 @@ export async function listStock(input: ListQuery, scope: DataScope) {
       idFilter(filters, 'center') ? { centerId: idFilter(filters, 'center') } : {},
       idFilter(filters, 'warehouse') ? { warehouseId: idFilter(filters, 'warehouse') } : {},
       idFilter(filters, 'shipper') ? { shipperId: idFilter(filters, 'shipper') } : {},
+      filters.status && STOCK_STATUS.has(filters.status) ? { status: filters.status } : {},
       filters.zero === 'Y' ? {} : { qty: { gt: 0 } },
       expiryWhere(filters.expiry, today),
     ],
@@ -147,10 +156,11 @@ export async function listStock(input: ListQuery, scope: DataScope) {
           lotNo: s.lotNo,
           expiryOn: s.expiryOn?.toISOString().slice(0, 10) ?? null,
           ...expiry,
+          status: s.status,
           baseUnit: s.item.baseUnit.code,
           qty: total,
           allocatedQty: allocated,
-          availableQty: qtyText(parseQty(total) - parseQty(allocated)),
+          availableQty: availableOf(s.status, total, allocated),
           packs: packText(total, s.item),
           locationCount: 1,
           updatedAt: s.updatedAt,
@@ -163,14 +173,17 @@ export async function listStock(input: ListQuery, scope: DataScope) {
   // 합계 보기: 화주사 + 품목 (+ 로트 + 유통기한)
   const by =
     view === 'item'
-      ? (['shipperId', 'itemId'] as const)
-      : (['shipperId', 'itemId', 'lotNo', 'expiryOn'] as const)
+      ? (['shipperId', 'itemId', 'status'] as const)
+      : (['shipperId', 'itemId', 'lotNo', 'expiryOn', 'status'] as const)
   const groups = await prisma.stock.groupBy({
     by: [...by],
     where,
     _sum: { qty: true, allocatedQty: true },
     _count: { _all: true },
-    orderBy: view === 'item' ? [{ itemId: 'asc' }] : [{ itemId: 'asc' }, { expiryOn: 'asc' }],
+    orderBy:
+      view === 'item'
+        ? [{ itemId: 'asc' }, { status: 'asc' }]
+        : [{ itemId: 'asc' }, { expiryOn: 'asc' }, { status: 'asc' }],
     ...page,
   })
   const allGroups = await prisma.stock.groupBy({ by: [...by], where })
@@ -203,9 +216,13 @@ export async function listStock(input: ListQuery, scope: DataScope) {
           ? expiryState(expiryOn, item.expiryAlertDays, today)
           : expiryState(null, null, today)
       return {
-        id: [g.shipperId, g.itemId, lot ?? '', expiryOn?.toISOString().slice(0, 10) ?? ''].join(
-          ':',
-        ),
+        id: [
+          g.shipperId,
+          g.itemId,
+          lot ?? '',
+          expiryOn?.toISOString().slice(0, 10) ?? '',
+          g.status,
+        ].join(':'),
         center: null,
         warehouse: null,
         location: null,
@@ -216,10 +233,11 @@ export async function listStock(input: ListQuery, scope: DataScope) {
         lotNo: lot,
         expiryOn: expiryOn?.toISOString().slice(0, 10) ?? null,
         ...expiry,
+        status: g.status,
         baseUnit: item.baseUnit.code,
         qty: total,
         allocatedQty: allocated,
-        availableQty: qtyText(parseQty(total) - parseQty(allocated)),
+        availableQty: availableOf(g.status, total, allocated),
         packs: packText(total, item),
         // 몇 개 로케이션(재고 줄)에 나눠 있는지
         locationCount: g._count._all,

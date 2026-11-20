@@ -16,6 +16,7 @@ export const TXN_TYPE_LABELS = {
   MOVE_OUT: '이동(나감)',
   MOVE_IN: '이동(들어옴)',
   ADJUST: '조정',
+  STATUS_CHANGE: '상태 변경',
 } as const
 
 // 원본 문서 종류 이름표
@@ -25,7 +26,7 @@ export const REF_TYPE_LABELS: Record<string, string> = {
   ADJUSTMENT: '실사·조정',
 }
 
-const TYPES = ['RECEIVE', 'MOVE_OUT', 'MOVE_IN', 'ADJUST'] as const
+const TYPES = ['RECEIVE', 'MOVE_OUT', 'MOVE_IN', 'ADJUST', 'STATUS_CHANGE'] as const
 const qty = (value: { toString(): string }) => qtyText(parseQty(value.toString()))
 
 export async function listStockHistory(input: ListQuery, scope: DataScope) {
@@ -90,6 +91,7 @@ export async function listStockHistory(input: ListQuery, scope: DataScope) {
       itemName: t.stock.item.name,
       lotNo: t.lotNo,
       expiryOn: t.expiryOn?.toISOString().slice(0, 10) ?? null,
+      status: t.status,
       baseUnit: t.stock.item.baseUnit.code,
       qtyChange: qty(t.qtyChange),
       qtyAfter: qty(t.qtyAfter),

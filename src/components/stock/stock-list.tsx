@@ -4,7 +4,14 @@ import { StatusBadge } from '@/components/common'
 import type { DataGridColumn } from '@/components/data-grid'
 import { MasterListPage, type SearchFieldDef, useListQuery } from '@/components/master-list'
 import type { ListFetcher } from '@/components/master-list/use-list-query'
+import { useState } from 'react'
+import { Button } from '@/components/ui/button'
+import { STOCK_STATUS } from '@/config/operator-codes'
+import type { ActionResult } from '@/lib/actions'
+import { labelOf } from '@/lib/db-value'
+import type { StockStatusChangeInput } from '@/lib/stock/stock-status-schema'
 import { formatQty } from '@/lib/units/convert'
+import { StockStatusBadge, StockStatusDialog, type StockStatusTarget } from './stock-status'
 
 export type StockListRow = {
   id: string
@@ -19,6 +26,8 @@ export type StockListRow = {
   expiryOn: string | null
   state: 'NONE' | 'OK' | 'SOON' | 'EXPIRED'
   daysLeft: number | null
+  // 재고상태 (0088): NORMAL·HOLD·DAMAGED·QUARANTINE — 합계 보기도 상태별로 나뉜다
+  status: string
   baseUnit: string
   qty: string
   allocatedQty: string
@@ -54,7 +63,11 @@ function ExpiryCell({ row }: { row: StockListRow }) {
   )
 }
 
-function columnsOf(view: string, withShipper: boolean): DataGridColumn<StockListRow>[] {
+function columnsOf(
+  view: string,
+  withShipper: boolean,
+  onChangeStatus?: (row: StockListRow) => void,
+): DataGridColumn<StockListRow>[] {
   const byLocation = view === 'location'
   const withLot = view !== 'item'
   const columns: DataGridColumn<StockListRow>[] = []
@@ -86,6 +99,13 @@ function columnsOf(view: string, withShipper: boolean): DataGridColumn<StockList
     )
   }
   columns.push(
+    {
+      id: 'status',
+      header: '재고상태',
+      accessor: (r) => labelOf(STOCK_STATUS.labels, r.status),
+      sortable: byLocation,
+      cell: (r) => <StockStatusBadge status={r.status} />,
+    },
     {
       id: 'qty',
       header: '재고',
@@ -132,6 +152,21 @@ function columnsOf(view: string, withShipper: boolean): DataGridColumn<StockList
           format: 'number',
         },
   )
+  // 위치별 보기에서만 재고 줄 하나의 상태를 바꾼다 (권한 stock.inventory.update)
+  if (byLocation && onChangeStatus) {
+    columns.push({
+      id: 'statusAction',
+      header: '',
+      accessor: () => '',
+      hideable: false,
+      cell: (r) =>
+        r.qty !== '0' ? (
+          <Button type="button" variant="outline" size="sm" onClick={() => onChangeStatus(r)}>
+            상태 변경
+          </Button>
+        ) : null,
+    })
+  }
   return columns
 }
 
@@ -144,6 +179,7 @@ export function StockList({
   options,
   canExport,
   listAction,
+  statusAction,
 }: {
   gridId: string
   title: string
@@ -156,7 +192,10 @@ export function StockList({
   }
   canExport: boolean
   listAction: ListFetcher<StockListRow>
+  // 있으면 위치별 보기에 [상태 변경] (운영사 화면, 권한 stock.inventory.update)
+  statusAction?: (input: StockStatusChangeInput) => Promise<ActionResult<unknown>>
 }) {
+  const [statusTarget, setStatusTarget] = useState<StockStatusTarget | null>(null)
   const searchFields: SearchFieldDef[] = [
     {
       key: 'view',
@@ -210,22 +249,57 @@ export function StockList({
       ],
       detail: true,
     },
+    {
+      key: 'status',
+      label: '재고상태',
+      type: 'select',
+      options: STOCK_STATUS.values.map((s) => ({
+        value: s,
+        label: labelOf(STOCK_STATUS.labels, s),
+      })),
+      detail: true,
+    },
     { key: 'zero', label: '수량 0 포함', type: 'yn', detail: true },
   )
   const list = useListQuery<StockListRow>({ gridId, fields: searchFields, fetch: listAction })
   const view = list.values.view || 'location'
 
   return (
-    <MasterListPage
-      title={title}
-      description={description}
-      gridId={`${gridId}-${view}`}
-      searchFields={searchFields}
-      list={list}
-      columns={columnsOf(view, options.shippers !== null)}
-      getRowId={(row) => row.id}
-      excelName={canExport ? '재고' : undefined}
-      emptyTitle="재고가 없습니다"
-    />
+    <>
+      <MasterListPage
+        title={title}
+        description={description}
+        gridId={`${gridId}-${view}`}
+        searchFields={searchFields}
+        list={list}
+        columns={columnsOf(
+          view,
+          options.shippers !== null,
+          statusAction
+            ? (row) =>
+                setStatusTarget({
+                  id: row.id,
+                  label: `${row.location} · ${row.itemName} (${row.itemCode})${row.lotNo ? ` · ${row.lotNo}` : ''}`,
+                  status: row.status,
+                  qty: row.qty,
+                  availableQty: row.availableQty,
+                  allocatedQty: row.allocatedQty,
+                  baseUnit: row.baseUnit,
+                })
+            : undefined,
+        )}
+        getRowId={(row) => row.id}
+        excelName={canExport ? '재고' : undefined}
+        emptyTitle="재고가 없습니다"
+      />
+      {statusAction && (
+        <StockStatusDialog
+          target={statusTarget}
+          onClose={() => setStatusTarget(null)}
+          onDone={() => list.refresh()}
+          action={statusAction}
+        />
+      )}
+    </>
   )
 }

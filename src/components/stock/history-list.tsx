@@ -1,5 +1,8 @@
 'use client'
 
+import { STOCK_STATUS } from '@/config/operator-codes'
+import { labelOf } from '@/lib/db-value'
+import { StockStatusBadge } from './stock-status'
 import { ReasonText } from '@/components/common-code'
 import type { DataGridColumn } from '@/components/data-grid'
 import { MasterListPage, type SearchFieldDef, useListQuery } from '@/components/master-list'
@@ -18,6 +21,8 @@ export type HistoryRow = {
   itemName: string
   lotNo: string | null
   expiryOn: string | null
+  // 그때의 재고상태 (0088)
+  status: string
   baseUnit: string
   qtyChange: string
   qtyAfter: string
@@ -38,6 +43,12 @@ const COLUMNS: DataGridColumn<HistoryRow>[] = [
     pinned: true,
   },
   { id: 'type', header: '유형', accessor: 'typeLabel', sortable: true },
+  {
+    id: 'status',
+    header: '재고상태',
+    accessor: (r) => labelOf(STOCK_STATUS.labels, r.status),
+    cell: (r) => <StockStatusBadge status={r.status} />,
+  },
   { id: 'center', header: '센터', accessor: 'center', defaultHidden: true },
   { id: 'location', header: '로케이션', accessor: 'location' },
   { id: 'shipper', header: '화주사', accessor: 'shipper' },
@@ -80,8 +91,14 @@ const COLUMNS: DataGridColumn<HistoryRow>[] = [
     id: 'reason',
     header: '사유',
     accessor: (r) => [r.reasonCd, r.reason].filter(Boolean).join(' '),
-    // 조정은 ADJUST_REASON 코드 (상태 변경 사유는 A2에서 HOLD_REASON)
-    cell: (r) => <ReasonText group="ADJUST_REASON" code={r.reasonCd} memo={r.reason} />,
+    // 조정은 ADJUST_REASON, 상태 변경은 HOLD_REASON 코드 (0087·0088)
+    cell: (r) => (
+      <ReasonText
+        group={r.type === 'STATUS_CHANGE' ? 'HOLD_REASON' : 'ADJUST_REASON'}
+        code={r.reasonCd}
+        memo={r.reason}
+      />
+    ),
   },
   { id: 'createdBy', header: '처리자', accessor: 'createdBy' },
   { id: 'groupId', header: '묶음 번호', accessor: 'groupId', defaultHidden: true },
@@ -117,6 +134,7 @@ export function HistoryList({
         { value: 'MOVE_OUT', label: '이동(나감)' },
         { value: 'MOVE_IN', label: '이동(들어옴)' },
         { value: 'ADJUST', label: '조정' },
+        { value: 'STATUS_CHANGE', label: '상태 변경' },
       ],
     },
     { key: 'txnAt', label: '기간', type: 'dateRange', span: 6 },
