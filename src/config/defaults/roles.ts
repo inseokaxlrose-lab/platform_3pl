@@ -56,8 +56,9 @@ export const DEFAULT_GROUPS: readonly DefaultGroup[] = [
         'master.shippers',
         'master.carriers',
       ),
-      // 소속 센터의 택배 계약 (0094)
+      // 소속 센터의 택배 계약 (0094)·배송 코스 (0095)
       ...menu('master.carrier-contracts'),
+      ...menu('master.routes'),
       ...menu('master.items'),
       ...menu('master.customers'),
       // 품목·거래처 화면에서 고치던 외부코드를 이 메뉴에서 (0068)

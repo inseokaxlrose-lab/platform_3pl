@@ -261,4 +261,42 @@ export const DEFAULT_CODE_GROUPS: readonly DefaultCodeGroup[] = [
       { code: 'ETC', name: '기타', faultParty: 'ETC' },
     ],
   },
+  // 배송 코스·납품 조건 (0095)
+  {
+    code: 'VEHICLE_TON',
+    name: '차량 톤수',
+    description: '배송 코스의 기본 차량 크기',
+    items: [
+      { code: '1T', name: '1톤' },
+      { code: '1_4T', name: '1.4톤' },
+      { code: '2_5T', name: '2.5톤' },
+      { code: '3_5T', name: '3.5톤' },
+      { code: '5T', name: '5톤' },
+      { code: '11T', name: '11톤' },
+      { code: '25T', name: '25톤' },
+    ],
+  },
+  {
+    code: 'VEHICLE_LIMIT',
+    name: '차량 제한',
+    description: '납품처에 들어갈 수 있는 차량',
+    items: [
+      { code: 'NONE', name: '제한 없음' },
+      { code: 'UNDER_1T', name: '1톤 이하' },
+      { code: 'UNDER_2_5T', name: '2.5톤 이하' },
+      { code: 'UNDER_5T', name: '5톤 이하' },
+      { code: 'NO_WING', name: '윙바디 불가' },
+    ],
+  },
+  {
+    code: 'UNLOAD_METHOD',
+    name: '하차 방법',
+    description: '납품처에서 물건을 내리는 방법',
+    items: [
+      { code: 'HAND', name: '수작업' },
+      { code: 'FORKLIFT', name: '지게차' },
+      { code: 'PALLET_JACK', name: '핸드파렛트' },
+      { code: 'DOCK', name: '도크 하차' },
+    ],
+  },
 ]

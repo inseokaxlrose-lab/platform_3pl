@@ -36,6 +36,8 @@ export const AUDITED_MODELS: ReadonlySet<string> = new Set([
   // 운송사·운송 계약 (0094)
   'Carrier',
   'CarrierContract',
+  // 배송 코스 (0095)
+  'Route',
 ])
 
 // 등록·수정자만 있는 표 (버전 칸 없음): 담당자 표 4개 (0084 ④-3) — 버전은 부모(운영사·센터·화주사·거래처)에서 검사
@@ -66,6 +68,8 @@ export const SOFT_DELETE_MODELS: ReadonlySet<string> = new Set([
   // 운송사·운송 계약 (0094)
   'Carrier',
   'CarrierContract',
+  // 배송 코스 (0095)
+  'Route',
 ])
 
 // 운영사 데이터가 들어가는 표 (operator_id가 있는 표, docs/decisions/0039)
@@ -116,6 +120,9 @@ export const TENANT_MODELS: ReadonlySet<string> = new Set([
   // 운송사·운송 계약 (0094)
   'Carrier',
   'CarrierContract',
+  // 배송 코스·코스 우편번호 (0095)
+  'Route',
+  'RouteZip',
 ])
 
 type Data = Record<string, unknown>

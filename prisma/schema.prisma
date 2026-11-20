@@ -307,6 +307,9 @@ model Center {
   tempZones        CenterTempZone[]
   // 운송 계약 (0094)
   carrierContracts CarrierContract[]
+  // 배송 코스·코스 우편번호 (0095)
+  routes           Route[]
+  routeZips        RouteZip[]
 
   // 논리 삭제: 'Y'면 지운 것 (목록·조회에서 빠지고 되살릴 수 있다, 0038)
   delYn         String              @default("N") @map("del_yn") @db.Char(1)
@@ -991,6 +994,9 @@ model Operator {
   // 운송사·운송 계약 (0094)
   carriers         Carrier[]
   carrierContracts CarrierContract[]
+  // 배송 코스 (0095)
+  routes           Route[]
+  routeZips        RouteZip[]
 
   // 운영사코드는 삭제 안 된 것끼리만 겹치면 안 된다 (0038)
   @@unique([code], where: raw("del_yn = 'N'"), map: "tb_operator_operator_cd_key")
@@ -1495,11 +1501,73 @@ model Carrier {
 
   contracts       CarrierContract[]
   defaultShippers Shipper[]         @relation("ShipperDefaultCarrier")
+  // 배송 코스의 수송 수단 (0095)
+  routes          Route[]
 
   @@unique([operatorId, code], where: raw("del_yn = 'N'"), map: "tb_carrier_operator_id_carrier_cd_key")
   @@unique([operatorId, custCode], where: raw("carrier_cust_cd IS NOT NULL AND del_yn = 'N'"), map: "tb_carrier_operator_id_cust_cd_key")
   @@index([operatorId])
   @@map("tb_carrier")
+}
+
+// 배송 코스 (0095): 센터 안에서 어느 차·어느 길로 보내는지. 코스 코드는 센터 안에서 고유
+model Route {
+  id         BigInt    @id @default(autoincrement()) @map("route_id")
+  operatorId BigInt    @map("operator_id")
+  operator   Operator  @relation(fields: [operatorId], references: [id], onDelete: Restrict)
+  centerId   BigInt    @map("center_id")
+  center     Center    @relation(fields: [centerId], references: [id], onDelete: Restrict)
+  // 우리 코드 (필수·등록 후 불변) + 사용자 정의 코드 (센터 안 고유)
+  code       String    @map("route_cd") @db.VarChar(20)
+  custCode   String?   @map("route_cust_cd") @db.VarChar(50)
+  name       String    @map("route_nm") @db.VarChar(100)
+  // 수송 수단: 운송사 (택배·화물·자차·용차)
+  carrierId  BigInt?   @map("carrier_id")
+  carrier    Carrier?  @relation(fields: [carrierId], references: [id], onDelete: Restrict)
+  // 운행 요일 (월~일 7글자 Y/N)·출발 마감 시각
+  runDays    String    @default("YYYYYNN") @map("run_days") @db.Char(7)
+  cutoffTime DateTime? @map("depart_cutoff_time") @db.Time(0)
+  // 기본 차량 톤수 (공통코드 VEHICLE_TON)·도착 거점
+  vehicleTon String?   @map("vehicle_ton_cd") @db.VarChar(20)
+  destHub    String?   @map("dest_hub_nm") @db.VarChar(100)
+  status     String    @default("ACTIVE") @map("status_cd") @db.VarChar(20)
+  sortOrder  Int       @default(0) @map("sort_seq")
+  remark     String?   @db.VarChar(1000)
+  createdAt  DateTime  @default(now()) @map("created_at")
+  updatedAt  DateTime  @updatedAt @map("updated_at")
+  createdBy  String    @default("system") @map("created_by") @db.VarChar(50)
+  updatedBy  String    @default("system") @map("updated_by") @db.VarChar(50)
+  rowVersion Int       @default(1) @map("row_version")
+  delYn      String    @default("N") @map("del_yn") @db.Char(1)
+
+  zips    RouteZip[]
+  shipTos ShipTo[]
+
+  @@unique([centerId, code], where: raw("del_yn = 'N'"), map: "tb_route_center_id_route_cd_key")
+  @@unique([centerId, custCode], where: raw("route_cust_cd IS NOT NULL AND del_yn = 'N'"), map: "tb_route_center_id_cust_cd_key")
+  @@index([operatorId])
+  @@index([carrierId])
+  @@map("tb_route")
+}
+
+// 코스 우편번호 배정 (0095): 센터 안에서 우편번호 하나에 코스 하나. 납품처의 코스를 정할 때 쓴다 (직접 지정이 없으면)
+model RouteZip {
+  id         BigInt   @id @default(autoincrement()) @map("route_zip_id")
+  operatorId BigInt   @map("operator_id")
+  operator   Operator @relation(fields: [operatorId], references: [id], onDelete: Restrict)
+  centerId   BigInt   @map("center_id")
+  center     Center   @relation(fields: [centerId], references: [id], onDelete: Restrict)
+  zipCode    String   @map("zip_cd") @db.Char(5)
+  routeId    BigInt   @map("route_id")
+  route      Route    @relation(fields: [routeId], references: [id], onDelete: Cascade)
+  // 배정한 사람·때 (작업자 아이디)
+  assignedBy String   @map("assigned_by") @db.VarChar(50)
+  assignedAt DateTime @default(now()) @map("assigned_at")
+
+  @@unique([centerId, zipCode], map: "tb_route_zip_center_id_zip_cd_key")
+  @@index([routeId])
+  @@index([operatorId])
+  @@map("tb_route_zip")
 }
 
 // 운송 계약 (0094): 센터(·화주)별 택배사 계약 — 고객코드·집하 점소·송장번호 대역
@@ -1671,6 +1739,19 @@ model ShipTo {
   receiverPhone2    String?   @map("receiver_tel_no2") @db.VarChar(15)
   // 배송 메모 (기사 전달, 예: 정문 경비실)
   deliveryMemo      String?   @map("delivery_memo") @db.VarChar(200)
+  // ── 납품 조건 (0095)
+  // 직접 지정한 배송 코스 (비우면 배송센터 + 우편번호의 코스 규칙 tb_route_zip). 배송센터의 코스가 아니면 무시한다
+  routeId           BigInt?   @map("route_id")
+  route             Route?    @relation(fields: [routeId], references: [id], onDelete: Restrict)
+  // 납품 가능 시간대·요일 (월~일 7글자 Y/N, 비우면 제한 없음)
+  deliveryTimeFrom  DateTime? @map("delivery_time_from") @db.Time(0)
+  deliveryTimeTo    DateTime? @map("delivery_time_to") @db.Time(0)
+  deliveryDays      String?   @map("delivery_days") @db.Char(7)
+  // 차량 제한 (공통코드 VEHICLE_LIMIT)·하차 방법 (공통코드 UNLOAD_METHOD)
+  vehicleLimit      String?   @map("vehicle_limit_cd") @db.VarChar(20)
+  unloadMethod      String?   @map("unload_method_cd") @db.VarChar(20)
+  // 도착 전 사전 연락
+  preCallYn         String    @default("N") @map("pre_call_yn") @db.Char(1)
 
   // ── 배송센터 (상수 CENTER_ASSIGN_TYPE·STATUS·CONFIRM_REASON)
   deliveryCenterId    BigInt?   @map("delivery_center_id")
