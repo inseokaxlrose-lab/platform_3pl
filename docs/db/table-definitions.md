@@ -3,7 +3,7 @@
 > 이 문서는 `npm run db:doc`가 실제 DB 구조와 `prisma/schema.prisma`의 주석으로 만든다. **손으로 고치지 않는다** — 마이그레이션을 적용한 뒤 명령을 다시 돌린다.
 > 엑셀 판: `docs/db/DB_테이블정의서.xlsx` · 이름 규칙: `docs/db-conventions.md`
 
-테이블 73개 · 칼럼 1176개
+테이블 75개 · 칼럼 1210개
 
 ## 목차
 
@@ -82,6 +82,8 @@
 | 기타 | [`tb_login_hist`](#tb_login_hist) | LoginHist | 로그인 이력 (docs/decisions/0093): 시도마다 한 줄 — SUCCESS 성공 / FAIL 실패 / LOCKED 잠김 / DISABLED 사용 중지·운영사 정지 없는 아이디로 시도하면 user_id 없이 아이디 글자만. 운영사는 그 사용자의 운영사 (플랫폼 관리자·없는 아이디는 비움) |
 | 기타 | [`tb_numbering_rule`](#tb_numbering_rule) | NumberingRule | 체번 규칙 (docs/decisions/0084): 대상별 코드·문서번호 모양 operator_id NULL = 시스템 기본 규칙, 값이 있으면 그 운영사의 재정의 (같은 대상이면 운영사 행이 이긴다) 번호 = 접두어(고정 문자 / 화주 code_prefix / 상위 코드) + 구분 문자 + 날짜 + 구분자 + 일련번호 |
 | 기타 | [`tb_numbering_seq`](#tb_numbering_seq) | NumberingSeq | 체번 현재값 (docs/decisions/0084): 운영사 × 대상 × 범위 × 주기마다 마지막 번호 발급은 한 문장으로 원자적 증가 (INSERT … ON CONFLICT DO UPDATE … RETURNING) — MAX()+1 금지 이력이 아니라 카운터라 FK를 두지 않는다 (scope_id는 범위에 따라 운영사 0·화주사·거래처 키) |
+| 기타 | [`tb_route`](#tb_route) | Route | 배송 코스 (0095): 센터 안에서 어느 차·어느 길로 보내는지. 코스 코드는 센터 안에서 고유 |
+| 기타 | [`tb_route_zip`](#tb_route_zip) | RouteZip | 코스 우편번호 배정 (0095): 센터 안에서 우편번호 하나에 코스 하나. 납품처의 코스를 정할 때 쓴다 (직접 지정이 없으면) |
 
 ## tb_account
 
@@ -1713,6 +1715,13 @@
 | 48 | `updated_by` | 수정 자 | 수정자 아이디 (자동) | VARCHAR(50) | N | system |  |
 | 49 | `row_version` | 행버전 | 동시 수정 막기용 버전 (수정할 때마다 +1, 0038) | INTEGER | N | 1 |  |
 | 50 | `ship_to_cust_cd` | 납품처 사용자정의코드 | 사용자 정의 코드 (화주 시스템의 납품처코드), 거래처 안에서 고유 (값이 있을 때) | VARCHAR(50) | Y |  | UK |
+| 51 | `delivery_days` | 배송 일수 |  | CHAR(7) | Y |  |  |
+| 52 | `delivery_time_from` | 배송 시각 시작 | 납품 가능 시간대·요일 (월~일 7글자 Y/N, 비우면 제한 없음) | TIME WITHOUT TIME ZONE | Y |  |  |
+| 53 | `delivery_time_to` | 배송 시각 대상 |  | TIME WITHOUT TIME ZONE | Y |  |  |
+| 54 | `pre_call_yn` | pre call 여부 | 도착 전 사전 연락 | CHAR(1) | N | N |  |
+| 55 | `route_id` | route ID | 납품 조건 (0095) 직접 지정한 배송 코스 (비우면 배송센터 + 우편번호의 코스 규칙 tb_route_zip). 배송센터의 코스가 아니면 무시한다 | BIGINT | Y |  | FK → tb_route.route_id |
+| 56 | `unload_method_cd` | unload 방식 코드 |  | VARCHAR(20) | Y |  |  |
+| 57 | `vehicle_limit_cd` | vehicle 한도 코드 | 차량 제한 (공통코드 VEHICLE_LIMIT)·하차 방법 (공통코드 UNLOAD_METHOD) | VARCHAR(20) | Y |  |  |
 
 **고유 인덱스**
 
@@ -1735,6 +1744,8 @@
 - `tb_ship_to_center_required_check`: `CHECK ((delivery_center_id IS NOT NULL) OR ((center_assign_status_cd) = 'NEED_CONFIRM'))`
 - `tb_ship_to_confirm_reason_cd_check`: `CHECK ((center_confirm_reason_cd) IN ('ADDR_NOT_RESOLVED', 'REGION_UNASSIGNED', 'REGION_MIXED', 'NOT_SHIPPER_CENTER', 'CENTER_INACTIVE', 'INVALID_CENTER_CD'))`
 - `tb_ship_to_default_active_check`: `CHECK ((default_yn = 'N') OR ((status_cd) = 'ACTIVE') OR (del_yn = 'Y'))`
+- `tb_ship_to_delivery_days_check`: `CHECK ((delivery_days IS NULL) OR (delivery_days ~ '^[YN]{7}$'))`
+- `tb_ship_to_pre_call_yn_check`: `CHECK (pre_call_yn IN ('Y', 'N')`
 - `tb_ship_to_resolve_level_cd_check`: `CHECK ((resolve_level_cd) IN ('ZIP', 'BJD', 'SIGUNGU'))`
 - `tb_ship_to_ship_to_cd_check`: `CHECK ((ship_to_cd) ~ '^[A-Z0-9_-]{1,30}$')`
 - `tb_ship_to_source_cd_check`: `CHECK ((source_cd) IN ('SCREEN', 'PORTAL', 'API', 'UPLOAD', 'ORDER_AUTO'))`
@@ -2458,7 +2469,7 @@
 
 **검사 조건**
 
-- `tb_ext_code_entity_type_cd_check`: `CHECK ((entity_type_cd) IN ('CENTER', 'WAREHOUSE', 'LOCATION', 'SHIPPER', 'ITEM', 'CUSTOMER', 'UNIT', 'CARRIER'))`
+- `tb_ext_code_entity_type_cd_check`: `CHECK ((entity_type_cd) IN ('CENTER', 'WAREHOUSE', 'LOCATION', 'SHIPPER', 'ITEM', 'CUSTOMER', 'UNIT', 'CARRIER', 'ROUTE'))`
 
 ## tb_carrier
 
@@ -2693,3 +2704,75 @@
 **검사 조건**
 
 - `tb_numbering_seq_last_seq_check`: `CHECK (last_seq >= 0)`
+
+## tb_route
+
+- 영역: 기타 · 모델: `Route`
+- 배송 코스 (0095): 센터 안에서 어느 차·어느 길로 보내는지. 코스 코드는 센터 안에서 고유
+
+| No | 칼럼 | 한글명 | 설명 | 타입 | NULL | 기본값 | 키 |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| 1 | `route_id` | route ID |  | BIGINT | N | 자동 증가 | PK |
+| 2 | `operator_id` | 운영사 ID | 운영사 (멀티테넌트 키 — 다른 운영사 데이터는 보이지 않는다, 0039) | BIGINT | N |  | FK → tb_operator.operator_id |
+| 3 | `center_id` | 센터 ID |  | BIGINT | N |  | UK FK → tb_center.center_id |
+| 4 | `route_cd` | route 코드 | 우리 코드 (필수·등록 후 불변) + 사용자 정의 코드 (센터 안 고유) | VARCHAR(20) | N |  | UK |
+| 5 | `route_cust_cd` | route 사용자정의코드 |  | VARCHAR(50) | Y |  | UK |
+| 6 | `route_nm` | route 명 |  | VARCHAR(100) | N |  |  |
+| 7 | `carrier_id` | carrier ID | 수송 수단: 운송사 (택배·화물·자차·용차) | BIGINT | Y |  | FK → tb_carrier.carrier_id |
+| 8 | `run_days` | run 일수 | 운행 요일 (월~일 7글자 Y/N)·출발 마감 시각 | CHAR(7) | N | YYYYYNN |  |
+| 9 | `depart_cutoff_time` | depart 마감 시각 |  | TIME WITHOUT TIME ZONE | Y |  |  |
+| 10 | `vehicle_ton_cd` | vehicle ton 코드 | 기본 차량 톤수 (공통코드 VEHICLE_TON)·도착 거점 | VARCHAR(20) | Y |  |  |
+| 11 | `dest_hub_nm` | dest hub 명 |  | VARCHAR(100) | Y |  |  |
+| 12 | `status_cd` | 상태 코드 | 상태 | VARCHAR(20) | N | ACTIVE |  |
+| 13 | `sort_seq` | 정렬순서 | 정렬 순서 | INTEGER | N | 0 |  |
+| 14 | `remark` | 비고 | 비고 | VARCHAR(1000) | Y |  |  |
+| 15 | `created_at` | 등록 일시 | 등록 일시 (자동) | TIMESTAMP(3) | N | CURRENT_TIMESTAMP |  |
+| 16 | `updated_at` | 수정 일시 | 수정 일시 (자동) | TIMESTAMP(3) | N |  |  |
+| 17 | `created_by` | 등록 자 | 등록자 아이디 (자동: 작업자 / seed / system) | VARCHAR(50) | N | system |  |
+| 18 | `updated_by` | 수정 자 | 수정자 아이디 (자동) | VARCHAR(50) | N | system |  |
+| 19 | `row_version` | 행버전 | 동시 수정 막기용 버전 (수정할 때마다 +1, 0038) | INTEGER | N | 1 |  |
+| 20 | `del_yn` | 삭제여부 | 논리 삭제 여부 ('Y' = 지움, 목록에서 빠지고 되살릴 수 있다, 0038) | CHAR(1) | N | N |  |
+
+**고유 인덱스**
+
+- `tb_route_center_id_cust_cd_key`: `CREATE UNIQUE INDEX tb_route_center_id_cust_cd_key ON tb_route (center_id, route_cust_cd) WHERE ((route_cust_cd IS NOT NULL) AND (del_yn = 'N'::bpchar))`
+- `tb_route_center_id_route_cd_key`: `CREATE UNIQUE INDEX tb_route_center_id_route_cd_key ON tb_route (center_id, route_cd) WHERE (del_yn = 'N'::bpchar)`
+
+**인덱스**
+
+- `tb_route_carrier_id_idx`: `CREATE INDEX tb_route_carrier_id_idx ON tb_route (carrier_id)`
+- `tb_route_operator_id_idx`: `CREATE INDEX tb_route_operator_id_idx ON tb_route (operator_id)`
+
+**검사 조건**
+
+- `tb_route_del_yn_check`: `CHECK (del_yn IN ('Y', 'N')`
+- `tb_route_run_days_check`: `CHECK (run_days ~ '^[YN]{7}$')`
+- `tb_route_status_cd_check`: `CHECK ((status_cd) IN ('ACTIVE', 'INACTIVE'))`
+
+## tb_route_zip
+
+- 영역: 기타 · 모델: `RouteZip`
+- 코스 우편번호 배정 (0095): 센터 안에서 우편번호 하나에 코스 하나. 납품처의 코스를 정할 때 쓴다 (직접 지정이 없으면)
+
+| No | 칼럼 | 한글명 | 설명 | 타입 | NULL | 기본값 | 키 |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| 1 | `route_zip_id` | route 우편번호 ID |  | BIGINT | N | 자동 증가 | PK |
+| 2 | `operator_id` | 운영사 ID | 운영사 (멀티테넌트 키 — 다른 운영사 데이터는 보이지 않는다, 0039) | BIGINT | N |  | FK → tb_operator.operator_id |
+| 3 | `center_id` | 센터 ID |  | BIGINT | N |  | UK FK → tb_center.center_id |
+| 4 | `zip_cd` | 우편번호 |  | CHAR(5) | N |  | UK |
+| 5 | `route_id` | route ID |  | BIGINT | N |  | FK → tb_route.route_id |
+| 6 | `assigned_by` | 지정 자 | 배정한 사람·때 (작업자 아이디) | VARCHAR(50) | N |  |  |
+| 7 | `assigned_at` | 지정 일시 |  | TIMESTAMP(3) | N | CURRENT_TIMESTAMP |  |
+
+**고유 인덱스**
+
+- `tb_route_zip_center_id_zip_cd_key`: `CREATE UNIQUE INDEX tb_route_zip_center_id_zip_cd_key ON tb_route_zip (center_id, zip_cd)`
+
+**인덱스**
+
+- `tb_route_zip_operator_id_idx`: `CREATE INDEX tb_route_zip_operator_id_idx ON tb_route_zip (operator_id)`
+- `tb_route_zip_route_id_idx`: `CREATE INDEX tb_route_zip_route_id_idx ON tb_route_zip (route_id)`
+
+**검사 조건**
+
+- `tb_route_zip_zip_cd_check`: `CHECK (zip_cd ~ '^[0-9]{5}$')`

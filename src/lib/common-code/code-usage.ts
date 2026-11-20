@@ -34,6 +34,13 @@ const CODE_USAGES: Record<string, CountUsage> = {
     db.shipper.count({ where: { operatorId, industry: code } }),
   SETTLE_CYCLE: async (db, operatorId, code) =>
     db.shipper.count({ where: { operatorId, settleCycle: code } }),
+  // 배송 코스 차량 톤수·납품처 차량 제한·하차 방법 (0095)
+  VEHICLE_TON: async (db, operatorId, code) =>
+    db.route.count({ where: { operatorId, vehicleTon: code } }),
+  VEHICLE_LIMIT: async (db, operatorId, code) =>
+    db.shipTo.count({ where: { operatorId, vehicleLimit: code } }),
+  UNLOAD_METHOD: async (db, operatorId, code) =>
+    db.shipTo.count({ where: { operatorId, unloadMethod: code } }),
   // 거래처 유형 (0082)
   CUSTOMER_TYPE: async (db, operatorId, code) =>
     db.customer.count({ where: { operatorId, customerType: code } }),

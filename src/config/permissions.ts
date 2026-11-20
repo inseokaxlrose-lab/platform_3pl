@@ -72,6 +72,13 @@ export const PERMISSION_MENUS = {
     area: 'admin',
     actions: [...CRUD, 'export'],
   },
+  // 배송 코스 (0095): 센터별 코스 + 우편번호 배정 (배정·해제 = 수정)
+  'master.routes': {
+    label: '배송 코스',
+    group: '기준정보',
+    area: 'admin',
+    actions: [...CRUD, 'export'],
+  },
   'master.shippers': {
     label: '화주사',
     group: '기준정보',

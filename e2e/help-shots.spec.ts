@@ -180,6 +180,37 @@ const SHOTS: Shot[] = [
   list('/admin/master/pallet-types'),
   // 운송사·운송 계약 (0094): 계약은 등록 화면 — 센터·운송사를 골라 송장 대역 안내가 보이게
   list('/admin/master/carriers'),
+  // 배송 코스 (0095): 화면으로 코스를 등록하고 우편번호 3개를 배정한 뒤 수정 화면을 찍는다
+  {
+    src: '/help/admin/master/routes/zips.png',
+    url: '/admin/master/routes/new',
+    account: 'admin',
+    prepare: async (page) => {
+      await page.locator('#route-centerId').click()
+      await page.getByRole('option').first().click()
+      // 다시 찍어도 겹치지 않는 코드
+      await page.locator('#route-code').fill(`R${Date.now().toString().slice(-6)}`)
+      await page.locator('#route-name').fill('권선 1코스')
+      await page.locator('#route-cutoffTime').fill('1400')
+      await page.locator('#route-destHub').fill('수원 허브')
+      await page.getByRole('button', { name: '저장' }).click()
+      await page.getByRole('link', { name: '등록한 항목 보기' }).click()
+      await page.getByRole('button', { name: '우편번호 추가' }).click()
+      await page.locator('#route-zip-text').fill('16613 16620 16625')
+      // e2e 권역설정은 비어 있으므로 "이 센터만"을 끈다
+      await page.getByRole('dialog').getByRole('checkbox').click()
+      await page.getByRole('button', { name: '미리보기' }).click()
+      await expect(page.getByTestId('route-zip-plan')).toBeVisible()
+      await page.getByRole('button', { name: '배정', exact: true }).click()
+      await expect(page.getByText('3개 우편번호')).toBeVisible()
+    },
+    scrollTo: (page) => page.locator('#section-operation'),
+    markers: [
+      { label: '1', target: (page) => page.locator('#section-operation') },
+      { label: '2', target: (page) => page.locator('#section-zips table').first() },
+      { label: '3', target: (page) => page.getByRole('button', { name: '우편번호 추가' }) },
+    ],
+  },
   {
     src: '/help/admin/master/carrier-contracts/new.png',
     url: '/admin/master/carrier-contracts/new',

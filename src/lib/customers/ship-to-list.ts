@@ -1,4 +1,5 @@
 import 'server-only'
+import { resolveShipToRoutes } from '@/lib/routes/route-resolve'
 import { ActionError } from '@/lib/actions/action-error'
 import { toPrismaQuery, type ListQuery } from '@/lib/grid/grid-query'
 import { codesFilter, idFilter, textFilter, ynFilter } from '@/lib/grid/list-filters'
@@ -95,6 +96,10 @@ export async function listShipTos(input: ListQuery, scope: DataScope) {
         source: true,
         updatedAt: true,
         customerId: true,
+        // 배송 코스 (0095): 직접 지정 → 배송센터 + 우편번호 배정
+        routeId: true,
+        deliveryCenterId: true,
+        zipCode: true,
         shipper: { select: { code: true, name: true } },
         customer: { select: { code: true, name: true } },
         deliveryCenter: { select: { code: true, name: true } },
@@ -103,9 +108,13 @@ export async function listShipTos(input: ListQuery, scope: DataScope) {
     }),
     prisma.shipTo.count({ where }),
   ])
+  const routes = await resolveShipToRoutes(prisma, rows)
   return {
-    rows: rows.map(({ shipper, customer, deliveryCenter, regionCenter, ...row }) => ({
+    rows: rows.map(({ shipper, customer, deliveryCenter, regionCenter, ...row }, index) => ({
       ...row,
+      route: routes[index]
+        ? `${routes[index].name} (${routes[index].code})${routes[index].by === 'MANUAL' ? ' · 지정' : ''}`
+        : null,
       shipper: `${shipper.name} (${shipper.code})`,
       customerCode: customer.code,
       customerName: customer.name,

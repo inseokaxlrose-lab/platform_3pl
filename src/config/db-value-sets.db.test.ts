@@ -212,6 +212,8 @@ const VALUE_SETS: Record<string, readonly string[]> = {
   'tb_carrier.invoice_check_cd': INVOICE_CHECK_RULE.values,
   'tb_carrier.status_cd': CARRIER_STATUS.values,
   'tb_carrier_contract.status_cd': CARRIER_STATUS.values,
+  // 배송 코스 (0095)
+  'tb_route.status_cd': CARRIER_STATUS.values,
   'tb_shipper.sender_addr_type_cd': SENDER_ADDR_TYPE.values,
   'tb_api_request_log.result_cd': API_LOG_RESULT.values,
   'tb_api_request_item.result_cd': API_ITEM_RESULT_VALUES,

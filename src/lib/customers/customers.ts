@@ -12,6 +12,7 @@ import { assertRowVersion, withVersionGuard } from '@/lib/row-version'
 import { assertAllFound, assertNoCodeConflict } from '@/lib/soft-delete'
 import { DELETED_ONLY, NOT_DELETED } from '@/lib/status'
 import { toYn } from '@/lib/yn'
+import { timeToDate } from '@/lib/format/time'
 import { isShipperSetupStatus } from '@/lib/shippers/shipper-codes'
 import { CUSTOMER_TYPE_GROUP } from './customer-codes'
 import type { CustomerCreateData, CustomerData, ShipToData } from './customer-schema'
@@ -185,6 +186,13 @@ const EXISTING_SHIP_TO_SELECT = {
   receiverPhone2: true,
   deliveryMemo: true,
   remark: true,
+  routeId: true,
+  deliveryTimeFrom: true,
+  deliveryTimeTo: true,
+  deliveryDays: true,
+  vehicleLimit: true,
+  unloadMethod: true,
+  preCallYn: true,
   rawZipCode: true,
   rawAddress: true,
   addressDetail: true,
@@ -208,6 +216,13 @@ type ExistingShipTo = {
   receiverPhone2: string | null
   deliveryMemo: string | null
   remark: string | null
+  routeId: bigint | null
+  deliveryTimeFrom: Date | null
+  deliveryTimeTo: Date | null
+  deliveryDays: string | null
+  vehicleLimit: string | null
+  unloadMethod: string | null
+  preCallYn: string
   rawZipCode: string | null
   rawAddress: string
   addressDetail: string | null
@@ -235,6 +250,56 @@ export type ShipToSaveResult = {
 }
 
 // 기존 납품처를 그대로 둘지 (주소·센터 선택이 그대로이고 이미 지정됐으면 다시 계산하지 않는다 — 연동 IF 지정 보존)
+// 납품 조건 (0095): 보낸 칸만 DB 모양으로 (undefined는 빼서 저장된 값을 그대로 둔다)
+function deliveryConditionsOf(row: ShipToData) {
+  const out: {
+    routeId?: bigint | null
+    deliveryTimeFrom?: Date | null
+    deliveryTimeTo?: Date | null
+    deliveryDays?: string | null
+    vehicleLimit?: string | null
+    unloadMethod?: string | null
+    preCallYn?: string
+  } = {}
+  if (row.routeId !== undefined) out.routeId = row.routeId
+  if (row.deliveryTimeFrom !== undefined) {
+    out.deliveryTimeFrom = row.deliveryTimeFrom ? timeToDate(row.deliveryTimeFrom) : null
+  }
+  if (row.deliveryTimeTo !== undefined) {
+    out.deliveryTimeTo = row.deliveryTimeTo ? timeToDate(row.deliveryTimeTo) : null
+  }
+  if (row.deliveryDays !== undefined) out.deliveryDays = row.deliveryDays
+  if (row.vehicleLimit !== undefined) out.vehicleLimit = row.vehicleLimit
+  if (row.unloadMethod !== undefined) out.unloadMethod = row.unloadMethod
+  if (row.preCall !== undefined) out.preCallYn = toYn(row.preCall)
+  return out
+}
+
+// 저장된 값과 같은지 (시각은 Date라 시간 값으로 비교)
+const sameValue = (a: unknown, b: unknown) =>
+  a instanceof Date && b instanceof Date ? a.getTime() === b.getTime() : (a ?? null) === (b ?? null)
+
+// 직접 지정한 코스는 최종 배송센터의 사용 중인 코스여야 한다 (바꾸지 않았으면 검사하지 않는다)
+async function assertShipToRoute(
+  db: Db,
+  code: string,
+  routeId: bigint | null | undefined,
+  centerId: bigint | null,
+  keep: bigint | null,
+) {
+  if (routeId === undefined || routeId === null || routeId === keep) return
+  const route = await db.route.findUnique({
+    where: { id: routeId },
+    select: { centerId: true, status: true, code: true },
+  })
+  if (!route || route.centerId !== centerId) {
+    throw new ActionError('VALIDATION', `${code}: 배송센터의 코스만 고를 수 있습니다.`)
+  }
+  if (route.status !== 'ACTIVE') {
+    throw new ActionError('CONFLICT', `${code}: 사용 중지한 코스입니다 (${route.code}).`)
+  }
+}
+
 function keepsAssignment(
   row: ShipToData,
   existing: ExistingShipTo,
@@ -341,6 +406,30 @@ async function syncShipTos(
     await db.shipTo.update({ where: { id: oldDefault.id }, data: { isDefault: 'N' } })
   }
 
+  // 차량 제한·하차 방법: 공통코드 값만 (이미 저장된 값은 사용 중지돼도 그대로 둘 수 있다, 0095)
+  const values = (pick: (r: ShipToData) => string | null | undefined) =>
+    rows.flatMap((r) => (pick(r) ? [pick(r)!] : []))
+  const kept = (pick: (s: ExistingShipTo) => string | null) =>
+    existing.flatMap((s) => (pick(s) ? [pick(s)!] : []))
+  await assertCodeValues(
+    db,
+    'VEHICLE_LIMIT',
+    values((r) => r.vehicleLimit),
+    {
+      label: '차량 제한',
+      keep: kept((s) => s.vehicleLimit),
+    },
+  )
+  await assertCodeValues(
+    db,
+    'UNLOAD_METHOD',
+    values((r) => r.unloadMethod),
+    {
+      label: '하차 방법',
+      keep: kept((s) => s.unloadMethod),
+    },
+  )
+
   const results: ShipToSaveResult[] = []
   const actor = currentActor()
   for (const [index, row] of rows.entries()) {
@@ -367,10 +456,12 @@ async function syncShipTos(
       receiverPhone2: row.receiverPhone2,
       deliveryMemo: row.deliveryMemo,
       remark: row.remark,
+      ...deliveryConditionsOf(row),
     }
     if (found && keepsAssignment(row, found, raw)) {
-      const same = (Object.keys(common) as (keyof typeof common)[]).every(
-        (key) => (found[key] ?? null) === (common[key] ?? null),
+      await assertShipToRoute(db, row.code, row.routeId, found.deliveryCenterId, found.routeId)
+      const same = (Object.keys(common) as (keyof typeof common)[]).every((key) =>
+        sameValue(found[key], common[key]),
       )
       if (!same) {
         await db.shipTo.update({
@@ -414,6 +505,7 @@ async function syncShipTos(
       continue
     }
     const f = assigned.fields
+    await assertShipToRoute(db, row.code, row.routeId, f.deliveryCenterId, found?.routeId ?? null)
     const data = {
       ...common,
       ...f,

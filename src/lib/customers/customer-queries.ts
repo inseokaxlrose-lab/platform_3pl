@@ -1,4 +1,5 @@
 import 'server-only'
+import { dateToTime } from '@/lib/format/time'
 import type { Prisma } from '@/generated/prisma/client'
 import { toContactInput } from '@/lib/contacts/contact-schema'
 import { textIds } from '@/lib/id'
@@ -83,6 +84,14 @@ export function customerInputOf(customer: CustomerInputSource): CustomerInput {
       centerMode: manual ? 'MANUAL' : 'AUTO',
       deliveryCenterId: manual && s.deliveryCenterId ? String(s.deliveryCenterId) : '',
       remark: text(s.remark),
+      // 납품 조건 (0095)
+      routeId: s.routeId === null ? '' : String(s.routeId),
+      deliveryTimeFrom: dateToTime(s.deliveryTimeFrom),
+      deliveryTimeTo: dateToTime(s.deliveryTimeTo),
+      deliveryDays: text(s.deliveryDays),
+      vehicleLimit: text(s.vehicleLimit),
+      unloadMethod: text(s.unloadMethod),
+      preCall: isYes(s.preCallYn),
     }
   })
   return {
@@ -164,6 +173,9 @@ export async function getCustomerForEdit(id: bigint, scope: DataScope) {
       centerAssignStatus: s.centerAssignStatus,
       centerConfirmReason: s.centerConfirmReason,
       regionMismatch: isYes(s.regionMismatchYn),
+      // 코스 고르기 (0095): 지금 배송센터·정제된 우편번호
+      deliveryCenterId: s.deliveryCenterId,
+      zipCode: s.zipCode,
     })),
     updatedBy: customer.updatedBy,
     updatedAt: customer.updatedAt,

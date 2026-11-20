@@ -40,6 +40,7 @@ type Row = {
   customerName: string
   deliveryCenter: string | null
   regionCenter: string | null
+  route: string | null
 }
 
 const SHIP_TO_STATUS_BADGE: StatusFormat = {
@@ -83,6 +84,8 @@ const COLUMNS: DataGridColumn<Row>[] = [
   { id: 'addressGrade', header: '정제 등급', accessor: 'addressGrade', sortable: true },
   { id: 'deliveryCenter', header: '배송센터', accessor: 'deliveryCenter', sortable: true },
   { id: 'regionCenter', header: '권역 기준 센터', accessor: 'regionCenter' },
+  // 배송 코스 (0095): 직접 지정이면 '· 지정', 아니면 우편번호 배정
+  { id: 'route', header: '배송 코스', accessor: 'route' },
   {
     id: 'centerAssignType',
     header: '지정 구분',

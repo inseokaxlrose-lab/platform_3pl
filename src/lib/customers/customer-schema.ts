@@ -10,6 +10,7 @@ import {
   optionalEmail,
   optionalPhone,
   optionalText,
+  optionalTime,
   requiredText,
 } from '@/lib/validation/common-fields'
 import { ORDER_ADDR_MODE, SHIP_TO_STATUS, CUSTOMER_ROLE } from './customer-codes'
@@ -71,6 +72,20 @@ export const shipToSchema = z
     deliveryCenterId: optionalIdSchema.default(null),
     centerCode: z.string().trim().max(20).optional(),
     remark: optionalText(1000),
+    // ── 납품 조건 (0095): 보내지 않으면(undefined) 저장된 값을 그대로 둔다 (연동·엑셀은 아직 이 칸을 보내지 않는다)
+    // 코스를 비우면 배송센터 + 우편번호의 코스 배정을 따른다
+    routeId: optionalIdSchema.optional(),
+    deliveryTimeFrom: optionalTime.optional(),
+    deliveryTimeTo: optionalTime.optional(),
+    // 월~일 7글자 Y/N, 비우면 제한 없음
+    deliveryDays: z
+      .string()
+      .refine((value) => value === '' || /^[YN]{7}$/.test(value), '납품 요일을 확인해 주세요.')
+      .transform((value) => (value === '' || value === 'NNNNNNN' ? null : value))
+      .optional(),
+    vehicleLimit: optionalText(20).optional(),
+    unloadMethod: optionalText(20).optional(),
+    preCall: z.boolean().optional(),
   })
   .superRefine((row, ctx) => {
     if (!row.addrSync && !row.address) {
@@ -78,6 +93,13 @@ export const shipToSchema = z
     }
     if (row.centerMode === 'IF' && !row.centerCode) {
       ctx.addIssue({ code: 'custom', path: ['centerCode'], message: '센터코드를 넣어 주세요.' })
+    }
+    if (row.deliveryTimeFrom && row.deliveryTimeTo && row.deliveryTimeFrom > row.deliveryTimeTo) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['deliveryTimeTo'],
+        message: '납품 시간의 끝이 시작보다 빠릅니다.',
+      })
     }
     if (row.centerMode === 'MANUAL' && !row.deliveryCenterId) {
       ctx.addIssue({
@@ -206,4 +228,11 @@ export const EMPTY_SHIP_TO: ShipToInput = {
   centerMode: 'AUTO',
   deliveryCenterId: '',
   remark: '',
+  routeId: '',
+  deliveryTimeFrom: '',
+  deliveryTimeTo: '',
+  deliveryDays: '',
+  vehicleLimit: '',
+  unloadMethod: '',
+  preCall: false,
 }
