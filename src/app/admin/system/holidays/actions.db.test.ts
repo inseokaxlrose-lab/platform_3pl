@@ -113,6 +113,19 @@ describe('국가 공휴일 가져오기', () => {
     expect(year).toMatchObject({ status: 'OK', holidayCount: 3, message: null })
   })
 
+  it('같은 날 이름이 둘이면 둘 다 저장하고, 건수는 날짜 수로 센다', async () => {
+    const overlap = [
+      { date: '2028-10-03', name: '개천절' },
+      { date: '2028-10-03', name: '추석' },
+      { date: '2028-10-04', name: '추석' },
+    ]
+    const result = await syncNationalHolidays(2028, fakeApi({ 2028: overlap }).fetcher)
+    expect(result).toMatchObject({ status: 'OK', count: 2 })
+    expect(await prisma.holiday.count()).toBe(3)
+    const down = await syncNationalHolidays(2028, fakeApi({ 2028: 'DOWN' }).fetcher)
+    expect(down).toMatchObject({ status: 'FAILED', count: 2 })
+  })
+
   it('API를 못 쓰거나 0건이면 기존 공휴일을 지우지 않는다', async () => {
     await syncNationalHolidays(2026, fakeApi({ 2026: H2026 }).fetcher)
     const down = await syncNationalHolidays(2026, fakeApi({ 2026: 'DOWN' }).fetcher)

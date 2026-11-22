@@ -35,14 +35,12 @@ export async function syncNationalHolidays(
 
   if (fetched.status === 'UNAVAILABLE') {
     // 실패해도 이전에 가져온 자료가 있으면 그 건수를 그대로 보여 준다
-    const kept = await prisma.holiday.count({ where: yearWhere(year) })
-    return record('FAILED', kept, fetched.reason.slice(0, 500))
+    return record('FAILED', await keptDays(year), fetched.reason.slice(0, 500))
   }
   // 같은 날·같은 이름은 한 번만
   const unique = [...new Map(fetched.holidays.map((h) => [`${h.date}|${h.name}`, h])).values()]
   if (unique.length === 0) {
-    const kept = await prisma.holiday.count({ where: yearWhere(year) })
-    return record('EMPTY', kept, '아직 이 연도의 공휴일이 발표되지 않았습니다.')
+    return record('EMPTY', await keptDays(year), '아직 이 연도의 공휴일이 발표되지 않았습니다.')
   }
   await prisma.$transaction([
     prisma.holiday.deleteMany({ where: yearWhere(year) }),
@@ -50,7 +48,18 @@ export async function syncNationalHolidays(
       data: unique.map((h) => ({ holidayOn: dateOf(h.date), name: h.name.slice(0, 100) })),
     }),
   ])
-  return record('OK', unique.length, null)
+  // 같은 날 이름이 둘이어도(예: 2028-10-03 개천절·추석) 하루로 센다
+  return record('OK', new Set(unique.map((h) => h.date)).size, null)
+}
+
+// 이미 받아 둔 공휴일의 날짜 수 (실패·발표 전일 때 배지에 그대로 보여 준다)
+async function keptDays(year: number) {
+  const rows = await prisma.holiday.findMany({
+    where: yearWhere(year),
+    distinct: ['holidayOn'],
+    select: { holidayOn: true },
+  })
+  return rows.length
 }
 
 function yearWhere(year: number) {
