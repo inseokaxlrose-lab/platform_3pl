@@ -7,6 +7,7 @@ import { listQuerySchema } from '@/lib/grid/grid-query'
 import { idSchema } from '@/lib/id'
 import { assertItemsInScope, listItems } from '@/lib/items/item-list'
 import { itemCodeField, itemSchema } from '@/lib/items/item-schema'
+import { getSetComponentOptions } from '@/lib/items/item-set-options'
 import {
   createItem,
   deleteItems,
@@ -33,6 +34,13 @@ function shipperOf(scope: DataScope): bigint {
 // 포털 입력 규칙: 운영사 화면과 같다 (외부 코드는 입력 규칙에 없다, 0068)
 const portalItemSchema = itemSchema
 const idsSchema = z.array(idSchema).min(1).max(500)
+
+// 세트 구성품으로 고를 품목: 자기 화주사 것만 (화면이 보낸 화주사는 쓰지 않는다, 0098)
+export const listPortalSetComponentOptionsAction = createAction({
+  permission: 'portal.items.read',
+  input: z.object({ shipperId: idSchema }),
+  handler: async ({ scope }) => getSetComponentOptions(shipperOf(scope), scope),
+})
 
 export const listPortalItemsAction = createAction({
   permission: 'portal.items.read',

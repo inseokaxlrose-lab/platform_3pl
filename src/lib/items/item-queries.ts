@@ -92,6 +92,8 @@ export async function getItemFormOptions(scope: DataScope): Promise<ItemFormOpti
 export const ITEM_INPUT_INCLUDE = {
   units: { orderBy: { sortOrder: 'asc' }, include: { unit: { select: { code: true } } } },
   barcodes: { orderBy: { id: 'asc' } },
+  // 세트 구성품 (0098)
+  setComponents: { orderBy: { sortOrder: 'asc' }, select: { componentItemId: true, qty: true } },
 } as const satisfies Prisma.ItemInclude
 
 export type ItemWithInput = Prisma.ItemGetPayload<{ include: typeof ITEM_INPUT_INCLUDE }>
@@ -110,6 +112,12 @@ export function itemInputOf(item: ItemWithInput): ItemInput {
     shortName: text(item.shortName),
     spec: text(item.spec),
     itemType: item.itemType,
+    // 세트 (0098): 세트 품목만 구성품을 채운다. 세트가 아니면 "보내지 않음" — 연동 API·엑셀이 유형만 SET으로 바꿀 때 막히지 않게
+    setType: (item.setType ?? '') as ItemInput['setType'],
+    components:
+      item.itemType === 'SET'
+        ? item.setComponents.map((c) => ({ itemId: String(c.componentItemId), qty: qty(c.qty) }))
+        : undefined,
     category1: text(item.category1),
     category2: text(item.category2),
     category3: text(item.category3),

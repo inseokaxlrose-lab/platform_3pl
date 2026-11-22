@@ -7,6 +7,7 @@ import { listQuerySchema } from '@/lib/grid/grid-query'
 import { idSchema } from '@/lib/id'
 import { assertItemsInScope, listItems, SHIPPER_SCOPE } from '@/lib/items/item-list'
 import { itemCreateSchema, itemSchema } from '@/lib/items/item-schema'
+import { getSetComponentOptions } from '@/lib/items/item-set-options'
 import { applyPalletToItems } from '@/lib/items/item-bulk'
 import { ITEM_STATUS } from '@/lib/items/item-codes'
 import { commitItemUpload, previewItemUpload } from '@/lib/items/item-upload'
@@ -40,6 +41,13 @@ export const listItemsAction = createAction({
 })
 
 const idsSchema = z.array(idSchema).min(1).max(500)
+
+// 세트 구성품으로 고를 품목 (같은 화주사, 세트 제외 — 0098)
+export const listSetComponentOptionsAction = createAction({
+  permission: 'master.items.read',
+  input: z.object({ shipperId: idSchema }),
+  handler: async ({ input, scope }) => getSetComponentOptions(input.shipperId, scope),
+})
 
 // 등록: 고른 화주사가 범위 안이어야 한다
 export const createItemAction = createAction({

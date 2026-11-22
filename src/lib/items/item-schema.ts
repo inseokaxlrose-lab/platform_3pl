@@ -9,6 +9,8 @@ import {
   EXPIRY_TYPE,
   ITEM_TYPE,
   LOT_SOURCE,
+  MAX_SET_COMPONENTS,
+  SET_TYPE,
   UNIT_LEVEL,
 } from './item-codes'
 
@@ -80,6 +82,12 @@ export const itemBarcodeSchema = z.object({
     .max(50, '50자 이하로 입력해 주세요.'),
   barcodeType: oneOf(BARCODE_TYPE.values, '바코드 종류를 골라 주세요.'),
   isPrimary: z.boolean(),
+})
+
+// ── 세트 구성품 한 줄 (0098): 구성 품목 + 세트 1개에 들어가는 수량(구성 품목의 기본단위)
+export const itemSetComponentSchema = z.object({
+  itemId: idField('구성 품목을 골라 주세요.'),
+  qty: positiveQty('수량을 0보다 크게 입력해 주세요.'),
 })
 
 const itemShape = {
@@ -160,6 +168,13 @@ const itemShape = {
   labelUnit: z.enum([INHERIT, ...LABEL_UNITS], '골라 주세요.'),
   // ⑥ 출고 조건
   boxOnlyShip: z.boolean(),
+  // 세트 (0098, 품목 유형이 세트일 때만 쓴다)
+  // 보내지 않으면(undefined) 그대로 둔다 — 엑셀 업로드·연동 API는 구성품을 보내지 않는다
+  setType: z.enum(['', ...SET_TYPE.values], '세트 방식을 골라 주세요.').optional(),
+  components: z
+    .array(itemSetComponentSchema)
+    .max(MAX_SET_COMPONENTS, `구성품은 ${MAX_SET_COMPONENTS}개까지입니다.`)
+    .optional(),
   // 바코드
   barcodes: z
     .array(itemBarcodeSchema)
@@ -231,6 +246,17 @@ function crossRules(value: ItemShapeOut, ctx: z.RefinementCtx) {
       issue(['units', index, 'unitId'], '같은 단위를 두 레벨에 쓸 수 없습니다.')
     }
   })
+  // 세트 구성품: 세트 품목이고 구성품을 보냈으면 1개 이상, 같은 품목 두 번 불가 (같은 화주사·세트 아님·자기 자신 아님은 서버)
+  if (value.itemType === 'SET' && value.components !== undefined) {
+    if (value.components.length === 0) {
+      issue(['components'], '세트 구성품을 1개 이상 넣어 주세요.', 'SET_COMPONENT_REQUIRED')
+    }
+    value.components.forEach((c, index) => {
+      if (value.components!.findIndex((x) => x.itemId === c.itemId) !== index) {
+        issue(['components', index, 'itemId'], '같은 품목이 두 번 있습니다.')
+      }
+    })
+  }
   // 바코드: 품목 안에서 겹치지 않음, 단위는 품목 단위 중에서, 대표는 단위별 1개
   const unitIds = new Set(value.units.map((u) => u.unitId))
   value.barcodes.forEach((b, index) => {
@@ -261,6 +287,7 @@ export type ItemCreateInput = z.input<typeof itemCreateSchema>
 export type ItemCreateData = z.output<typeof itemCreateSchema>
 export type ItemUnitInput = z.input<typeof itemUnitSchema>
 export type ItemBarcodeInput = z.input<typeof itemBarcodeSchema>
+export type ItemSetComponentInput = z.input<typeof itemSetComponentSchema>
 
 // 실제로 적용되는 라벨 단위: 품목에 비어 있으면 화주사 값 (로트·기한은 품목의 명시값 — 0083)
 type Yn = 'Y' | 'N' | '' | null | undefined
