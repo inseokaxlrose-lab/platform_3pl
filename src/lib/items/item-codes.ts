@@ -4,7 +4,7 @@ import { codeSet } from '@/config/operator-codes'
 // 품목 값 목록 (docs/decisions/0083) — 프로그램이 값에 따라 동작을 바꾸므로 상수 + DB 검사 조건
 // DB 검사 조건(마이그레이션 _item_spec)과 값 목록이 같아야 한다
 
-// 품목 유형: SET이면 세트 품목 (구성품은 2차)
+// 품목 유형: SET이면 세트 품목 (구성품·세트 방식은 0098)
 export const ITEM_TYPE = codeSet({
   GOODS: '상품',
   PRODUCT: '제품',
@@ -16,6 +16,16 @@ export const ITEM_TYPE = codeSet({
   ETC: '기타',
 })
 export type ItemTypeKey = (typeof ITEM_TYPE.values)[number]
+
+// 세트 방식 (0098, 세트 품목만): 가상 세트 = 세트 재고 없이 출고 때 구성품 재고에서 뺀다
+// 실물 세트 = 미리 조립해 세트 품목 자체를 재고로 둔다 (조립 작업은 부가작업 C1 때 — 1차 출고는 가상 세트만)
+export const SET_TYPE = codeSet({
+  VIRTUAL: '가상 세트 (구성품 출고)',
+  KIT: '실물 세트 (조립 보관)',
+})
+export type SetTypeKey = (typeof SET_TYPE.values)[number]
+// 세트 하나에 넣을 수 있는 구성품 수
+export const MAX_SET_COMPONENTS = 50
 
 // 품목 상태: 단종 = 신규 입고 불가, 재고 출고는 가능 / 사용중지 = 신규 입고·출고요청 모두 불가
 export const ITEM_STATUS = codeSet({ ACTIVE: '사용', INACTIVE: '사용중지', DISCONTINUED: '단종' })

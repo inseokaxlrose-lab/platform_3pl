@@ -6,6 +6,7 @@ import { getItemFormOptions } from '@/lib/items/item-queries'
 import { getCurrentScope, hasPermission } from '@/lib/session'
 import {
   createPortalItemAction,
+  listPortalSetComponentOptionsAction,
   setPortalItemsActiveAction,
   updatePortalItemAction,
 } from '../actions'
@@ -34,6 +35,7 @@ export default async function PortalNewItemPage() {
       createAction={createPortalItemAction}
       updateAction={updatePortalItemAction}
       setActiveAction={setPortalItemsActiveAction}
+      loadComponentOptions={listPortalSetComponentOptionsAction}
     />
   )
 }

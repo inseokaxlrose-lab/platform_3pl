@@ -9,6 +9,7 @@ import { getItemForEdit, getItemFormOptions } from '@/lib/items/item-queries'
 import { getCurrentScope, hasPermission } from '@/lib/session'
 import {
   createPortalItemAction,
+  listPortalSetComponentOptionsAction,
   setPortalItemsActiveAction,
   updatePortalItemAction,
 } from '../actions'
@@ -44,6 +45,7 @@ export default async function PortalItemPage({ params }: PageProps<'/portal/item
       createAction={createPortalItemAction}
       updateAction={updatePortalItemAction}
       setActiveAction={setPortalItemsActiveAction}
+      loadComponentOptions={listPortalSetComponentOptionsAction}
       extraSections={[
         {
           id: 'images',

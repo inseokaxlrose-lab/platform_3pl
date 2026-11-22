@@ -694,14 +694,15 @@ model Shipper {
   updatedBy            String    @default("system") @map("updated_by") @db.VarChar(50)
   rowVersion           Int       @default(1) @map("row_version")
 
-  users        User[]
-  centers      ShipperCenter[]
-  contacts     ShipperContact[]
-  items        Item[]
-  itemBarcodes ItemBarcode[]
-  customers    Customer[]
-  stocks       Stock[]
-  asns         Asn[]
+  users             User[]
+  centers           ShipperCenter[]
+  contacts          ShipperContact[]
+  items             Item[]
+  itemBarcodes      ItemBarcode[]
+  itemSetComponents ItemSetComponent[]
+  customers         Customer[]
+  stocks            Stock[]
+  asns              Asn[]
 
   // 논리 삭제: 'Y'면 지운 것 (목록·조회에서 빠지고 되살릴 수 있다, 0038)
   delYn               String            @default("N") @map("del_yn") @db.Char(1)
@@ -952,33 +953,34 @@ model Operator {
   contacts OperatorContact[]
 
   // 이 운영사의 데이터 (운영사를 지울 수 없게 Restrict)
-  users            User[]
-  permissionGroups PermissionGroup[]
-  centers          Center[]
-  warehouses       Warehouse[]
-  locations        Location[]
-  shippers         Shipper[]
-  externalCodes    ExternalCode[]
-  codeGroups       CodeGroup[]
-  codeItems        CodeItem[]
-  units            Unit[]
-  unitSettings     OperatorUnit[]
-  items            Item[]
-  itemBarcodes     ItemBarcode[]
-  palletTypes      PalletType[]
-  numberingRules   NumberingRule[]
-  customers        Customer[]
-  stocks           Stock[]
-  stockTxns        StockTxn[]
-  asns             Asn[]
-  asnLines         AsnLine[]
-  receipts         InboundReceipt[]
-  receiptLines     InboundReceiptLine[]
-  inspections      InboundInspection[]
-  labels           InboundLabel[]
-  putaways         Putaway[]
-  stockAdjusts     StockAdjust[]
-  stockAdjustLines StockAdjustLine[]
+  users             User[]
+  permissionGroups  PermissionGroup[]
+  centers           Center[]
+  warehouses        Warehouse[]
+  locations         Location[]
+  shippers          Shipper[]
+  externalCodes     ExternalCode[]
+  codeGroups        CodeGroup[]
+  codeItems         CodeItem[]
+  units             Unit[]
+  unitSettings      OperatorUnit[]
+  items             Item[]
+  itemBarcodes      ItemBarcode[]
+  itemSetComponents ItemSetComponent[]
+  palletTypes       PalletType[]
+  numberingRules    NumberingRule[]
+  customers         Customer[]
+  stocks            Stock[]
+  stockTxns         StockTxn[]
+  asns              Asn[]
+  asnLines          AsnLine[]
+  receipts          InboundReceipt[]
+  receiptLines      InboundReceiptLine[]
+  inspections       InboundInspection[]
+  labels            InboundLabel[]
+  putaways          Putaway[]
+  stockAdjusts      StockAdjust[]
+  stockAdjustLines  StockAdjustLine[]
 
   // 논리 삭제: 'Y'면 지운 것 (목록·조회에서 빠지고 되살릴 수 있다, 0038)
   delYn            String              @default("N") @map("del_yn") @db.Char(1)
@@ -1317,6 +1319,8 @@ model Item {
   boxOnlyShipYn String   @default("N") @map("box_only_ship_yn") @db.Char(1)
   minOrderQty   Decimal? @map("min_order_qty") @db.Decimal(15, 3)
   setYn         String   @default("N") @map("set_yn") @db.Char(1)
+  // 세트 방식 (상수 SET_TYPE, 세트 품목만): VIRTUAL 가상 세트(출고 때 구성품 재고 차감) / KIT 실물 세트(조립해 세트로 보관) — 0098
+  setType       String?  @map("set_type_cd") @db.VarChar(20)
 
   // ── ⑦ 연동 정보 (거래처와 같다)
   source        String    @default("SCREEN") @map("source_cd") @db.VarChar(20)
@@ -1335,12 +1339,15 @@ model Item {
   rowVersion Int      @default(1) @map("row_version")
 
   // 단위별 환산·규격 (BASE·INNER·BOX·PLT), 바코드
-  units       ItemUnit[]
-  unitHistory ItemUnitHist[]
-  barcodes    ItemBarcode[]
-  stocks      Stock[]
-  asnLines    AsnLine[]
-  inspections InboundInspection[]
+  units         ItemUnit[]
+  unitHistory   ItemUnitHist[]
+  barcodes      ItemBarcode[]
+  // 세트 품목의 구성품 / 이 품목을 구성품으로 쓰는 세트 (0098)
+  setComponents ItemSetComponent[]  @relation("SetItem")
+  usedInSets    ItemSetComponent[]  @relation("ComponentItem")
+  stocks        Stock[]
+  asnLines      AsnLine[]
+  inspections   InboundInspection[]
 
   // 논리 삭제: 'Y'면 지운 것 (목록·조회에서 빠지고 되살릴 수 있다, 0038)
   delYn String @default("N") @map("del_yn") @db.Char(1)
@@ -1413,6 +1420,33 @@ model ItemUnitHist {
 }
 
 // 품목 바코드 (0083): 단위별 여러 개, 단위별 대표 1개. 같은 화주 안에서 바코드 하나는 품목·단위 하나만 가리킨다
+// 세트 구성품 (0098): 세트 품목 1개 = 구성 품목 × 수량(구성 품목의 기본단위). 품목 저장 때 통째로 다시 쓴다
+// 같은 화주사의 품목만, 세트 안에 세트는 넣지 않는다(한 단계), 자기 자신 불가 — 검사는 lib/items
+model ItemSetComponent {
+  id              BigInt   @id @default(autoincrement()) @map("set_component_id")
+  operatorId      BigInt   @map("operator_id")
+  operator        Operator @relation(fields: [operatorId], references: [id], onDelete: Restrict)
+  shipperId       BigInt   @map("shipper_id")
+  shipper         Shipper  @relation(fields: [shipperId], references: [id], onDelete: Restrict)
+  setItemId       BigInt   @map("set_item_id")
+  setItem         Item     @relation("SetItem", fields: [setItemId], references: [id], onDelete: Cascade)
+  componentItemId BigInt   @map("component_item_id")
+  componentItem   Item     @relation("ComponentItem", fields: [componentItemId], references: [id], onDelete: Restrict)
+  // 세트 1개에 들어가는 수량 (구성 품목의 기본단위)
+  qty             Decimal  @map("component_qty") @db.Decimal(15, 3)
+  sortOrder       Int      @default(0) @map("sort_seq")
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+  createdBy       String   @default("system") @map("created_by") @db.VarChar(50)
+  updatedBy       String   @default("system") @map("updated_by") @db.VarChar(50)
+  rowVersion      Int      @default(1) @map("row_version")
+
+  @@unique([setItemId, componentItemId])
+  @@index([componentItemId])
+  @@index([operatorId])
+  @@map("tb_item_set_component")
+}
+
 model ItemBarcode {
   id          BigInt   @id @default(autoincrement()) @map("barcode_id")
   operatorId  BigInt   @map("operator_id")

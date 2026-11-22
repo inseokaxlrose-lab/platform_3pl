@@ -13,7 +13,12 @@ import { assertAllFound, assertNoCodeConflict } from '@/lib/soft-delete'
 import { DELETED_ONLY, NOT_DELETED, toStatus } from '@/lib/status'
 import { checkQtyDecimals, parseQty } from '@/lib/units/convert'
 import { isItemBaseType } from '@/lib/units/unit-labels'
-import { isUnitActive, resolveUnitDecimals, unitStatusSelect } from '@/lib/units/unit-status'
+import {
+  isUnitActive,
+  resolveUnitDecimals,
+  unitDecimalsSelect,
+  unitStatusSelect,
+} from '@/lib/units/unit-status'
 import { toYn } from '@/lib/yn'
 import {
   calcPallet,
@@ -272,6 +277,68 @@ async function buildBarcodes(db: Db, shipperId: bigint, itemId: bigint | null, d
   })
 }
 
+// 세트 구성품 검사 (0098) → 다시 쓸 행. undefined = 구성품을 보내지 않음(그대로 둔다)
+// 세트가 아니면 빈 목록(지운다). 같은 화주사의 품목만, 세트 안에 세트 불가(한 단계), 자기 자신 불가, 수량은 구성 품목 기본단위의 소수 자리까지
+type ComponentRow = { itemId: bigint; qty: string }
+async function buildComponents(
+  db: Db,
+  shipperId: bigint,
+  itemId: bigint | null,
+  data: ItemData,
+): Promise<ComponentRow[] | undefined> {
+  if (data.itemType !== 'SET') return []
+  if (data.components === undefined) return undefined
+  const ids = data.components.map((c) => c.itemId)
+  if (itemId !== null && ids.includes(itemId)) {
+    throw new ActionError(
+      'VALIDATION',
+      '세트 자신을 구성품으로 넣을 수 없습니다.',
+      'SET_COMPONENT_INVALID',
+    )
+  }
+  const found = resolveUnitDecimals(
+    await db.item.findMany({
+      where: { id: { in: ids } },
+      select: {
+        id: true,
+        code: true,
+        shipperId: true,
+        itemType: true,
+        baseUnit: { select: { code: true, ...unitDecimalsSelect(requireOperatorId()) } },
+      },
+    }),
+  )
+  const byId = new Map(found.map((f) => [f.id, f]))
+  return data.components.map((c) => {
+    const component = byId.get(c.itemId)
+    if (!component || component.shipperId !== shipperId) {
+      throw new ActionError(
+        'VALIDATION',
+        '구성품은 같은 화주사의 품목 중에서 골라 주세요.',
+        'SET_COMPONENT_INVALID',
+      )
+    }
+    if (component.itemType === 'SET') {
+      throw new ActionError(
+        'VALIDATION',
+        `세트 품목(${component.code})은 다른 세트의 구성품으로 넣을 수 없습니다.`,
+        'SET_COMPONENT_INVALID',
+      )
+    }
+    const decimals = component.baseUnit.decimals
+    if (!checkQtyDecimals(c.qty, decimals)) {
+      throw new ActionError(
+        'VALIDATION',
+        decimals === 0
+          ? `${component.code} 수량은 정수입니다. (기본단위 ${component.baseUnit.code})`
+          : `${component.code} 수량은 소수 ${decimals}자리까지입니다. (기본단위 ${component.baseUnit.code})`,
+        'QTY_DECIMALS',
+      )
+    }
+    return { itemId: c.itemId, qty: c.qty }
+  })
+}
+
 // DB 칸으로 옮길 값
 function fieldsOf(data: ItemData, units: UnitRow[]) {
   const unitIds = new Set(units.map((u) => u.unitId))
@@ -297,6 +364,10 @@ function fieldsOf(data: ItemData, units: UnitRow[]) {
     spec: data.spec,
     itemType: data.itemType,
     setYn: toYn(data.itemType === 'SET'),
+    // 세트 방식: 세트가 아니면 비우고, 보내지 않았으면 그대로 (등록은 createItemIn에서 기본 가상 세트)
+    ...(data.itemType !== 'SET'
+      ? { setType: null }
+      : data.setType !== undefined && { setType: data.setType || 'VIRTUAL' }),
     category1: data.category1,
     category2: data.category2,
     category3: data.category3,
@@ -347,6 +418,7 @@ async function writeChildren(
   item: { id: bigint; shipperId: bigint },
   units: UnitRow[],
   barcodes: Awaited<ReturnType<typeof buildBarcodes>>,
+  components: ComponentRow[] | undefined,
 ) {
   await db.itemUnit.deleteMany({ where: { itemId: item.id } })
   for (const [index, u] of units.entries()) {
@@ -381,6 +453,21 @@ async function writeChildren(
       },
     })
   }
+  // 세트 구성품 (0098): 보냈을 때만 통째로 다시 쓴다
+  if (components === undefined) return
+  await db.itemSetComponent.deleteMany({ where: { setItemId: item.id } })
+  for (const [index, c] of components.entries()) {
+    await db.itemSetComponent.create({
+      data: {
+        operatorId: requireOperatorId(),
+        shipperId: item.shipperId,
+        setItemId: item.id,
+        componentItemId: c.itemId,
+        qty: new Prisma.Decimal(c.qty),
+        sortOrder: index,
+      },
+    })
+  }
 }
 
 // 경고 → 저장 알림 문구
@@ -407,9 +494,12 @@ export async function createItemIn(db: Db, data: ItemCreateData, options: ItemSa
   const { byId } = await checkUnits(db, data, [])
   const { rows, warnings } = await buildUnits(db, data, byId)
   const barcodes = await buildBarcodes(db, data.shipperId, null, data)
+  const components = await buildComponents(db, data.shipperId, null, data)
   const item = await db.item.create({
     data: {
       ...fieldsOf(data, rows),
+      // 세트 방식을 보내지 않은 세트 품목(엑셀·API)은 가상 세트
+      ...(data.itemType === 'SET' && !data.setType && { setType: 'VIRTUAL' }),
       operatorId: requireOperatorId(),
       shipperId: data.shipperId,
       // 품목코드: 비우면 자동 체번 {화주 접두어}S000001
@@ -425,7 +515,7 @@ export async function createItemIn(db: Db, data: ItemCreateData, options: ItemSa
     },
     select: { id: true, code: true, rowVersion: true, shipperId: true },
   })
-  await writeChildren(db, item, rows, barcodes)
+  await writeChildren(db, item, rows, barcodes, components)
   return {
     id: item.id,
     code: item.code,
@@ -518,6 +608,21 @@ export async function updateItemIn(
     }
   }
   const barcodes = await buildBarcodes(db, current.shipperId, id, data)
+  const components = await buildComponents(db, current.shipperId, id, data)
+  // 다른 세트의 구성품인 품목은 세트로 바꿀 수 없다 (세트 안에 세트 불가)
+  if (data.itemType === 'SET') {
+    const parent = await db.itemSetComponent.findFirst({
+      where: { componentItemId: id, setItem: NOT_DELETED },
+      select: { setItem: { select: { code: true } } },
+    })
+    if (parent) {
+      throw new ActionError(
+        'CONFLICT',
+        `세트(${parent.setItem.code})의 구성품이라 세트 품목으로 바꿀 수 없습니다.`,
+        'SET_COMPONENT_INVALID',
+      )
+    }
+  }
   const saved = await withVersionGuard(() =>
     db.item.update({
       where: { id, rowVersion },
@@ -528,7 +633,7 @@ export async function updateItemIn(
       select: { id: true, code: true, rowVersion: true, shipperId: true },
     }),
   )
-  await writeChildren(db, saved, rows, barcodes)
+  await writeChildren(db, saved, rows, barcodes, components)
   const actor = currentActor()
   for (const code of changed) {
     const b = before.get(code)
@@ -605,6 +710,17 @@ export async function deleteItems(ids: bigint[]) {
       '재고·입고 기록이 있는 품목은 지울 수 없습니다. 사용 중지하세요.',
     )
   }
+  // 지우지 않은 세트의 구성품이면 막는다 (세트에서 먼저 빼야 한다, 0098)
+  const usedInSet = await prisma.itemSetComponent.findFirst({
+    where: { componentItemId: { in: ids }, setItem: NOT_DELETED, setItemId: { notIn: ids } },
+    select: { componentItem: { select: { code: true } }, setItem: { select: { code: true } } },
+  })
+  if (usedInSet) {
+    throw new ActionError(
+      'CONFLICT',
+      `품목 ${usedInSet.componentItem.code}은 세트(${usedInSet.setItem.code})의 구성품입니다. 세트에서 먼저 빼 주세요.`,
+    )
+  }
   return prisma.$transaction(async (tx) => {
     for (const id of ids) await deleteExternalCodes(tx, 'ITEM', id)
     await tx.itemBarcode.deleteMany({ where: { itemId: { in: ids } } })
@@ -629,6 +745,21 @@ export async function restoreItems(ids: bigint[]) {
       taken.map((t) => t.code),
       '품목코드',
     )
+    // 세트를 되살릴 때 구성품이 지워져 있으면 거부 (구성품을 먼저 되살린다, 0098)
+    const missing = await tx.itemSetComponent.findFirst({
+      where: {
+        setItemId: { in: ids },
+        componentItemId: { notIn: ids },
+        componentItem: DELETED_ONLY,
+      },
+      select: { setItem: { select: { code: true } }, componentItem: { select: { code: true } } },
+    })
+    if (missing) {
+      throw new ActionError(
+        'CONFLICT',
+        `세트(${missing.setItem.code})의 구성품 ${missing.componentItem.code}이 지워져 있습니다. 구성품을 먼저 되살려 주세요.`,
+      )
+    }
     const { count } = await tx.item.updateMany({
       where: { id: { in: ids }, ...DELETED_ONLY },
       data: NOT_DELETED,

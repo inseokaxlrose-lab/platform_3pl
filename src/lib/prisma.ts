@@ -27,6 +27,8 @@ export const AUDITED_MODELS: ReadonlySet<string> = new Set([
   'ShipTo',
   'ItemUnit',
   'ItemBarcode',
+  // 세트 구성품 (0098)
+  'ItemSetComponent',
   'PalletType',
   'NumberingRule',
   'Asn',
@@ -99,6 +101,7 @@ export const TENANT_MODELS: ReadonlySet<string> = new Set([
   'Customer',
   'ShipTo',
   'ItemBarcode',
+  'ItemSetComponent',
   'PalletType',
   'NumberingRule',
   'Stock',

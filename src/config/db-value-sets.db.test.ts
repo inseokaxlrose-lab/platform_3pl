@@ -57,6 +57,7 @@ import {
   ITEM_STATUS,
   ITEM_TYPE,
   LOT_SOURCE,
+  SET_TYPE,
   UNIT_LEVEL,
 } from '@/lib/items/item-codes'
 import {
@@ -159,6 +160,7 @@ const VALUE_SETS: Record<string, readonly string[]> = {
   // 품목
   'tb_item.status_cd': ITEM_STATUS.values,
   'tb_item.item_type_cd': ITEM_TYPE.values,
+  'tb_item.set_type_cd': SET_TYPE.values,
   'tb_item.source_cd': ITEM_SOURCE.values,
   'tb_item.temp_zone_cd': TEMP_ZONE.values,
   'tb_item.alloc_rule_cd': ALLOC_RULE.values,

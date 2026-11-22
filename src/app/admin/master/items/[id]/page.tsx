@@ -9,7 +9,12 @@ import { parseId } from '@/lib/id'
 import { prisma } from '@/lib/prisma'
 import { getCurrentScope, hasPermission } from '@/lib/session'
 import { actorLabel } from '@/lib/users/actor-label'
-import { createItemAction, setItemsActiveAction, updateItemAction } from '../actions'
+import {
+  createItemAction,
+  listSetComponentOptionsAction,
+  setItemsActiveAction,
+  updateItemAction,
+} from '../actions'
 import { getItemForEdit, getItemFormOptions } from '@/lib/items/item-queries'
 
 export const metadata: Metadata = { title: '품목 수정' }
@@ -48,6 +53,7 @@ export default async function ItemPage({ params }: PageProps<'/admin/master/item
       createAction={createItemAction}
       updateAction={updateItemAction}
       setActiveAction={setItemsActiveAction}
+      loadComponentOptions={listSetComponentOptionsAction}
       extraSections={[
         {
           id: 'images',
