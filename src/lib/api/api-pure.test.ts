@@ -17,7 +17,9 @@ describe('API 키 (0081)', () => {
     expect(hash).toHaveLength(64)
     expect(hash).toBe(hashApiKey(fullKey))
     expect(isSameHash(fullKey, hash)).toBe(true)
-    expect(isSameHash(`${fullKey.slice(0, -1)}x`, hash)).toBe(false)
+    // 마지막 글자를 다른 글자로 (무작위 키가 원래 x로 끝나면 같은 키가 되므로 고른다)
+    const other = fullKey.endsWith('x') ? 'y' : 'x'
+    expect(isSameHash(`${fullKey.slice(0, -1)}${other}`, hash)).toBe(false)
     expect(maskedKey('LIVE', prefix)).toBe(`live_${prefix}_••••`)
   })
 
