@@ -1,14 +1,19 @@
 'use client'
 
 import { LogInIcon } from 'lucide-react'
-import { useActionState } from 'react'
+import { useActionState, useEffect } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { clearAllDrafts } from '@/lib/navigation/form-drafts'
 import { signInAction, type LoginState } from './actions'
 
 // 로그인 입력 폼
 export function LoginForm({ next }: { next?: string }) {
+  // 로그인 화면이 열리면(로그아웃·세션 만료) 이 창에 보관한 작성 내용을 버린다 (0097)
+  useEffect(() => {
+    clearAllDrafts()
+  }, [])
   const [state, formAction, pending] = useActionState<LoginState, FormData>(signInAction, {})
 
   return (
