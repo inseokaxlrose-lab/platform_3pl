@@ -13,6 +13,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { signOutAction } from '@/lib/auth-actions'
+import { clearAllDrafts } from '@/lib/navigation/form-drafts'
 
 const USER_TYPE_LABELS = {
   OPERATOR: '운영사',
@@ -52,7 +53,13 @@ export function UserMenu({ user }: UserMenuProps) {
             비밀번호 변경
           </Link>
         </DropdownMenuItem>
-        <DropdownMenuItem onSelect={() => startTransition(() => signOutAction())}>
+        <DropdownMenuItem
+          onSelect={() => {
+            // 보관한 작성 내용을 버리고 로그아웃 (같은 창에서 다른 사람이 로그인할 수 있다, 0097)
+            clearAllDrafts()
+            startTransition(() => signOutAction())
+          }}
+        >
           <LogOutIcon />
           {pending ? '로그아웃 중…' : '로그아웃'}
         </DropdownMenuItem>

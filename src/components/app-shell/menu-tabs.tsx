@@ -3,10 +3,21 @@
 import { ExternalLinkIcon, HouseIcon, ListXIcon, XIcon } from 'lucide-react'
 import Link from 'next/link'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { usePermission } from '@/components/permission'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
 import { navigation, type NavAreaKey } from '@/config/navigation'
-import { askBeforeLeave, usePageDirty } from '@/lib/navigation/page-dirty'
+import { removeDraft, useDraftPaths } from '@/lib/navigation/form-drafts'
+import { askBeforeLeave, setMenuResolver, usePageDirty } from '@/lib/navigation/page-dirty'
 import { cn } from '@/lib/utils'
 import { filterNavigation } from './filter-navigation'
 import { findActiveHref } from './find-active-href'
@@ -15,7 +26,9 @@ import { closeAllTabs, closeTab, openTab, useMenuTabs } from './menu-tabs-store'
 
 // 상단 메뉴 탭 (docs/decisions/0069): 연 메뉴를 책갈피처럼 모아 두고 눌러서 오간다
 // - 탭을 누르면 그 메뉴에서 마지막으로 보던 주소로 (검색 조건·하위 화면 그대로)
-// - 저장하지 않은 변경이 있는 화면은 ● (마우스를 올리면 ×), 떠날 때는 확인 창
+// - 저장하지 않은 변경이 있는 화면은 ● (마우스를 올리면 ×)
+//   다른 메뉴 탭으로 가면 작성 내용을 보관하고 ●를 남긴다 → 돌아오면 이어서 쓴다 (0097)
+//   ● 탭을 [×]·[전체 닫기]로 닫을 때만 "버릴까요?"를 묻는다
 // - ↗: 새 창으로 열기 (나란히 보고 싶을 때)
 export function MenuTabs({ area }: { area: NavAreaKey }) {
   const pathname = usePathname()
@@ -24,12 +37,28 @@ export function MenuTabs({ area }: { area: NavAreaKey }) {
   const { codes } = usePermission()
   const tabs = useMenuTabs(area)
   const dirty = usePageDirty()
+  const draftPaths = useDraftPaths()
+  // ● 탭을 닫기 전 확인: 버릴 작성 내용이 있는 탭들과, 확인하면 할 일
+  const [confirmClose, setConfirmClose] = useState<{ count: number; run: () => void } | null>(null)
 
   const allowed = filterNavigation(navigation[area], codes)
   const items = allowed.groups.flatMap((group) => group.items).filter((item) => item.ready)
   const homeHref = allowed.homeHref
   const activeHref = findActiveHref(pathname, items)
   const url = search ? `${pathname}?${search}` : pathname
+
+  // 링크를 눌렀을 때 "다른 메뉴로 가는지" 판단에 쓰도록 주소 → 메뉴 함수를 알려 둔다 (0097)
+  const itemsRef = useRef(items)
+  useEffect(() => {
+    itemsRef.current = items
+  })
+  useEffect(() => {
+    setMenuResolver((path) => findActiveHref(path, itemsRef.current) ?? null)
+    return () => setMenuResolver(null)
+  }, [])
+
+  // 보던 탭이 아닌데 작성 내용을 보관해 둔 탭
+  const hasDraft = (tabUrl: string) => draftPaths.has(pathOf(tabUrl))
 
   // [×]로 닫는 중인 보던 탭: 다른 화면으로 옮겨 간 뒤에 목록에서 뺀다 (확인 창에서 [계속 작성]이면 남는다)
   const closing = useRef<string | null>(null)
@@ -46,6 +75,17 @@ export function MenuTabs({ area }: { area: NavAreaKey }) {
 
   function close(href: string) {
     if (href !== activeHref) {
+      const tab = tabs.find((t) => t.href === href)
+      if (tab && hasDraft(tab.url)) {
+        setConfirmClose({
+          count: 1,
+          run: () => {
+            removeDraft(pathOf(tab.url))
+            closeTab(area, href)
+          },
+        })
+        return
+      }
       closeTab(area, href)
       return
     }
@@ -57,6 +97,22 @@ export function MenuTabs({ area }: { area: NavAreaKey }) {
 
   // 전체 닫기: 보던 탭이 아닌 것은 바로 닫고, 보던 탭은 홈으로 옮긴 뒤 닫는다 (한 탭 [×]와 같은 방식)
   function closeAll() {
+    // 보던 탭이 아닌데 작성 내용을 보관해 둔 탭이 있으면 먼저 묻는다 (보던 탭은 기존 확인 창)
+    const drafts = tabs.filter((t) => t.href !== activeHref && hasDraft(t.url))
+    if (drafts.length > 0) {
+      setConfirmClose({
+        count: drafts.length,
+        run: () => {
+          for (const t of drafts) removeDraft(pathOf(t.url))
+          closeAllNow()
+        },
+      })
+      return
+    }
+    closeAllNow()
+  }
+
+  function closeAllNow() {
     const keep = tabs.some((tab) => tab.href === activeHref) ? activeHref : null
     closeAllTabs(area, keep)
     if (!keep) return
@@ -93,7 +149,7 @@ export function MenuTabs({ area }: { area: NavAreaKey }) {
             label={item.title}
             icon={<item.icon />}
             active={active}
-            dirty={active && dirty}
+            dirty={active ? dirty : hasDraft(tab.url)}
             onClose={() => close(tab.href)}
           />
         )
@@ -110,8 +166,41 @@ export function MenuTabs({ area }: { area: NavAreaKey }) {
           전체 닫기
         </button>
       )}
+      <AlertDialog
+        open={confirmClose !== null}
+        onOpenChange={(open) => !open && setConfirmClose(null)}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>저장하지 않은 작성 내용이 있습니다</AlertDialogTitle>
+            <AlertDialogDescription>
+              {confirmClose && confirmClose.count > 1
+                ? `탭 ${confirmClose.count}개에 저장하지 않은 작성 내용이 있습니다. 닫으면 그 내용이 사라집니다.`
+                : '이 탭을 닫으면 저장하지 않은 작성 내용이 사라집니다.'}{' '}
+              그래도 닫을까요?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>닫지 않기</AlertDialogCancel>
+            <AlertDialogAction
+              variant="destructive"
+              onClick={() => {
+                confirmClose?.run()
+                setConfirmClose(null)
+              }}
+            >
+              버리고 닫기
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </nav>
   )
+}
+
+// 탭 주소에서 경로만 (작성 내용은 경로로 보관한다)
+function pathOf(url: string) {
+  return url.split(/[?#]/)[0]
 }
 
 function TabLink({

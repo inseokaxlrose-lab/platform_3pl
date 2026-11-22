@@ -1,9 +1,10 @@
 'use client'
 
-import { useRouter } from 'next/navigation'
-import { useState, useTransition } from 'react'
+import { usePathname, useRouter } from 'next/navigation'
+import { useEffect, useRef, useState, useSyncExternalStore, useTransition } from 'react'
 import type { z } from 'zod'
 import type { ActionResult } from '@/lib/actions'
+import { readDraft, removeDraft, writeDraft } from '@/lib/navigation/form-drafts'
 
 // 오류 위치 → 문구 (예: 'businessNumber', 'contacts.0.name', 'contacts' = 표 전체)
 export type FormErrors = Record<string, string>
@@ -32,6 +33,11 @@ type UseMasterFormOptions<TSchema extends z.ZodType, TResult> = {
   createdHref?: (result: TResult) => string
 }
 
+// "브라우저에서 그리는 중인가" (서버·하이드레이션 중에는 false)
+const noSubscribe = () => () => {}
+const isBrowser = () => true
+const isServer = () => false
+
 // 기준정보 입력 화면의 공통 동작: 값·오류·변경 감지·취소·저장 (MasterFormPage와 함께 쓴다)
 export function useMasterForm<TSchema extends z.ZodType, TResult = unknown>({
   initial,
@@ -44,6 +50,7 @@ export function useMasterForm<TSchema extends z.ZodType, TResult = unknown>({
 }: UseMasterFormOptions<TSchema, TResult>) {
   type Input = z.input<TSchema>
   const router = useRouter()
+  const pathname = usePathname()
   // [계속 등록]으로 되돌아갈 빈 양식 (처음 받은 값)
   const [blank] = useState<Input>(initial)
   const [value, setValue] = useState<Input>(initial)
@@ -61,6 +68,43 @@ export function useMasterForm<TSchema extends z.ZodType, TResult = unknown>({
   const [pending, startTransition] = useTransition()
 
   const dirty = JSON.stringify(value) !== JSON.stringify(baseline)
+
+  // ── 작성 중 내용 임시 보관 (0097): 다른 메뉴 탭에 다녀와도 이어서 쓴다 ──
+  // 불러온 버전 (보관한 내용을 버릴 때 되돌릴 값)
+  const [loadedVersion] = useState<number | null>(initialVersion)
+  // 보관한 내용을 불러왔으면 안내 (stale = 그 사이 다른 사람이 이 자료를 고쳤다)
+  const [restored, setRestored] = useState<{ stale: boolean } | null>(null)
+  // 화면을 연 뒤 서랍을 한 번 확인했는지 (그 전에는 보관·비우기를 하지 않는다)
+  const [draftChecked, setDraftChecked] = useState(false)
+  // [나가기]로 버렸으면 더는 보관하지 않는다
+  const dropped = useRef(false)
+  // 마지막 보관이 성공했는지 (저장소를 못 쓰면 false → 떠날 때 예전처럼 묻는다)
+  const kept = useRef(false)
+
+  // 화면을 열 때: 이 주소에 보관한 작성 내용이 있으면 이어서 채운다
+  // 저장소는 브라우저에만 있어서, 서버가 그린 화면과 맞춘 뒤(inBrowser) 그리는 중에 한 번 읽는다
+  const inBrowser = useSyncExternalStore(noSubscribe, isBrowser, isServer)
+  if (inBrowser && !draftChecked) {
+    setDraftChecked(true)
+    const draft = readDraft(pathname)
+    if (draft) {
+      setValue(draft.value as Input)
+      // 작성을 시작할 때의 버전으로 저장해야, 그 사이 누가 고쳤으면 충돌로 막힌다
+      setVersion(draft.version)
+      setRestored({ stale: draft.version !== loadedVersion })
+    }
+  }
+
+  // 바뀔 때마다: 변경이 있으면 보관, 없어지면(저장·취소·되돌리기) 비운다
+  useEffect(() => {
+    if (!draftChecked || dropped.current) return
+    if (dirty && created === null) {
+      kept.current = writeDraft(pathname, { value, version })
+    } else {
+      kept.current = false
+      removeDraft(pathname)
+    }
+  }, [draftChecked, dirty, created, value, version, pathname])
 
   function fail(nextErrors: FormErrors, text: string) {
     setErrors(nextErrors)
@@ -97,6 +141,23 @@ export function useMasterForm<TSchema extends z.ZodType, TResult = unknown>({
       setValue(baseline)
       setErrors({})
       setMessage(null)
+      if (restored) {
+        // 보관했던 내용을 버린 것이므로 불러온 버전으로
+        setVersion(loadedVersion)
+        setRestored(null)
+      }
+    },
+    // 보관한 작성 내용을 이어서 불러왔는지 (MasterFormPage가 안내를 띄운다)
+    restored,
+    // 떠날 때 작성 내용을 보관해 두었는지 (true면 다른 메뉴로 갈 때 묻지 않는다)
+    keepsDraft() {
+      return kept.current
+    },
+    // [나가기]: 작성 내용을 버리고 떠난다 → 보관한 것도 지운다
+    dropDraft() {
+      dropped.current = true
+      kept.current = false
+      removeDraft(pathname)
     },
     submit(event?: React.FormEvent) {
       event?.preventDefault()
@@ -130,6 +191,7 @@ export function useMasterForm<TSchema extends z.ZodType, TResult = unknown>({
         const next = afterSave ? afterSave(parsed.data, result.data, value) : value
         setValue(next)
         setBaseline(next)
+        setRestored(null)
         // 저장은 됐지만 알려 줄 것이 있으면 결과의 notice를 덧붙인다 (예: 할당 가능 창고 없음 경고)
         const notice = (result.data as { notice?: unknown } | null)?.notice
         const done = createdHref ? '등록했습니다.' : '저장했습니다.'
@@ -161,4 +223,7 @@ export type MasterFormState = Pick<
   | 'created'
   | 'resetCount'
   | 'startNext'
+  | 'restored'
+  | 'keepsDraft'
+  | 'dropDraft'
 >

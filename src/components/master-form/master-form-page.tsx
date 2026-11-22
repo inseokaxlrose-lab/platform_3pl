@@ -1,6 +1,6 @@
 'use client'
 
-import { ArrowRightIcon, PlusIcon, RotateCcwIcon, SaveIcon } from 'lucide-react'
+import { ArrowRightIcon, HistoryIcon, PlusIcon, RotateCcwIcon, SaveIcon } from 'lucide-react'
 import Link from 'next/link'
 import { useEffect, useId, useRef, useState } from 'react'
 import { AppPage } from '@/components/app-page'
@@ -70,7 +70,10 @@ export function MasterFormPage({
   const sections = [...formSections, ...standaloneSections]
   const [activeId, setActiveId] = useState(sections[0]?.id)
   const [errorSectionIds, setErrorSectionIds] = useState<string[]>([])
-  const guard = useDirtyGuard(form.dirty && !readOnly)
+  const guard = useDirtyGuard(form.dirty && !readOnly, {
+    kept: form.keepsDraft,
+    drop: form.dropDraft,
+  })
   const editable = !readOnly && formSections.length > 0
 
   // 지금 보는 섹션: 헤더 아래 위쪽 1/3 안에 들어온 섹션
@@ -233,6 +236,38 @@ export function MasterFormPage({
       }
       aside={toc}
     >
+      {editable && form.restored && form.dirty && (
+        // 다른 메뉴 탭에 다녀왔다: 보관해 둔 작성 내용을 이어서 채웠다 (0097)
+        <div
+          role="status"
+          className={cn(
+            'mb-section flex flex-wrap items-center gap-x-3 gap-y-2 rounded-md border px-4 py-3 text-sm',
+            form.restored.stale
+              ? 'border-warning/50 bg-warning/10'
+              : 'border-primary/30 bg-primary/5',
+          )}
+        >
+          <HistoryIcon
+            aria-hidden
+            className={cn('size-4 shrink-0', form.restored.stale ? 'text-warning' : 'text-primary')}
+          />
+          <p className="min-w-0 flex-1">
+            {form.restored.stale
+              ? '저장하지 않은 작성 내용을 불러왔습니다. 그 사이 다른 사람이 이 자료를 고쳐서 이대로는 저장할 수 없습니다. 처음 값으로 되돌린 뒤 다시 입력해 주세요.'
+              : '저장하지 않은 작성 내용을 불러왔습니다. 이어서 작성하고 [저장]하세요.'}
+          </p>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            disabled={form.pending}
+            onClick={form.cancel}
+          >
+            <RotateCcwIcon />
+            처음 값으로 되돌리기
+          </Button>
+        </div>
+      )}
       <form id={formId} ref={formRef} onSubmit={form.submit} noValidate>
         {/* 등록을 마치면 입력 칸을 잠근다(방금 등록한 값 확인용). [계속 등록]마다 key가 바뀌어 칸을 새로 그린다 */}
         <fieldset key={form.resetCount} disabled={form.created !== null} className="contents">

@@ -2,6 +2,8 @@ import { act, fireEvent, render, screen, waitFor, within } from '@testing-librar
 import { useState } from 'react'
 import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { z } from 'zod'
+import { readDraft } from '@/lib/navigation/form-drafts'
+import { setMenuResolver } from '@/lib/navigation/page-dirty'
 import { requireOneOf } from '@/lib/validation/common-fields'
 import { EditableSubTable } from './editable-sub-table'
 import { Field, FormGrid } from './form-grid'
@@ -27,6 +29,8 @@ beforeAll(() => {
 beforeEach(() => {
   push.mockClear()
   refresh.mockClear()
+  // 작성 중 내용 보관(0097)은 sessionStorage에 남으므로 시험마다 비운다
+  sessionStorage.clear()
 })
 
 type Contact = { name: string; phone: string; isPrimary: boolean }
@@ -122,6 +126,7 @@ function FormHarness({
   return (
     <>
       <a href="/elsewhere">다른 화면</a>
+      <a href="/admin/test/list">같은 메뉴 목록</a>
       <MasterFormPage
         header={{ title: '견본' }}
         form={form}
@@ -353,5 +358,77 @@ describe('등록 화면: 저장 후 [계속 등록]', () => {
     expect(screen.getByRole('link', { name: '등록한 항목 보기' }).getAttribute('href')).toBe(
       '/admin/test/8',
     )
+  })
+})
+
+describe('작성 중 내용 임시 보관 (0097)', () => {
+  const name = () => screen.getByLabelText(/이름/) as HTMLInputElement
+
+  beforeEach(() => {
+    // 지금 화면 = /admin/test 메뉴, /elsewhere = 다른 메뉴
+    window.history.pushState({}, '', '/admin/test')
+    setMenuResolver((path) =>
+      path.startsWith('/admin/test') ? '/admin/test' : path === '/elsewhere' ? '/elsewhere' : null,
+    )
+  })
+
+  it('바꾸면 보관하고, 다시 열면 이어서 채운다 → [처음 값으로 되돌리기]면 처음 값·보관 비움', () => {
+    const first = render(<FormHarness save={vi.fn()} version={3} />)
+    fireEvent.change(name(), { target: { value: '작성 중' } })
+    expect(readDraft('/admin/test')).toMatchObject({
+      value: { name: '작성 중', phone: '', email: 'a@b.c' },
+      version: 3,
+    })
+    first.unmount()
+
+    render(<FormHarness save={vi.fn()} version={3} />)
+    expect(name().value).toBe('작성 중')
+    expect(screen.getByText(/저장하지 않은 작성 내용을 불러왔습니다/)).toBeTruthy()
+    expect(screen.getByText('변경사항 있음')).toBeTruthy()
+
+    fireEvent.click(screen.getByRole('button', { name: '처음 값으로 되돌리기' }))
+    expect(name().value).toBe('원래')
+    expect(screen.queryByText(/작성 내용을 불러왔습니다/)).toBeNull()
+    expect(readDraft('/admin/test')).toBeNull()
+  })
+
+  it('되돌려 처음 값과 같아지거나 저장하면 보관을 비운다', async () => {
+    const save = vi.fn().mockResolvedValue({ ok: true, data: null })
+    render(<FormHarness save={save} />)
+    fireEvent.change(name(), { target: { value: '작성 중' } })
+    fireEvent.change(name(), { target: { value: '원래' } })
+    expect(readDraft('/admin/test')).toBeNull()
+
+    fireEvent.change(name(), { target: { value: '새 이름' } })
+    expect(readDraft('/admin/test')).not.toBeNull()
+    await act(async () => fireEvent.click(screen.getByRole('button', { name: '저장' })))
+    expect(readDraft('/admin/test')).toBeNull()
+  })
+
+  it('그 사이 다른 사람이 고쳤으면(버전이 다름) 주의 안내, 저장은 작성을 시작한 버전으로 보내 충돌로 막힌다', async () => {
+    const first = render(<FormHarness save={vi.fn()} version={3} />)
+    fireEvent.change(name(), { target: { value: '작성 중' } })
+    first.unmount()
+
+    const save = vi.fn().mockResolvedValue({ ok: true, data: null })
+    render(<FormHarness save={save} version={4} />)
+    expect(screen.getByText(/그 사이 다른 사람이 이 자료를 고쳐서/)).toBeTruthy()
+    await act(async () => fireEvent.click(screen.getByRole('button', { name: '저장' })))
+    expect(save.mock.calls[0][1]).toBe(3)
+  })
+
+  it('다른 메뉴로 가는 링크는 묻지 않고, 같은 메뉴 안의 이동은 묻고 [나가기]면 보관도 버린다', async () => {
+    render(<FormHarness save={vi.fn()} />)
+    fireEvent.change(name(), { target: { value: '작성 중' } })
+
+    fireEvent.click(screen.getByText('다른 화면'))
+    expect(screen.queryByRole('alertdialog')).toBeNull()
+    expect(readDraft('/admin/test')).not.toBeNull()
+
+    fireEvent.click(screen.getByText('같은 메뉴 목록'))
+    const dialog = await screen.findByRole('alertdialog')
+    fireEvent.click(within(dialog).getByRole('button', { name: '나가기' }))
+    expect(push).toHaveBeenCalledWith('/admin/test/list')
+    expect(readDraft('/admin/test')).toBeNull()
   })
 })
