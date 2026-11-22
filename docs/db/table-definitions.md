@@ -3,7 +3,7 @@
 > 이 문서는 `npm run db:doc`가 실제 DB 구조와 `prisma/schema.prisma`의 주석으로 만든다. **손으로 고치지 않는다** — 마이그레이션을 적용한 뒤 명령을 다시 돌린다.
 > 엑셀 판: `docs/db/DB_테이블정의서.xlsx` · 이름 규칙: `docs/db-conventions.md`
 
-테이블 79개 · 칼럼 1246개
+테이블 80개 · 칼럼 1265개
 
 ## 목차
 
@@ -57,6 +57,7 @@
 | 연동 API | [`tb_api_request_log`](#tb_api_request_log) | ApiRequestLog | API 요청 로그: 요청 하나에 한 줄 (응답을 보낸 뒤 저장). 본문은 개인정보를 가린 뒤 저장하고 90일 뒤 비운다 |
 | 거래처·납품처 | [`tb_customer`](#tb_customer) | Customer | 거래처 (docs/decisions/0043): 화주사의 고객사 — 출고(MVP 이후) 때 물건을 받는 곳 코드 3층 (0084): id(내부) / code(거래처코드, 비우면 자동 체번 {화주 접두어}C000001, 화주 안에서 고유·수정 불가) / custCode(화주 시스템 거래처코드) + 외부 코드(ExternalCode CUSTOMER) |
 | 거래처·납품처 | [`tb_customer_contact`](#tb_customer_contact) | CustomerContact | 거래처 담당자 (담당자 표 4개 공통 모양, 0084) |
+| 거래처·납품처 | [`tb_customer_item`](#tb_customer_item) | CustomerItem | 거래처별 품목코드 (0098): 같은 품목도 납품하는 거래처(대형마트·유통사)마다 상품코드·바코드가 다르다 → 납품서·라벨에 찍는다 거래처(매출처) × 품목 한 줄, 같은 화주사끼리만. 메뉴: 기준정보 › 거래처별 품목코드 (목록 + 팝업 + 엑셀) |
 | 거래처·납품처 | [`tb_ship_to`](#tb_ship_to) | ShipTo | 납품처: 물건이 실제로 도착하는 곳 (0082). 거래처 하나에 여러 곳, 기본 납품처 정확히 1곳, 사용 중 1곳 이상 납품처마다 배송센터가 정해진다 (assignShipToCenter: 연동 IF / 권역 자동 AUTO / 화면 수동 MANUAL) |
 | 품목 | [`tb_item`](#tb_item) | Item | 품목 (docs/decisions/0041, 0083): 화주사가 맡긴 상품의 관리 단위 코드 3층 (0084): id(내부) / code(품목코드, 비우면 자동 체번 {화주 접두어}S000001, 화주 안에서 고유·수정 불가) / custCode(화주 시스템 품목코드) + 외부 코드(ExternalCode ITEM) 기한·LOT·시리얼 관리 여부는 상속하지 않는 명시값: 신규 등록 때 화주 실제 값을 복사하고, 이후 화주 설정이 바뀌어도 그대로 (재고 구조를 정하므로, 0083) |
 | 품목 | [`tb_item_barcode`](#tb_item_barcode) | ItemBarcode |  |
@@ -1696,6 +1697,50 @@
 
 - `tb_customer_contact_notify_yn_check`: `CHECK (notify_yn IN ('Y', 'N')`
 - `tb_customer_contact_primary_yn_check`: `CHECK (primary_yn IN ('Y', 'N')`
+
+## tb_customer_item
+
+- 영역: 거래처·납품처 · 모델: `CustomerItem`
+- 거래처별 품목코드 (0098): 같은 품목도 납품하는 거래처(대형마트·유통사)마다 상품코드·바코드가 다르다 → 납품서·라벨에 찍는다 거래처(매출처) × 품목 한 줄, 같은 화주사끼리만. 메뉴: 기준정보 › 거래처별 품목코드 (목록 + 팝업 + 엑셀)
+
+| No | 칼럼 | 한글명 | 설명 | 타입 | NULL | 기본값 | 키 |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| 1 | `customer_item_id` | 거래처 품목 ID |  | BIGINT | N | 자동 증가 | PK |
+| 2 | `operator_id` | 운영사 ID | 운영사 (멀티테넌트 키 — 다른 운영사 데이터는 보이지 않는다, 0039) | BIGINT | N |  | FK → tb_operator.operator_id |
+| 3 | `shipper_id` | 화주사 ID | 조회 성능·데이터 범위용 (거래처·품목의 화주사와 같다) | BIGINT | N |  | FK → tb_shipper.shipper_id |
+| 4 | `customer_id` | 거래처 ID |  | BIGINT | N |  | UK FK → tb_customer.customer_id |
+| 5 | `item_id` | 품목 ID |  | BIGINT | N |  | UK FK → tb_item.item_id |
+| 6 | `cust_item_cd` | cust 품목 코드 | 거래처의 상품코드 (거래처 안에서 고유) | VARCHAR(50) | N |  | UK |
+| 7 | `cust_item_nm` | cust 품목 명 |  | VARCHAR(200) | Y |  |  |
+| 8 | `cust_barcode` | cust 바코드 |  | VARCHAR(50) | Y |  |  |
+| 9 | `delivery_unit_id` | 배송 단위 ID | 납품 단위 (품목의 단위 중 하나, NULL = 품목의 기본 주문단위) | BIGINT | Y |  | FK → tb_unit.unit_id |
+| 10 | `min_shelf_days` | 최소 잔여유통일수 | 최소 잔여 유통기한 — 이 품목만 거래처 값(tb_customer)과 다를 때 (NULL = 거래처 값) | INTEGER | Y |  |  |
+| 11 | `min_shelf_ratio` | 최소 잔여기한 비율 |  | DECIMAL(5,2) | Y |  |  |
+| 12 | `remark` | 비고 | 비고 | VARCHAR(1000) | Y |  |  |
+| 13 | `status_cd` | 상태 코드 | 상태 | VARCHAR(20) | N | ACTIVE |  |
+| 14 | `created_at` | 등록 일시 | 등록 일시 (자동) | TIMESTAMP(3) | N | CURRENT_TIMESTAMP |  |
+| 15 | `updated_at` | 수정 일시 | 수정 일시 (자동) | TIMESTAMP(3) | N |  |  |
+| 16 | `created_by` | 등록 자 | 등록자 아이디 (자동: 작업자 / seed / system) | VARCHAR(50) | N | system |  |
+| 17 | `updated_by` | 수정 자 | 수정자 아이디 (자동) | VARCHAR(50) | N | system |  |
+| 18 | `row_version` | 행버전 | 동시 수정 막기용 버전 (수정할 때마다 +1, 0038) | INTEGER | N | 1 |  |
+| 19 | `del_yn` | 삭제여부 | 논리 삭제 여부 ('Y' = 지움, 목록에서 빠지고 되살릴 수 있다, 0038) | CHAR(1) | N | N |  |
+
+**고유 인덱스**
+
+- `tb_customer_item_customer_cd_key`: `CREATE UNIQUE INDEX tb_customer_item_customer_cd_key ON tb_customer_item (customer_id, cust_item_cd) WHERE (del_yn = 'N'::bpchar)`
+- `tb_customer_item_customer_item_key`: `CREATE UNIQUE INDEX tb_customer_item_customer_item_key ON tb_customer_item (customer_id, item_id) WHERE (del_yn = 'N'::bpchar)`
+
+**인덱스**
+
+- `tb_customer_item_item_id_idx`: `CREATE INDEX tb_customer_item_item_id_idx ON tb_customer_item (item_id)`
+- `tb_customer_item_operator_id_shipper_id_idx`: `CREATE INDEX tb_customer_item_operator_id_shipper_id_idx ON tb_customer_item (operator_id, shipper_id)`
+
+**검사 조건**
+
+- `tb_customer_item_del_yn_check`: `CHECK (del_yn IN ('Y', 'N')`
+- `tb_customer_item_min_shelf_days_check`: `CHECK ((min_shelf_days IS NULL) OR ((min_shelf_days >= 0) AND (min_shelf_days <= 9999)))`
+- `tb_customer_item_min_shelf_ratio_check`: `CHECK ((min_shelf_ratio IS NULL) OR ((min_shelf_ratio >= 0) AND (min_shelf_ratio <= 100)))`
+- `tb_customer_item_status_cd_check`: `CHECK ((status_cd) IN ('ACTIVE', 'INACTIVE'))`
 
 ## tb_ship_to
 

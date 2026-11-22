@@ -42,6 +42,8 @@ export const AUDITED_MODELS: ReadonlySet<string> = new Set([
   'Route',
   // 운영사 개별 휴일 (0096)
   'OperatorHoliday',
+  // 거래처별 품목코드 (0098)
+  'CustomerItem',
 ])
 
 // 등록·수정자만 있는 표 (버전 칸 없음): 담당자 표 4개 (0084 ④-3) — 버전은 부모(운영사·센터·화주사·거래처)에서 검사
@@ -76,6 +78,8 @@ export const SOFT_DELETE_MODELS: ReadonlySet<string> = new Set([
   'Route',
   // 운영사 개별 휴일 (0096)
   'OperatorHoliday',
+  // 거래처별 품목코드 (0098)
+  'CustomerItem',
 ])
 
 // 운영사 데이터가 들어가는 표 (operator_id가 있는 표, docs/decisions/0039)
@@ -132,6 +136,8 @@ export const TENANT_MODELS: ReadonlySet<string> = new Set([
   'RouteZip',
   // 운영사 개별 휴일 (0096) — 국가 공휴일 tb_holiday는 운영사 공통
   'OperatorHoliday',
+  // 거래처별 품목코드 (0098)
+  'CustomerItem',
 ])
 
 type Data = Record<string, unknown>

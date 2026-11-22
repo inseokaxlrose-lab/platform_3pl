@@ -79,6 +79,13 @@ export const PERMISSION_MENUS = {
     area: 'admin',
     actions: [...CRUD, 'export'],
   },
+  // 거래처별 품목코드 (0098): 거래처(매출처)마다 다른 상품코드·바코드 — 엑셀 업로드 = 등록·수정
+  'master.customer-items': {
+    label: '거래처별 품목코드',
+    group: '기준정보',
+    area: 'admin',
+    actions: [...CRUD, 'export'],
+  },
   'master.shippers': {
     label: '화주사',
     group: '기준정보',

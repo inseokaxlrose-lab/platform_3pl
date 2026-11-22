@@ -32,6 +32,7 @@ import {
   RouteIcon,
   SignatureIcon,
   CalendarDaysIcon,
+  TagsIcon,
 } from 'lucide-react'
 import type { PermissionCode } from './permissions'
 
@@ -152,6 +153,14 @@ const adminNavigation: NavArea = {
           icon: MapPinnedIcon,
           ready: true,
           permission: 'master.customers.read',
+        },
+        {
+          // 거래처별 품목코드 (0098)
+          title: '거래처별 품목코드',
+          href: '/admin/master/customer-items',
+          icon: TagsIcon,
+          ready: true,
+          permission: 'master.customer-items.read',
         },
         {
           // 운송사·운송 계약 (0094)

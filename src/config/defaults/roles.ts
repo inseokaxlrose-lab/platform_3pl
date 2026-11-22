@@ -61,6 +61,8 @@ export const DEFAULT_GROUPS: readonly DefaultGroup[] = [
       ...menu('master.routes'),
       ...menu('master.items'),
       ...menu('master.customers'),
+      // 거래처별 품목코드 (0098)
+      ...menu('master.customer-items'),
       // 품목·거래처 화면에서 고치던 외부코드를 이 메뉴에서 (0068)
       ...menu('master.external-codes'),
       ...menu('inbound.asn'),

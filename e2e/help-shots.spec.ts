@@ -159,6 +159,22 @@ const SHOTS: Shot[] = [
     ],
   },
   list('/admin/master/customers'),
+  // 거래처별 품목코드 (0098): e2e 준비 데이터의 견본 행복마트 × E2E-WATER
+  list('/admin/master/customer-items'),
+  {
+    src: '/help/admin/master/customer-items/dialog.png',
+    url: '/admin/master/customer-items',
+    account: 'admin',
+    prepare: async (page) => {
+      await page.getByRole('cell', { name: 'HM-200017' }).click()
+      await expect(page.getByRole('dialog')).toBeVisible()
+    },
+    markers: [
+      { label: '1', target: (page) => page.locator('#customer-item-customer') },
+      { label: '2', target: (page) => page.locator('#customer-item-code') },
+      { label: '3', target: (page) => page.locator('#customer-item-unit') },
+    ],
+  },
   {
     // 거래처 등록: 화주사를 고르면 [납품처 추가]가 열린다 — ① 주소 ② 납품처 ③ 저장 (0082)
     src: '/help/admin/master/customers/new.png',

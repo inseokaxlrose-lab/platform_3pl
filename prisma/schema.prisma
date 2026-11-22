@@ -700,6 +700,7 @@ model Shipper {
   items             Item[]
   itemBarcodes      ItemBarcode[]
   itemSetComponents ItemSetComponent[]
+  customerItems     CustomerItem[]
   customers         Customer[]
   stocks            Stock[]
   asns              Asn[]
@@ -967,6 +968,7 @@ model Operator {
   items             Item[]
   itemBarcodes      ItemBarcode[]
   itemSetComponents ItemSetComponent[]
+  customerItems     CustomerItem[]
   palletTypes       PalletType[]
   numberingRules    NumberingRule[]
   customers         Customer[]
@@ -1195,11 +1197,12 @@ model Unit {
   lengthOperators  Operator[]     @relation("OperatorLengthUnit")
 
   // 이 단위를 쓰는 품목 (기본단위 / 환산단위) — 쓰이고 있으면 지울 수 없다
-  baseItems    Item[]        @relation("ItemBaseUnit")
-  inboundItems Item[]        @relation("ItemInboundUnit")
-  orderItems   Item[]        @relation("ItemOrderUnit")
-  packItems    ItemUnit[]    @relation("ItemPackUnit")
-  barcodes     ItemBarcode[] @relation("ItemBarcodeUnit")
+  baseItems              Item[]         @relation("ItemBaseUnit")
+  inboundItems           Item[]         @relation("ItemInboundUnit")
+  orderItems             Item[]         @relation("ItemOrderUnit")
+  packItems              ItemUnit[]     @relation("ItemPackUnit")
+  barcodes               ItemBarcode[]  @relation("ItemBarcodeUnit")
+  customerItemDeliveries CustomerItem[] @relation("CustomerItemDeliveryUnit")
 
   // 논리 삭제: 'Y'면 지운 것 (목록·조회에서 빠지고 되살릴 수 있다, 0038)
   delYn String @default("N") @map("del_yn") @db.Char(1)
@@ -1345,6 +1348,8 @@ model Item {
   // 세트 품목의 구성품 / 이 품목을 구성품으로 쓰는 세트 (0098)
   setComponents ItemSetComponent[]  @relation("SetItem")
   usedInSets    ItemSetComponent[]  @relation("ComponentItem")
+  // 거래처별 품목코드 (0098)
+  customerItems CustomerItem[]
   stocks        Stock[]
   asnLines      AsnLine[]
   inspections   InboundInspection[]
@@ -1445,6 +1450,45 @@ model ItemSetComponent {
   @@index([componentItemId])
   @@index([operatorId])
   @@map("tb_item_set_component")
+}
+
+// 거래처별 품목코드 (0098): 같은 품목도 납품하는 거래처(대형마트·유통사)마다 상품코드·바코드가 다르다 → 납품서·라벨에 찍는다
+// 거래처(매출처) × 품목 한 줄, 같은 화주사끼리만. 메뉴: 기준정보 › 거래처별 품목코드 (목록 + 팝업 + 엑셀)
+model CustomerItem {
+  id             BigInt   @id @default(autoincrement()) @map("customer_item_id")
+  operatorId     BigInt   @map("operator_id")
+  operator       Operator @relation(fields: [operatorId], references: [id], onDelete: Restrict)
+  // 조회 성능·데이터 범위용 (거래처·품목의 화주사와 같다)
+  shipperId      BigInt   @map("shipper_id")
+  shipper        Shipper  @relation(fields: [shipperId], references: [id], onDelete: Restrict)
+  customerId     BigInt   @map("customer_id")
+  customer       Customer @relation(fields: [customerId], references: [id], onDelete: Restrict)
+  itemId         BigInt   @map("item_id")
+  item           Item     @relation(fields: [itemId], references: [id], onDelete: Restrict)
+  // 거래처의 상품코드 (거래처 안에서 고유)
+  custItemCode   String   @map("cust_item_cd") @db.VarChar(50)
+  custItemName   String?  @map("cust_item_nm") @db.VarChar(200)
+  custBarcode    String?  @map("cust_barcode") @db.VarChar(50)
+  // 납품 단위 (품목의 단위 중 하나, NULL = 품목의 기본 주문단위)
+  deliveryUnitId BigInt?  @map("delivery_unit_id")
+  deliveryUnit   Unit?    @relation("CustomerItemDeliveryUnit", fields: [deliveryUnitId], references: [id], onDelete: Restrict)
+  // 최소 잔여 유통기한 — 이 품목만 거래처 값(tb_customer)과 다를 때 (NULL = 거래처 값)
+  minShelfDays   Int?     @map("min_shelf_days")
+  minShelfRatio  Decimal? @map("min_shelf_ratio") @db.Decimal(5, 2)
+  remark         String?  @db.VarChar(1000)
+  status         String   @default("ACTIVE") @map("status_cd") @db.VarChar(20)
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+  createdBy      String   @default("system") @map("created_by") @db.VarChar(50)
+  updatedBy      String   @default("system") @map("updated_by") @db.VarChar(50)
+  rowVersion     Int      @default(1) @map("row_version")
+  delYn          String   @default("N") @map("del_yn") @db.Char(1)
+
+  @@unique([customerId, itemId], where: raw("del_yn = 'N'"), map: "tb_customer_item_customer_item_key")
+  @@unique([customerId, custItemCode], where: raw("del_yn = 'N'"), map: "tb_customer_item_customer_cd_key")
+  @@index([operatorId, shipperId])
+  @@index([itemId])
+  @@map("tb_customer_item")
 }
 
 model ItemBarcode {
@@ -1716,6 +1760,8 @@ model Customer {
 
   contacts CustomerContact[]
   shipTos  ShipTo[]
+  // 거래처별 품목코드 (0098)
+  items    CustomerItem[]
 
   // 논리 삭제: 'Y'면 지운 것 (목록·조회에서 빠지고 되살릴 수 있다, 0038)
   delYn String @default("N") @map("del_yn") @db.Char(1)

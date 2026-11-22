@@ -2,6 +2,7 @@
 // 예시 운영사(가장 먼저 만든 운영사)의 가나식품(GANA, 로트·유통기한 사용)에
 // - 품목 E2E-WATER (기본단위 EA, BOX 24, PLT 1,440)
 // - 이천센터(ICN) 보관 창고 E2EGEN + 로케이션 E2E-01
+// - 견본 매출처 행복마트(E2E-MART) + E2E-WATER의 거래처 품목코드 (0098, 도움말 사진용)
 // 실행: DATABASE_URL을 e2e DB로 바꿔서 (scripts/e2e-prepare.sh가 한다)
 import 'dotenv/config'
 import { runInContext } from '../src/lib/actor'
@@ -109,8 +110,41 @@ async function main() {
         })
       }
     }
+
+    // 거래처별 품목코드 (0098): 견본 매출처 + E2E-WATER의 거래처 코드 (도움말 사진용)
+    const mart =
+      (await prisma.customer.findFirst({ where: { shipperId: shipper.id, code: 'E2E-MART' } })) ??
+      (await prisma.customer.create({
+        data: {
+          operatorId: operator.id,
+          shipperId: shipper.id,
+          code: 'E2E-MART',
+          name: '행복마트',
+          role: 'SALES',
+        },
+      }))
+    const martItem = await prisma.customerItem.findFirst({
+      where: { customerId: mart.id, itemId: item.id },
+    })
+    if (!martItem) {
+      await prisma.customerItem.create({
+        data: {
+          operatorId: operator.id,
+          shipperId: shipper.id,
+          customerId: mart.id,
+          itemId: item.id,
+          custItemCode: 'HM-200017',
+          custItemName: '가나 생수 2L (행복마트)',
+          custBarcode: '8801234500017',
+          deliveryUnitId: box.id,
+          minShelfDays: 30,
+        },
+      })
+    }
   })
-  console.log('e2e 준비 데이터 확인: 품목 E2E-WATER, 로케이션 E2EGEN/E2E-01, 견본 휴일')
+  console.log(
+    'e2e 준비 데이터 확인: 품목 E2E-WATER, 로케이션 E2EGEN/E2E-01, 견본 휴일, 견본 거래처 품목코드',
+  )
 }
 
 main()
