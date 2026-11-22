@@ -179,7 +179,8 @@ export function AppSidebar({
         </div>
       </SidebarHeader>
 
-      <SidebarContent>
+      {/* 메뉴 목록 끝까지 내려도 스크롤이 본문으로 넘어가지 않게 (overscroll-contain) */}
+      <SidebarContent className="overscroll-contain">
         {favoriteError && (
           <p role="alert" className="px-4 pt-2 text-xs text-destructive">
             {favoriteError}
