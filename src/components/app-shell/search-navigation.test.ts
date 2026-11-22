@@ -32,7 +32,8 @@ describe('matchesQuery', () => {
 
 describe('searchNavigation', () => {
   it('맞는 메뉴만 남기고, 메뉴가 없는 묶음은 뺀다', () => {
-    expect(titles('ㅍㅁ')).toEqual(['품목'])
+    // 이름 가운데 '품목'이 있는 메뉴도 맞는다 (거래처별 품목코드, 0098)
+    expect(titles('ㅍㅁ')).toEqual(['품목', '거래처별 품목코드'])
     expect(searchNavigation(navigation.admin, 'ㅍㅁ').groups.map((g) => g.label)).toEqual([
       '기준정보',
     ])
