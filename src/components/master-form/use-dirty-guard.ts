@@ -2,18 +2,32 @@
 
 import { useRouter } from 'next/navigation'
 import { useEffect, useRef, useState } from 'react'
-import { setLeaveRequest, setPageDirty } from '@/lib/navigation/page-dirty'
+import { isOtherMenu, setLeaveRequest, setPageDirty } from '@/lib/navigation/page-dirty'
 
 // 저장하지 않은 변경이 있을 때 화면을 떠나지 못하게 한 번 묻는다
 // - 새로고침·창 닫기·주소 직접 입력: 브라우저 기본 확인 창 (beforeunload — 문구는 브라우저가 정한다)
 // - 화면 안의 링크(사이드바 메뉴 등): 링크 클릭을 가로채 우리 확인 창을 띄운다
 //   App Router에는 "이동 직전" 알림이 없어서 문서 전체의 클릭을 먼저(capture) 받아 막는 방식
 // - 브라우저 [뒤로] 버튼은 막지 못한다 (docs/ui-guidelines.md "남은 제약")
-export function useDirtyGuard(dirty: boolean) {
+// - 작성 내용을 보관해 두었으면(0097) 다른 메뉴로 가는 링크는 묻지 않고 보낸다 → 돌아오면 이어서 쓴다
+//   같은 메뉴 안의 이동(수정 → 목록 등)은 지금처럼 묻고, [나가기]면 보관한 것도 버린다
+export function useDirtyGuard(
+  dirty: boolean,
+  draft?: {
+    // 지금 작성 내용이 보관돼 있는지
+    kept: () => boolean
+    // [나가기]: 보관한 작성 내용을 버린다
+    drop: () => void
+  },
+) {
   const router = useRouter()
   // 확인 창을 띄운 이동 대상 주소 (null = 창 닫힘)
   const [pendingHref, setPendingHref] = useState<string | null>(null)
   const dirtyRef = useRef(dirty)
+  const draftRef = useRef(draft)
+  useEffect(() => {
+    draftRef.current = draft
+  })
   useEffect(() => {
     dirtyRef.current = dirty
     // 메뉴 탭의 ● 표시 (0069)
@@ -45,6 +59,8 @@ export function useDirtyGuard(dirty: boolean) {
       if (url.origin !== location.origin) return
       // 같은 화면 안의 이동(#목차 등)은 막지 않는다
       if (url.pathname === location.pathname && url.search === location.search) return
+      // 다른 메뉴로 가는데 작성 내용을 보관해 두었으면 묻지 않는다 (메뉴 탭에 ● 가 남는다)
+      if (draftRef.current?.kept() && isOtherMenu(location.pathname, url.pathname)) return
       event.preventDefault()
       event.stopPropagation()
       setPendingHref(url.pathname + url.search + url.hash)
@@ -63,6 +79,7 @@ export function useDirtyGuard(dirty: boolean) {
     leave() {
       if (!pendingHref) return
       dirtyRef.current = false
+      draftRef.current?.drop()
       setPendingHref(null)
       router.push(pendingHref)
     },
