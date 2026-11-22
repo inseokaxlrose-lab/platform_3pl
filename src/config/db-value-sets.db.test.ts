@@ -90,6 +90,7 @@ import { TXN_TYPE_LABELS } from '@/lib/stock/history-list'
 import { HOLIDAY_DAY_TYPE, HOLIDAY_SYNC_STATUS } from '@/lib/holidays/holiday-codes'
 import { UNIT_TYPES } from '@/lib/units/unit-labels'
 import { WAREHOUSE_STATUS, WAREHOUSE_TYPE } from '@/lib/warehouses/warehouse-codes'
+import { CUSTOMER_ITEM_STATUS } from '@/lib/customer-items/customer-item-codes'
 
 // 값 목록 칸의 상수 ↔ DB 검사 조건(CHECK … IN …)이 같은지 (docs/decisions/0084 ④-2, 0030·0040)
 // 프로그램이 값에 따라 동작을 바꾸는 값은 상수 + DB CHECK 두 곳에 둔다 — 한쪽만 바꾸면 여기서 실패한다
@@ -217,6 +218,7 @@ const VALUE_SETS: Record<string, readonly string[]> = {
   'tb_carrier_contract.status_cd': CARRIER_STATUS.values,
   // 배송 코스 (0095)
   'tb_route.status_cd': CARRIER_STATUS.values,
+  'tb_customer_item.status_cd': CUSTOMER_ITEM_STATUS.values,
   // 휴무관리 (0096)
   'tb_operator_holiday.day_type_cd': HOLIDAY_DAY_TYPE.values,
   'tb_holiday_year.status_cd': HOLIDAY_SYNC_STATUS.values,
