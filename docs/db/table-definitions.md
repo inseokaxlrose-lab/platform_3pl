@@ -3,7 +3,7 @@
 > 이 문서는 `npm run db:doc`가 실제 DB 구조와 `prisma/schema.prisma`의 주석으로 만든다. **손으로 고치지 않는다** — 마이그레이션을 적용한 뒤 명령을 다시 돌린다.
 > 엑셀 판: `docs/db/DB_테이블정의서.xlsx` · 이름 규칙: `docs/db-conventions.md`
 
-테이블 78개 · 칼럼 1233개
+테이블 79개 · 칼럼 1246개
 
 ## 목차
 
@@ -59,7 +59,8 @@
 | 거래처·납품처 | [`tb_customer_contact`](#tb_customer_contact) | CustomerContact | 거래처 담당자 (담당자 표 4개 공통 모양, 0084) |
 | 거래처·납품처 | [`tb_ship_to`](#tb_ship_to) | ShipTo | 납품처: 물건이 실제로 도착하는 곳 (0082). 거래처 하나에 여러 곳, 기본 납품처 정확히 1곳, 사용 중 1곳 이상 납품처마다 배송센터가 정해진다 (assignShipToCenter: 연동 IF / 권역 자동 AUTO / 화면 수동 MANUAL) |
 | 품목 | [`tb_item`](#tb_item) | Item | 품목 (docs/decisions/0041, 0083): 화주사가 맡긴 상품의 관리 단위 코드 3층 (0084): id(내부) / code(품목코드, 비우면 자동 체번 {화주 접두어}S000001, 화주 안에서 고유·수정 불가) / custCode(화주 시스템 품목코드) + 외부 코드(ExternalCode ITEM) 기한·LOT·시리얼 관리 여부는 상속하지 않는 명시값: 신규 등록 때 화주 실제 값을 복사하고, 이후 화주 설정이 바뀌어도 그대로 (재고 구조를 정하므로, 0083) |
-| 품목 | [`tb_item_barcode`](#tb_item_barcode) | ItemBarcode | 품목 바코드 (0083): 단위별 여러 개, 단위별 대표 1개. 같은 화주 안에서 바코드 하나는 품목·단위 하나만 가리킨다 |
+| 품목 | [`tb_item_barcode`](#tb_item_barcode) | ItemBarcode |  |
+| 품목 | [`tb_item_set_component`](#tb_item_set_component) | ItemSetComponent | 품목 바코드 (0083): 단위별 여러 개, 단위별 대표 1개. 같은 화주 안에서 바코드 하나는 품목·단위 하나만 가리킨다 세트 구성품 (0098): 세트 품목 1개 = 구성 품목 × 수량(구성 품목의 기본단위). 품목 저장 때 통째로 다시 쓴다 같은 화주사의 품목만, 세트 안에 세트는 넣지 않는다(한 단계), 자기 자신 불가 — 검사는 lib/items |
 | 품목 | [`tb_item_unit`](#tb_item_unit) | ItemUnit | 품목 단위·환산·규격 (0083): 품목이 쓰는 단위마다 1행, 레벨(BASE·INNER·BOX·PLT)별 1행. 기본단위 행도 반드시 있다 환산수량은 기본단위 기준 (예: 생수 BOX = 24 EA, PLT = 1,440 EA), 소수 자리는 기본단위의 소수 자리수까지 (KG면 2.5 가능) 체적은 BOX 기준, PLT 행은 팔레트 적재 정보(종류·TI·HI)로 자동 계산 |
 | 품목 | [`tb_item_unit_hist`](#tb_item_unit_hist) | ItemUnitHist | 품목 단위 환산수량 변경 이력 (0083): 미완료 ASN·주문이 없을 때만 바꿀 수 있고, 바꾸면 남긴다 |
 | 입고 | [`tb_asn`](#tb_asn) | Asn | ASN 헤더 |
@@ -1860,6 +1861,7 @@
 | 60 | `temp_zone_cd` | 온도대 코드 | ④ 보관 조건 | VARCHAR(20) | N | AMBIENT |  |
 | 61 | `upright_yn` | 세움보관 여부 |  | CHAR(1) | N | N |  |
 | 62 | `item_cust_cd` | 품목 사용자정의코드 | 사용자 정의 코드 (화주 시스템의 품목코드), 화주 안에서 고유 (값이 있을 때) | VARCHAR(50) | Y |  | UK |
+| 63 | `set_type_cd` | 세트 유형 코드 | 세트 방식 (상수 SET_TYPE, 세트 품목만): VIRTUAL 가상 세트(출고 때 구성품 재고 차감) / KIT 실물 세트(조립해 세트로 보관) — 0098 | VARCHAR(20) | Y |  |  |
 
 **고유 인덱스**
 
@@ -1889,6 +1891,7 @@
 - `tb_item_lot_source_cd_check`: `CHECK ((lot_source_cd IS NULL) OR ((lot_source_cd) IN ('INPUT', 'MFG_DATE', 'EXPIRY_DATE', 'SYSTEM')))`
 - `tb_item_lot_source_required_check`: `CHECK ((lot_mgmt_yn = 'N') OR (lot_source_cd IS NOT NULL))`
 - `tb_item_pallet_check`: `CHECK (((pallet_ti IS NULL) OR (pallet_ti > 0)) AND ((pallet_hi IS NULL) OR (pallet_hi > 0)) AND ((pallet_box_cnt IS NULL) OR (pallet_box_cnt > 0)) AND ((max_stack_box_cnt IS NULL) OR (max_stack_box_cnt > 0)))`
+- `tb_item_set_type_cd_check`: `CHECK ((set_type_cd) IN ('VIRTUAL', 'KIT'))`
 - `tb_item_set_yn_check`: `CHECK ((set_yn = 'Y') = ((item_type_cd) = 'SET'))`
 - `tb_item_shelf_life_required_check`: `CHECK ((expiry_mgmt_yn = 'N') OR ((expiry_input_cd) = 'EXPIRY') OR (shelf_life_days IS NOT NULL))`
 - `tb_item_source_cd_check`: `CHECK ((source_cd) IN ('SCREEN', 'PORTAL', 'API', 'UPLOAD', 'ORDER_AUTO'))`
@@ -1901,7 +1904,6 @@
 ## tb_item_barcode
 
 - 영역: 품목 · 모델: `ItemBarcode`
-- 품목 바코드 (0083): 단위별 여러 개, 단위별 대표 1개. 같은 화주 안에서 바코드 하나는 품목·단위 하나만 가리킨다
 
 | No | 칼럼 | 한글명 | 설명 | 타입 | NULL | 기본값 | 키 |
 | --- | --- | --- | --- | --- | --- | --- | --- |
@@ -1934,6 +1936,39 @@
 
 - `tb_item_barcode_primary_yn_check`: `CHECK (primary_yn IN ('Y', 'N')`
 - `tb_item_barcode_type_cd_check`: `CHECK ((barcode_type_cd) IN ('EAN13', 'EAN8', 'UPCA', 'ITF14', 'GS1_128', 'CODE128', 'QR', 'CUSTOM'))`
+
+## tb_item_set_component
+
+- 영역: 품목 · 모델: `ItemSetComponent`
+- 품목 바코드 (0083): 단위별 여러 개, 단위별 대표 1개. 같은 화주 안에서 바코드 하나는 품목·단위 하나만 가리킨다 세트 구성품 (0098): 세트 품목 1개 = 구성 품목 × 수량(구성 품목의 기본단위). 품목 저장 때 통째로 다시 쓴다 같은 화주사의 품목만, 세트 안에 세트는 넣지 않는다(한 단계), 자기 자신 불가 — 검사는 lib/items
+
+| No | 칼럼 | 한글명 | 설명 | 타입 | NULL | 기본값 | 키 |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| 1 | `set_component_id` | 세트 component ID |  | BIGINT | N | 자동 증가 | PK |
+| 2 | `operator_id` | 운영사 ID | 운영사 (멀티테넌트 키 — 다른 운영사 데이터는 보이지 않는다, 0039) | BIGINT | N |  | FK → tb_operator.operator_id |
+| 3 | `shipper_id` | 화주사 ID |  | BIGINT | N |  | FK → tb_shipper.shipper_id |
+| 4 | `set_item_id` | 세트 품목 ID |  | BIGINT | N |  | UK FK → tb_item.item_id |
+| 5 | `component_item_id` | component 품목 ID |  | BIGINT | N |  | UK FK → tb_item.item_id |
+| 6 | `component_qty` | component 수량 | 세트 1개에 들어가는 수량 (구성 품목의 기본단위) | DECIMAL(15,3) | N |  |  |
+| 7 | `sort_seq` | 정렬순서 | 정렬 순서 | INTEGER | N | 0 |  |
+| 8 | `created_at` | 등록 일시 | 등록 일시 (자동) | TIMESTAMP(3) | N | CURRENT_TIMESTAMP |  |
+| 9 | `updated_at` | 수정 일시 | 수정 일시 (자동) | TIMESTAMP(3) | N |  |  |
+| 10 | `created_by` | 등록 자 | 등록자 아이디 (자동: 작업자 / seed / system) | VARCHAR(50) | N | system |  |
+| 11 | `updated_by` | 수정 자 | 수정자 아이디 (자동) | VARCHAR(50) | N | system |  |
+| 12 | `row_version` | 행버전 | 동시 수정 막기용 버전 (수정할 때마다 +1, 0038) | INTEGER | N | 1 |  |
+
+**고유 인덱스**
+
+- `tb_item_set_component_set_item_id_component_item_id_key`: `CREATE UNIQUE INDEX tb_item_set_component_set_item_id_component_item_id_key ON tb_item_set_component (set_item_id, component_item_id)`
+
+**인덱스**
+
+- `tb_item_set_component_component_item_id_idx`: `CREATE INDEX tb_item_set_component_component_item_id_idx ON tb_item_set_component (component_item_id)`
+- `tb_item_set_component_operator_id_idx`: `CREATE INDEX tb_item_set_component_operator_id_idx ON tb_item_set_component (operator_id)`
+
+**검사 조건**
+
+- `tb_item_set_component_qty_check`: `CHECK (component_qty > 0)`
 
 ## tb_item_unit
 
