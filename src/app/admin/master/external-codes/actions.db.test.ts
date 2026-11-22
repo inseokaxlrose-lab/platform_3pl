@@ -116,6 +116,84 @@ describe('외부코드 매핑', () => {
     ).toMatchObject({ ok: false, error: { code: 'NOT_FOUND' } })
   })
 
+  it('납품처(소속 거래처)·구역(소속 창고)도 대상 (0098), 범위 밖 센터의 구역은 고치지 못한다', async () => {
+    const icn = await createTestCenter('ICN')
+    const yin = await createTestCenter('YIN')
+    const gana = await createTestShipper('GANA')
+    const customer = await prisma.customer.create({
+      data: { operatorId: TEST_OPERATOR_ID, shipperId: gana.id, code: 'EMART', name: '이마트' },
+    })
+    const shipTo = await prisma.shipTo.create({
+      data: {
+        operatorId: TEST_OPERATOR_ID,
+        shipperId: gana.id,
+        customerId: customer.id,
+        code: 'EMART-01',
+        name: '이마트 성수점',
+        rawAddress: '서울 성동구',
+        address: '서울 성동구',
+      },
+    })
+    const zoneIn = async (centerId: bigint, code: string) => {
+      const warehouse = await prisma.warehouse.create({
+        data: {
+          operatorId: TEST_OPERATOR_ID,
+          centerId,
+          code: `W${code}`,
+          name: `${code} 창고`,
+          tempZone: 'AMBIENT',
+        },
+      })
+      return prisma.zone.create({
+        data: {
+          operatorId: TEST_OPERATOR_ID,
+          centerId,
+          warehouseId: warehouse.id,
+          code,
+          name: code,
+        },
+      })
+    }
+    const zoneA = await zoneIn(icn.id, 'A')
+    const zoneB = await zoneIn(yin.id, 'B')
+
+    expect(
+      await saveExternalCodesAction({
+        target: 'SHIP_TO',
+        id: String(shipTo.id),
+        codes: { SAP: 'P-7001', ERP: '' },
+      }),
+    ).toMatchObject({ ok: true })
+    const shipTos = await list({ target: 'SHIP_TO' })
+    expect(
+      shipTos.ok && shipTos.data.rows.map((r) => [r.code, r.owner, r.externalCodes.SAP]),
+    ).toEqual([['EMART-01', '이마트', 'P-7001']])
+
+    const zones = await list({ target: 'ZONE' })
+    expect(zones.ok && zones.data.rows.map((r) => [r.code, r.owner])).toEqual([
+      ['A', 'A 창고'],
+      ['B', 'B 창고'],
+    ])
+
+    signIn({ kind: 'CENTERS', operatorId: TEST_OPERATOR_ID, centerIds: [icn.id] })
+    const mine = await list({ target: 'ZONE' })
+    expect(mine.ok && mine.data.rows.map((r) => r.code)).toEqual(['A'])
+    expect(
+      await saveExternalCodesAction({
+        target: 'ZONE',
+        id: String(zoneB.id),
+        codes: { SAP: 'X', ERP: '' },
+      }),
+    ).toMatchObject({ ok: false, error: { code: 'NOT_FOUND' } })
+    expect(
+      await saveExternalCodesAction({
+        target: 'ZONE',
+        id: String(zoneA.id),
+        codes: { SAP: 'SL01', ERP: '' },
+      }),
+    ).toMatchObject({ ok: true })
+  })
+
   it('고칠 권한이 없으면 저장 거부', async () => {
     const icn = await createTestCenter('ICN')
     signIn(ALL, ['master.external-codes.read'])

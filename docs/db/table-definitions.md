@@ -2507,7 +2507,7 @@
 
 **검사 조건**
 
-- `tb_ext_code_entity_type_cd_check`: `CHECK ((entity_type_cd) IN ('CENTER', 'WAREHOUSE', 'LOCATION', 'SHIPPER', 'ITEM', 'CUSTOMER', 'UNIT', 'CARRIER', 'ROUTE'))`
+- `tb_ext_code_entity_type_cd_check`: `CHECK ((entity_type_cd) IN ('CENTER', 'WAREHOUSE', 'LOCATION', 'SHIPPER', 'ITEM', 'CUSTOMER', 'UNIT', 'CARRIER', 'ROUTE', 'SHIP_TO', 'ZONE'))`
 
 ## tb_carrier
 

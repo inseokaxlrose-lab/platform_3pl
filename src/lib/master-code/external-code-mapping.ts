@@ -19,11 +19,13 @@ function targetScope(target: ExternalTarget, scope: DataScope): Where {
       return scopeFilter(scope, { center: 'id' })
     case 'WAREHOUSE':
     case 'ROUTE':
+    case 'ZONE':
       return scopeFilter(scope, { center: 'centerId' })
     case 'SHIPPER':
       return scopeFilter(scope, { center: 'centers.some.centerId', shipper: 'id' })
     case 'ITEM':
     case 'CUSTOMER':
+    case 'SHIP_TO':
       return scopeFilter(scope, { center: 'shipper.centers.some.centerId', shipper: 'shipperId' })
     case 'UNIT':
     case 'CARRIER':
@@ -35,8 +37,12 @@ type FoundRow = { id: bigint; code: string; name: string; status: string; owner:
 type FindArgs = { where: Where; orderBy: Where[]; skip: number; take: number }
 
 const BASE = { id: true, code: true, name: true, status: true } as const
-const withOwner = (row: { center?: { name: string }; shipper?: { name: string } }) =>
-  row.center?.name ?? row.shipper?.name ?? null
+const withOwner = (row: {
+  center?: { name: string }
+  shipper?: { name: string }
+  customer?: { name: string }
+  warehouse?: { name: string }
+}) => row.center?.name ?? row.shipper?.name ?? row.customer?.name ?? row.warehouse?.name ?? null
 
 // 대상 종류별 조회 (모델이 달라 종류마다 나눠 부른다, 모양은 같게 맞춘다)
 async function findTargets(
@@ -97,6 +103,28 @@ async function findTargets(
       const [rows, rowCount] = await prisma.$transaction([
         prisma.route.findMany({ ...args, select: { ...BASE, center: { select: { name: true } } } }),
         prisma.route.count({ where }),
+      ])
+      return { rows: rows.map((r) => ({ ...r, owner: withOwner(r) })), rowCount }
+    }
+    case 'SHIP_TO': {
+      // 소속 = 거래처 (납품처 코드는 거래처 안에서만 고유)
+      const [rows, rowCount] = await prisma.$transaction([
+        prisma.shipTo.findMany({
+          ...args,
+          select: { ...BASE, customer: { select: { name: true } } },
+        }),
+        prisma.shipTo.count({ where }),
+      ])
+      return { rows: rows.map((r) => ({ ...r, owner: withOwner(r) })), rowCount }
+    }
+    case 'ZONE': {
+      // 소속 = 창고 (구역 코드는 창고 안에서만 고유)
+      const [rows, rowCount] = await prisma.$transaction([
+        prisma.zone.findMany({
+          ...args,
+          select: { ...BASE, warehouse: { select: { name: true } } },
+        }),
+        prisma.zone.count({ where }),
       ])
       return { rows: rows.map((r) => ({ ...r, owner: withOwner(r) })), rowCount }
     }
