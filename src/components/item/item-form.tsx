@@ -2,9 +2,10 @@
 
 import { InfoIcon, PowerIcon } from 'lucide-react'
 import { useRouter } from 'next/navigation'
+import { useEffect, useState } from 'react'
 import { ConfirmDialog, StatusBadge } from '@/components/common'
 import { formatDate } from '@/components/data-grid'
-import { NumberInput, YnToggle } from '@/components/inputs'
+import { NumberInput, SearchSelect, YnToggle } from '@/components/inputs'
 import {
   EditableSubTable,
   Field,
@@ -34,8 +35,11 @@ import {
   EXPIRY_INPUT,
   EXPIRY_TYPE,
   ITEM_STATUS_BADGE,
+  ITEM_STATUS,
   ITEM_TYPE,
   LOT_SOURCE,
+  MAX_SET_COMPONENTS,
+  SET_TYPE,
 } from '@/lib/items/item-codes'
 import type { ItemFormOptions } from '@/lib/items/item-form-options'
 import {
@@ -44,7 +48,9 @@ import {
   type ItemBarcodeInput,
   type ItemCreateInput,
   type ItemInput,
+  type ItemSetComponentInput,
 } from '@/lib/items/item-schema'
+import type { SetComponentOption } from '@/lib/items/item-set-options'
 import { LABEL_UNITS } from '@/lib/shippers/shipper-schema'
 import { EMPTY_ITEM_INPUT, shipperItemStart } from '@/lib/items/item-defaults'
 import { ItemPalletSection } from './item-pallet-section'
@@ -91,6 +97,10 @@ type ItemFormProps = {
     input: ItemInput & { id: string; rowVersion: number },
   ) => Promise<ActionResult<SaveResult>>
   setActiveAction: (input: { ids: string[]; isActive: boolean }) => Promise<ActionResult<unknown>>
+  // 세트 구성품으로 고를 품목 (같은 화주사, 세트 제외 — 0098)
+  loadComponentOptions: (input: {
+    shipperId: string
+  }) => Promise<ActionResult<SetComponentOption[]>>
 }
 
 // 품목 등록·수정 (docs/decisions/0041, 0083 — 입력 화면 틀 0031). 운영사 화면과 화주 포털이 같이 쓴다
@@ -106,6 +116,7 @@ export function ItemForm({
   createAction,
   updateAction,
   setActiveAction,
+  loadComponentOptions,
   extraSections = [],
 }: ItemFormProps) {
   const router = useRouter()
@@ -270,6 +281,41 @@ export function ItemForm({
       />
     </Field>
   )
+  // 세트 구성품 선택지: 세트 품목이고 화주사가 정해지면 불러온다 (화주사가 바뀌면 다시)
+  const isSet = value.itemType === 'SET'
+  const [componentOptions, setComponentOptions] = useState<{
+    shipperId: string
+    items: SetComponentOption[]
+  } | null>(null)
+  useEffect(() => {
+    if (!isSet || !value.shipperId || componentOptions?.shipperId === value.shipperId) return
+    let cancelled = false
+    loadComponentOptions({ shipperId: value.shipperId }).then((result) => {
+      if (cancelled) return
+      setComponentOptions({ shipperId: value.shipperId, items: result.ok ? result.data : [] })
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [isSet, value.shipperId, componentOptions?.shipperId, loadComponentOptions])
+  const componentItems =
+    componentOptions?.shipperId === value.shipperId ? componentOptions.items : []
+  const componentById = new Map(componentItems.map((c) => [c.id, c]))
+  const componentChoices = componentItems
+    // 자기 자신은 고를 수 없다
+    .filter((c) => c.id !== item?.id)
+    .map((c) => ({
+      value: c.id,
+      label: `${c.code} · ${c.name}`,
+      description: [
+        c.spec,
+        c.baseUnit,
+        c.status !== 'ACTIVE' && (ITEM_STATUS.labels as Record<string, string>)[c.status],
+      ]
+        .filter(Boolean)
+        .join(' · '),
+    }))
+
   const itemUnitChoices = value.units
     .map((u) => unitOf(u.unitId))
     .filter((u): u is NonNullable<typeof u> => Boolean(u))
@@ -355,7 +401,48 @@ export function ItemForm({
               aria-invalid={Boolean(errors.custCode)}
             />
           </Field>
-          {select('itemType', '품목 유형', 3, ITEM_TYPE.options, { required: true })}
+          <Field
+            label="품목 유형"
+            span={3}
+            required
+            error={errors.itemType}
+            htmlFor={id('itemType')}
+          >
+            <Select
+              value={value.itemType}
+              // 세트로 바꾸면 세트 방식(기본 가상)·구성품 표를 준비한다 (0098)
+              onValueChange={(itemType) =>
+                set({
+                  itemType: itemType as ItemCreateInput['itemType'],
+                  ...(itemType === 'SET' && {
+                    setType: value.setType || 'VIRTUAL',
+                    components: value.components ?? [],
+                  }),
+                })
+              }
+              disabled={disabled}
+            >
+              <SelectTrigger
+                id={id('itemType')}
+                className="w-full"
+                aria-invalid={Boolean(errors.itemType)}
+              >
+                <SelectValue placeholder="선택" />
+              </SelectTrigger>
+              <SelectContent>
+                {ITEM_TYPE.options.map((c) => (
+                  <SelectItem key={c.value} value={c.value}>
+                    {c.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </Field>
+          {isSet &&
+            select('setType', '세트 방식', 3, SET_TYPE.options, {
+              required: true,
+              hint: '실물 세트의 조립 작업은 부가작업에서 (출고는 가상 세트부터)',
+            })}
           {text('name', '품목명', 8, { required: true, newRow: true })}
           {text('shortName', '약칭', 4, { hint: '피킹리스트·라벨 표시용' })}
           {text('nameEn', '영문명', 8)}
@@ -396,6 +483,71 @@ export function ItemForm({
         </FormGrid>
       ),
     },
+    ...(isSet
+      ? [
+          {
+            id: 'set',
+            title: '세트 구성품',
+            description:
+              '세트 1개에 들어가는 품목과 수량(구성 품목의 기본단위)입니다. 같은 화주사의 세트가 아닌 품목만 넣을 수 있습니다. 가상 세트는 출고할 때 구성품 재고에서 뺍니다.',
+            content: (
+              <EditableSubTable<ItemSetComponentInput>
+                name="components"
+                rows={value.components ?? []}
+                onChange={(components) => set({ components })}
+                columns={[
+                  {
+                    key: 'itemId',
+                    label: '구성 품목',
+                    required: true,
+                    render: (cell) => (
+                      <SearchSelect
+                        id={cell.id}
+                        options={componentChoices}
+                        value={cell.value}
+                        onChange={cell.onChange}
+                        disabled={cell.disabled || !value.shipperId}
+                        invalid={cell.invalid}
+                        placeholder={value.shipperId ? '품목 선택' : '화주사를 먼저 고르세요'}
+                        searchPlaceholder="품목코드·품목명 검색"
+                        emptyText="고를 수 있는 품목이 없습니다."
+                        className="w-full"
+                      />
+                    ),
+                  },
+                  {
+                    key: 'qty',
+                    label: '수량',
+                    required: true,
+                    width: '12rem',
+                    render: (cell) => (
+                      <div className="flex items-center gap-2">
+                        <Input
+                          id={cell.id}
+                          inputMode="decimal"
+                          value={cell.value}
+                          onChange={(e) => cell.onChange(e.target.value)}
+                          disabled={cell.disabled}
+                          aria-invalid={cell.invalid}
+                        />
+                        <span className="w-10 shrink-0 text-sm text-muted-foreground">
+                          {componentById.get(cell.row.itemId)?.baseUnit ?? ''}
+                        </span>
+                      </div>
+                    ),
+                  },
+                ]}
+                createRow={() => ({ itemId: '', qty: '1' })}
+                maxRows={MAX_SET_COMPONENTS}
+                errors={errors}
+                addLabel="구성품 추가"
+                emptyText="구성품이 없습니다. [구성품 추가]로 넣어 주세요."
+                disabled={disabled}
+              />
+            ),
+          } satisfies MasterFormSection,
+        ]
+      : []),
     {
       id: 'units',
       title: '단위·규격',

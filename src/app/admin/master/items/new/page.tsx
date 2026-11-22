@@ -3,7 +3,12 @@ import { ItemForm } from '@/components/item'
 import { BackToListButton } from '@/components/master-list'
 import { AccessDenied } from '@/components/permission'
 import { getCurrentScope, hasPermission } from '@/lib/session'
-import { createItemAction, setItemsActiveAction, updateItemAction } from '../actions'
+import {
+  createItemAction,
+  listSetComponentOptionsAction,
+  setItemsActiveAction,
+  updateItemAction,
+} from '../actions'
 import { getItemFormOptions } from '@/lib/items/item-queries'
 
 export const metadata: Metadata = { title: '품목 등록' }
@@ -26,6 +31,7 @@ export default async function NewItemPage() {
       createAction={createItemAction}
       updateAction={updateItemAction}
       setActiveAction={setItemsActiveAction}
+      loadComponentOptions={listSetComponentOptionsAction}
     />
   )
 }
